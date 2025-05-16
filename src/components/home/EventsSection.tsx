@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useState } from 'react';
 import { fetchEvents, Event } from '@/services/eventService';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 
 const EventsSection = () => {
@@ -75,9 +75,15 @@ const EventsSection = () => {
                   <p className="line-clamp-3 mb-4">
                     {event.description}
                   </p>
-                  <Button asChild size="sm">
-                    <Link to={`/events`}>View Details</Link>
-                  </Button>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <Tag className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{event.is_free ? 'Free' : `${event.price} ${event.currency || 'ZMW'}`}</span>
+                    </div>
+                    <Button asChild size="sm">
+                      <Link to={`/events`}>View Details</Link>
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}

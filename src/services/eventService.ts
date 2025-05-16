@@ -151,7 +151,7 @@ export const registerForEvent = async (event: Event, user: User | null) => {
           status: 'pending',
           payment_status: 'pending',
           payment_amount: event.price,
-          payment_currency: event.currency || 'USD'
+          payment_currency: event.currency || 'ZMW'
         })
         .select()
         .single();
@@ -170,7 +170,7 @@ export const registerForEvent = async (event: Event, user: User | null) => {
       try {
         const response = await initiatePawaPayPayment(data.id, {
           amount: event.price,
-          currency: event.currency || 'USD',
+          currency: event.currency || 'ZMW',
           description: `Registration for ${event.title}`,
           userId: user.id,
           referenceType: 'event',

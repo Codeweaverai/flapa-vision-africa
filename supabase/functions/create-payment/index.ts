@@ -100,7 +100,7 @@ serve(async (req) => {
       reason: reason || 'Payment for services',
       amount: {
         value: amount.toString(),
-        currency: currency
+        currency: currency // Now this can be ZMW
       },
       redirectUrl: `${Deno.env.get('SUPABASE_URL') || 'https://rxqoczksnddbxcdwobnw.supabase.co'}/functions/v1/verify-payment?txnId=${paymentTransaction.id}`,
       cancelUrl: `${req.headers.get('origin') || 'http://localhost:5173'}/payment-result?status=cancelled&txnId=${paymentTransaction.id}`,

@@ -80,7 +80,7 @@ export const fetchBookingById = async (id: string, user: User | null) => {
   }
 };
 
-export const createConsultationBooking = async (bookingData: BookingFormData, user: User | null, price: number, currency: string = 'USD') => {
+export const createConsultationBooking = async (bookingData: BookingFormData, user: User | null, price: number, currency: string = 'ZMW') => {
   if (!user) {
     toast.error("Please sign in to book a consultation");
     return null;

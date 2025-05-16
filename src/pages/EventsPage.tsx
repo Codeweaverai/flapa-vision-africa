@@ -221,7 +221,7 @@ const EventsPage = () => {
                             <Tag className="h-5 w-5 text-primary" />
                             <span>
                               {event.is_free ? 'Free Registration' : (
-                                `${event.price} ${event.currency || 'USD'}`
+                                `${event.price} ${event.currency || 'ZMW'}`
                               )}
                             </span>
                           </div>
@@ -280,7 +280,7 @@ const EventsPage = () => {
                         </div>
                         <div className="flex items-center">
                           <Tag className="h-4 w-4 mr-1" />
-                          <span>{event.is_free ? 'Free' : `${event.price} ${event.currency || 'USD'}`}</span>
+                          <span>{event.is_free ? 'Free' : `${event.price} ${event.currency || 'ZMW'}`}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -337,7 +337,7 @@ const EventsPage = () => {
                           <div className="flex items-center gap-2">
                             <Tag className="h-5 w-5 text-primary" />
                             <span>
-                              {event.is_free ? 'Free' : `${event.price} ${event.currency || 'USD'}`}
+                              {event.is_free ? 'Free' : `${event.price} ${event.currency || 'ZMW'}`}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -406,7 +406,7 @@ const EventsPage = () => {
                   <div className="mt-4 p-3 border rounded-md bg-muted">
                     <div className="flex justify-between">
                       <span>Registration Fee:</span>
-                      <span className="font-medium">{selectedEvent.price} {selectedEvent.currency || 'USD'}</span>
+                      <span className="font-medium">{selectedEvent.price} {selectedEvent.currency || 'ZMW'}</span>
                     </div>
                     <p className="text-xs mt-2 text-muted-foreground">
                       You will be redirected to our secure payment provider to complete your registration.
