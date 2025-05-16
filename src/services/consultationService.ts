@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -20,7 +19,8 @@ export interface ConsultationBooking {
   payment_amount: number | null;
   payment_currency: string | null;
   payment_method: string | null;
-  phone_number: string | null; // Added phone_number field, making it optional with null
+  phone_number: string | null;
+  mobile_operator?: string | null;
 }
 
 export interface BookingFormData {
@@ -31,6 +31,7 @@ export interface BookingFormData {
   topic?: string;
   notes?: string;
   phone_number?: string;
+  mobile_operator?: string;
 }
 
 export const fetchUserBookings = async (user: User | null) => {
@@ -146,7 +147,8 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         payment_status: 'pending',
         payment_amount: price,
         payment_currency: currency,
-        phone_number: bookingData.phone_number || null // Add phone number
+        phone_number: bookingData.phone_number || null,
+        mobile_operator: bookingData.mobile_operator || 'MTN_MOMO_ZMB' // Default to MTN if not provided
       })
       .select()
       .single();
@@ -166,7 +168,8 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         userId: user.id,
         referenceType: 'consultation',
         referenceId: data.id,
-        phoneNumber: bookingData.phone_number // Add phone number to payment request
+        phoneNumber: bookingData.phone_number, 
+        mobileOperator: bookingData.mobile_operator || 'MTN_MOMO_ZMB' // Pass mobile operator
       });
       
       if (response && response.redirectUrl) {
@@ -229,6 +232,7 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
   referenceType: 'event' | 'consultation';
   referenceId: string;
   phoneNumber?: string;
+  mobileOperator?: string;
 }) => {
   try {
     const { data, error } = await supabase.functions.invoke('create-payment', {
@@ -240,7 +244,8 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
         userId: paymentDetails.userId,
         referenceType: paymentDetails.referenceType,
         referenceId: paymentDetails.referenceId,
-        phoneNumber: paymentDetails.phoneNumber
+        phoneNumber: paymentDetails.phoneNumber,
+        mobileOperator: paymentDetails.mobileOperator
       }
     });
 

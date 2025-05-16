@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -107,7 +106,7 @@ export const fetchUserRegistrations = async (user: User | null) => {
   }
 };
 
-export const registerForEvent = async (event: Event, user: User | null) => {
+export const registerForEvent = async (event: Event, user: User | null, phoneNumber?: string, mobileOperator?: string) => {
   if (!user) {
     toast.error("Please sign in to register for events");
     return null;
@@ -123,6 +122,7 @@ export const registerForEvent = async (event: Event, user: User | null) => {
           user_id: user.id,
           status: 'confirmed',
           payment_status: 'completed',
+          phone_number: phoneNumber || null
         })
         .select()
         .single();
@@ -142,6 +142,12 @@ export const registerForEvent = async (event: Event, user: User | null) => {
     } 
     // For paid events, we'll initiate the payment flow
     else {
+      // Check if phone number is provided for paid events
+      if (!phoneNumber) {
+        toast.error("Please provide a phone number for mobile money payment");
+        return null;
+      }
+      
       // First create a pending registration
       const { data, error } = await supabase
         .from('registrations')
@@ -151,7 +157,8 @@ export const registerForEvent = async (event: Event, user: User | null) => {
           status: 'pending',
           payment_status: 'pending',
           payment_amount: event.price,
-          payment_currency: event.currency || 'ZMW'
+          payment_currency: event.currency || 'ZMW',
+          phone_number: phoneNumber
         })
         .select()
         .single();
@@ -174,7 +181,9 @@ export const registerForEvent = async (event: Event, user: User | null) => {
           description: `Registration for ${event.title}`,
           userId: user.id,
           referenceType: 'event',
-          referenceId: event.id
+          referenceId: event.id,
+          phoneNumber: phoneNumber,
+          mobileOperator: mobileOperator || 'MTN_MOMO_ZMB'
         });
         
         if (response && response.redirectUrl) {
@@ -237,6 +246,8 @@ const initiatePawaPayPayment = async (registrationId: string, paymentDetails: {
   userId: string;
   referenceType: 'event' | 'consultation';
   referenceId: string;
+  phoneNumber?: string;
+  mobileOperator?: string;
 }) => {
   try {
     const { data, error } = await supabase.functions.invoke('create-payment', {
@@ -247,7 +258,9 @@ const initiatePawaPayPayment = async (registrationId: string, paymentDetails: {
         reason: paymentDetails.description,
         userId: paymentDetails.userId,
         referenceType: paymentDetails.referenceType,
-        referenceId: paymentDetails.referenceId
+        referenceId: paymentDetails.referenceId,
+        phoneNumber: paymentDetails.phoneNumber,
+        mobileOperator: paymentDetails.mobileOperator
       }
     });
 

@@ -1,12 +1,23 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 // Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, content-digest',
 };
+
+// Helper function to create SHA-512 hash digest
+async function createSha512Digest(data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-512', dataBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return btoa(String.fromCharCode.apply(null, hashArray)); // Base64 encoding
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -44,7 +55,7 @@ serve(async (req) => {
     }
     
     // Parse the request body
-    const { bookingId, amount, currency, reason, userId, referenceType, referenceId, phoneNumber } = await req.json();
+    const { bookingId, amount, currency, reason, userId, referenceType, referenceId, phoneNumber, mobileOperator } = await req.json();
     
     // Check that all required fields are present
     if (!amount || !currency || !userId || !referenceType || !referenceId) {
@@ -61,6 +72,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // Determine the mobile operator/correspondent
+    const correspondent = mobileOperator || "MTN_MOMO_ZMB"; // Default to MTN if not specified
     
     // Integration with PawaPay API
     const pawaPayToken = Deno.env.get('PAWAPAY_TOKEN');
@@ -71,6 +85,15 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // Generate unique deposit ID
+    const depositId = crypto.randomUUID();
+    
+    // Format phone number properly - ensure it has country code without any symbols
+    const formattedPhoneNumber = phoneNumber.replace(/[^0-9]/g, ''); // Remove any non-numeric characters
+    const phoneWithCountryCode = formattedPhoneNumber.startsWith('260') 
+      ? formattedPhoneNumber 
+      : `260${formattedPhoneNumber.replace(/^0+/, '')}`; // Add country code if missing and remove leading zeros
     
     // Create a payment transaction record
     const { data: paymentTransaction, error: paymentError } = await supabaseClient
@@ -83,7 +106,12 @@ serve(async (req) => {
         currency,
         status: 'pending',
         provider: 'pawapay',
-        phone_number: phoneNumber
+        phone_number: phoneWithCountryCode,
+        metadata: {
+          depositId,
+          correspondent,
+          reason
+        }
       })
       .select()
       .single();
@@ -103,32 +131,52 @@ serve(async (req) => {
       .eq('id', userId)
       .single();
     
+    // Current timestamp in ISO format
+    const customerTimestamp = new Date().toISOString();
+    
     // Prepare PawaPay payment request
     const paymentRequestBody = {
-      reference: paymentTransaction.id,
-      reason: reason || 'Payment for services',
-      amount: {
-        value: amount.toString(),
-        currency: currency
+      depositId,
+      amount: amount.toString(),
+      currency,
+      correspondent,
+      payer: {
+        type: "MSISDN",
+        address: {
+          value: phoneWithCountryCode
+        }
       },
-      redirectUrl: `${Deno.env.get('SUPABASE_URL') || 'https://rxqoczksnddbxcdwobnw.supabase.co'}/functions/v1/verify-payment?txnId=${paymentTransaction.id}`,
-      cancelUrl: `${req.headers.get('origin') || 'http://localhost:5173'}/payment-result?status=cancelled&txnId=${paymentTransaction.id}`,
-      customer: {
-        name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
-        email: user.email || 'customer@example.com',
-        phoneNumber: phoneNumber // Add phone number for mobile money payment
-      }
+      customerTimestamp,
+      statementDescription: reason || 'Payment for services'
     };
     
+    // Create the content digest
+    const requestBodyString = JSON.stringify(paymentRequestBody);
+    const digest = await createSha512Digest(requestBodyString);
+    const contentDigestHeader = `sha-512=:${digest}:`;
+    
     console.log('PawaPay payment request:', JSON.stringify(paymentRequestBody));
+    console.log('Content-Digest:', contentDigestHeader);
     
     // Simulate PawaPay API response - in production you would call their API
     // This is a mock response for demonstration purposes
     const mockPawaPayResponse = {
-      id: `pawa_${Math.random().toString(36).substring(2, 15)}`,
+      id: depositId,
       status: 'pending',
       redirectUrl: `${req.headers.get('origin') || 'http://localhost:5173'}/payment-result?status=success&txnId=${paymentTransaction.id}`,
     };
+    
+    // In production, you would call the actual PawaPay API
+    // const pawaPayResponse = await fetch('https://api.sandbox.pawapay.io/deposits', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'Authorization': `Bearer ${pawaPayToken}`,
+    //     'Content-Digest': contentDigestHeader,
+    //   },
+    //   body: requestBodyString
+    // });
+    // const responseData = await pawaPayResponse.json();
     
     // Update the payment transaction with the payment provider's transaction ID
     await supabaseClient
@@ -138,7 +186,10 @@ serve(async (req) => {
         status: mockPawaPayResponse.status,
         metadata: { 
           pawaPayResponse: mockPawaPayResponse,
-          customerPhone: phoneNumber
+          customerPhone: phoneWithCountryCode,
+          correspondent,
+          depositId,
+          customerTimestamp
         }
       })
       .eq('id', paymentTransaction.id);
@@ -150,7 +201,7 @@ serve(async (req) => {
         .update({
           payment_id: paymentTransaction.id,
           payment_status: 'processing',
-          phone_number: phoneNumber
+          phone_number: phoneWithCountryCode
         })
         .eq('id', referenceId);
     } else if (referenceType === 'event') {
@@ -159,7 +210,7 @@ serve(async (req) => {
         .update({
           payment_id: paymentTransaction.id,
           payment_status: 'processing',
-          phone_number: phoneNumber
+          phone_number: phoneWithCountryCode
         })
         .eq('id', referenceId);
     }
@@ -169,7 +220,8 @@ serve(async (req) => {
         success: true,
         paymentId: paymentTransaction.id,
         redirectUrl: mockPawaPayResponse.redirectUrl,
-        status: 'pending'
+        status: 'pending',
+        depositId
       }),
       { 
         status: 200,

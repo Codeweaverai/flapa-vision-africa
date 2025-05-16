@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { CalendarClock, Clock, MessageSquare, User, Users, Video, Briefcase, FileText, Check, Calendar, Phone } from 'lucide-react';
@@ -27,6 +26,12 @@ interface CountryOption {
   flag: string;
 }
 
+interface MobileOperator {
+  id: string;
+  name: string;
+  code: string;
+}
+
 const countries: CountryOption[] = [
   {
     code: "ZM",
@@ -34,6 +39,12 @@ const countries: CountryOption[] = [
     dialCode: "+260",
     flag: "🇿🇲"
   }
+];
+
+const mobileOperators: MobileOperator[] = [
+  { id: "mtn", name: "MTN", code: "MTN_MOMO_ZMB" },
+  { id: "airtel", name: "Airtel", code: "AIRTEL_MONEY_ZMB" },
+  { id: "zamtel", name: "Zamtel", code: "ZAMTEL_KWACHA_ZMB" }
 ];
 
 const ConsultPage = () => {
@@ -56,6 +67,8 @@ const ConsultPage = () => {
   // New state for phone number
   const [selectedCountry, setSelectedCountry] = useState<CountryOption>(countries[0]);
   const [phoneNumber, setPhoneNumber] = useState('');
+  // New state for mobile operator
+  const [selectedOperator, setSelectedOperator] = useState<string>(mobileOperators[0].code);
 
   // Get consultation details based on type
   const getConsultationDetails = () => {
@@ -96,7 +109,7 @@ const ConsultPage = () => {
       return;
     }
 
-    if (!selectedDate || !selectedTime || !agreedToTerms || !phoneNumber) {
+    if (!selectedDate || !selectedTime || !agreedToTerms || !phoneNumber || !selectedOperator) {
       toast.error("Please fill in all required fields and agree to the terms");
       return;
     }
@@ -120,6 +133,9 @@ const ConsultPage = () => {
       
       const endTime = addMinutes(scheduledTime, consultationDetails.duration);
       
+      // Format phone number correctly
+      const formattedPhoneNumber = `${selectedCountry.dialCode}${phoneNumber.replace(/^0+/, '')}`;
+      
       // Explicitly type the booking_type as 'google_meet' to match the BookingFormData type
       const bookingData: BookingFormData = {
         booking_type: 'google_meet' as 'google_meet', // Explicit casting to the union type
@@ -127,7 +143,8 @@ const ConsultPage = () => {
         scheduled_time: scheduledTime,
         topic: topic || consultationDetails.title,
         notes: notes || `Business type: ${businessType}`,
-        phone_number: `${selectedCountry.dialCode}${phoneNumber.replace(/^0+/, '')}` // Remove leading zeros and add country code
+        phone_number: formattedPhoneNumber,
+        mobile_operator: selectedOperator
       };
 
       const result = await createConsultationBooking(
@@ -505,6 +522,29 @@ const ConsultPage = () => {
                       </p>
                     </div>
                     
+                    {/* New Mobile Operator Selection */}
+                    <div className="space-y-2">
+                      <Label htmlFor="mobile-operator">Mobile Network Operator</Label>
+                      <Select 
+                        value={selectedOperator}
+                        onValueChange={setSelectedOperator}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select your mobile money provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mobileOperators.map((operator) => (
+                            <SelectItem key={operator.id} value={operator.code}>
+                              {operator.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Select the mobile network operator for your mobile money account
+                      </p>
+                    </div>
+                    
                     <div>
                       <Label htmlFor="time-zone">Time Zone</Label>
                       <select 
@@ -545,7 +585,7 @@ const ConsultPage = () => {
                     <Button 
                       type="button" 
                       className="w-full"
-                      disabled={isSubmitting || !selectedDate || !selectedTime || !agreedToTerms || !phoneNumber}
+                      disabled={isSubmitting || !selectedDate || !selectedTime || !agreedToTerms || !phoneNumber || !selectedOperator}
                       onClick={handleRequestBooking}
                     >
                       <CalendarClock className="h-4 w-4 mr-2" /> 
