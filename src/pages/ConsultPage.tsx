@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { CalendarClock, Clock, MessageSquare, User, Users, Video, Briefcase, FileText, Check, Calendar } from 'lucide-react';
@@ -38,13 +37,13 @@ const ConsultPage = () => {
   const getConsultationDetails = () => {
     switch (consultationType) {
       case 'discovery':
-        return { title: 'Discovery Call', duration: 30, price: 99 };
+        return { title: 'Discovery Call', duration: 30, price: 2000 };
       case 'strategy':
-        return { title: 'Strategy Session', duration: 60, price: 199 };
+        return { title: 'Strategy Session', duration: 60, price: 4000 };
       case 'executive':
-        return { title: 'Executive Team Session', duration: 90, price: 499 };
+        return { title: 'Executive Team Session', duration: 90, price: 10000 };
       default:
-        return { title: 'Discovery Call', duration: 30, price: 99 };
+        return { title: 'Discovery Call', duration: 30, price: 2000 };
     }
   };
 
@@ -104,7 +103,8 @@ const ConsultPage = () => {
       const result = await createConsultationBooking(
         bookingData, 
         user, 
-        consultationDetails.price
+        consultationDetails.price,
+        'ZMW'
       );
 
       if (result) {
@@ -166,7 +166,7 @@ const ConsultPage = () => {
               <CardDescription>30 Minutes</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
-              <div className="text-3xl font-bold mb-4">$99</div>
+              <div className="text-3xl font-bold mb-4">ZMW 2,000</div>
               <p className="mb-6">
                 A brief introductory session to discuss your business and determine 
                 how Mbolela can best support your goals.
@@ -211,7 +211,7 @@ const ConsultPage = () => {
               <CardDescription>60 Minutes</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
-              <div className="text-3xl font-bold mb-4">$199</div>
+              <div className="text-3xl font-bold mb-4">ZMW 4,000</div>
               <p className="mb-6">
                 An in-depth consultation focused on developing actionable strategies 
                 for your specific business challenges.
@@ -257,7 +257,7 @@ const ConsultPage = () => {
               <CardDescription>90 Minutes</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
-              <div className="text-3xl font-bold mb-4">$499</div>
+              <div className="text-3xl font-bold mb-4">ZMW 10,000</div>
               <p className="mb-6">
                 A collaborative session with your leadership team to align vision, 
                 address challenges, and develop strategic initiatives.
@@ -393,9 +393,9 @@ const ConsultPage = () => {
                         onChange={(e) => setConsultationType(e.target.value)}
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <option value="discovery">Discovery Call (30 min) - $99</option>
-                        <option value="strategy">Strategy Session (60 min) - $199</option>
-                        <option value="executive">Executive Team Session (90 min) - $499</option>
+                        <option value="discovery">Discovery Call (30 min) - ZMW 2,000</option>
+                        <option value="strategy">Strategy Session (60 min) - ZMW 4,000</option>
+                        <option value="executive">Executive Team Session (90 min) - ZMW 10,000</option>
                       </select>
                     </div>
                     
