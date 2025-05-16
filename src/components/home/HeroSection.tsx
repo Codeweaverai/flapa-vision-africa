@@ -1,0 +1,50 @@
+
+import { Button } from '@/components/ui/button';
+import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const HeroSection = () => {
+  return (
+    <section className="relative bg-gradient-to-br from-flapabay-dark to-secondary min-h-[90vh] flex items-center">
+      <div className="absolute inset-0 z-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1466442929976-97f336a657be?auto=format&fit=crop&w=2834&q=80')] bg-cover bg-center"></div>
+      <div className="section-container relative z-10 grid md:grid-cols-2 gap-8 items-center">
+        <div className="text-white animate-fade-in">
+          <h1 className="heading-xl mb-6">
+            <span className="text-gradient">Empowering Africa</span> Through Travel, Logistics & Innovation
+          </h1>
+          <p className="text-xl md:text-2xl mb-8 max-w-xl">
+            Building technology solutions that transform how people explore
+            and move across Africa, connecting opportunities and driving growth.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <Button asChild size="lg" className="text-lg">
+              <Link to="/ventures">
+                Discover FlapaBay
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="text-lg bg-white/10 backdrop-blur-sm hover:bg-white/20">
+              <Link to="/consult">Book a Consultation</Link>
+            </Button>
+          </div>
+        </div>
+        <div className="hidden md:block">
+          <div className="relative">
+            <div className="w-full h-[500px] rounded-xl overflow-hidden shadow-2xl animate-zoom-in">
+              <img 
+                src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80" 
+                alt="Mbolela Pule" 
+                className="w-full h-full object-cover" 
+              />
+            </div>
+            <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-primary rounded-full flex items-center justify-center p-4 shadow-xl">
+              <span className="text-white text-center font-bold">Founder & CEO of FlapaBay</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default HeroSection;
