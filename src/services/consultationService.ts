@@ -20,7 +20,7 @@ export interface ConsultationBooking {
   payment_amount: number | null;
   payment_currency: string | null;
   payment_method: string | null;
-  phone_number: string | null;
+  phone_number: string | null; // Added phone_number field, making it optional with null
 }
 
 export interface BookingFormData {
@@ -30,7 +30,7 @@ export interface BookingFormData {
   location?: string;
   topic?: string;
   notes?: string;
-  phone_number?: string; // Add phone number field
+  phone_number?: string;
 }
 
 export const fetchUserBookings = async (user: User | null) => {
@@ -49,6 +49,7 @@ export const fetchUserBookings = async (user: User | null) => {
       return [];
     }
 
+    // Cast the data to the correct type since we know the structure
     return data as ConsultationBooking[];
   } catch (error) {
     console.error('Unexpected error:', error);
@@ -74,6 +75,7 @@ export const fetchBookingById = async (id: string, user: User | null) => {
       return null;
     }
 
+    // Cast the data to the correct type
     return data as ConsultationBooking;
   } catch (error) {
     console.error('Unexpected error:', error);
@@ -133,7 +135,7 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         payment_status: 'pending',
         payment_amount: price,
         payment_currency: currency,
-        phone_number: bookingData.phone_number || null // Add phone number field
+        phone_number: bookingData.phone_number || null // Add phone number
       })
       .select()
       .single();
@@ -215,7 +217,7 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
   userId: string;
   referenceType: 'event' | 'consultation';
   referenceId: string;
-  phoneNumber?: string; // Add phone number field
+  phoneNumber?: string;
 }) => {
   try {
     const { data, error } = await supabase.functions.invoke('create-payment', {
@@ -227,7 +229,7 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
         userId: paymentDetails.userId,
         referenceType: paymentDetails.referenceType,
         referenceId: paymentDetails.referenceId,
-        phoneNumber: paymentDetails.phoneNumber // Include phone number
+        phoneNumber: paymentDetails.phoneNumber
       }
     });
 
