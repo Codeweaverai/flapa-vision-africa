@@ -49,8 +49,14 @@ export const fetchUserBookings = async (user: User | null) => {
       return [];
     }
 
-    // Cast the data to the correct type since we know the structure
-    return data as ConsultationBooking[];
+    // The data from Supabase might not have the phone_number field if it was just added
+    // We need to ensure each booking has the phone_number field, even if it's null
+    const bookingsWithPhoneNumber = data.map(booking => ({
+      ...booking,
+      phone_number: booking.phone_number || null
+    }));
+
+    return bookingsWithPhoneNumber as ConsultationBooking[];
   } catch (error) {
     console.error('Unexpected error:', error);
     toast.error("An unexpected error occurred");
@@ -75,8 +81,13 @@ export const fetchBookingById = async (id: string, user: User | null) => {
       return null;
     }
 
-    // Cast the data to the correct type
-    return data as ConsultationBooking;
+    // Ensure the booking has the phone_number field, even if it's null
+    const bookingWithPhoneNumber = {
+      ...data,
+      phone_number: data.phone_number || null
+    };
+
+    return bookingWithPhoneNumber as ConsultationBooking;
   } catch (error) {
     console.error('Unexpected error:', error);
     toast.error("An unexpected error occurred");

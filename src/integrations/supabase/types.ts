@@ -23,6 +23,7 @@ export type Database = {
           payment_id: string | null
           payment_method: string | null
           payment_status: string
+          phone_number: string | null
           scheduled_time: string
           status: string
           topic: string | null
@@ -42,6 +43,7 @@ export type Database = {
           payment_id?: string | null
           payment_method?: string | null
           payment_status: string
+          phone_number?: string | null
           scheduled_time: string
           status: string
           topic?: string | null
@@ -61,6 +63,7 @@ export type Database = {
           payment_id?: string | null
           payment_method?: string | null
           payment_status?: string
+          phone_number?: string | null
           scheduled_time?: string
           status?: string
           topic?: string | null
