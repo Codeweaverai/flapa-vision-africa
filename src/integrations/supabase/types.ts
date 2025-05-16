@@ -308,6 +308,114 @@ export type Database = {
           },
         ]
       }
+      speaking_appearances: {
+        Row: {
+          appearance_type: string
+          created_at: string
+          description: string
+          event_date: string
+          event_name: string
+          id: string
+          image_url: string | null
+          location: string
+          media_link: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          appearance_type: string
+          created_at?: string
+          description: string
+          event_date: string
+          event_name: string
+          id?: string
+          image_url?: string | null
+          location: string
+          media_link?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          appearance_type?: string
+          created_at?: string
+          description?: string
+          event_date?: string
+          event_name?: string
+          id?: string
+          image_url?: string | null
+          location?: string
+          media_link?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      speaking_bookings: {
+        Row: {
+          created_at: string
+          description: string | null
+          email: string
+          event_date: string
+          event_type: string
+          id: string
+          name: string
+          organization: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          email: string
+          event_date: string
+          event_type: string
+          id?: string
+          name: string
+          organization: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          email?: string
+          event_date?: string
+          event_type?: string
+          id?: string
+          name?: string
+          organization?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      speaking_topics: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

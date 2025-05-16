@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -29,7 +30,7 @@ const SpeakingSection = () => {
                 economic growth in Africa, inspiring audiences with his vision for the future.
               </p>
               <Button asChild variant="outline" className="group">
-                <Link to="/speaking/keynotes">
+                <Link to="/speaking">
                   Explore Topics
                 </Link>
               </Button>
@@ -54,7 +55,7 @@ const SpeakingSection = () => {
                 innovation, logistics, and the evolving landscape of African business.
               </p>
               <Button asChild variant="outline" className="group">
-                <Link to="/speaking/media">
+                <Link to="/speaking">
                   Watch & Listen
                 </Link>
               </Button>

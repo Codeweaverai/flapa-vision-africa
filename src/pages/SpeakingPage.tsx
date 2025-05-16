@@ -1,17 +1,96 @@
 
-import Layout from '@/components/layout/Layout';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import { Mic, Video, Calendar, BookOpen, MessageSquare, FileText, Users } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { format } from 'date-fns';
+import { fetchSpeakingAppearances, fetchSpeakingTopics, createSpeakingBooking } from '@/services/speakingService';
+
+// Form schema
+const speakingFormSchema = z.object({
+  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+  organization: z.string().min(2, { message: 'Organization must be at least 2 characters.' }),
+  eventType: z.string().min(1, { message: 'Please specify the type of event.' }),
+  eventDate: z.string().refine((date) => {
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate > today;
+  }, { message: 'Event date must be in the future.' }),
+  description: z.string().optional(),
+});
+
+type SpeakingFormValues = z.infer<typeof speakingFormSchema>;
 
 const SpeakingPage = () => {
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch speaking topics and appearances
+  const { data: topics = [], isLoading: isLoadingTopics } = useQuery({
+    queryKey: ['speakingTopics'],
+    queryFn: fetchSpeakingTopics,
+  });
+
+  const { data: appearances = [], isLoading: isLoadingAppearances } = useQuery({
+    queryKey: ['speakingAppearances'],
+    queryFn: fetchSpeakingAppearances,
+  });
+
+  // Form handling
+  const form = useForm<SpeakingFormValues>({
+    resolver: zodResolver(speakingFormSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      organization: '',
+      eventType: '',
+      eventDate: '',
+      description: '',
+    },
+  });
+
+  const onSubmit = async (values: SpeakingFormValues) => {
+    setIsSubmitting(true);
+    
+    try {
+      const result = await createSpeakingBooking({
+        name: values.name,
+        email: values.email,
+        organization: values.organization,
+        event_type: values.eventType,
+        event_date: values.eventDate,
+        description: values.description,
+        user_id: user?.id || null,
+      });
+      
+      if (result) {
+        form.reset();
+      }
+    } catch (error) {
+      console.error("Error submitting speaking request:", error);
+      toast.error("Failed to submit your request. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <Layout>
-      <div className="section-container">
+      <div className="section-container bg-light-purple py-16">
         <div className="mb-12 max-w-3xl mx-auto text-center">
           <h1 className="heading-lg mb-6 text-gradient">Speaking & Media</h1>
           <p className="text-lg">
@@ -28,44 +107,20 @@ const SpeakingPage = () => {
               Speaking Topics
             </h2>
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>The Future of African Logistics</CardTitle>
-                  <CardDescription>Technology, Infrastructure, and Innovation</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>
-                    How emerging technologies and innovative business models are transforming 
-                    logistics across Africa, creating new opportunities and solving longstanding challenges.
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>AI-Driven Business Transformation</CardTitle>
-                  <CardDescription>Practical Applications for African Enterprises</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>
-                    Real-world case studies on implementing AI solutions in businesses across Africa, 
-                    with practical insights on overcoming implementation challenges and measuring ROI.
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Building Pan-African Businesses</CardTitle>
-                  <CardDescription>Strategies for Cross-Border Success</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>
-                    Lessons learned from scaling FlapaBay across multiple African countries, 
-                    navigating regulatory environments, and building effective multicultural teams.
-                  </p>
-                </CardContent>
-              </Card>
+              {isLoadingTopics ? (
+                <p>Loading topics...</p>
+              ) : (
+                topics.map((topic) => (
+                  <Card key={topic.id}>
+                    <CardHeader>
+                      <CardTitle>{topic.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p>{topic.description}</p>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </div>
           
@@ -75,55 +130,45 @@ const SpeakingPage = () => {
               Recent Appearances
             </h2>
             <div className="space-y-6">
-              <div className="bg-card rounded-lg overflow-hidden shadow">
-                <img 
-                  src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b" 
-                  alt="Tech conference presentation" 
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-lg">Africa Tech Summit</h3>
-                    <Badge>Keynote</Badge>
+              {isLoadingAppearances ? (
+                <p>Loading appearances...</p>
+              ) : (
+                appearances.map((appearance) => (
+                  <div key={appearance.id} className="bg-card rounded-lg overflow-hidden shadow">
+                    <img 
+                      src={appearance.image_url || "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b"} 
+                      alt={appearance.title} 
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-lg">{appearance.event_name}</h3>
+                        <Badge>{appearance.appearance_type}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {format(new Date(appearance.event_date), 'MMMM d, yyyy')} • {appearance.location}
+                      </p>
+                      <p className="mb-4">{appearance.title} - {appearance.description}</p>
+                      {appearance.media_link && (
+                        <Button variant="outline" size="sm" className="w-full" asChild>
+                          <a href={appearance.media_link} target="_blank" rel="noopener noreferrer">
+                            {appearance.appearance_type === 'Keynote' || appearance.appearance_type === 'Panel' ? (
+                              <><Video className="h-4 w-4 mr-2" /> Watch Recording</>
+                            ) : (
+                              <><FileText className="h-4 w-4 mr-2" /> View Summary</>
+                            )}
+                          </a>
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3">March 15, 2025 • Nairobi, Kenya</p>
-                  <p className="mb-4">
-                    "AI-Powered Logistics: Revolutionizing Movement Across Africa" - 
-                    An exploration of how artificial intelligence is transforming 
-                    transportation and logistics on the continent.
-                  </p>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Video className="h-4 w-4 mr-2" /> Watch Recording
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="bg-card rounded-lg overflow-hidden shadow">
-                <img 
-                  src="https://images.unsplash.com/photo-1461749280684-dccba630e2f6" 
-                  alt="Panel discussion" 
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-lg">Future of Travel Conference</h3>
-                    <Badge variant="secondary">Panel</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">January 22, 2025 • Cape Town, South Africa</p>
-                  <p className="mb-4">
-                    "Sustainable Tourism in Africa: Balancing Growth with Environmental Responsibility" - 
-                    Panel discussion on creating eco-friendly travel businesses.
-                  </p>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <FileText className="h-4 w-4 mr-2" /> View Summary
-                  </Button>
-                </div>
-              </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
-        <div className="bg-card rounded-lg p-8 shadow-lg">
+        <div className="bg-white rounded-lg p-8 shadow-lg">
           <h2 className="heading-md mb-6 text-center">Book Mbolela for Your Event</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
@@ -165,37 +210,107 @@ const SpeakingPage = () => {
             </div>
             
             <div>
-              <form className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Your Name</Label>
-                  <Input id="name" placeholder="Full Name" />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" type="email" placeholder="your@email.com" />
-                </div>
-                <div>
-                  <Label htmlFor="organization">Organization</Label>
-                  <Input id="organization" placeholder="Company or Event Name" />
-                </div>
-                <div>
-                  <Label htmlFor="event-type">Event Type</Label>
-                  <Input id="event-type" placeholder="Conference, Workshop, etc." />
-                </div>
-                <div>
-                  <Label htmlFor="event-date">Event Date</Label>
-                  <Input id="event-date" type="date" />
-                </div>
-                <div className="flex items-start space-x-2">
-                  <Checkbox id="terms" />
-                  <Label htmlFor="terms" className="text-sm">
-                    I understand that submitting this form doesn't guarantee availability, and I'll receive a response within 48 hours.
-                  </Label>
-                </div>
-                <Button type="submit" className="w-full">
-                  <MessageSquare className="h-4 w-4 mr-2" /> Submit Speaking Request
-                </Button>
-              </form>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Your Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Full Name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="your@email.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="organization"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Organization</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Company or Event Name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="eventType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Event Type</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Conference, Workshop, etc." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="eventDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Event Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Event Details</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Please provide any additional details about the event, expected audience, etc."
+                            className="min-h-[100px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormDescription className="text-sm">
+                    By submitting this form, you understand that this is a preliminary inquiry and doesn't guarantee availability.
+                    You will receive a response within 48 hours.
+                  </FormDescription>
+                  
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    {isSubmitting ? "Submitting..." : "Submit Speaking Request"}
+                  </Button>
+                </form>
+              </Form>
             </div>
           </div>
         </div>
