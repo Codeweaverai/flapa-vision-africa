@@ -1,6 +1,5 @@
-
 import Layout from '@/components/layout/Layout';
-import { CircuitBoard, Workflow, Code, BarChart, CloudLightning, Robot } from 'lucide-react';
+import { CircuitBoard, Workflow, Code, BarChart, CloudLightning, Bot, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,7 +16,7 @@ const AnimationsPage = () => {
           </p>
           <div className="flex justify-center mt-6">
             <Button size="lg">
-              <Robot className="h-5 w-5 mr-2" /> Schedule Demo
+              <Bot className="h-5 w-5 mr-2" /> Schedule Demo
             </Button>
           </div>
         </div>
@@ -202,7 +201,7 @@ const AnimationsPage = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg">
-              <Robot className="h-5 w-5 mr-2" /> Schedule Demo
+              <Bot className="h-5 w-5 mr-2" /> Schedule Demo
             </Button>
             <Button size="lg" variant="outline">
               <FileText className="h-5 w-5 mr-2" /> Download Case Studies
