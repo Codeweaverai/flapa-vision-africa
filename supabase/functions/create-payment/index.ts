@@ -44,11 +44,19 @@ serve(async (req) => {
     }
     
     // Parse the request body
-    const { bookingId, amount, currency, reason, userId, referenceType, referenceId } = await req.json();
+    const { bookingId, amount, currency, reason, userId, referenceType, referenceId, phoneNumber } = await req.json();
     
     // Check that all required fields are present
     if (!amount || !currency || !userId || !referenceType || !referenceId) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Check for mobile money phone number for payment processing
+    if (!phoneNumber) {
+      return new Response(JSON.stringify({ error: 'Missing phone number for mobile money payment' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -75,6 +83,7 @@ serve(async (req) => {
         currency,
         status: 'pending',
         provider: 'pawapay',
+        phone_number: phoneNumber
       })
       .select()
       .single();
@@ -100,13 +109,14 @@ serve(async (req) => {
       reason: reason || 'Payment for services',
       amount: {
         value: amount.toString(),
-        currency: currency // Now this can be ZMW
+        currency: currency
       },
       redirectUrl: `${Deno.env.get('SUPABASE_URL') || 'https://rxqoczksnddbxcdwobnw.supabase.co'}/functions/v1/verify-payment?txnId=${paymentTransaction.id}`,
       cancelUrl: `${req.headers.get('origin') || 'http://localhost:5173'}/payment-result?status=cancelled&txnId=${paymentTransaction.id}`,
       customer: {
         name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
-        email: user.email || 'customer@example.com'
+        email: user.email || 'customer@example.com',
+        phoneNumber: phoneNumber // Add phone number for mobile money payment
       }
     };
     
@@ -126,7 +136,10 @@ serve(async (req) => {
       .update({
         provider_transaction_id: mockPawaPayResponse.id,
         status: mockPawaPayResponse.status,
-        metadata: { pawaPayResponse: mockPawaPayResponse }
+        metadata: { 
+          pawaPayResponse: mockPawaPayResponse,
+          customerPhone: phoneNumber
+        }
       })
       .eq('id', paymentTransaction.id);
       
@@ -136,7 +149,8 @@ serve(async (req) => {
         .from('consultation_bookings')
         .update({
           payment_id: paymentTransaction.id,
-          payment_status: 'processing'
+          payment_status: 'processing',
+          phone_number: phoneNumber
         })
         .eq('id', referenceId);
     } else if (referenceType === 'event') {
@@ -144,7 +158,8 @@ serve(async (req) => {
         .from('registrations')
         .update({
           payment_id: paymentTransaction.id,
-          payment_status: 'processing'
+          payment_status: 'processing',
+          phone_number: phoneNumber
         })
         .eq('id', referenceId);
     }

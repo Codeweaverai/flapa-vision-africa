@@ -20,6 +20,7 @@ export interface ConsultationBooking {
   payment_amount: number | null;
   payment_currency: string | null;
   payment_method: string | null;
+  phone_number: string | null;
 }
 
 export interface BookingFormData {
@@ -29,6 +30,7 @@ export interface BookingFormData {
   location?: string;
   topic?: string;
   notes?: string;
+  phone_number?: string; // Add phone number field
 }
 
 export const fetchUserBookings = async (user: User | null) => {
@@ -130,7 +132,8 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         status: 'pending',
         payment_status: 'pending',
         payment_amount: price,
-        payment_currency: currency
+        payment_currency: currency,
+        phone_number: bookingData.phone_number || null // Add phone number field
       })
       .select()
       .single();
@@ -149,7 +152,8 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         description: `Consultation booking: ${bookingData.topic || bookingData.booking_type}`,
         userId: user.id,
         referenceType: 'consultation',
-        referenceId: data.id
+        referenceId: data.id,
+        phoneNumber: bookingData.phone_number // Add phone number to payment request
       });
       
       if (response && response.redirectUrl) {
@@ -211,6 +215,7 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
   userId: string;
   referenceType: 'event' | 'consultation';
   referenceId: string;
+  phoneNumber?: string; // Add phone number field
 }) => {
   try {
     const { data, error } = await supabase.functions.invoke('create-payment', {
@@ -221,7 +226,8 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
         reason: paymentDetails.description,
         userId: paymentDetails.userId,
         referenceType: paymentDetails.referenceType,
-        referenceId: paymentDetails.referenceId
+        referenceId: paymentDetails.referenceId,
+        phoneNumber: paymentDetails.phoneNumber // Include phone number
       }
     });
 

@@ -1,6 +1,7 @@
+
 import { useState } from 'react';
 import Layout from '@/components/layout/Layout';
-import { CalendarClock, Clock, MessageSquare, User, Users, Video, Briefcase, FileText, Check, Calendar } from 'lucide-react';
+import { CalendarClock, Clock, MessageSquare, User, Users, Video, Briefcase, FileText, Check, Calendar, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,25 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, addMinutes, addDays, parse, isAfter, isBefore, startOfToday, addHours, setHours, setMinutes } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+
+interface CountryOption {
+  code: string;
+  name: string;
+  dialCode: string;
+  flag: string;
+}
+
+const countries: CountryOption[] = [
+  {
+    code: "ZM",
+    name: "Zambia",
+    dialCode: "+260",
+    flag: "🇿🇲"
+  }
+];
 
 const ConsultPage = () => {
   const { user } = useAuth();
@@ -32,6 +52,10 @@ const ConsultPage = () => {
   const [preferredTimes, setPreferredTimes] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // New state for phone number
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption>(countries[0]);
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   // Get consultation details based on type
   const getConsultationDetails = () => {
@@ -72,8 +96,13 @@ const ConsultPage = () => {
       return;
     }
 
-    if (!selectedDate || !selectedTime || !agreedToTerms) {
+    if (!selectedDate || !selectedTime || !agreedToTerms || !phoneNumber) {
       toast.error("Please fill in all required fields and agree to the terms");
+      return;
+    }
+
+    if (phoneNumber.trim().length < 9) {
+      toast.error("Please enter a valid phone number");
       return;
     }
 
@@ -98,6 +127,7 @@ const ConsultPage = () => {
         scheduled_time: scheduledTime,
         topic: topic || consultationDetails.title,
         notes: notes || `Business type: ${businessType}`,
+        phone_number: `${selectedCountry.dialCode}${phoneNumber.replace(/^0+/, '')}` // Remove leading zeros and add country code
       };
 
       const result = await createConsultationBooking(
@@ -127,7 +157,7 @@ const ConsultPage = () => {
       return;
     }
 
-    if (!topic || !businessType || !notes) {
+    if (!topic || !businessType || !notes || !phoneNumber) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -448,6 +478,32 @@ const ConsultPage = () => {
                         </select>
                       </div>
                     </div>
+
+                    {/* New country and phone field */}
+                    <div className="space-y-2">
+                      <Label>Mobile Money Phone Number</Label>
+                      <div className="grid grid-cols-5 gap-2">
+                        <div className="col-span-2">
+                          <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center text-sm ring-offset-background">
+                            <span className="mr-2">{selectedCountry.flag}</span>
+                            <span>{selectedCountry.dialCode}</span>
+                          </div>
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="tel"
+                            placeholder="Phone number"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                            className="w-full"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Enter the phone number linked to your mobile money account for payment processing
+                      </p>
+                    </div>
                     
                     <div>
                       <Label htmlFor="time-zone">Time Zone</Label>
@@ -489,7 +545,7 @@ const ConsultPage = () => {
                     <Button 
                       type="button" 
                       className="w-full"
-                      disabled={isSubmitting || !selectedDate || !selectedTime || !agreedToTerms}
+                      disabled={isSubmitting || !selectedDate || !selectedTime || !agreedToTerms || !phoneNumber}
                       onClick={handleRequestBooking}
                     >
                       <CalendarClock className="h-4 w-4 mr-2" /> 
@@ -518,6 +574,32 @@ const ConsultPage = () => {
                         onChange={(e) => setBusinessType(e.target.value)}
                         placeholder="Industry & company size" 
                       />
+                    </div>
+
+                    {/* New country and phone field for inquiry form */}
+                    <div className="space-y-2">
+                      <Label>Mobile Money Phone Number</Label>
+                      <div className="grid grid-cols-5 gap-2">
+                        <div className="col-span-2">
+                          <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center text-sm ring-offset-background">
+                            <span className="mr-2">{selectedCountry.flag}</span>
+                            <span>{selectedCountry.dialCode}</span>
+                          </div>
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="tel"
+                            placeholder="Phone number"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                            className="w-full"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Enter the phone number linked to your mobile money account for payment processing
+                      </p>
                     </div>
                     
                     <div>
@@ -557,7 +639,7 @@ const ConsultPage = () => {
                     <Button 
                       type="button" 
                       className="w-full"
-                      disabled={isSubmitting || !topic || !businessType || !notes}
+                      disabled={isSubmitting || !topic || !businessType || !notes || !phoneNumber}
                       onClick={handleInquirySubmission}
                     >
                       <MessageSquare className="h-4 w-4 mr-2" /> 
