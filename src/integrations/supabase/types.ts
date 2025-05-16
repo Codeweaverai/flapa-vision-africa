@@ -130,6 +130,7 @@ export type Database = {
           currency: string
           id: string
           metadata: Json | null
+          phone_number: string | null
           provider: string
           provider_transaction_id: string | null
           reference_id: string
@@ -144,6 +145,7 @@ export type Database = {
           currency: string
           id?: string
           metadata?: Json | null
+          phone_number?: string | null
           provider?: string
           provider_transaction_id?: string | null
           reference_id: string
@@ -158,6 +160,7 @@ export type Database = {
           currency?: string
           id?: string
           metadata?: Json | null
+          phone_number?: string | null
           provider?: string
           provider_transaction_id?: string | null
           reference_id?: string
