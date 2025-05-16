@@ -5,7 +5,7 @@ import { ArrowRight } from 'lucide-react';
 
 const VenturesSection = () => {
   return (
-    <section className="bg-slate-50 py-16 md:py-24">
+    <section className="bg-light-purple py-16 md:py-24">
       <div className="section-container">
         <h2 className="heading-lg text-center mb-4">Ventures</h2>
         <p className="text-xl text-center mb-16 max-w-3xl mx-auto">

@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 const AboutPage = () => {
   return (
     <Layout>
-      <div className="section-container">
+      <div className="section-container bg-light-purple">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-16">
           <div>
             <h1 className="heading-lg mb-6 text-gradient">About Mbolela Pule</h1>

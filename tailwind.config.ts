@@ -56,7 +56,8 @@ export default {
                 flapabay: {
                     dark: '#1A1F2C',
                     light: '#F2FCE2'
-                }
+                },
+                'light-purple': '#E9D5FF'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

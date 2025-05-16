@@ -39,7 +39,7 @@ const AuthPage = () => {
 
   return (
     <Layout>
-      <div className="container max-w-md mx-auto py-20">
+      <div className="container max-w-md mx-auto py-20 bg-light-purple">
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>

@@ -1,3 +1,4 @@
+
 import Layout from '@/components/layout/Layout';
 import { CircuitBoard, Workflow, Code, BarChart, CloudLightning, Bot, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 const AnimationsPage = () => {
   return (
     <Layout>
-      <div className="section-container">
+      <div className="section-container bg-light-purple">
         <div className="mb-12 max-w-3xl mx-auto text-center">
           <h1 className="heading-lg mb-6 text-gradient">AI Workflow Automations</h1>
           <p className="text-lg">
