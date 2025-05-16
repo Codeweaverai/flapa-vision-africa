@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { createConsultationBooking } from '@/services/consultationService';
+import { BookingFormData, createConsultationBooking } from '@/services/consultationService';
 import { toast } from 'sonner';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, addMinutes, addDays, parse, isAfter, isBefore, startOfToday, addHours, setHours, setMinutes } from 'date-fns';
@@ -92,8 +92,9 @@ const ConsultPage = () => {
       
       const endTime = addMinutes(scheduledTime, consultationDetails.duration);
       
-      const bookingData = {
-        booking_type: 'google_meet',
+      // Explicitly type the booking_type as 'google_meet' to match the BookingFormData type
+      const bookingData: BookingFormData = {
+        booking_type: 'google_meet' as 'google_meet', // Explicit casting to the union type
         duration: consultationDetails.duration,
         scheduled_time: scheduledTime,
         topic: topic || consultationDetails.title,
