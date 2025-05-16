@@ -13,6 +13,7 @@ import LearningPage from "./pages/LearningPage";
 import EventsPage from "./pages/EventsPage";
 import ConsultPage from "./pages/ConsultPage";
 import AuthPage from "./pages/AuthPage";
+import PaymentResultPage from "./pages/PaymentResultPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import NotFound from "./pages/NotFound";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/events" element={<EventsPage />} />
             <Route path="/consult" element={<ConsultPage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/payment-result" element={<PaymentResultPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>

@@ -9,6 +9,162 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      consultation_bookings: {
+        Row: {
+          booking_type: string
+          created_at: string | null
+          duration: number
+          id: string
+          location: string | null
+          notes: string | null
+          online_meeting_link: string | null
+          payment_amount: number | null
+          payment_currency: string | null
+          payment_id: string | null
+          payment_method: string | null
+          payment_status: string
+          scheduled_time: string
+          status: string
+          topic: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          booking_type: string
+          created_at?: string | null
+          duration: number
+          id?: string
+          location?: string | null
+          notes?: string | null
+          online_meeting_link?: string | null
+          payment_amount?: number | null
+          payment_currency?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_status: string
+          scheduled_time: string
+          status: string
+          topic?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          booking_type?: string
+          created_at?: string | null
+          duration?: number
+          id?: string
+          location?: string | null
+          notes?: string | null
+          online_meeting_link?: string | null
+          payment_amount?: number | null
+          payment_currency?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_status?: string
+          scheduled_time?: string
+          status?: string
+          topic?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          capacity: number | null
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          end_time: string
+          event_type: string
+          id: string
+          is_free: boolean | null
+          location: string | null
+          online_meeting_link: string | null
+          price: number | null
+          start_time: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          capacity?: number | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          end_time: string
+          event_type: string
+          id?: string
+          is_free?: boolean | null
+          location?: string | null
+          online_meeting_link?: string | null
+          price?: number | null
+          start_time: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          capacity?: number | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          end_time?: string
+          event_type?: string
+          id?: string
+          is_free?: boolean | null
+          location?: string | null
+          online_meeting_link?: string | null
+          price?: number | null
+          start_time?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          id: string
+          metadata: Json | null
+          provider: string
+          provider_transaction_id: string | null
+          reference_id: string
+          reference_type: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency: string
+          id?: string
+          metadata?: Json | null
+          provider?: string
+          provider_transaction_id?: string | null
+          reference_id: string
+          reference_type: string
+          status: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          provider?: string
+          provider_transaction_id?: string | null
+          reference_id?: string
+          reference_type?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -41,6 +197,56 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      registrations: {
+        Row: {
+          created_at: string | null
+          event_id: string
+          id: string
+          payment_amount: number | null
+          payment_currency: string | null
+          payment_id: string | null
+          payment_method: string | null
+          payment_status: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_id: string
+          id?: string
+          payment_amount?: number | null
+          payment_currency?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_status: string
+          status: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          payment_amount?: number | null
+          payment_currency?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_status?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
