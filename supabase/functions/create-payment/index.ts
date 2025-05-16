@@ -95,7 +95,58 @@ serve(async (req) => {
       ? formattedPhoneNumber 
       : `260${formattedPhoneNumber.replace(/^0+/, '')}`; // Add country code if missing and remove leading zeros
     
-    // Create a payment transaction record
+    // Current timestamp in ISO format
+    const customerTimestamp = new Date().toISOString();
+
+    // Get the user's profile for contact information
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single();
+    
+    // Generate a clear statement description based on transaction type
+    let statementDescription = reason;
+    if (!statementDescription) {
+      if (referenceType === 'consultation') {
+        statementDescription = 'Consultation Booking Payment';
+        
+        // Try to get more details from the consultation booking
+        const { data: consultationData } = await supabaseClient
+          .from('consultation_bookings')
+          .select('topic, booking_type')
+          .eq('id', referenceId)
+          .single();
+          
+        if (consultationData?.topic) {
+          statementDescription = `Consultation: ${consultationData.topic}`;
+        } else if (consultationData?.booking_type) {
+          const bookingTypeMap: Record<string, string> = {
+            'google_meet': 'Online Consultation',
+            'in_person': 'In-Person Consultation',
+            'discovery': 'Discovery Call',
+            'strategy': 'Strategy Session',
+            'executive': 'Executive Team Session'
+          };
+          statementDescription = bookingTypeMap[consultationData.booking_type] || 'Consultation Booking';
+        }
+      } else if (referenceType === 'event') {
+        statementDescription = 'Event Registration Payment';
+        
+        // Try to get more details from the event
+        const { data: eventData } = await supabaseClient
+          .from('events')
+          .select('title')
+          .eq('id', referenceId)
+          .single();
+          
+        if (eventData?.title) {
+          statementDescription = `Event: ${eventData.title}`;
+        }
+      }
+    }
+    
+    // Create a payment transaction record with all the required fields
     const { data: paymentTransaction, error: paymentError } = await supabaseClient
       .from('payment_transactions')
       .insert({
@@ -107,10 +158,18 @@ serve(async (req) => {
         status: 'pending',
         provider: 'pawapay',
         phone_number: phoneWithCountryCode,
+        deposit_id: depositId,
+        correspondent,
+        payer_type: 'MSISDN',
+        payer_address: phoneWithCountryCode,
+        customer_timestamp: customerTimestamp,
+        statement_description: statementDescription,
         metadata: {
-          depositId,
+          reason,
+          customerPhone: phoneWithCountryCode,
           correspondent,
-          reason
+          depositId,
+          customerTimestamp
         }
       })
       .select()
@@ -123,16 +182,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    
-    // Get the user's profile for contact information
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('full_name')
-      .eq('id', userId)
-      .single();
-    
-    // Current timestamp in ISO format
-    const customerTimestamp = new Date().toISOString();
     
     // Prepare PawaPay payment request
     const paymentRequestBody = {
@@ -147,7 +196,7 @@ serve(async (req) => {
         }
       },
       customerTimestamp,
-      statementDescription: reason || 'Payment for services'
+      statementDescription
     };
     
     // Create the content digest
@@ -155,7 +204,7 @@ serve(async (req) => {
     const digest = await createSha512Digest(requestBodyString);
     const contentDigestHeader = `sha-512=:${digest}:`;
     
-    console.log('PawaPay payment request:', JSON.stringify(paymentRequestBody));
+    console.log('PawaPay payment request:', requestBodyString);
     console.log('Content-Digest:', contentDigestHeader);
     
     // Simulate PawaPay API response - in production you would call their API
@@ -183,14 +232,7 @@ serve(async (req) => {
       .from('payment_transactions')
       .update({
         provider_transaction_id: mockPawaPayResponse.id,
-        status: mockPawaPayResponse.status,
-        metadata: { 
-          pawaPayResponse: mockPawaPayResponse,
-          customerPhone: phoneWithCountryCode,
-          correspondent,
-          depositId,
-          customerTimestamp
-        }
+        status: mockPawaPayResponse.status
       })
       .eq('id', paymentTransaction.id);
       
@@ -201,7 +243,8 @@ serve(async (req) => {
         .update({
           payment_id: paymentTransaction.id,
           payment_status: 'processing',
-          phone_number: phoneWithCountryCode
+          phone_number: phoneWithCountryCode,
+          mobile_operator: correspondent
         })
         .eq('id', referenceId);
     } else if (referenceType === 'event') {
@@ -210,7 +253,8 @@ serve(async (req) => {
         .update({
           payment_id: paymentTransaction.id,
           payment_status: 'processing',
-          phone_number: phoneWithCountryCode
+          phone_number: phoneWithCountryCode,
+          mobile_operator: correspondent
         })
         .eq('id', referenceId);
     }

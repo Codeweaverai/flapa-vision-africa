@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -27,6 +28,15 @@ export interface Registration {
   payment_amount: number | null;
   payment_currency: string | null;
   payment_method: string | null;
+  phone_number: string | null;
+  mobile_operator: string | null;
+}
+
+export interface MobileOperator {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
 }
 
 export const fetchEvents = async () => {
@@ -106,6 +116,27 @@ export const fetchUserRegistrations = async (user: User | null) => {
   }
 };
 
+export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('mobile_operators')
+      .select('*')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching mobile operators:', error);
+      toast.error("Failed to load mobile operators");
+      return [];
+    }
+
+    return data as MobileOperator[];
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    toast.error("An unexpected error occurred");
+    return [];
+  }
+};
+
 export const registerForEvent = async (event: Event, user: User | null, phoneNumber?: string, mobileOperator?: string) => {
   if (!user) {
     toast.error("Please sign in to register for events");
@@ -122,7 +153,8 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           user_id: user.id,
           status: 'confirmed',
           payment_status: 'completed',
-          phone_number: phoneNumber || null
+          phone_number: phoneNumber || null,
+          mobile_operator: mobileOperator || null
         })
         .select()
         .single();
@@ -158,7 +190,8 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           payment_status: 'pending',
           payment_amount: event.price,
           payment_currency: event.currency || 'ZMW',
-          phone_number: phoneNumber
+          phone_number: phoneNumber,
+          mobile_operator: mobileOperator || 'MTN_MOMO_ZMB'
         })
         .select()
         .single();
@@ -175,10 +208,12 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
 
       // Now initiate payment process
       try {
+        const description = `Registration for ${event.title}`;
+        
         const response = await initiatePawaPayPayment(data.id, {
           amount: event.price,
           currency: event.currency || 'ZMW',
-          description: `Registration for ${event.title}`,
+          description: description,
           userId: user.id,
           referenceType: 'event',
           referenceId: event.id,
@@ -252,7 +287,7 @@ const initiatePawaPayPayment = async (registrationId: string, paymentDetails: {
   try {
     const { data, error } = await supabase.functions.invoke('create-payment', {
       body: {
-        registrationId,
+        bookingId: registrationId,
         amount: paymentDetails.amount,
         currency: paymentDetails.currency,
         reason: paymentDetails.description,

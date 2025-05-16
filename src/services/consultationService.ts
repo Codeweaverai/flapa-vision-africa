@@ -1,7 +1,9 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { createGoogleMeetEvent } from "./googleCalendarService";
+import { MobileOperator } from "./eventService";
 
 export interface ConsultationBooking {
   id: string;
@@ -20,7 +22,7 @@ export interface ConsultationBooking {
   payment_currency: string | null;
   payment_method: string | null;
   phone_number: string | null;
-  mobile_operator?: string | null;
+  mobile_operator: string | null;
 }
 
 export interface BookingFormData {
@@ -54,7 +56,8 @@ export const fetchUserBookings = async (user: User | null) => {
     // We need to ensure each booking has the phone_number field, even if it's null
     const bookingsWithPhoneNumber = data.map(booking => ({
       ...booking,
-      phone_number: booking.phone_number || null
+      phone_number: booking.phone_number || null,
+      mobile_operator: booking.mobile_operator || null
     }));
 
     return bookingsWithPhoneNumber as ConsultationBooking[];
@@ -82,17 +85,39 @@ export const fetchBookingById = async (id: string, user: User | null) => {
       return null;
     }
 
-    // Ensure the booking has the phone_number field, even if it's null
-    const bookingWithPhoneNumber = {
+    // Ensure the booking has the phone_number and mobile_operator fields, even if they're null
+    const bookingWithUpdatedFields = {
       ...data,
-      phone_number: data.phone_number || null
+      phone_number: data.phone_number || null,
+      mobile_operator: data.mobile_operator || null
     };
 
-    return bookingWithPhoneNumber as ConsultationBooking;
+    return bookingWithUpdatedFields as ConsultationBooking;
   } catch (error) {
     console.error('Unexpected error:', error);
     toast.error("An unexpected error occurred");
     return null;
+  }
+};
+
+export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('mobile_operators')
+      .select('*')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching mobile operators:', error);
+      toast.error("Failed to load mobile operators");
+      return [];
+    }
+
+    return data as MobileOperator[];
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    toast.error("An unexpected error occurred");
+    return [];
   }
 };
 
@@ -131,6 +156,15 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
       console.log("Created meeting link:", meetingLink);
     }
 
+    // Format phone number properly
+    let formattedPhoneNumber = null;
+    if (bookingData.phone_number) {
+      const cleaned = bookingData.phone_number.replace(/[^0-9]/g, '');
+      formattedPhoneNumber = cleaned.startsWith('260') 
+        ? cleaned 
+        : `260${cleaned.replace(/^0+/, '')}`;
+    }
+
     // Create a new booking record
     const { data, error } = await supabase
       .from('consultation_bookings')
@@ -147,7 +181,7 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         payment_status: 'pending',
         payment_amount: price,
         payment_currency: currency,
-        phone_number: bookingData.phone_number || null,
+        phone_number: formattedPhoneNumber,
         mobile_operator: bookingData.mobile_operator || 'MTN_MOMO_ZMB' // Default to MTN if not provided
       })
       .select()
@@ -161,15 +195,20 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
 
     // Now initiate payment process
     try {
+      // Generate appropriate description for the payment
+      const description = bookingData.topic 
+        ? `Consultation: ${bookingData.topic}` 
+        : getConsultationTypeDescription(bookingData.booking_type, bookingData.duration);
+      
       const response = await initiatePawaPayPayment(data.id, {
         amount: price,
         currency: currency,
-        description: `Consultation booking: ${bookingData.topic || bookingData.booking_type}`,
+        description: description,
         userId: user.id,
         referenceType: 'consultation',
         referenceId: data.id,
-        phoneNumber: bookingData.phone_number, 
-        mobileOperator: bookingData.mobile_operator || 'MTN_MOMO_ZMB' // Pass mobile operator
+        phoneNumber: formattedPhoneNumber, 
+        mobileOperator: bookingData.mobile_operator || 'MTN_MOMO_ZMB'
       });
       
       if (response && response.redirectUrl) {
@@ -195,6 +234,23 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
     console.error('Unexpected error:', error);
     toast.error("An unexpected error occurred");
     return null;
+  }
+};
+
+// Helper function to get a descriptive consultation type
+const getConsultationTypeDescription = (bookingType: string, duration: number): string => {
+  if (bookingType === 'in_person') return 'In-Person Consultation';
+  
+  // For Google Meet consultations, classify by duration
+  switch (duration) {
+    case 30:
+      return 'Discovery Call (30 min)';
+    case 60:
+      return 'Strategy Session (60 min)';
+    case 90:
+      return 'Executive Team Session (90 min)';
+    default:
+      return `Online Consultation (${duration} min)`;
   }
 };
 

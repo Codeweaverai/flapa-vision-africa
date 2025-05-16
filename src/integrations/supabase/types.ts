@@ -16,6 +16,7 @@ export type Database = {
           duration: number
           id: string
           location: string | null
+          mobile_operator: string | null
           notes: string | null
           online_meeting_link: string | null
           payment_amount: number | null
@@ -36,6 +37,7 @@ export type Database = {
           duration: number
           id?: string
           location?: string | null
+          mobile_operator?: string | null
           notes?: string | null
           online_meeting_link?: string | null
           payment_amount?: number | null
@@ -56,6 +58,7 @@ export type Database = {
           duration?: number
           id?: string
           location?: string | null
+          mobile_operator?: string | null
           notes?: string | null
           online_meeting_link?: string | null
           payment_amount?: number | null
@@ -123,48 +126,93 @@ export type Database = {
         }
         Relationships: []
       }
+      mobile_operators: {
+        Row: {
+          code: string
+          country: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          country: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          country?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payment_transactions: {
         Row: {
           amount: number
+          correspondent: string | null
           created_at: string | null
           currency: string
+          customer_timestamp: string | null
+          deposit_id: string | null
           id: string
           metadata: Json | null
+          payer_address: string | null
+          payer_type: string | null
           phone_number: string | null
           provider: string
           provider_transaction_id: string | null
           reference_id: string
           reference_type: string
+          statement_description: string | null
           status: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
           amount: number
+          correspondent?: string | null
           created_at?: string | null
           currency: string
+          customer_timestamp?: string | null
+          deposit_id?: string | null
           id?: string
           metadata?: Json | null
+          payer_address?: string | null
+          payer_type?: string | null
           phone_number?: string | null
           provider?: string
           provider_transaction_id?: string | null
           reference_id: string
           reference_type: string
+          statement_description?: string | null
           status: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
           amount?: number
+          correspondent?: string | null
           created_at?: string | null
           currency?: string
+          customer_timestamp?: string | null
+          deposit_id?: string | null
           id?: string
           metadata?: Json | null
+          payer_address?: string | null
+          payer_type?: string | null
           phone_number?: string | null
           provider?: string
           provider_transaction_id?: string | null
           reference_id?: string
           reference_type?: string
+          statement_description?: string | null
           status?: string
           updated_at?: string | null
           user_id?: string
@@ -209,11 +257,13 @@ export type Database = {
           created_at: string | null
           event_id: string
           id: string
+          mobile_operator: string | null
           payment_amount: number | null
           payment_currency: string | null
           payment_id: string | null
           payment_method: string | null
           payment_status: string
+          phone_number: string | null
           status: string
           updated_at: string | null
           user_id: string
@@ -222,11 +272,13 @@ export type Database = {
           created_at?: string | null
           event_id: string
           id?: string
+          mobile_operator?: string | null
           payment_amount?: number | null
           payment_currency?: string | null
           payment_id?: string | null
           payment_method?: string | null
           payment_status: string
+          phone_number?: string | null
           status: string
           updated_at?: string | null
           user_id: string
@@ -235,11 +287,13 @@ export type Database = {
           created_at?: string | null
           event_id?: string
           id?: string
+          mobile_operator?: string | null
           payment_amount?: number | null
           payment_currency?: string | null
           payment_id?: string | null
           payment_method?: string | null
           payment_status?: string
+          phone_number?: string | null
           status?: string
           updated_at?: string | null
           user_id?: string
