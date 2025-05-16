@@ -2,11 +2,21 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,6 +35,20 @@ const Navbar = () => {
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return 'MP';
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
   };
 
   return (
@@ -61,10 +85,51 @@ const Navbar = () => {
             </Link>
           </nav>
           
-          <div className="hidden md:block">
-            <Button asChild variant="default">
-              <Link to="/consult">Book a Consultation</Link>
-            </Button>
+          <div className="hidden md:flex items-center space-x-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative rounded-full h-8 w-8 p-0">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user.user_metadata.avatar_url} alt={user.user_metadata.full_name || ''} />
+                      <AvatarFallback>{getInitials(user.user_metadata.full_name)}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="flex items-center justify-start gap-2 p-2">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      {user.user_metadata.full_name && (
+                        <p className="font-medium">{user.user_metadata.full_name}</p>
+                      )}
+                      {user.email && (
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                      )}
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/consult" className="w-full cursor-pointer">
+                      Book a Consultation
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link to="/auth">Sign in</Link>
+                </Button>
+                <Button asChild variant="default">
+                  <Link to="/consult">Book a Consultation</Link>
+                </Button>
+              </>
+            )}
           </div>
           
           <div className="md:hidden">
@@ -128,8 +193,35 @@ const Navbar = () => {
             >
               Events
             </Link>
-            <Button asChild className="w-full" variant="default">
-              <Link to="/consult" onClick={() => setIsMenuOpen(false)}>Book a Consultation</Link>
+            
+            {user ? (
+              <>
+                <div className="flex items-center space-x-2 py-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.user_metadata.avatar_url} alt={user.user_metadata.full_name || ''} />
+                    <AvatarFallback>{getInitials(user.user_metadata.full_name)}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium">{user.user_metadata.full_name || user.email}</span>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="outline" className="w-full" onClick={() => setIsMenuOpen(false)}>
+                  <Link to="/auth">Sign in</Link>
+                </Button>
+              </>
+            )}
+            
+            <Button asChild className="w-full" variant="default" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/consult">Book a Consultation</Link>
             </Button>
           </div>
         </div>

@@ -13,6 +13,8 @@ import AnimationsPage from "./pages/AnimationsPage";
 import LearningPage from "./pages/LearningPage";
 import EventsPage from "./pages/EventsPage";
 import ConsultPage from "./pages/ConsultPage";
+import AuthPage from "./pages/AuthPage"; // New AuthPage
+import { AuthProvider } from "./contexts/AuthContext";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,17 +25,20 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/ventures" element={<VenturesPage />} />
-          <Route path="/speaking" element={<SpeakingPage />} />
-          <Route path="/ai-animations" element={<AnimationsPage />} />
-          <Route path="/learning" element={<LearningPage />} />
-          <Route path="/events" element={<EventsPage />} />
-          <Route path="/consult" element={<ConsultPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/ventures" element={<VenturesPage />} />
+            <Route path="/speaking" element={<SpeakingPage />} />
+            <Route path="/ai-animations" element={<AnimationsPage />} />
+            <Route path="/learning" element={<LearningPage />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/consult" element={<ConsultPage />} />
+            <Route path="/auth" element={<AuthPage />} /> {/* New AuthPage route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
