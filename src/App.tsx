@@ -1,7 +1,6 @@
 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
@@ -13,19 +12,20 @@ import AnimationsPage from "./pages/AnimationsPage";
 import LearningPage from "./pages/LearningPage";
 import EventsPage from "./pages/EventsPage";
 import ConsultPage from "./pages/ConsultPage";
-import AuthPage from "./pages/AuthPage"; // New AuthPage
+import AuthPage from "./pages/AuthPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import NotFound from "./pages/NotFound";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<AboutPage />} />
@@ -35,12 +35,12 @@ const App = () => (
             <Route path="/learning" element={<LearningPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/consult" element={<ConsultPage />} />
-            <Route path="/auth" element={<AuthPage />} /> {/* New AuthPage route */}
+            <Route path="/auth" element={<AuthPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+        </TooltipProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
