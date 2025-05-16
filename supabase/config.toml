@@ -1,1 +1,24 @@
+
 project_id = "rxqoczksnddbxcdwobnw"
+[api]
+enabled = true
+port = 54321
+[db]
+port = 54322
+[studio]
+port = 54323
+[inbucket]
+port = 54324
+[auth]
+enabled = true
+[storage]
+enabled = true
+[realtime]
+enabled = true
+[functions]
+[functions.create-payment]
+verify_jwt = true
+[functions.verify-payment]
+verify_jwt = false
+[functions.create-google-meet]
+verify_jwt = true

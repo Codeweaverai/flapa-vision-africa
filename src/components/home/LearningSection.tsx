@@ -64,7 +64,7 @@ const LearningSection = () => {
             </div>
             <div className="absolute -bottom-6 -right-6 md:bottom-12 md:-right-12 bg-white p-6 rounded-xl shadow-lg w-64">
               <div className="text-lg font-bold mb-2">Next Available</div>
-              <div className="text-primary font-bold mb-1">June 25, 2025</div>
+              <div className="text-primary font-bold mb-1">May 20, 2025</div>
               <div className="text-sm text-muted-foreground">Book early to secure your spot</div>
             </div>
           </div>

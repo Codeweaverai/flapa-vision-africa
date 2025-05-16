@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { createGoogleMeetEvent } from "./googleCalendarService";
 
 export interface ConsultationBooking {
   id: string;
@@ -86,6 +87,34 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
   }
 
   try {
+    // For Google Meet bookings, create a meeting link
+    let meetingLink = null;
+    if (bookingData.booking_type === 'google_meet') {
+      // Get the user's profile to use their email
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+        
+      const username = profileData?.full_name || user.email?.split('@')[0] || 'User';
+      
+      // Calculate end time
+      const endTime = new Date(bookingData.scheduled_time);
+      endTime.setMinutes(endTime.getMinutes() + bookingData.duration);
+      
+      // Create Google Meet event
+      meetingLink = await createGoogleMeetEvent({
+        title: `Consultation with ${username}: ${bookingData.topic || 'Business Consultation'}`,
+        description: `Consultation booking: ${bookingData.topic || ''}\n\nNotes: ${bookingData.notes || ''}`,
+        startTime: bookingData.scheduled_time,
+        endTime: endTime,
+        attendeeEmails: [user.email || '']
+      });
+      
+      console.log("Created meeting link:", meetingLink);
+    }
+
     // Create a new booking record
     const { data, error } = await supabase
       .from('consultation_bookings')
@@ -95,6 +124,7 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         duration: bookingData.duration,
         scheduled_time: bookingData.scheduled_time.toISOString(),
         location: bookingData.location || null,
+        online_meeting_link: meetingLink || null,
         topic: bookingData.topic || null,
         notes: bookingData.notes || null,
         status: 'pending',
