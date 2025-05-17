@@ -25,18 +25,18 @@ const AboutSection = () => {
           
           <div>
             <h2 className="heading-lg mb-6">
-              Visionary Leader & <span className="text-gradient">Tech Innovator</span>
+              African Innovation <span className="text-gradient">Leader</span>
             </h2>
             <p className="mb-4 text-lg">
               Mbolela Pule is the Founder and CEO of FlapaBay, a pioneering travel and logistics 
-              technology company transforming mobility across Africa. With over 15 years of 
-              experience in technology and logistics, he has built solutions that connect 
-              people, goods, and opportunities throughout the continent.
+              technology company transforming mobility across Africa. With a unique blend of technical, 
+              financial, and entrepreneurial expertise, he founded FlapaBay to harness technology for 
+              social good.
             </p>
             <p className="mb-6 text-lg">
-              His mission is to harness innovation to solve Africa's most pressing challenges 
-              in transportation, tourism, and trade, creating sustainable growth and 
-              opportunities for millions.
+              His mission is to bridge the gap between technology and social impact, drive 
+              economic growth, and foster community development throughout the continent, creating 
+              sustainable opportunities for millions.
             </p>
             <Button asChild size="lg">
               <Link to="/about">Learn More About Mbolela</Link>

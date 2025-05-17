@@ -1,6 +1,6 @@
 
 import Layout from '@/components/layout/Layout';
-import { User, Award, BookOpen, Map, Briefcase } from 'lucide-react';
+import { User, Award, BookOpen, Map, Briefcase, Globe, Layers, Heart, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
@@ -12,30 +12,29 @@ const AboutPage = () => {
           <div>
             <h1 className="heading-lg mb-6 text-gradient">About Mbolela Pule</h1>
             <p className="text-lg mb-6">
-              Founder & CEO of FlapaBay, a visionary entrepreneur dedicated to 
-              revolutionizing logistics and travel across Africa through innovative 
-              technology solutions and strategic business development.
+              Founder & CEO of FlapaBay | African Innovation Leader | Technical & Finance Expert based in Lusaka Province, Zambia.
+              An innovative thinker, seasoned expert, and passionate leader dedicated to transforming Africa's travel and fintech landscape.
             </p>
             <div className="space-y-4 mb-8">
               <div className="flex items-start gap-3">
                 <Map className="h-6 w-6 text-primary mt-1" />
                 <div>
                   <h3 className="font-semibold text-lg">Vision</h3>
-                  <p>Building a connected Africa where travel and logistics are seamless, efficient, and accessible to all.</p>
+                  <p>Bridging the gap between technology and social impact, creating sustainable growth and opportunities across Africa.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Briefcase className="h-6 w-6 text-primary mt-1" />
                 <div>
                   <h3 className="font-semibold text-lg">Industry Experience</h3>
-                  <p>15+ years leading innovation in travel technologies, logistics automation, and business strategy.</p>
+                  <p>Over 10 years of experience in technical innovation, financial expertise, travel and tourism management, and leadership development.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <BookOpen className="h-6 w-6 text-primary mt-1" />
                 <div>
                   <h3 className="font-semibold text-lg">Education</h3>
-                  <p>MBA in International Business, BSc in Computer Science with specialization in AI and Automation.</p>
+                  <p>ACCA Full Professional Qualification in Accounting and Finance, Certified Financial Analyst, Project Management and Software Development certifications.</p>
                 </div>
               </div>
             </div>
@@ -59,30 +58,141 @@ const AboutPage = () => {
 
         <div className="mb-16">
           <h2 className="heading-md mb-8">Professional Journey</h2>
+          <div className="space-y-6">
+            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex flex-col md:flex-row md:justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold">Founder & Chief Executive Officer</h3>
+                  <p className="text-primary font-medium">FlapaBay Group</p>
+                </div>
+                <div className="text-muted-foreground mt-1">December 2020 - Present</div>
+              </div>
+              <p>
+                As Founder & CEO of FlapaBay Group and its subsidiaries, Mbolela ensures overall success of the organization 
+                and takes a leading role in the development and execution of long-term corporate strategies, with the goal of 
+                increasing shareholder value.
+              </p>
+            </div>
+
+            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex flex-col md:flex-row md:justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold">Finance and Administration Officer</h3>
+                  <p className="text-primary font-medium">Act!on for Nature</p>
+                </div>
+                <div className="text-muted-foreground mt-1">January 2020 - December 2020</div>
+              </div>
+              <p>
+                Managed the NGO's finances, project management and fundraising in Lusaka.
+              </p>
+            </div>
+
+            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex flex-col md:flex-row md:justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold">Senior Auditor</h3>
+                  <p className="text-primary font-medium">Grant Thornton LLP</p>
+                </div>
+                <div className="text-muted-foreground mt-1">January 2015 - December 2019</div>
+              </div>
+              <p>
+                Responsible for analyzing and communicating financial information for companies, local, federal and state government 
+                as well as individual clients. Reviewed company operations to ensure compliance with corporate and government policies.
+                Oversaw fieldwork, planning and reporting of audit assignments to the audit manager and partner.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-16">
+          <h2 className="heading-md mb-8">Key Expertise & Skills</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <User className="h-10 w-10 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Leadership</h3>
+              <Layers className="h-10 w-10 text-primary mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Technical Innovation</h3>
               <p>
-                Founded FlapaBay in 2015 with a mission to transform how people and goods move across Africa.
-                Scaled operations to 12 countries and built a team of over 200 dedicated professionals.
+                Expert in leveraging technology for business optimization, logistics innovation, 
+                and creating accessible solutions for underserved markets.
               </p>
             </div>
             <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <Award className="h-10 w-10 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Achievements</h3>
+              <Star className="h-10 w-10 text-primary mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Financial Expertise</h3>
               <p>
-                Recognized as one of Africa's Top 40 Under 40 Entrepreneurs.
-                Secured $12M in funding to expand FlapaBay's footprint across the continent.
+                Strong financial analysis skills, certified chartered accountant with experience
+                in corporate financial statement analysis and financial modeling.
               </p>
             </div>
             <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <BookOpen className="h-10 w-10 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Expertise</h3>
+              <Heart className="h-10 w-10 text-primary mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Social Impact</h3>
               <p>
-                Specializes in leveraging AI for business optimization, logistics 
-                innovation, and creating accessible travel solutions for underserved markets.
+                Dedicated to harnessing innovation for social good, driving economic growth, 
+                and fostering community development across Africa.
               </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-16">
+          <h2 className="heading-md mb-8">Education & Certifications</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-card rounded-lg p-6 shadow-md">
+              <h3 className="text-xl font-semibold mb-4">Education</h3>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-2">
+                  <Award className="h-5 w-5 text-primary mt-1" />
+                  <div>
+                    <p className="font-medium">ACCA Full Professional Qualification</p>
+                    <p className="text-sm text-muted-foreground">Accounting and Finance (2012 - 2015)</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Award className="h-5 w-5 text-primary mt-1" />
+                  <div>
+                    <p className="font-medium">Philanthropy University</p>
+                    <p className="text-sm text-muted-foreground">Fundamentals of Project Management & Fundraising Strategies (2020)</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Award className="h-5 w-5 text-primary mt-1" />
+                  <div>
+                    <p className="font-medium">LinkedIn Learning</p>
+                    <p className="text-sm text-muted-foreground">Software and Web Developer, Computer Programming (2020)</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div className="bg-card rounded-lg p-6 shadow-md">
+              <h3 className="text-xl font-semibold mb-4">Certifications</h3>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-2">
+                  <Award className="h-5 w-5 text-primary mt-1" />
+                  <div>
+                    <p className="font-medium">Financial Modelling Foundations</p>
+                    <p className="text-sm text-muted-foreground">National Association of State Boards of Accountancy (NASBA) USA</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Award className="h-5 w-5 text-primary mt-1" />
+                  <div>
+                    <p className="font-medium">Certified Chartered Accountant</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Award className="h-5 w-5 text-primary mt-1" />
+                  <div>
+                    <p className="font-medium">Corporate Financial Statement Analysis</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Award className="h-5 w-5 text-primary mt-1" />
+                  <div>
+                    <p className="font-medium">Managerial Economics</p>
+                    <p className="text-sm text-muted-foreground">Project Management Institute</p>
+                  </div>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
@@ -93,8 +203,7 @@ const AboutPage = () => {
             <p className="text-xl italic text-center">
               "My mission is to connect people, places, and possibilities across Africa. 
               Through technological innovation and strategic vision, I'm dedicated to 
-              breaking down barriers in transportation and logistics, making movement more efficient, 
-              accessible, and sustainable for all Africans."
+              harnessing technology for social good, driving economic growth, and fostering community development."
             </p>
           </div>
         </div>

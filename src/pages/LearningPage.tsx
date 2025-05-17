@@ -1,4 +1,3 @@
-
 import Layout from '@/components/layout/Layout';
 import { BookOpen, Video, FileText, Lock, Award, Users, BookUser, Headphones, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,9 +9,9 @@ import { Link } from 'react-router-dom';
 const LearningPage = () => {
   return (
     <Layout>
-      <div className="section-container">
+      <div className="section-container bg-light-purple">
         <div className="mb-12 max-w-3xl mx-auto text-center">
-          <h1 className="heading-lg mb-6 text-gradient">Learning Platform</h1>
+          <h1 className="heading-lg mb-8 text-gradient">Learning Resources</h1>
           <p className="text-lg">
             Elevate your skills with curated courses on AI implementation, business growth strategies, 
             and entrepreneurship in Africa's evolving tech landscape.

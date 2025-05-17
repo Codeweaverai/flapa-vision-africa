@@ -1,14 +1,12 @@
-
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import Layout from '@/components/layout/Layout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const AuthPage = () => {
   const { user, loading, signIn, signUp } = useAuth();
@@ -17,6 +15,8 @@ const AuthPage = () => {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   // Redirect if already authenticated
   if (!loading && user) {
@@ -26,19 +26,41 @@ const AuthPage = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await signIn(email, password);
+    try {
+      await signIn(email, password);
+      toast({
+        title: 'Success',
+        description: 'You have successfully signed in.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to sign in.',
+      });
+    }
     setIsSubmitting(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await signUp(email, password, { full_name: fullName, username });
+    try {
+      await signUp(email, password, { full_name: fullName, username });
+      toast({
+        title: 'Success',
+        description: 'You have successfully signed up.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to sign up.',
+      });
+    }
     setIsSubmitting(false);
   };
 
   return (
-    <Layout>
+    <div className="flex min-h-screen bg-light-purple">
       <div className="container max-w-md mx-auto py-20 bg-light-purple">
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -159,7 +181,7 @@ const AuthPage = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </div>
   );
 };
 

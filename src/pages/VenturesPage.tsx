@@ -1,4 +1,3 @@
-
 import Layout from '@/components/layout/Layout';
 import { Briefcase, Home, Truck, Plane, Shield, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 const VenturesPage = () => {
   return (
     <Layout>
-      <div className="section-container">
+      <div className="section-container bg-light-purple">
         <div className="mb-12 text-center max-w-3xl mx-auto">
           <h1 className="heading-lg mb-6 text-gradient">Ventures</h1>
           <p className="text-lg">
