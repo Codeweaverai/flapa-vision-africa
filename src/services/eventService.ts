@@ -47,6 +47,23 @@ export interface Registration {
   events?: Event; // Join with events table
 }
 
+export interface EventBooking {
+  id: string;
+  user_id: string;
+  event_id: string;
+  booking_date: string;
+  status: string;
+  payment_status: string;
+  payment_id?: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  phone_number?: string;
+  mobile_operator?: string;
+  created_at?: string;
+  updated_at?: string;
+  events?: Event; // Join with events table
+}
+
 export const fetchEvents = async (): Promise<Event[]> => {
   try {
     const { data, error } = await supabase
@@ -73,46 +90,56 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
   }
 
   try {
-    // First check if user is already registered for this event
+    // First check if user is already registered for this event in either table
+    // Check registrations table (old)
     const { data: existingRegistration, error: existingRegistrationError } = await supabase
       .from('registrations')
       .select('*')
       .eq('user_id', user.id)
       .eq('event_id', event.id)
-      .maybeSingle(); // Changed from single() to maybeSingle() to avoid 406 errors
+      .maybeSingle(); // Using maybeSingle() to avoid 406 errors
 
-    if (existingRegistrationError) {
+    // Check event_bookings table (new)
+    const { data: existingBooking, error: existingBookingError } = await supabase
+      .from('event_bookings')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('event_id', event.id)
+      .maybeSingle();
+
+    if (existingRegistrationError && !existingBookingError) {
       console.error('Error checking existing registration:', existingRegistrationError);
       toast.error('Failed to check existing registration');
       return false;
     }
 
-    if (existingRegistration) {
+    if (existingRegistration || existingBooking) {
       toast.error('You are already registered for this event.');
       return false;
     }
 
-    // Create registration data object with proper structure
-    const registrationData: any = {
+    // Create booking data object with proper structure
+    const bookingData: any = {
       user_id: user.id,
       event_id: event.id,
       status: 'pending',
       payment_status: event.is_free ? 'confirmed' : 'pending',
+      booking_date: new Date().toISOString()
     };
 
     if (phoneNumber && mobileOperator) {
-      registrationData.phone_number = phoneNumber;
-      registrationData.mobile_operator = mobileOperator;
-      registrationData.payment_method = 'mobile_money';
+      bookingData.phone_number = phoneNumber;
+      bookingData.mobile_operator = mobileOperator;
     }
 
-    const { data, error } = await supabase
-      .from('registrations')
-      .insert([registrationData])
+    // Insert into the new event_bookings table
+    const { data: bookingResult, error: bookingError } = await supabase
+      .from('event_bookings')
+      .insert([bookingData])
       .select();
 
-    if (error) {
-      console.error('Error registering for event:', error);
+    if (bookingError) {
+      console.error('Error registering for event:', bookingError);
       toast.error('Failed to register for event');
       return false;
     }
@@ -128,7 +155,10 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           return false;
         }
 
-        const response = await fetch(`${supabase.url}/functions/v1/initiate-payment`, {
+        // Get the supabase URL from the client
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || supabase.supabaseUrl;
+        
+        const response = await fetch(`${supabaseUrl}/functions/v1/initiate-payment`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -140,7 +170,7 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
             phone_number: phoneNumber,
             mobile_operator: mobileOperator,
             referenceType: 'event',
-            referenceId: data[0].id,
+            referenceId: bookingResult[0].id,
             userId: user.id
           }),
         });
@@ -155,11 +185,11 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           console.error('Payment initiation failed:', result.error || 'Unknown error');
           toast.error('Payment initiation failed. Please try again.');
           
-          // Update registration status to failed
+          // Update booking status to failed
           await supabase
-            .from('registrations')
+            .from('event_bookings')
             .update({ status: 'failed', payment_status: 'failed' })
-            .eq('id', data[0].id);
+            .eq('id', bookingResult[0].id);
             
           return false;
         }
@@ -167,12 +197,12 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
         console.error('Error initiating payment:', err);
         toast.error('Error initiating payment. Please try again.');
         
-        // Update registration status to failed if possible
-        if (data && data[0]?.id) {
+        // Update booking status to failed if possible
+        if (bookingResult && bookingResult[0]?.id) {
           await supabase
-            .from('registrations')
+            .from('event_bookings')
             .update({ status: 'failed', payment_status: 'failed' })
-            .eq('id', data[0].id);
+            .eq('id', bookingResult[0].id);
         }
         return false;
       }
@@ -196,19 +226,59 @@ export const fetchUserRegistrations = async (user: User | null): Promise<Registr
   }
 
   try {
-    const { data, error } = await supabase
+    // First get registrations from the old table
+    const { data: oldRegistrations, error: oldError } = await supabase
       .from('registrations')
-      .select('*, events(*)')  // Join with events table to get event details
+      .select('*, events(*)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching user registrations:', error);
-      toast.error('Failed to load registrations');
-      return [];
+    if (oldError) {
+      console.error('Error fetching user registrations from old table:', oldError);
     }
 
-    return data as Registration[];
+    // Then get registrations from the new event_bookings table
+    const { data: newBookings, error: newError } = await supabase
+      .from('event_bookings')
+      .select('*, events(*)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (newError) {
+      console.error('Error fetching user registrations from new table:', newError);
+    }
+
+    // Convert event_bookings to the Registration format
+    const convertedBookings: Registration[] = (newBookings || []).map((booking: EventBooking) => ({
+      id: booking.id,
+      user_id: booking.user_id,
+      event_id: booking.event_id,
+      status: booking.status,
+      payment_status: booking.payment_status,
+      created_at: booking.created_at,
+      updated_at: booking.updated_at,
+      phone_number: booking.phone_number,
+      mobile_operator: booking.mobile_operator,
+      payment_id: booking.payment_id,
+      payment_currency: booking.payment_currency,
+      payment_amount: booking.payment_amount,
+      events: booking.events
+    }));
+
+    // Merge both results, with new bookings taking precedence for the same event
+    const combinedResults = [...(oldRegistrations || [])];
+    
+    // Add new bookings, avoiding duplicates by event_id
+    for (const newBooking of convertedBookings) {
+      const existingIndex = combinedResults.findIndex(r => r.event_id === newBooking.event_id);
+      if (existingIndex >= 0) {
+        combinedResults[existingIndex] = newBooking; // Replace with the newer booking
+      } else {
+        combinedResults.push(newBooking);
+      }
+    }
+
+    return combinedResults as Registration[];
   } catch (error) {
     console.error('Error in fetchUserRegistrations:', error);
     return [];
@@ -222,14 +292,24 @@ export const cancelRegistration = async (registrationId: string, user: User | nu
   }
 
   try {
-    const { error } = await supabase
+    // Try to cancel in both tables
+    // First try in the old registrations table
+    const { error: oldError } = await supabase
       .from('registrations')
       .update({ status: 'cancelled' })
       .eq('id', registrationId)
       .eq('user_id', user.id);
 
-    if (error) {
-      console.error('Error cancelling registration:', error);
+    // Then try in the new event_bookings table
+    const { error: newError } = await supabase
+      .from('event_bookings')
+      .update({ status: 'cancelled' })
+      .eq('id', registrationId)
+      .eq('user_id', user.id);
+
+    // If both failed, show error
+    if (oldError && newError) {
+      console.error('Error cancelling registration:', oldError || newError);
       toast.error('Failed to cancel registration');
       return false;
     }

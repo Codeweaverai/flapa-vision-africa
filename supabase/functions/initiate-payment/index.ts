@@ -109,8 +109,21 @@ serve(async (req) => {
       
     // Update the registration/booking status
     if (referenceType === 'event') {
+      // Try to update in both tables for compatibility
       await supabaseClient
         .from('registrations')
+        .update({
+          payment_status: 'confirmed',
+          status: 'confirmed',
+          payment_id: payment.id,
+          payment_amount: amount,
+          payment_currency: currency
+        })
+        .eq('id', referenceId);
+      
+      // Also update in the new event_bookings table
+      await supabaseClient
+        .from('event_bookings')
         .update({
           payment_status: 'confirmed',
           status: 'confirmed',

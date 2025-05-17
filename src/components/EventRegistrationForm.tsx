@@ -75,6 +75,9 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
         toast.success(`Successfully registered for ${event.title}`);
         if (onSuccess) onSuccess();
       }
+    } catch (error) {
+      console.error("Error during free registration:", error);
+      toast.error("Failed to register for event");
     } finally {
       setLoading(false);
     }
@@ -99,6 +102,9 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
       if (result && onSuccess) {
         onSuccess();
       }
+    } catch (error) {
+      console.error("Error during paid registration:", error);
+      toast.error("Failed to process registration");
     } finally {
       setLoading(false);
     }

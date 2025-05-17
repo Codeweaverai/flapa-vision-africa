@@ -75,6 +75,62 @@ export type Database = {
         }
         Relationships: []
       }
+      event_bookings: {
+        Row: {
+          booking_date: string | null
+          created_at: string | null
+          event_id: string
+          id: string
+          mobile_operator: string | null
+          payment_amount: number | null
+          payment_currency: string | null
+          payment_id: string | null
+          payment_status: string | null
+          phone_number: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          booking_date?: string | null
+          created_at?: string | null
+          event_id: string
+          id?: string
+          mobile_operator?: string | null
+          payment_amount?: number | null
+          payment_currency?: string | null
+          payment_id?: string | null
+          payment_status?: string | null
+          phone_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          booking_date?: string | null
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          mobile_operator?: string | null
+          payment_amount?: number | null
+          payment_currency?: string | null
+          payment_id?: string | null
+          payment_status?: string | null
+          phone_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_bookings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           capacity: number | null
