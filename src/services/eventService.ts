@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -36,7 +35,7 @@ export interface Registration {
   event_id: string;
   status: string;
   payment_status: string;
-  created_at?: string;
+  created_at: string; // Changed from optional to required
   updated_at?: string;
   phone_number?: string;
   mobile_operator?: string;
@@ -59,7 +58,7 @@ export interface EventBooking {
   payment_currency?: string;
   phone_number?: string;
   mobile_operator?: string;
-  created_at?: string;
+  created_at: string; // Changed from optional to required
   updated_at?: string;
   events?: Event; // Join with events table
 }
@@ -155,8 +154,8 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           return false;
         }
 
-        // Get the supabase URL from the client
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || supabase.supabaseUrl;
+        // Get the supabase URL from the environment variable instead of the client property
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://rxqoczksnddbxcdwobnw.supabase.co";
         
         const response = await fetch(`${supabaseUrl}/functions/v1/initiate-payment`, {
           method: 'POST',
@@ -255,7 +254,7 @@ export const fetchUserRegistrations = async (user: User | null): Promise<Registr
       event_id: booking.event_id,
       status: booking.status,
       payment_status: booking.payment_status,
-      created_at: booking.created_at,
+      created_at: booking.created_at || new Date().toISOString(), // Ensure created_at is not undefined
       updated_at: booking.updated_at,
       phone_number: booking.phone_number,
       mobile_operator: booking.mobile_operator,
@@ -266,7 +265,10 @@ export const fetchUserRegistrations = async (user: User | null): Promise<Registr
     }));
 
     // Merge both results, with new bookings taking precedence for the same event
-    const combinedResults = [...(oldRegistrations || [])];
+    const combinedResults = [...(oldRegistrations || [])].map(reg => ({
+      ...reg,
+      created_at: reg.created_at || new Date().toISOString() // Ensure created_at is not undefined
+    }));
     
     // Add new bookings, avoiding duplicates by event_id
     for (const newBooking of convertedBookings) {
