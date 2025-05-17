@@ -34,22 +34,52 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Download, Search } from 'lucide-react';
-import { Event, Registration } from '@/services/eventService';
+import { Download, Search, FileSpreadsheet, FileText } from 'lucide-react';
+import { Event, Registration, EventBooking } from '@/services/eventService';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface EventWithRegistrations extends Event {
   registrations_count: number;
+  bookings_count: number;
+  total_attendees: number;
+}
+
+// Combined type for both registration types
+interface CombinedRegistration {
+  id: string;
+  user_id: string;
+  event_id: string;
+  status: string;
+  payment_status: string;
+  created_at: string;
+  phone_number: string | null;
+  mobile_operator: string | null;
+  source_table: 'registrations' | 'event_bookings'; // Track which table it came from
+  profiles?: {
+    full_name: string | null;
+    email: string | null;
+  };
+  events?: Event;
 }
 
 const AdminRegistrations = () => {
   const [events, setEvents] = useState<EventWithRegistrations[]>([]);
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [registrations, setRegistrations] = useState<CombinedRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
+  const [selectedRegistration, setSelectedRegistration] = useState<CombinedRegistration | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('all');
 
   useEffect(() => {
     fetchEvents();
@@ -57,24 +87,51 @@ const AdminRegistrations = () => {
 
   useEffect(() => {
     fetchRegistrations(selectedEvent);
-  }, [selectedEvent]);
+  }, [selectedEvent, activeTab]);
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      // Get events with registration counts
-      const { data, error } = await supabase
+      
+      // Get events with registration counts from both tables
+      const { data: eventsData, error: eventsError } = await supabase
         .from('events')
-        .select('*, registrations:registrations(count)')
+        .select('*')
         .order('start_time', { ascending: false });
       
-      if (error) throw error;
+      if (eventsError) throw eventsError;
       
-      // Transform the data to include registration counts
-      const eventsWithCounts = data.map(event => ({
-        ...event,
-        registrations_count: event.registrations[0]?.count || 0
-      })) as EventWithRegistrations[];
+      // Get counts from registrations table
+      const { data: regCounts, error: regError } = await supabase
+        .from('registrations')
+        .select('event_id, count')
+        .group('event_id');
+        
+      if (regError) throw regError;
+      
+      // Get counts from event_bookings table
+      const { data: bookingCounts, error: bookingError } = await supabase
+        .from('event_bookings')
+        .select('event_id, count')
+        .group('event_id');
+        
+      if (bookingError) throw bookingError;
+      
+      // Process and combine the data
+      const eventsWithCounts = eventsData.map(event => {
+        // Count from registrations table
+        const regCount = regCounts.find(r => r.event_id === event.id)?.count || 0;
+        
+        // Count from bookings table
+        const bookingCount = bookingCounts.find(b => b.event_id === event.id)?.count || 0;
+        
+        return {
+          ...event,
+          registrations_count: parseInt(regCount),
+          bookings_count: parseInt(bookingCount),
+          total_attendees: parseInt(regCount) + parseInt(bookingCount)
+        };
+      }) as EventWithRegistrations[];
       
       setEvents(eventsWithCounts);
       fetchRegistrations('all');
@@ -89,23 +146,64 @@ const AdminRegistrations = () => {
   const fetchRegistrations = async (eventId: string) => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('registrations')
-        .select(`
-          *,
-          events(*),
-          profiles:user_id(full_name, email:username)
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (eventId !== 'all') {
-        query = query.eq('event_id', eventId);
+
+      // Prepare arrays to hold results from both tables
+      let oldRegistrations: CombinedRegistration[] = [];
+      let newBookings: CombinedRegistration[] = [];
+
+      // Fetch from registrations table (if showing all or registrations tab)
+      if (activeTab === 'all' || activeTab === 'registrations') {
+        let regQuery = supabase
+          .from('registrations')
+          .select(`
+            *,
+            events(*),
+            profiles:user_id(full_name, email:username)
+          `)
+          .order('created_at', { ascending: false });
+        
+        if (eventId !== 'all') {
+          regQuery = regQuery.eq('event_id', eventId);
+        }
+        
+        const { data: regData, error: regError } = await regQuery;
+        
+        if (regError) throw regError;
+        
+        oldRegistrations = regData.map(reg => ({
+          ...reg,
+          source_table: 'registrations' as const
+        }));
       }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      setRegistrations(data as unknown as Registration[]);
+
+      // Fetch from event_bookings table (if showing all or bookings tab)
+      if (activeTab === 'all' || activeTab === 'bookings') {
+        let bookingQuery = supabase
+          .from('event_bookings')
+          .select(`
+            *,
+            events(*),
+            profiles:user_id(full_name, email:username)
+          `)
+          .order('created_at', { ascending: false });
+        
+        if (eventId !== 'all') {
+          bookingQuery = bookingQuery.eq('event_id', eventId);
+        }
+        
+        const { data: bookingData, error: bookingError } = await bookingQuery;
+        
+        if (bookingError) throw bookingError;
+        
+        newBookings = bookingData.map(booking => ({
+          ...booking,
+          source_table: 'event_bookings' as const
+        }));
+      }
+
+      // Combine both datasets
+      const combined = [...oldRegistrations, ...newBookings];
+      setRegistrations(combined);
     } catch (error) {
       console.error('Error fetching registrations:', error);
       toast.error('Failed to load registrations');
@@ -114,12 +212,15 @@ const AdminRegistrations = () => {
     }
   };
 
-  const handleUpdateStatus = async (registrationId: string, status: string, paymentStatus: string) => {
+  const handleUpdateStatus = async (registration: CombinedRegistration, status: string, paymentStatus: string) => {
     try {
+      // Update in the correct table based on source
+      const table = registration.source_table;
+      
       const { error } = await supabase
-        .from('registrations')
+        .from(table)
         .update({ status, payment_status: paymentStatus })
-        .eq('id', registrationId);
+        .eq('id', registration.id);
       
       if (error) throw error;
       
@@ -132,14 +233,17 @@ const AdminRegistrations = () => {
     }
   };
 
-  const handleDeleteRegistration = async (registrationId: string) => {
+  const handleDeleteRegistration = async (registration: CombinedRegistration) => {
     if (!confirm('Are you sure you want to delete this registration?')) return;
     
     try {
+      // Delete from the correct table based on source
+      const table = registration.source_table;
+      
       const { error } = await supabase
-        .from('registrations')
+        .from(table)
         .delete()
-        .eq('id', registrationId);
+        .eq('id', registration.id);
       
       if (error) throw error;
       
@@ -151,30 +255,62 @@ const AdminRegistrations = () => {
     }
   };
 
-  const exportAttendees = (eventId: string) => {
+  const exportAttendees = (eventId: string, format: 'xlsx' | 'pdf') => {
     const event = events.find(e => e.id === eventId);
     if (!event) return;
     
     // Filter registrations for the selected event
     const filteredRegistrations = registrations.filter(reg => reg.event_id === eventId);
     
-    // Convert to Excel format
-    const exportData = filteredRegistrations.map((reg: any) => ({
+    // Convert to export format
+    const exportData = filteredRegistrations.map(reg => ({
       'Name': reg.profiles?.full_name || 'Unknown',
       'Email': reg.profiles?.email || 'Unknown',
       'Phone': reg.phone_number || 'Not provided',
       'Status': reg.status,
       'Payment Status': reg.payment_status,
-      'Registration Date': format(parseISO(reg.created_at || new Date().toISOString()), 'MMM d, yyyy')
+      'Source': reg.source_table === 'registrations' ? 'Legacy System' : 'New System',
+      'Registration Date': formatDate(reg.created_at || new Date().toISOString())
     }));
     
-    // Create workbook and worksheet
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Attendees');
-    
-    // Generate Excel file and trigger download
-    XLSX.writeFile(wb, `${event.title}-attendees.xlsx`);
+    if (format === 'xlsx') {
+      // Create workbook and worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Attendees');
+      
+      // Generate Excel file and trigger download
+      XLSX.writeFile(wb, `${event.title}-attendees.xlsx`);
+    } else if (format === 'pdf') {
+      // Generate PDF
+      const doc = new jsPDF();
+      
+      // Add event title as header
+      doc.setFontSize(18);
+      doc.text(event.title, 14, 22);
+      doc.setFontSize(12);
+      doc.text('Attendee List', 14, 32);
+      
+      // Create the table
+      autoTable(doc, {
+        head: [['Name', 'Email', 'Phone', 'Status', 'Payment Status', 'Source', 'Registration Date']],
+        body: exportData.map(row => [
+          row.Name, 
+          row.Email, 
+          row.Phone, 
+          row.Status, 
+          row['Payment Status'],
+          row.Source,
+          row['Registration Date']
+        ]),
+        startY: 40,
+        styles: { fontSize: 10, cellPadding: 3 },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      });
+      
+      // Save the PDF
+      doc.save(`${event.title}-attendees.pdf`);
+    }
   };
 
   const formatDate = (dateString?: string) => {
@@ -189,7 +325,7 @@ const AdminRegistrations = () => {
   const filterRegistrations = () => {
     if (!searchQuery) return registrations;
     
-    return registrations.filter((reg: any) => {
+    return registrations.filter(reg => {
       const fullName = reg.profiles?.full_name?.toLowerCase() || '';
       const email = reg.profiles?.email?.toLowerCase() || '';
       const phone = reg.phone_number?.toLowerCase() || '';
@@ -216,6 +352,14 @@ const AdminRegistrations = () => {
         </div>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="all">All Registrations</TabsTrigger>
+          <TabsTrigger value="registrations">Legacy Registrations</TabsTrigger>
+          <TabsTrigger value="bookings">New Bookings</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="w-full sm:w-1/2">
           <Label htmlFor="event-filter">Filter by Event</Label>
@@ -227,7 +371,7 @@ const AdminRegistrations = () => {
               <SelectItem value="all">All Events</SelectItem>
               {events.map(event => (
                 <SelectItem key={event.id} value={event.id}>
-                  {event.title} ({event.registrations_count})
+                  {event.title} ({event.total_attendees})
                 </SelectItem>
               ))}
             </SelectContent>
@@ -271,12 +415,13 @@ const AdminRegistrations = () => {
                   <TableHead>Registration Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Payment</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRegistrations.map((registration: any) => (
-                  <TableRow key={registration.id}>
+                {filteredRegistrations.map((registration) => (
+                  <TableRow key={`${registration.source_table}-${registration.id}`}>
                     <TableCell className="font-medium">
                       <div>
                         <p>{registration.profiles?.full_name || 'Unknown'}</p>
@@ -303,7 +448,12 @@ const AdminRegistrations = () => {
                         registration.payment_status === 'failed' ? 'destructive' :
                         'secondary'
                       }>
-                        {registration.is_free ? 'Free' : registration.payment_status}
+                        {registration.events?.is_free ? 'Free' : registration.payment_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {registration.source_table === 'registrations' ? 'Legacy' : 'New System'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -321,7 +471,7 @@ const AdminRegistrations = () => {
                         <Button 
                           size="sm" 
                           variant="destructive"
-                          onClick={() => handleDeleteRegistration(registration.id)}
+                          onClick={() => handleDeleteRegistration(registration)}
                         >
                           Delete
                         </Button>
@@ -339,23 +489,45 @@ const AdminRegistrations = () => {
       <div className="mt-8">
         <h3 className="text-lg font-medium mb-4">Export Attendees</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.filter(event => event.registrations_count > 0).map(event => (
+          {events.filter(event => event.total_attendees > 0).map(event => (
             <Card key={event.id} className="p-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="font-medium">{event.title}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {event.registrations_count} {event.registrations_count === 1 ? 'attendee' : 'attendees'}
-                  </p>
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-medium">{event.title}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {event.total_attendees} {event.total_attendees === 1 ? 'attendee' : 'attendees'}
+                    </p>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => exportAttendees(event.id, 'xlsx')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Export as Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => exportAttendees(event.id, 'pdf')}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Export as PDF
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => exportAttendees(event.id)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
+                <div className="text-sm grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-muted-foreground">Legacy System: </span> 
+                    <Badge variant="outline">{event.registrations_count}</Badge>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">New System: </span> 
+                    <Badge variant="outline">{event.bookings_count}</Badge>
+                  </div>
+                </div>
               </div>
             </Card>
           ))}
@@ -375,8 +547,9 @@ const AdminRegistrations = () => {
           {selectedRegistration && (
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <h4 className="font-medium">{(selectedRegistration as any).events?.title}</h4>
-                <p className="text-sm">Attendee: {(selectedRegistration as any).profiles?.full_name || 'Unknown'}</p>
+                <h4 className="font-medium">{selectedRegistration.events?.title}</h4>
+                <p className="text-sm">Attendee: {selectedRegistration.profiles?.full_name || 'Unknown'}</p>
+                <Badge>{selectedRegistration.source_table === 'registrations' ? 'Legacy Registration' : 'New Booking'}</Badge>
               </div>
               
               <div className="grid gap-2">
@@ -433,7 +606,7 @@ const AdminRegistrations = () => {
               onClick={() => {
                 if (selectedRegistration) {
                   handleUpdateStatus(
-                    selectedRegistration.id, 
+                    selectedRegistration,
                     selectedRegistration.status, 
                     selectedRegistration.payment_status
                   );
