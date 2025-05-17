@@ -67,10 +67,10 @@ const App = () => (
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
             <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
-            <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
             <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
             <Route path="/admin/courses/create" element={<AdminRoute><CourseForm /></AdminRoute>} />
             <Route path="/admin/courses/edit/:id" element={<AdminRoute><CourseForm /></AdminRoute>} />
+            <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

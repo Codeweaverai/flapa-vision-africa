@@ -9,7 +9,8 @@ import {
   X, 
   Settings,
   Mic,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  BookOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,6 +61,12 @@ const AdminLayout = ({ children, title = 'Dashboard' }: AdminLayoutProps) => {
       href: '/admin/consultations', 
       icon: <CalendarIcon className="mr-2 h-4 w-4" />, 
       active: location.pathname === '/admin/consultations' 
+    },
+    { 
+      name: 'Courses', 
+      href: '/admin/courses', 
+      icon: <BookOpen className="mr-2 h-4 w-4" />, 
+      active: location.pathname === '/admin/courses' || location.pathname.startsWith('/admin/courses/') 
     },
     { 
       name: 'Settings', 
