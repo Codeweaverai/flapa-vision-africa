@@ -28,6 +28,10 @@ import { AuthProvider } from "./contexts/AuthContext";
 import NotFound from "./pages/NotFound";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AdminRoute from "./components/admin/AdminRoute";
+import CourseDetailPage from "./pages/CourseDetailPage";
+import AdminCourses from "./pages/admin/AdminCourses";
+import CourseForm from "./pages/admin/CourseForm";
+import CoursePlayerPage from "./pages/CoursePlayerPage";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +49,8 @@ const App = () => (
             <Route path="/speaking" element={<SpeakingPage />} />
             <Route path="/ai-animations" element={<AnimationsPage />} />
             <Route path="/learning" element={<LearningPage />} />
+            <Route path="/learning/course/:courseId" element={<CourseDetailPage />} />
+            <Route path="/learning/player/:courseId" element={<CoursePlayerPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/consult" element={<ConsultPage />} />
             <Route path="/auth" element={<AuthPage />} />
@@ -62,6 +68,9 @@ const App = () => (
             <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
             <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
             <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+            <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
+            <Route path="/admin/courses/create" element={<AdminRoute><CourseForm /></AdminRoute>} />
+            <Route path="/admin/courses/edit/:id" element={<AdminRoute><CourseForm /></AdminRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,12 +1,52 @@
+
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { BookOpen, Video, FileText, Lock, Award, Users, BookUser, Headphones, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Link } from 'react-router-dom';
+import { BookOpen, Video, FileText, Lock, Award, Users, BookUser, Headphones, Play } from 'lucide-react';
+import { Course, fetchPublishedCourses } from '@/services/courseService';
 
 const LearningPage = () => {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const loadCourses = async () => {
+      setLoading(true);
+      try {
+        const coursesData = await fetchPublishedCourses();
+        setCourses(coursesData);
+        setFilteredCourses(coursesData);
+      } catch (error) {
+        console.error('Error loading courses:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCourses();
+  }, []);
+
+  // Filter courses when category changes
+  useEffect(() => {
+    if (activeCategory === 'all') {
+      setFilteredCourses(courses);
+    } else {
+      setFilteredCourses(courses.filter(course => {
+        // Case insensitive comparison
+        return course.category.toLowerCase() === activeCategory.toLowerCase();
+      }));
+    }
+  }, [activeCategory, courses]);
+
+  // Get unique categories from courses
+  const categories = ['all', ...new Set(courses.map(course => course.category))];
+
   return (
     <Layout>
       <div className="section-container bg-light-purple">
@@ -26,286 +66,76 @@ const LearningPage = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="featured" className="mb-16">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="featured">Featured</TabsTrigger>
-            <TabsTrigger value="ai-courses">AI & Tech</TabsTrigger>
-            <TabsTrigger value="business">Business</TabsTrigger>
-            <TabsTrigger value="leadership">Leadership</TabsTrigger>
+        <Tabs defaultValue="all" className="mb-16" onValueChange={setActiveCategory}>
+          <TabsList className="grid w-full grid-cols-4 mb-8">
+            {categories.slice(0, 4).map(category => (
+              <TabsTrigger key={category} value={category.toLowerCase()}>
+                {category === 'all' ? 'All Courses' : category}
+              </TabsTrigger>
+            ))}
           </TabsList>
           
-          <TabsContent value="featured" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="flex flex-col">
-                <div className="relative">
-                  <img 
-                    src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b" 
-                    alt="AI Fundamentals Course" 
-                    className="w-full h-48 object-cover rounded-t-lg"
-                  />
-                  <Badge className="absolute top-3 right-3">Featured</Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle>AI Implementation for Business Leaders</CardTitle>
-                  <CardDescription>8 Modules • 24 Lessons • 6 Hours</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="mb-4">
-                    A comprehensive guide to implementing AI solutions in your business, 
-                    from identifying opportunities to measuring ROI and scaling deployment.
-                  </p>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <BookOpen className="h-4 w-4 mr-1" />
-                    <span className="mr-4">Beginner-Friendly</span>
-                    <Users className="h-4 w-4 mr-1" />
-                    <span>2,450+ Enrolled</span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <div className="relative">
-                  <img 
-                    src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158" 
-                    alt="Entrepreneurship Course" 
-                    className="w-full h-48 object-cover rounded-t-lg"
-                  />
-                  <Badge className="absolute top-3 right-3" variant="secondary">Popular</Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle>Pan-African Entrepreneurship</CardTitle>
-                  <CardDescription>6 Modules • 18 Lessons • 5 Hours</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="mb-4">
-                    Learn how to build and scale businesses across African markets, 
-                    navigate regulatory environments, and access funding opportunities.
-                  </p>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <BookOpen className="h-4 w-4 mr-1" />
-                    <span className="mr-4">Intermediate</span>
-                    <Users className="h-4 w-4 mr-1" />
-                    <span>1,820+ Enrolled</span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <div className="relative">
-                  <img 
-                    src="https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d" 
-                    alt="Logistics Optimization Course" 
-                    className="w-full h-48 object-cover rounded-t-lg"
-                  />
-                  <Badge className="absolute top-3 right-3" variant="outline">New</Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle>Logistics Optimization Masterclass</CardTitle>
-                  <CardDescription>10 Modules • 32 Lessons • 8 Hours</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="mb-4">
-                    Master advanced techniques for optimizing logistics operations, 
-                    from route planning to inventory management and supply chain resilience.
-                  </p>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <BookOpen className="h-4 w-4 mr-1" />
-                    <span className="mr-4">Advanced</span>
-                    <Users className="h-4 w-4 mr-1" />
-                    <span>980+ Enrolled</span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="ai-courses" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>AI for Business Decision Making</CardTitle>
-                  <CardDescription>5 Modules • 15 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Learn how to leverage AI for strategic business decisions, 
-                    predictive analytics, and competitive advantage.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Practical Machine Learning</CardTitle>
-                  <CardDescription>8 Modules • 24 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Hands-on course teaching practical applications of machine learning 
-                    for business problems, with real-world case studies.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Data Strategy for Growth</CardTitle>
-                  <CardDescription>6 Modules • 18 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Develop a comprehensive data strategy to fuel business growth, 
-                    innovation, and customer insights.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="business" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>African Market Entry Strategies</CardTitle>
-                  <CardDescription>7 Modules • 21 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Comprehensive guide to entering and succeeding in diverse 
-                    African markets with tailored business strategies.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Sustainable Business Models</CardTitle>
-                  <CardDescription>6 Modules • 18 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Design business models that combine profitability with positive 
-                    social and environmental impact across Africa.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Funding & Investment</CardTitle>
-                  <CardDescription>8 Modules • 24 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Navigate the African investment landscape, prepare for funding 
-                    rounds, and build relationships with investors.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="leadership" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Cross-Cultural Leadership</CardTitle>
-                  <CardDescription>5 Modules • 15 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Develop leadership skills for effectively managing diverse 
-                    teams across different African cultural contexts.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Strategic Innovation</CardTitle>
-                  <CardDescription>7 Modules • 21 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Master the art of fostering innovation within your organization 
-                    and turning ideas into market-leading solutions.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Building Resilient Teams</CardTitle>
-                  <CardDescription>6 Modules • 18 Lessons</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>
-                    Learn strategies for building high-performing teams that can 
-                    adapt to challenges and thrive in uncertain environments.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">
-                    <Play className="h-4 w-4 mr-2" /> Start Learning
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
+          <TabsContent value={activeCategory} className="mt-6">
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
+            ) : filteredCourses.length === 0 ? (
+              <div className="text-center py-12">
+                <h3 className="text-xl font-semibold mb-2">No courses found</h3>
+                <p className="text-muted-foreground">
+                  {activeCategory === 'all' 
+                    ? "There are currently no courses available." 
+                    : `No courses found in the ${activeCategory} category.`}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {filteredCourses.map(course => (
+                  <Card key={course.id} className="flex flex-col">
+                    <div className="relative">
+                      {course.thumbnail_url ? (
+                        <img 
+                          src={course.thumbnail_url} 
+                          alt={course.title} 
+                          className="w-full h-48 object-cover rounded-t-lg"
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-muted flex items-center justify-center rounded-t-lg">
+                          <BookOpen className="h-12 w-12 text-muted-foreground/40" />
+                        </div>
+                      )}
+                      <Badge className="absolute top-3 right-3">
+                        {course.is_free ? "Free" : `$${course.price}`}
+                      </Badge>
+                    </div>
+                    <CardHeader>
+                      <div className="flex gap-2 mb-2">
+                        <Badge variant="outline">{course.category}</Badge>
+                        <Badge variant="outline">{course.difficulty_level}</Badge>
+                      </div>
+                      <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                      <CardDescription className="line-clamp-2">{course.summary}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <BookOpen className="h-4 w-4 mr-1" />
+                        <span className="mr-4">{course.difficulty_level}</span>
+                        <Users className="h-4 w-4 mr-1" />
+                        <span>New</span>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button className="w-full" asChild>
+                        <Link to={`/learning/course/${course.id}`}>
+                          <Play className="h-4 w-4 mr-2" /> View Course
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 

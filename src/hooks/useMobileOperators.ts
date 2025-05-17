@@ -1,6 +1,29 @@
 
 import { useState, useEffect } from 'react';
-import { fetchMobileOperators, MobileOperator } from '@/services/eventService';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface MobileOperator {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
+  const { data, error } = await supabase
+    .from('mobile_operators')
+    .select('*')
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching mobile operators:', error);
+    throw error;
+  }
+
+  return data || [];
+};
 
 export const useMobileOperators = () => {
   const [mobileOperators, setMobileOperators] = useState<MobileOperator[]>([]);
