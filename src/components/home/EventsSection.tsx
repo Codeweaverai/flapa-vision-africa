@@ -81,7 +81,7 @@ const EventsSection = () => {
                       <span className="text-sm">{event.is_free ? 'Free' : `${event.price} ${event.currency || 'ZMW'}`}</span>
                     </div>
                     <Button asChild size="sm">
-                      <Link to={`/events#${event.id}`}>View Details</Link>
+                      <Link to={`/events`}>View Details</Link>
                     </Button>
                   </div>
                 </CardContent>
