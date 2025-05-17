@@ -67,11 +67,11 @@ const ConsultationBookingsTable = ({ bookings, loading, onUpdateStatus }: Consul
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'approved':
-        return 'success';
+        return 'default'; // Changed from 'success' to 'default'
       case 'rejected':
         return 'destructive';
       case 'completed':
-        return 'default';
+        return 'secondary';
       case 'pending':
       default:
         return 'outline';
@@ -142,12 +142,12 @@ const ConsultationBookingsTable = ({ bookings, loading, onUpdateStatus }: Consul
                   </TableCell>
                   <TableCell>{booking.topic || 'N/A'}</TableCell>
                   <TableCell>
-                    <Badge variant={booking.payment_status === 'paid' ? 'success' : 'outline'}>
+                    <Badge variant={booking.payment_status === 'paid' ? 'default' : 'outline'}>
                       {booking.payment_status}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(booking.status) as any}>
+                    <Badge variant={getStatusBadgeVariant(booking.status)}>
                       {booking.status}
                     </Badge>
                   </TableCell>

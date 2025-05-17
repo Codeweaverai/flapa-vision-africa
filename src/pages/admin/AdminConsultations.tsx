@@ -30,7 +30,15 @@ const AdminConsultations = () => {
         throw error;
       }
 
-      setBookings(data || []);
+      // Cast the data to match the expected types
+      const typedBookings = data?.map(booking => ({
+        ...booking,
+        booking_type: booking.booking_type as 'google_meet' | 'in_person',
+        status: booking.status,
+        payment_status: booking.payment_status
+      })) as ConsultationBooking[];
+
+      setBookings(typedBookings || []);
     } catch (error) {
       console.error('Error fetching consultation bookings:', error);
       toast.error('Failed to load consultation bookings');
