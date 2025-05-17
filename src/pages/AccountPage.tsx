@@ -1,372 +1,239 @@
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { CalendarIcon, Clock, MapPin, X, ExternalLink, Calendar, CreditCard, Settings } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { toast } from 'sonner';
-import { ConsultationBooking, fetchUserBookings, cancelBooking } from '@/services/consultationService';
-import { Registration, fetchUserRegistrations, cancelRegistration } from '@/services/eventService';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
+import { fetchUserRegistrations, Registration, cancelRegistration } from '@/services/eventService';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { CalendarDays, User, MapPin, Video, ShieldCheck, Loader2 } from 'lucide-react';
 
 const AccountPage = () => {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const [bookings, setBookings] = useState<ConsultationBooking[]>([]);
+  const { user, loading, signOut } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingRegistrations, setLoadingRegistrations] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
-      
-      loadUserData();
+    if (!loading && !user) {
+      navigate('/auth');
     }
   }, [user, loading, navigate]);
 
-  const loadUserData = async () => {
-    setLoadingData(true);
-    try {
-      const consultations = await fetchUserBookings(user);
-      const events = await fetchUserRegistrations(user);
+  useEffect(() => {
+    const getProfile = async () => {
+      if (!user) return;
       
-      setBookings(consultations);
-      setRegistrations(events as Registration[]);
-    } catch (error) {
-      console.error('Error loading user data:', error);
-      toast.error('Failed to load your account data');
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
-  const handleCancelConsultation = async (bookingId: string) => {
-    if (confirm('Are you sure you want to cancel this consultation?')) {
-      const success = await cancelBooking(bookingId, user);
-      if (success) {
-        setBookings(prev => prev.filter(booking => booking.id !== bookingId));
-        toast.success('Consultation cancelled successfully');
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching profile:', error);
+        } else {
+          setProfile(data);
+          
+          // Check if user is admin
+          try {
+            const { data: isAdminData, error: isAdminError } = await supabase.rpc('is_admin');
+            if (!isAdminError) {
+              setIsAdmin(isAdminData);
+            }
+          } catch (err) {
+            console.error('Error checking admin status:', err);
+          }
+        }
+      } catch (error) {
+        console.error('Unexpected error:', error);
+      } finally {
+        setLoadingProfile(false);
       }
+    };
+
+    const getRegistrations = async () => {
+      if (user) {
+        try {
+          const data = await fetchUserRegistrations(user);
+          setRegistrations(data);
+        } catch (error) {
+          console.error('Error fetching registrations:', error);
+        } finally {
+          setLoadingRegistrations(false);
+        }
+      }
+    };
+
+    if (user) {
+      getProfile();
+      getRegistrations();
     }
-  };
+  }, [user]);
 
   const handleCancelRegistration = async (registrationId: string) => {
-    if (confirm('Are you sure you want to cancel this event registration?')) {
-      const success = await cancelRegistration(registrationId, user);
-      if (success) {
-        setRegistrations(prev => prev.filter(reg => reg.id !== registrationId));
-        toast.success('Event registration cancelled successfully');
-      }
+    const success = await cancelRegistration(registrationId, user);
+    if (success) {
+      setRegistrations(registrations.map(reg => 
+        reg.id === registrationId ? { ...reg, status: 'cancelled' } : reg
+      ));
     }
   };
 
-  const getInitials = (name: string | null | undefined) => {
-    if (!name) return 'U';
+  const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
-
-  const formatDateTime = (dateString: string) => {
-    try {
-      return format(parseISO(dateString), 'PPP p');
-    } catch (error) {
-      return dateString;
-    }
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+      ? name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .toUpperCase()
+      : 'U';
   };
 
   if (loading || !user) {
     return (
-      <Layout>
-        <div className="section-container bg-light-purple min-h-[60vh] flex items-center justify-center">
-          <div className="animate-pulse text-xl">Loading account...</div>
-        </div>
-      </Layout>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="section-container bg-light-purple">
-        <h1 className="heading-lg mb-8 text-gradient">My Account</h1>
-        
-        <div className="grid lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center mb-6">
-                  <Avatar className="h-24 w-24 mb-4">
-                    <AvatarImage src={user.user_metadata.avatar_url} alt={user.user_metadata.full_name || user.email || ''} />
-                    <AvatarFallback className="text-xl">{getInitials(user.user_metadata.full_name || user.email)}</AvatarFallback>
-                  </Avatar>
-                  <h2 className="text-xl font-bold">{user.user_metadata.full_name || 'User'}</h2>
-                  <p className="text-muted-foreground">{user.email}</p>
+    <div className="container py-12 max-w-5xl">
+      <h1 className="text-3xl font-bold mb-6">Your Account</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card className="col-span-1 h-fit">
+          <CardHeader>
+            <CardTitle>Profile</CardTitle>
+            <CardDescription>Your personal information</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center py-4">
+            {loadingProfile ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <>
+                <Avatar className="h-24 w-24 mb-4">
+                  <AvatarFallback className="bg-primary text-lg">
+                    {profile?.full_name ? getInitials(profile.full_name) : 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="space-y-1 text-center mb-4">
+                  <h3 className="text-xl font-medium">{profile?.full_name || 'User'}</h3>
+                  <p className="text-sm text-muted-foreground flex items-center justify-center">
+                    <User className="h-3 w-3 mr-1" /> 
+                    @{profile?.username || 'username'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                  
+                  {isAdmin && (
+                    <div className="flex items-center justify-center mt-2">
+                      <ShieldCheck className="h-4 w-4 mr-1 text-amber-500" />
+                      <span className="text-sm font-medium text-amber-500">Admin</span>
+                    </div>
+                  )}
                 </div>
                 
-                <div className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/consult">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Book Consultation
-                    </a>
+                {isAdmin && (
+                  <Button variant="outline" size="sm" asChild className="mb-2">
+                    <Link to="/admin">
+                      <ShieldCheck className="h-4 w-4 mr-1" />
+                      Admin Dashboard
+                    </Link>
                   </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/events">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      View Events
-                    </a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Main content */}
-          <div className="lg:col-span-3">
-            <Tabs defaultValue="consultations">
-              <TabsList className="grid w-full grid-cols-2 mb-8">
-                <TabsTrigger value="consultations">My Consultations</TabsTrigger>
-                <TabsTrigger value="events">Event Registrations</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="consultations">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>My Consultation Bookings</CardTitle>
-                    <CardDescription>
-                      View and manage your scheduled consultations
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {loadingData ? (
-                      <div className="py-8 text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                        <p className="mt-2 text-muted-foreground">Loading your bookings...</p>
-                      </div>
-                    ) : bookings.length === 0 ? (
-                      <div className="py-12 text-center border rounded-lg bg-muted/10">
-                        <h3 className="font-medium text-lg mb-2">No consultations booked yet</h3>
-                        <p className="text-muted-foreground mb-6">Book your first consultation with Mbolela Pule</p>
-                        <Button asChild>
-                          <a href="/consult">Book a Consultation</a>
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {bookings.map(booking => (
-                          <Card key={booking.id} className="overflow-hidden">
-                            <div className="p-6">
-                              <div className="flex justify-between items-start mb-4">
-                                <div>
-                                  <h3 className="font-semibold text-lg">{booking.topic || 'Consultation'}</h3>
-                                  <p className="text-muted-foreground">
-                                    {booking.booking_type === 'google_meet' ? 'Online Meeting' : 'In-Person Meeting'}
-                                  </p>
-                                </div>
-                                <Badge className={getStatusBadgeClass(booking.status)}>
-                                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                </Badge>
-                              </div>
-                              
-                              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                                <div className="flex items-center text-sm">
-                                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span>{formatDateTime(booking.scheduled_time)}</span>
-                                </div>
-                                <div className="flex items-center text-sm">
-                                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span>{booking.duration} minutes</span>
-                                </div>
-                              </div>
-                              
-                              {booking.booking_type === 'in_person' && booking.location && (
-                                <div className="flex items-start text-sm mb-4">
-                                  <MapPin className="h-4 w-4 mr-2 mt-1 text-muted-foreground" />
-                                  <span>{booking.location}</span>
-                                </div>
+                )}
+              </>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => signOut()} variant="outline" className="w-full">
+              Sign Out
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card className="col-span-1 md:col-span-2 h-fit">
+          <CardHeader>
+            <CardTitle>Your Registrations</CardTitle>
+            <CardDescription>Events you have registered for</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingRegistrations ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : registrations.length > 0 ? (
+              <div className="space-y-4">
+                {registrations.map((registration) => (
+                  <div key={registration.id} className="border rounded-lg p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-semibold">
+                          {registration.events?.title || 'Event'}
+                        </h3>
+                        
+                        <div className="flex flex-wrap gap-y-1 gap-x-3 mt-1 text-sm text-muted-foreground">
+                          <div className="flex items-center">
+                            <CalendarDays className="h-3 w-3 mr-1" />
+                            {registration.events?.start_time ? (
+                              format(new Date(registration.events.start_time), 'MMM d, yyyy • h:mm a')
+                            ) : (
+                              'Date not available'
+                            )}
+                          </div>
+                          
+                          {registration.events?.event_type && (
+                            <div className="flex items-center">
+                              {registration.events.event_type === 'webinar' ? (
+                                <Video className="h-3 w-3 mr-1" />
+                              ) : (
+                                <MapPin className="h-3 w-3 mr-1" />
                               )}
-                              
-                              {booking.notes && (
-                                <div className="bg-muted/20 p-3 rounded-md text-sm mb-4">
-                                  <p className="font-medium mb-1">Notes:</p>
-                                  <p>{booking.notes}</p>
-                                </div>
-                              )}
-                              
-                              <div className="border-t pt-4 mt-4 flex justify-between items-center">
-                                <div className="text-sm">
-                                  <span className="font-medium">Payment:</span>{' '}
-                                  <Badge variant={booking.payment_status === 'completed' ? 'default' : 'outline'}>
-                                    {booking.payment_status.charAt(0).toUpperCase() + booking.payment_status.slice(1)}
-                                  </Badge>
-                                  {booking.payment_amount && (
-                                    <span className="ml-2">
-                                      {booking.payment_currency || 'ZMW'} {booking.payment_amount}
-                                    </span>
-                                  )}
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                  {booking.online_meeting_link && booking.status === 'confirmed' && (
-                                    <Button variant="outline" size="sm" asChild>
-                                      <a href={booking.online_meeting_link} target="_blank" rel="noopener noreferrer">
-                                        <ExternalLink className="h-4 w-4 mr-1" />
-                                        Join
-                                      </a>
-                                    </Button>
-                                  )}
-                                  
-                                  {booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm"
-                                      onClick={() => handleCancelConsultation(booking.id)}
-                                    >
-                                      <X className="h-4 w-4 mr-1" />
-                                      Cancel
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
+                              {registration.events.event_type}
                             </div>
-                          </Card>
-                        ))}
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="events">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>My Event Registrations</CardTitle>
-                    <CardDescription>
-                      View and manage your event registrations
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {loadingData ? (
-                      <div className="py-8 text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                        <p className="mt-2 text-muted-foreground">Loading your registrations...</p>
+                      
+                      <div className="flex items-center gap-2 mt-2 md:mt-0">
+                        {registration.status === 'confirmed' ? (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleCancelRegistration(registration.id)}
+                          >
+                            Cancel
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            {registration.status === 'cancelled' ? 'Cancelled' : registration.status}
+                          </span>
+                        )}
                       </div>
-                    ) : registrations.length === 0 ? (
-                      <div className="py-12 text-center border rounded-lg bg-muted/10">
-                        <h3 className="font-medium text-lg mb-2">No events registered yet</h3>
-                        <p className="text-muted-foreground mb-6">Explore and register for upcoming events</p>
-                        <Button asChild>
-                          <a href="/events">View Events</a>
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {registrations.map(reg => (
-                          <Card key={reg.id} className="overflow-hidden">
-                            <div className="p-6">
-                              <div className="flex justify-between items-start mb-4">
-                                <div>
-                                  <h3 className="font-semibold text-lg">{reg.events?.title || 'Event Registration'}</h3>
-                                  <p className="text-muted-foreground">
-                                    {reg.events?.event_type || 'Event'}
-                                  </p>
-                                </div>
-                                <Badge className={getStatusBadgeClass(reg.status)}>
-                                  {reg.status.charAt(0).toUpperCase() + reg.status.slice(1)}
-                                </Badge>
-                              </div>
-                              
-                              {reg.events && (
-                                <div className="grid md:grid-cols-2 gap-4 mb-4">
-                                  <div className="flex items-center text-sm">
-                                    <CalendarIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                                    <span>{formatDateTime(reg.events.start_time)}</span>
-                                  </div>
-                                  
-                                  {reg.events.location && (
-                                    <div className="flex items-center text-sm">
-                                      <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                                      <span>{reg.events.location}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              
-                              <div className="border-t pt-4 mt-4 flex justify-between items-center">
-                                <div className="text-sm">
-                                  <span className="font-medium">Payment:</span>{' '}
-                                  <Badge variant={reg.payment_status === 'completed' ? 'default' : 'outline'}>
-                                    {reg.payment_status.charAt(0).toUpperCase() + reg.payment_status.slice(1)}
-                                  </Badge>
-                                  {reg.payment_amount && (
-                                    <span className="ml-2">
-                                      {reg.payment_currency || 'ZMW'} {reg.payment_amount}
-                                    </span>
-                                  )}
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                  {reg.events?.online_meeting_link && reg.status === 'confirmed' && (
-                                    <Button variant="outline" size="sm" asChild>
-                                      <a href={reg.events.online_meeting_link} target="_blank" rel="noopener noreferrer">
-                                        <ExternalLink className="h-4 w-4 mr-1" />
-                                        Join
-                                      </a>
-                                    </Button>
-                                  )}
-                                  
-                                  {reg.status !== 'cancelled' && reg.status !== 'attended' && (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm"
-                                      onClick={() => handleCancelRegistration(reg.id)}
-                                    >
-                                      <X className="h-4 w-4 mr-1" />
-                                      Cancel
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">You haven't registered for any events yet</p>
+                <Button asChild>
+                  <Link to="/events">Browse Events</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </Layout>
+    </div>
   );
 };
 

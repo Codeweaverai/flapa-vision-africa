@@ -1,51 +1,65 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import { Toaster } from 'sonner';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Layout from './components/layout/Layout';
+import Index from './pages/Index';
+import AboutPage from './pages/AboutPage';
+import SpeakingPage from './pages/SpeakingPage';
+import VenturesPage from './pages/VenturesPage';
+import LearningPage from './pages/LearningPage';
+import AnimationsPage from './pages/AnimationsPage';
+import ConsultPage from './pages/ConsultPage';
+import EventsPage from './pages/EventsPage';
+import AccountPage from './pages/AccountPage';
+import AuthPage from './pages/AuthPage';
+import NotFound from './pages/NotFound';
+import PaymentResultPage from './pages/PaymentResultPage';
+import { AuthProvider } from './contexts/AuthContext';
 
-import Index from "./pages/Index";
-import AboutPage from "./pages/AboutPage";
-import VenturesPage from "./pages/VenturesPage";
-import SpeakingPage from "./pages/SpeakingPage";
-import AnimationsPage from "./pages/AnimationsPage";
-import LearningPage from "./pages/LearningPage";
-import EventsPage from "./pages/EventsPage";
-import ConsultPage from "./pages/ConsultPage";
-import AuthPage from "./pages/AuthPage";
-import AccountPage from "./pages/AccountPage";
-import PaymentResultPage from "./pages/PaymentResultPage";
-import { AuthProvider } from "./contexts/AuthContext";
-import NotFound from "./pages/NotFound";
-import { TooltipProvider } from "@/components/ui/tooltip";
+// Import the admin pages
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminEvents from "./pages/admin/AdminEvents";
+import EventForm from "./pages/admin/EventForm";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
+function App() {
+  return (
     <BrowserRouter>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Toaster position="bottom-right" richColors />
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/ventures" element={<VenturesPage />} />
-            <Route path="/speaking" element={<SpeakingPage />} />
-            <Route path="/ai-animations" element={<AnimationsPage />} />
-            <Route path="/learning" element={<LearningPage />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/consult" element={<ConsultPage />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Index />} />
+              <Route path="about" element={<AboutPage />} />
+              <Route path="speaking" element={<SpeakingPage />} />
+              <Route path="ventures" element={<VenturesPage />} />
+              <Route path="learning" element={<LearningPage />} />
+              <Route path="animations" element={<AnimationsPage />} />
+              <Route path="consult" element={<ConsultPage />} />
+              <Route path="events" element={<EventsPage />} />
+              <Route path="account" element={<AccountPage />} />
+              <Route path="payment-result" element={<PaymentResultPage />} />
+            </Route>
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/events" element={<AdminEvents />} />
+            <Route path="/admin/events/create" element={<EventForm />} />
+            <Route path="/admin/events/edit/:id" element={<EventForm />} />
+
+            {/* Auth Route */}
             <Route path="/auth" element={<AuthPage />} />
-            <Route path="/account" element={<AccountPage />} />
-            <Route path="/payment-result" element={<PaymentResultPage />} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </TooltipProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </BrowserRouter>
-  </QueryClientProvider>
-);
+  );
+}
 
 export default App;
