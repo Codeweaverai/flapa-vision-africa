@@ -43,7 +43,13 @@ const AdminSpeaking = () => {
         throw error;
       }
 
-      setBookings(data || []);
+      // Cast the data to ensure type compatibility
+      const typedData = (data || []).map(booking => ({
+        ...booking,
+        status: booking.status as 'pending' | 'approved' | 'rejected' | 'completed'
+      }));
+
+      setBookings(typedData);
     } catch (error) {
       console.error('Error fetching speaking bookings:', error);
       toast.error('Failed to load speaking booking requests');
