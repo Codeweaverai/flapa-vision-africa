@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { toast } from 'sonner';
@@ -41,7 +40,7 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
       
-      // Get events with registration counts from both tables
+      // Get events data
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
@@ -49,39 +48,83 @@ const AdminRegistrations = () => {
       
       if (eventsError) throw eventsError;
       
-      // Get counts from registrations table
+      // Count registrations by event_id from the old table
       const { data: regCounts, error: regError } = await supabase
-        .from('registrations')
-        .select('event_id, count(*)')
-        .groupBy('event_id');
+        .rpc('count_registrations_by_event');
         
-      if (regError) throw regError;
+      if (regError) {
+        console.error('Error counting registrations:', regError);
+        // Fallback if RPC doesn't exist - fetch all and count manually
+        const { data: regData } = await supabase.from('registrations').select('event_id');
+        const regCountsMap = {};
+        regData?.forEach(reg => {
+          regCountsMap[reg.event_id] = (regCountsMap[reg.event_id] || 0) + 1;
+        });
+        
+        // Count bookings by event_id from the new table
+        const { data: bookingData } = await supabase.from('event_bookings').select('event_id');
+        const bookingCountsMap = {};
+        bookingData?.forEach(booking => {
+          bookingCountsMap[booking.event_id] = (bookingCountsMap[booking.event_id] || 0) + 1;
+        });
+        
+        // Process and combine the data
+        const eventsWithCounts = eventsData.map(event => {
+          // Count from registrations table
+          const regCount = regCountsMap[event.id] || 0;
+          
+          // Count from bookings table
+          const bookingCount = bookingCountsMap[event.id] || 0;
+          
+          return {
+            ...event,
+            registrations_count: regCount,
+            bookings_count: bookingCount,
+            total_attendees: regCount + bookingCount
+          };
+        }) as EventWithRegistrations[];
+        
+        setEvents(eventsWithCounts);
+      } else {
+        // If RPC succeeded, use the results
+        // Get counts from event_bookings table
+        const { data: bookingCounts, error: bookingError } = await supabase
+          .rpc('count_bookings_by_event');
+          
+        if (bookingError) {
+          console.error('Error counting bookings:', bookingError);
+          // Handle the error but continue
+        }
+        
+        // Process and combine the data
+        const regCountsMap = {};
+        regCounts?.forEach(item => {
+          regCountsMap[item.event_id] = parseInt(item.count);
+        });
+        
+        const bookingCountsMap = {};
+        bookingCounts?.forEach(item => {
+          bookingCountsMap[item.event_id] = parseInt(item.count);
+        });
+        
+        const eventsWithCounts = eventsData.map(event => {
+          // Count from registrations table
+          const regCount = regCountsMap[event.id] || 0;
+          
+          // Count from bookings table
+          const bookingCount = bookingCountsMap[event.id] || 0;
+          
+          return {
+            ...event,
+            registrations_count: regCount,
+            bookings_count: bookingCount,
+            total_attendees: regCount + bookingCount
+          };
+        }) as EventWithRegistrations[];
+        
+        setEvents(eventsWithCounts);
+      }
       
-      // Get counts from event_bookings table
-      const { data: bookingCounts, error: bookingError } = await supabase
-        .from('event_bookings')
-        .select('event_id, count(*)')
-        .groupBy('event_id');
-        
-      if (bookingError) throw bookingError;
-      
-      // Process and combine the data
-      const eventsWithCounts = eventsData.map(event => {
-        // Count from registrations table
-        const regCount = regCounts.find(r => r.event_id === event.id)?.count || 0;
-        
-        // Count from bookings table
-        const bookingCount = bookingCounts.find(b => b.event_id === event.id)?.count || 0;
-        
-        return {
-          ...event,
-          registrations_count: parseInt(regCount),
-          bookings_count: parseInt(bookingCount),
-          total_attendees: parseInt(regCount) + parseInt(bookingCount)
-        };
-      }) as EventWithRegistrations[];
-      
-      setEvents(eventsWithCounts);
       fetchRegistrations('all');
     } catch (error) {
       console.error('Error fetching events:', error);
@@ -124,7 +167,7 @@ const AdminRegistrations = () => {
           phone_number: reg.phone_number || null,
           mobile_operator: reg.mobile_operator || null,
           source_table: 'registrations' as const
-        })) as CombinedRegistration[];
+        })) as unknown as CombinedRegistration[];
       }
 
       // Fetch from event_bookings table (if showing all or bookings tab)
@@ -152,7 +195,7 @@ const AdminRegistrations = () => {
           phone_number: booking.phone_number || null,
           mobile_operator: booking.mobile_operator || null,
           source_table: 'event_bookings' as const
-        })) as CombinedRegistration[];
+        })) as unknown as CombinedRegistration[];
       }
 
       // Combine both datasets

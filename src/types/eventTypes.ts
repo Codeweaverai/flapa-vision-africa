@@ -15,7 +15,7 @@ export interface CombinedRegistration {
   profiles?: {
     full_name: string | null;
     email: string | null;
-  } | null;
+  } | null | { error: true }; // Adding error as a possible type
   events?: Event | null;
   payment_id?: string | null;
   payment_amount?: number | null;
