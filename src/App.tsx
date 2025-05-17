@@ -15,6 +15,7 @@ import ConsultPage from './pages/ConsultPage';
 import EventsPage from './pages/EventsPage';
 import AccountPage from './pages/AccountPage';
 import AuthPage from './pages/AuthPage';
+import AdminAuthPage from './pages/AdminAuthPage';
 import NotFound from './pages/NotFound';
 import PaymentResultPage from './pages/PaymentResultPage';
 import { AuthProvider } from './contexts/AuthContext';
@@ -52,8 +53,9 @@ function App() {
             <Route path="/admin/events/create" element={<EventForm />} />
             <Route path="/admin/events/edit/:id" element={<EventForm />} />
 
-            {/* Auth Route */}
+            {/* Auth Routes */}
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/admin-login" element={<AdminAuthPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
