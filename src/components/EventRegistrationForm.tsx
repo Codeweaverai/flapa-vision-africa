@@ -1,18 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Event, MobileOperator, fetchMobileOperators, registerForEvent } from '@/services/eventService';
+import { Event, registerForEvent } from '@/services/eventService';
 import { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form } from '@/components/ui/form';
 
 interface EventRegistrationFormProps {
   event: Event;
@@ -21,44 +18,20 @@ interface EventRegistrationFormProps {
   onCancel?: () => void;
 }
 
-const phoneRegex = /^[0-9]{10,12}$/;
-
 const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({ 
   event, 
   user,
   onSuccess,
   onCancel
 }) => {
-  const [operators, setOperators] = useState<MobileOperator[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!event.is_free) {
-      loadMobileOperators();
-    }
-  }, [event.is_free]);
-
-  const loadMobileOperators = async () => {
-    const data = await fetchMobileOperators();
-    setOperators(data);
-  };
-
-  const formSchema = z.object({
-    phoneNumber: event.is_free 
-      ? z.string().optional()
-      : z.string().regex(phoneRegex, { message: "Phone number must be 10-12 digits" }),
-    mobileOperator: event.is_free 
-      ? z.string().optional()
-      : z.string({ required_error: "Please select a mobile operator" })
-  });
+  const formSchema = z.object({});
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      phoneNumber: "",
-      mobileOperator: event.is_free ? undefined : "MTN_MOMO_ZMB"
-    },
+    defaultValues: {},
   });
 
   const handleFreeRegistration = async () => {
@@ -83,7 +56,7 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async () => {
     if (!user) {
       toast.error("Please sign in to register");
       navigate("/auth");
@@ -92,12 +65,7 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
     setLoading(true);
     try {
-      const result = await registerForEvent(
-        event, 
-        user, 
-        values.phoneNumber, 
-        values.mobileOperator
-      );
+      const result = await registerForEvent(event, user);
       
       if (result && onSuccess) {
         onSuccess();
@@ -146,60 +114,12 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <p className="text-sm text-muted-foreground mb-2">
-                Registration fee: {event.currency || 'ZMW'} {event.price}
+                Registration fee: {event.currency || 'USD'} {event.price}
               </p>
               <p className="text-sm mb-4">
-                Please enter your mobile money payment details below.
+                You will be redirected to our secure payment provider to complete your registration.
               </p>
             </div>
-
-            <FormField
-              control={form.control}
-              name="phoneNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. 260971234567" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Enter your mobile money number with country code (e.g. 260)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="mobileOperator"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mobile Operator</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select mobile operator" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {operators.map(op => (
-                        <SelectItem key={op.code} value={op.code}>
-                          {op.name} ({op.country})
-                        </SelectItem>
-                      ))}
-                      {operators.length === 0 && (
-                        <>
-                          <SelectItem value="MTN_MOMO_ZMB">MTN Mobile Money (Zambia)</SelectItem>
-                          <SelectItem value="AIRTEL_MONEY_ZMB">Airtel Money (Zambia)</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="flex justify-between pt-4">
               <Button type="button" variant="outline" onClick={onCancel}>

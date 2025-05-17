@@ -1,24 +1,42 @@
 
 project_id = "rxqoczksnddbxcdwobnw"
+
 [api]
 enabled = true
 port = 54321
+schemas = ["public", "storage"]
+
 [db]
 port = 54322
-[studio]
-port = 54323
-[inbucket]
-port = 54324
-[auth]
-enabled = true
-[storage]
-enabled = true
+
 [realtime]
 enabled = true
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
 [functions]
+[functions.create-google-meet]
+verify_jwt = true
 [functions.create-payment]
 verify_jwt = true
+[functions.initiate-payment]
+verify_jwt = true
 [functions.verify-payment]
-verify_jwt = false
-[functions.create-google-meet]
+verify_jwt = true
+[functions.stripe-checkout]
+verify_jwt = true
+[functions.verify-stripe-payment]
 verify_jwt = true

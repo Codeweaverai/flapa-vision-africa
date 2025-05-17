@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -83,7 +82,7 @@ export const fetchEvents = async (): Promise<Event[]> => {
   }
 };
 
-export const registerForEvent = async (event: Event, user: User | null, phoneNumber?: string, mobileOperator?: string): Promise<boolean> => {
+export const registerForEvent = async (event: Event, user: User | null): Promise<boolean> => {
   if (!user) {
     toast.error("Please sign in to register for events");
     return false;
@@ -127,11 +126,6 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
       booking_date: new Date().toISOString()
     };
 
-    if (phoneNumber && mobileOperator) {
-      bookingData.phone_number = phoneNumber;
-      bookingData.mobile_operator = mobileOperator;
-    }
-
     // Insert into the new event_bookings table
     const { data: bookingResult, error: bookingError } = await supabase
       .from('event_bookings')
@@ -144,8 +138,8 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
       return false;
     }
 
-    if (!event.is_free && phoneNumber && mobileOperator) {
-      // Initiate payment via Supabase Edge Function
+    if (!event.is_free) {
+      // Initiate payment via Stripe Checkout
       try {
         // Get the session token for authorization
         const { data: { session } } = await supabase.auth.getSession();
@@ -155,10 +149,10 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           return false;
         }
 
-        // Get the supabase URL from the environment variable instead of the client property
+        // Get the supabase URL from the environment variable
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://rxqoczksnddbxcdwobnw.supabase.co";
         
-        const response = await fetch(`${supabaseUrl}/functions/v1/initiate-payment`, {
+        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -166,20 +160,19 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           },
           body: JSON.stringify({
             amount: event.price,
-            currency: event.currency || 'ZMW',
-            phone_number: phoneNumber,
-            mobile_operator: mobileOperator,
+            currency: event.currency || 'USD',
             referenceType: 'event',
             referenceId: bookingResult[0].id,
-            userId: user.id
+            userId: user.id,
+            eventTitle: event.title
           }),
         });
 
         const result = await response.json();
 
-        if (response.ok && result.redirectUrl) {
-          // Redirect user to payment URL
-          window.location.href = result.redirectUrl;
+        if (response.ok && result.url) {
+          // Open Stripe checkout in a new window
+          window.location.href = result.url;
           return true;
         } else {
           console.error('Payment initiation failed:', result.error || 'Unknown error');

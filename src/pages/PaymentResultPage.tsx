@@ -1,226 +1,162 @@
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 
 const PaymentResultPage = () => {
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const [verifying, setVerifying] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState(searchParams.get('status') || 'unknown');
   const navigate = useNavigate();
   
-  const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading');
-  const [paymentDetails, setPaymentDetails] = useState<any>(null);
+  const type = searchParams.get('type') || '';
+  const id = searchParams.get('id') || '';
+  const sessionId = searchParams.get('sessionId');
   
-  const txnId = searchParams.get('txnId');
-  const type = searchParams.get('type');
-  const id = searchParams.get('id');
-  const statusParam = searchParams.get('status');
-  
-  useEffect(() => {
-    const verifyPayment = async () => {
-      if (!txnId) {
-        setStatus('failed');
-        toast.error("Missing payment information");
-        return;
-      }
-
-      // If status is already provided in URL params, use it first
-      if (statusParam) {
-        if (statusParam === 'success' || statusParam === 'completed') {
-          setStatus('success');
-          toast.success("Your payment has been processed successfully");
-        } else if (statusParam === 'failed' || statusParam === 'error') {
-          setStatus('failed');
-          toast.error("Your payment was not successful");
-        } else if (statusParam === 'pending') {
-          setStatus('pending');
-          toast.info("Your payment is being processed");
-        }
-      }
-
-      try {
-        // First, fetch the payment details from our database
-        const { data: transaction, error: txError } = await supabase
-          .from('payment_transactions')
-          .select('*')
-          .eq('id', txnId)
-          .single();
-          
-        if (txError) {
-          console.error('Error finding transaction:', txError);
-          setStatus('failed');
-          toast.error("Could not find your payment record");
-          return;
-        }
-        
-        setPaymentDetails(transaction);
-        
-        // If we didn't get status from URL, use the one in the database
-        if (!statusParam && transaction) {
-          if (transaction.status === 'completed') {
-            setStatus('success');
-            toast.success("Your payment has been processed successfully");
-          } else if (transaction.status === 'failed') {
-            setStatus('failed');
-            toast.error("Your payment was not successful");
-          } else {
-            setStatus('pending');
-          }
-        }
-        
-        // Verify payment with the backend if still pending
-        if (status === 'loading' || status === 'pending') {
-          const { data, error } = await supabase.functions.invoke('verify-payment', {
-            body: {
-              txnId,
-              type,
-              id
-            }
-          });
-          
-          if (error) {
-            console.error('Error verifying payment:', error);
-            if (status === 'loading') {
-              setStatus('pending');
-              toast.info("Payment verification in progress");
-            }
-          } else if (data) {
-            // Update status based on verification result
-            if (data.status === 'completed') {
-              setStatus('success');
-              toast.success("Your payment has been processed successfully");
-            } else if (data.status === 'failed') {
-              setStatus('failed');
-              toast.error("Your payment was not successful");
-            } else {
-              setStatus('pending');
-              toast.info("Your payment is being processed");
-            }
-            
-            // Update payment details if new information is available
-            setPaymentDetails(prevDetails => ({
-              ...prevDetails,
-              ...data,
-              verificationResult: data
-            }));
-          }
-        }
-      } catch (error) {
-        console.error('Unexpected error:', error);
-        if (status === 'loading') {
-          setStatus('pending');
-          toast.warning("Unable to verify payment status");
-        }
-      }
-    };
-    
-    if (user) {
-      verifyPayment();
-    } else {
-      // If no user is logged in, show a message and redirect to login
-      toast.error("Please sign in to view payment details");
-      setTimeout(() => navigate('/auth'), 2000);
-    }
-  }, [txnId, type, id, statusParam, user, navigate]);
-  
-  const handleNavigate = () => {
+  // Redirect to appropriate page based on payment type
+  const handleContinue = () => {
     if (type === 'event') {
       navigate('/events');
     } else if (type === 'consultation') {
-      navigate('/account');
+      navigate('/consult');
     } else {
       navigate('/');
     }
   };
   
+  useEffect(() => {
+    // If we have a Stripe session ID, verify the payment status
+    const verifyStripePayment = async () => {
+      if (sessionId) {
+        try {
+          setVerifying(true);
+          
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            console.error('No authentication session');
+            return;
+          }
+          
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://rxqoczksnddbxcdwobnw.supabase.co";
+          const response = await fetch(`${supabaseUrl}/functions/v1/verify-stripe-payment?sessionId=${sessionId}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          });
+          
+          const result = await response.json();
+          if (result.status) {
+            setPaymentStatus(result.status);
+          }
+        } catch (error) {
+          console.error('Error verifying payment:', error);
+        } finally {
+          setVerifying(false);
+        }
+      }
+    };
+    
+    verifyStripePayment();
+  }, [sessionId]);
+  
+  const renderPaymentStatus = () => {
+    switch (paymentStatus) {
+      case 'success':
+      case 'completed':
+        return (
+          <div className="text-center">
+            <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+            <CardTitle className="text-2xl mb-2">Payment Successful!</CardTitle>
+            <CardDescription className="text-lg">
+              {type === 'event' 
+                ? 'Your registration has been confirmed.' 
+                : 'Your booking has been confirmed.'}
+            </CardDescription>
+          </div>
+        );
+      
+      case 'pending':
+      case 'processing':
+        return (
+          <div className="text-center">
+            <Clock className="h-12 w-12 mx-auto mb-4 text-amber-500" />
+            <CardTitle className="text-2xl mb-2">Payment Processing</CardTitle>
+            <CardDescription className="text-lg">
+              Your payment is being processed. We'll update you once it's confirmed.
+            </CardDescription>
+          </div>
+        );
+      
+      case 'canceled':
+        return (
+          <div className="text-center">
+            <XCircle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
+            <CardTitle className="text-2xl mb-2">Payment Cancelled</CardTitle>
+            <CardDescription className="text-lg">
+              You've cancelled the payment. No charges were made.
+            </CardDescription>
+          </div>
+        );
+      
+      case 'failed':
+      case 'error':
+        return (
+          <div className="text-center">
+            <XCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+            <CardTitle className="text-2xl mb-2">Payment Failed</CardTitle>
+            <CardDescription className="text-lg">
+              We couldn't process your payment. Please try again later.
+            </CardDescription>
+          </div>
+        );
+      
+      default:
+        return (
+          <div className="text-center">
+            <Clock className="h-12 w-12 mx-auto mb-4 text-blue-500" />
+            <CardTitle className="text-2xl mb-2">Verifying Payment</CardTitle>
+            <CardDescription className="text-lg">
+              Please wait while we verify your payment status...
+            </CardDescription>
+          </div>
+        );
+    }
+  };
+  
   return (
     <Layout>
-      <div className="section-container py-12">
-        <div className="max-w-lg mx-auto bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-6">
-            {status === 'loading' && (
-              <div className="flex flex-col items-center">
-                <Loader2 className="h-16 w-16 text-primary animate-spin mb-4" />
-                <h2 className="text-2xl font-bold mb-2">Verifying Payment</h2>
-                <p className="text-muted-foreground">Please wait while we verify your payment...</p>
+      <div className="section-container">
+        <div className="max-w-md mx-auto">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-center mb-4">
+                <h1 className="text-2xl font-bold text-center">Payment Result</h1>
               </div>
-            )}
+            </CardHeader>
             
-            {status === 'success' && (
-              <div className="flex flex-col items-center">
-                <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-                <h2 className="text-2xl font-bold mb-2">Payment Successful!</h2>
-                <p className="text-muted-foreground">
-                  {type === 'event' 
-                    ? 'Your event registration is confirmed.' 
-                    : 'Your consultation booking is confirmed.'}
-                </p>
-              </div>
-            )}
-            
-            {status === 'pending' && (
-              <div className="flex flex-col items-center">
-                <AlertCircle className="h-16 w-16 text-amber-500 mb-4" />
-                <h2 className="text-2xl font-bold mb-2">Payment Processing</h2>
-                <p className="text-muted-foreground">
-                  Your payment is being processed. We'll notify you when it's complete.
-                </p>
-              </div>
-            )}
-            
-            {status === 'failed' && (
-              <div className="flex flex-col items-center">
-                <XCircle className="h-16 w-16 text-destructive mb-4" />
-                <h2 className="text-2xl font-bold mb-2">Payment Failed</h2>
-                <p className="text-muted-foreground">
-                  We couldn't process your payment. Please try again.
-                </p>
-              </div>
-            )}
-          </div>
-          
-          {paymentDetails && (
-            <div className="border-t border-gray-200 pt-4 mb-6">
-              <h3 className="font-medium text-lg mb-2">Payment Details</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="text-muted-foreground">Amount:</div>
-                <div>{paymentDetails.amount} {paymentDetails.currency}</div>
-                
-                <div className="text-muted-foreground">Reference:</div>
-                <div>{type || paymentDetails.reference_type} - {id?.substring(0, 8) || paymentDetails.reference_id?.substring(0, 8)}...</div>
-                
-                <div className="text-muted-foreground">Status:</div>
-                <div className={
-                  status === 'success' ? 'text-green-600' : 
-                  status === 'failed' ? 'text-red-600' : 
-                  'text-amber-600'
-                }>
-                  {status.toUpperCase()}
+            <CardContent>
+              {verifying ? (
+                <div className="text-center p-4">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-4">Verifying payment status...</p>
                 </div>
-                
-                <div className="text-muted-foreground">Phone:</div>
-                <div>{paymentDetails.phone_number}</div>
-              </div>
-            </div>
-          )}
-          
-          <div className="flex flex-col space-y-2">
-            <Button onClick={handleNavigate} className="w-full">
-              {type === 'event' 
-                ? 'View My Registrations' 
-                : type === 'consultation'
-                ? 'View My Bookings'
-                : 'Return Home'}
-            </Button>
-            <Button onClick={() => navigate('/')} variant="outline" className="w-full">
-              Return to Home
-            </Button>
-          </div>
+              ) : (
+                renderPaymentStatus()
+              )}
+            </CardContent>
+            
+            <CardFooter className="flex justify-center">
+              <Button onClick={handleContinue}>
+                {type === 'event' ? 'Back to Events' : type === 'consultation' ? 'Back to Consultations' : 'Back to Home'}
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       </div>
     </Layout>
