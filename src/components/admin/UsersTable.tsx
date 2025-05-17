@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { User, UserPlus, UserMinus, Edit } from 'lucide-react';
 import { 
-  Card,
   Table, 
   TableBody, 
   TableCell, 
@@ -13,6 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,

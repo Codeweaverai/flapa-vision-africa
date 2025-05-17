@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Search, User } from 'lucide-react';
 import UsersTable from '@/components/admin/UsersTable';
 
+type UserRole = 'user' | 'admin';
+
 interface UserProfile {
   id: string;
   full_name: string | null;
   username: string | null;
   avatar_url: string | null;
-  role: string | null;
+  role: UserRole | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -50,9 +52,12 @@ const AdminUsers = () => {
 
   const handleUpdateRole = async (userId: string, role: string) => {
     try {
+      // Cast the role to UserRole type to ensure it's either 'user' or 'admin'
+      const userRole = role as UserRole;
+      
       const { error } = await supabase
         .from('profiles')
-        .update({ role })
+        .update({ role: userRole })
         .eq('id', userId);
       
       if (error) throw error;
