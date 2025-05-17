@@ -54,8 +54,9 @@ const AdminRegistrations = () => {
       if (eventsError) throw eventsError;
       
       // Count registrations by event_id from the old table
+      // Fix: Use a type assertion to avoid the TypeScript error
       const { data: regCountsData, error: regError } = await supabase
-        .rpc('count_registrations_by_event');
+        .rpc('count_registrations_by_event') as { data: {event_id: string, count: string}[] | null, error: any };
         
       if (regError) {
         console.error('Error counting registrations:', regError);
@@ -93,8 +94,9 @@ const AdminRegistrations = () => {
       } else {
         // If RPC succeeded, use the results
         // Get counts from event_bookings table
+        // Fix: Use a type assertion to avoid the TypeScript error
         const { data: bookingCountsData, error: bookingError } = await supabase
-          .rpc('count_bookings_by_event');
+          .rpc('count_bookings_by_event') as { data: {event_id: string, count: string}[] | null, error: any };
           
         if (bookingError) {
           console.error('Error counting bookings:', bookingError);
