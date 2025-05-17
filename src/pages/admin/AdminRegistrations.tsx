@@ -143,11 +143,15 @@ const AdminRegistrations = () => {
       const userIds = bookingData?.map(booking => booking.user_id) || [];
       const uniqueUserIds = [...new Set(userIds)];
       
+      if (uniqueUserIds.length === 0) {
+        setRegistrations([]);
+        return;
+      }
+      
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
-        .in('id', uniqueUserIds);
-        
+        .select('id, full_name, avatar_url');
+      
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
       }
@@ -156,7 +160,7 @@ const AdminRegistrations = () => {
       const profilesMap = {};
       if (profilesData) {
         profilesData.forEach(profile => {
-          profilesMap[profile.id] = { full_name: profile.full_name, email: profile.email };
+          profilesMap[profile.id] = profile;
         });
       }
       
@@ -167,7 +171,7 @@ const AdminRegistrations = () => {
         phone_number: booking.phone_number || null,
         mobile_operator: booking.mobile_operator || null,
         source_table: 'event_bookings' as const,
-        profiles: profilesMap[booking.user_id] || { full_name: 'Unknown', email: null }
+        profiles: profilesMap[booking.user_id] || { full_name: 'Unknown', id: booking.user_id }
       })) as unknown as CombinedRegistration[];
 
       setRegistrations(bookings);
@@ -225,17 +229,12 @@ const AdminRegistrations = () => {
         ? (reg.profiles.full_name?.toLowerCase() || '') 
         : '';
       
-      const email = reg.profiles && 'email' in reg.profiles 
-        ? (reg.profiles.email?.toLowerCase() || '') 
-        : '';
-      
       const phone = reg.phone_number?.toLowerCase() || '';
       const eventTitle = reg.events?.title?.toLowerCase() || '';
       
       const query = searchQuery.toLowerCase();
       return (
         fullName.includes(query) ||
-        email.includes(query) ||
         phone.includes(query) ||
         eventTitle.includes(query)
       );

@@ -65,16 +65,12 @@ const RegistrationsTable = ({
               const fullName = registration.profiles && 'full_name' in registration.profiles 
                 ? registration.profiles.full_name 
                 : 'Unknown';
-              const email = registration.profiles && 'email' in registration.profiles 
-                ? registration.profiles.email 
-                : 'No email';
                 
               return (
                 <TableRow key={registration.id}>
                   <TableCell className="font-medium">
                     <div>
                       <p>{fullName || 'Unknown'}</p>
-                      <p className="text-sm text-muted-foreground">{email || 'No email'}</p>
                       {registration.phone_number && (
                         <p className="text-xs text-muted-foreground">{registration.phone_number}</p>
                       )}
