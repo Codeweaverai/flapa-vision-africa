@@ -20,6 +20,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminEvents from "./pages/admin/AdminEvents";
 import AdminRegistrations from "./pages/admin/AdminRegistrations";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminSpeaking from "./pages/admin/AdminSpeaking";
 import AdminSettings from "./pages/admin/AdminSettings";
 import EventForm from "./pages/admin/EventForm";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -57,6 +58,7 @@ const App = () => (
             <Route path="/admin/events/edit/:id" element={<AdminRoute><EventForm /></AdminRoute>} />
             <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+            <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
             <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
             
             <Route path="*" element={<NotFound />} />

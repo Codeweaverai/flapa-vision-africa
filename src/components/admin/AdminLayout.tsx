@@ -7,7 +7,8 @@ import {
   Menu, 
   Users,
   X, 
-  Settings 
+  Settings,
+  Mic 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +47,12 @@ const AdminLayout = ({ children, title = 'Dashboard' }: AdminLayoutProps) => {
       href: '/admin/users', 
       icon: <Users className="mr-2 h-4 w-4" />, 
       active: location.pathname === '/admin/users' 
+    },
+    { 
+      name: 'Speaking', 
+      href: '/admin/speaking', 
+      icon: <Mic className="mr-2 h-4 w-4" />, 
+      active: location.pathname === '/admin/speaking' 
     },
     { 
       name: 'Settings', 
