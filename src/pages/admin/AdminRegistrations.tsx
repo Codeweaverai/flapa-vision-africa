@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { toast } from 'sonner';
@@ -54,7 +53,6 @@ const AdminRegistrations = () => {
       if (eventsError) throw eventsError;
       
       // Count registrations by event_id from the old table
-      // Fix: Use a type assertion to avoid the TypeScript error
       const { data: regCountsData, error: regError } = await supabase
         .rpc('count_registrations_by_event') as { data: {event_id: string, count: string}[] | null, error: any };
         
@@ -63,16 +61,20 @@ const AdminRegistrations = () => {
         // Fallback if RPC doesn't exist - fetch all and count manually
         const { data: regData } = await supabase.from('registrations').select('event_id');
         const regCountsMap = {};
-        regData?.forEach(reg => {
-          regCountsMap[reg.event_id] = (regCountsMap[reg.event_id] || 0) + 1;
-        });
+        if (regData) {
+          regData.forEach(reg => {
+            regCountsMap[reg.event_id] = (regCountsMap[reg.event_id] || 0) + 1;
+          });
+        }
         
         // Count bookings by event_id from the new table
         const { data: bookingData } = await supabase.from('event_bookings').select('event_id');
         const bookingCountsMap = {};
-        bookingData?.forEach(booking => {
-          bookingCountsMap[booking.event_id] = (bookingCountsMap[booking.event_id] || 0) + 1;
-        });
+        if (bookingData) {
+          bookingData.forEach(booking => {
+            bookingCountsMap[booking.event_id] = (bookingCountsMap[booking.event_id] || 0) + 1;
+          });
+        }
         
         // Process and combine the data
         const eventsWithCounts = eventsData.map(event => {
@@ -94,7 +96,6 @@ const AdminRegistrations = () => {
       } else {
         // If RPC succeeded, use the results
         // Get counts from event_bookings table
-        // Fix: Use a type assertion to avoid the TypeScript error
         const { data: bookingCountsData, error: bookingError } = await supabase
           .rpc('count_bookings_by_event') as { data: {event_id: string, count: string}[] | null, error: any };
           
@@ -170,15 +171,17 @@ const AdminRegistrations = () => {
         
         const { data: regData, error: regError } = await regQuery;
         
-        if (regError) throw regError;
-        
-        oldRegistrations = (regData || []).map(reg => ({
-          ...reg,
-          created_at: reg.created_at || new Date().toISOString(),
-          phone_number: reg.phone_number || null,
-          mobile_operator: reg.mobile_operator || null,
-          source_table: 'registrations' as const
-        })) as unknown as CombinedRegistration[];
+        if (regError) {
+          console.error('Error fetching from registrations table:', regError);
+        } else {
+          oldRegistrations = (regData || []).map(reg => ({
+            ...reg,
+            created_at: reg.created_at || new Date().toISOString(),
+            phone_number: reg.phone_number || null,
+            mobile_operator: reg.mobile_operator || null,
+            source_table: 'registrations' as const
+          })) as unknown as CombinedRegistration[];
+        }
       }
 
       // Fetch from event_bookings table (if showing all or bookings tab)
@@ -198,15 +201,17 @@ const AdminRegistrations = () => {
         
         const { data: bookingData, error: bookingError } = await bookingQuery;
         
-        if (bookingError) throw bookingError;
-        
-        newBookings = (bookingData || []).map(booking => ({
-          ...booking,
-          created_at: booking.created_at || new Date().toISOString(),
-          phone_number: booking.phone_number || null,
-          mobile_operator: booking.mobile_operator || null,
-          source_table: 'event_bookings' as const
-        })) as unknown as CombinedRegistration[];
+        if (bookingError) {
+          console.error('Error fetching from event_bookings table:', bookingError);
+        } else {
+          newBookings = (bookingData || []).map(booking => ({
+            ...booking,
+            created_at: booking.created_at || new Date().toISOString(),
+            phone_number: booking.phone_number || null,
+            mobile_operator: booking.mobile_operator || null,
+            source_table: 'event_bookings' as const
+          })) as unknown as CombinedRegistration[];
+        }
       }
 
       // Combine both datasets

@@ -480,6 +480,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      count_bookings_by_event: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          event_id: string
+          count: string
+        }[]
+      }
+      count_registrations_by_event: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          event_id: string
+          count: string
+        }[]
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
