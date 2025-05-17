@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -37,12 +38,12 @@ export interface Registration {
   payment_status: string;
   created_at: string; // Changed from optional to required
   updated_at?: string;
-  phone_number?: string;
-  mobile_operator?: string;
-  payment_method?: string;
-  payment_id?: string;
-  payment_currency?: string;
-  payment_amount?: number;
+  phone_number?: string | null;
+  mobile_operator?: string | null;
+  payment_method?: string | null;
+  payment_id?: string | null;
+  payment_currency?: string | null;
+  payment_amount?: number | null;
   events?: Event; // Join with events table
 }
 
@@ -53,11 +54,11 @@ export interface EventBooking {
   booking_date: string;
   status: string;
   payment_status: string;
-  payment_id?: string;
-  payment_amount?: number;
-  payment_currency?: string;
-  phone_number?: string;
-  mobile_operator?: string;
+  payment_id?: string | null;
+  payment_amount?: number | null;
+  payment_currency?: string | null;
+  phone_number?: string | null;
+  mobile_operator?: string | null;
   created_at: string; // Changed from optional to required
   updated_at?: string;
   events?: Event; // Join with events table
@@ -265,9 +266,15 @@ export const fetchUserRegistrations = async (user: User | null): Promise<Registr
     }));
 
     // Merge both results, with new bookings taking precedence for the same event
-    const combinedResults = [...(oldRegistrations || [])].map(reg => ({
+    const combinedResults: Registration[] = [...(oldRegistrations || [])].map(reg => ({
       ...reg,
-      created_at: reg.created_at || new Date().toISOString() // Ensure created_at is not undefined
+      created_at: reg.created_at || new Date().toISOString(), // Ensure created_at is not undefined
+      phone_number: reg.phone_number || null,
+      mobile_operator: reg.mobile_operator || null,
+      payment_id: reg.payment_id || null,
+      payment_currency: reg.payment_currency || null,
+      payment_amount: reg.payment_amount || null,
+      payment_method: reg.payment_method || null
     }));
     
     // Add new bookings, avoiding duplicates by event_id
