@@ -73,25 +73,13 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
   }
 
   try {
-    let registrationData: any = {
-      user_id: user.id,
-      event_id: event.id,
-      status: 'pending',
-      payment_status: event.is_free ? 'confirmed' : 'pending',
-    };
-
-    if (phoneNumber && mobileOperator) {
-      registrationData.phone_number = phoneNumber;
-      registrationData.mobile_operator = mobileOperator;
-      registrationData.payment_method = 'mobile_money';
-    }
-
+    // First check if user is already registered for this event
     const { data: existingRegistration, error: existingRegistrationError } = await supabase
       .from('registrations')
       .select('*')
       .eq('user_id', user.id)
       .eq('event_id', event.id)
-      .single();
+      .maybeSingle(); // Changed from single() to maybeSingle() to avoid 406 errors
 
     if (existingRegistrationError && existingRegistrationError.code !== 'PGRST116') {
       console.error('Error checking existing registration:', existingRegistrationError);
@@ -104,11 +92,27 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
       return false;
     }
 
+    // Create registration data object with proper structure
+    let registrationData = {
+      user_id: user.id,
+      event_id: event.id,
+      status: 'pending',
+      payment_status: event.is_free ? 'confirmed' : 'pending',
+    };
+
+    if (phoneNumber && mobileOperator) {
+      registrationData = {
+        ...registrationData,
+        phone_number: phoneNumber,
+        mobile_operator: mobileOperator,
+        payment_method: 'mobile_money'
+      };
+    }
+
     const { data, error } = await supabase
       .from('registrations')
       .insert([registrationData])
-      .select()
-      .single();
+      .select();
 
     if (error) {
       console.error('Error registering for event:', error);
@@ -118,56 +122,66 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
 
     if (!event.is_free && phoneNumber && mobileOperator) {
       // Initiate payment via Supabase Edge Function
-      const initiatePayment = async (registrationId: string) => {
-        try {
-          const response = await fetch('/api/initiate-payment', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.auth.getSession()}`
-            },
-            body: JSON.stringify({
-              registrationId: registrationId,
-              amount: event.price,
-              currency: event.currency || 'ZMW',
-              phone_number: phoneNumber,
-              mobile_operator: mobileOperator,
-              referenceType: 'event',
-              referenceId: registrationId,
-              userId: user.id
-            }),
-          });
-
-          const result = await response.json();
-
-          if (response.ok && result.redirectUrl) {
-            // Redirect user to payment URL
-            window.location.href = result.redirectUrl;
-          } else {
-            console.error('Payment initiation failed:', result.error || 'Unknown error');
-            toast.error('Payment initiation failed. Please try again.');
-            // Optionally, update registration status to failed
-            await supabase
-              .from('registrations')
-              .update({ status: 'failed', payment_status: 'failed' })
-              .eq('id', registrationId);
-          }
-        } catch (err) {
-          console.error('Error initiating payment:', err);
-          toast.error('Error initiating payment. Please try again.');
-          // Optionally, update registration status to failed
-          if (data?.id) {
-            await supabase
-              .from('registrations')
-              .update({ status: 'failed', payment_status: 'failed' })
-              .eq('id', data.id);
-          }
+      try {
+        // Get the session token for authorization
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          toast.error('Authentication session expired. Please sign in again.');
+          return false;
         }
-      };
 
-      await initiatePayment(data.id);
-    } else {
+        const response = await fetch(`${supabase.supabaseUrl}/functions/v1/initiate-payment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            amount: event.price,
+            currency: event.currency || 'ZMW',
+            phone_number: phoneNumber,
+            mobile_operator: mobileOperator,
+            referenceType: 'event',
+            referenceId: data[0].id,
+            userId: user.id
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.redirectUrl) {
+          // Redirect user to payment URL
+          window.location.href = result.redirectUrl;
+          return true;
+        } else {
+          console.error('Payment initiation failed:', result.error || 'Unknown error');
+          toast.error('Payment initiation failed. Please try again.');
+          
+          // Update registration status to failed
+          await supabase
+            .from('registrations')
+            .update({ status: 'failed', payment_status: 'failed' })
+            .eq('id', data[0].id);
+            
+          return false;
+        }
+      } catch (err) {
+        console.error('Error initiating payment:', err);
+        toast.error('Error initiating payment. Please try again.');
+        
+        // Update registration status to failed if possible
+        if (data && data[0]?.id) {
+          await supabase
+            .from('registrations')
+            .update({ status: 'failed', payment_status: 'failed' })
+            .eq('id', data[0].id);
+        }
+        return false;
+      }
+    } else if (event.is_free) {
       toast.success('Successfully registered for the event!');
+      return true;
     }
 
     return true;
