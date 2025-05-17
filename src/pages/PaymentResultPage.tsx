@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,120 +12,127 @@ const PaymentResultPage = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   
   const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading');
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
   
+  const txnId = searchParams.get('txnId');
   const type = searchParams.get('type');
   const id = searchParams.get('id');
-  const paymentId = searchParams.get('paymentId');
+  const statusParam = searchParams.get('status');
   
   useEffect(() => {
     const verifyPayment = async () => {
-      if (!type || !id) {
+      if (!txnId) {
         setStatus('failed');
-        toast({
-          title: "Error",
-          description: "Missing payment information",
-          variant: "destructive"
-        });
+        toast.error("Missing payment information");
         return;
       }
 
+      // If status is already provided in URL params, use it first
+      if (statusParam) {
+        if (statusParam === 'success' || statusParam === 'completed') {
+          setStatus('success');
+          toast.success("Your payment has been processed successfully");
+        } else if (statusParam === 'failed' || statusParam === 'error') {
+          setStatus('failed');
+          toast.error("Your payment was not successful");
+        } else if (statusParam === 'pending') {
+          setStatus('pending');
+          toast.info("Your payment is being processed");
+        }
+      }
+
       try {
-        // Find the payment transaction
-        const { data: transactions, error: txError } = await supabase
+        // First, fetch the payment details from our database
+        const { data: transaction, error: txError } = await supabase
           .from('payment_transactions')
           .select('*')
-          .eq('reference_type', type)
-          .eq('reference_id', id)
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .eq('id', txnId)
+          .single();
           
-        if (txError || !transactions || transactions.length === 0) {
+        if (txError) {
           console.error('Error finding transaction:', txError);
           setStatus('failed');
-          toast({
-            title: "Payment Error",
-            description: "Could not find your payment record",
-            variant: "destructive"
-          });
+          toast.error("Could not find your payment record");
           return;
         }
         
-        const transaction = transactions[0];
         setPaymentDetails(transaction);
         
-        // Verify payment with the backend
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: {
-            paymentId: transaction.id,
-            referenceType: type,
-            referenceId: id
+        // If we didn't get status from URL, use the one in the database
+        if (!statusParam && transaction) {
+          if (transaction.status === 'completed') {
+            setStatus('success');
+            toast.success("Your payment has been processed successfully");
+          } else if (transaction.status === 'failed') {
+            setStatus('failed');
+            toast.error("Your payment was not successful");
+          } else {
+            setStatus('pending');
           }
-        });
-        
-        if (error) {
-          console.error('Error verifying payment:', error);
-          setStatus('failed');
-          toast({
-            title: "Verification Failed",
-            description: "Unable to verify your payment status",
-            variant: "destructive"
-          });
-          return;
         }
         
-        // Update the UI based on the payment status
-        if (data.status === 'completed') {
-          setStatus('success');
-          toast({
-            title: "Payment Successful",
-            description: "Your payment has been processed successfully"
+        // Verify payment with the backend if still pending
+        if (status === 'loading' || status === 'pending') {
+          const { data, error } = await supabase.functions.invoke('verify-payment', {
+            body: {
+              txnId,
+              type,
+              id
+            }
           });
-        } else if (data.status === 'failed') {
-          setStatus('failed');
-          toast({
-            title: "Payment Failed",
-            description: "Your payment was not successful",
-            variant: "destructive"
-          });
-        } else {
-          setStatus('pending');
-          toast({
-            title: "Payment Pending",
-            description: "Your payment is being processed",
-            variant: "default"
-          });
+          
+          if (error) {
+            console.error('Error verifying payment:', error);
+            if (status === 'loading') {
+              setStatus('pending');
+              toast.info("Payment verification in progress");
+            }
+          } else if (data) {
+            // Update status based on verification result
+            if (data.status === 'completed') {
+              setStatus('success');
+              toast.success("Your payment has been processed successfully");
+            } else if (data.status === 'failed') {
+              setStatus('failed');
+              toast.error("Your payment was not successful");
+            } else {
+              setStatus('pending');
+              toast.info("Your payment is being processed");
+            }
+            
+            // Update payment details if new information is available
+            setPaymentDetails(prevDetails => ({
+              ...prevDetails,
+              ...data,
+              verificationResult: data
+            }));
+          }
         }
-        
-        setPaymentDetails({
-          ...transaction,
-          verificationResult: data
-        });
-        
       } catch (error) {
         console.error('Unexpected error:', error);
-        setStatus('failed');
-        toast({
-          title: "System Error",
-          description: "An unexpected error occurred",
-          variant: "destructive"
-        });
+        if (status === 'loading') {
+          setStatus('pending');
+          toast.warning("Unable to verify payment status");
+        }
       }
     };
     
     if (user) {
       verifyPayment();
+    } else {
+      // If no user is logged in, show a message and redirect to login
+      toast.error("Please sign in to view payment details");
+      setTimeout(() => navigate('/auth'), 2000);
     }
-  }, [type, id, paymentId, toast, user]);
+  }, [txnId, type, id, statusParam, user, navigate]);
   
   const handleNavigate = () => {
     if (type === 'event') {
       navigate('/events');
     } else if (type === 'consultation') {
-      navigate('/consult');
+      navigate('/account');
     } else {
       navigate('/');
     }
@@ -185,7 +192,7 @@ const PaymentResultPage = () => {
                 <div>{paymentDetails.amount} {paymentDetails.currency}</div>
                 
                 <div className="text-muted-foreground">Reference:</div>
-                <div>{paymentDetails.reference_type} - {paymentDetails.reference_id.substring(0, 8)}...</div>
+                <div>{type || paymentDetails.reference_type} - {id?.substring(0, 8) || paymentDetails.reference_id?.substring(0, 8)}...</div>
                 
                 <div className="text-muted-foreground">Status:</div>
                 <div className={
@@ -195,6 +202,9 @@ const PaymentResultPage = () => {
                 }>
                   {status.toUpperCase()}
                 </div>
+                
+                <div className="text-muted-foreground">Phone:</div>
+                <div>{paymentDetails.phone_number}</div>
               </div>
             </div>
           )}

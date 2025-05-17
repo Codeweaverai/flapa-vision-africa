@@ -44,6 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state change:', event, !!session);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -60,6 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', !!session);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -83,6 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .limit(1);
       
       if (checkError) {
+        console.error('Error checking username:', checkError);
         throw new Error('Error checking username availability');
       }
       
@@ -90,7 +93,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Username already exists. Please choose a different username.');
       }
       
-      const { error } = await supabase.auth.signUp({
+      console.log('Signing up with:', { email, userData });
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -98,14 +102,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             full_name: userData.full_name,
             username: userData.username,
           },
+          emailRedirectTo: window.location.origin + '/account',
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Sign up error:', error);
+        throw error;
+      }
       
+      console.log('Sign up successful:', data);
       toast.success("Account created! Check your email to verify your account.");
       navigate('/');
     } catch (error: any) {
+      console.error('Sign up error catch:', error);
       toast.error(error.message || "An error occurred during sign up");
       throw error; // Re-throw to allow component to handle it
     } finally {
@@ -119,15 +129,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       cleanupAuthState();
       
       setLoading(true);
+      console.log('Signing in with:', { email });
       const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Sign in error:', error);
+        throw error;
+      }
       
+      console.log('Sign in successful:', data);
       navigate('/account');
     } catch (error: any) {
+      console.error('Sign in error catch:', error);
       toast.error(error.message || "An error occurred during sign in");
       throw error; // Re-throw to allow component to handle it
     } finally {
@@ -147,6 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Force a page reload to ensure clean state
       window.location.href = '/';
     } catch (error: any) {
+      console.error('Sign out error:', error);
       toast.error(error.message || "An error occurred during sign out");
       throw error;
     } finally {

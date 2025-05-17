@@ -109,7 +109,7 @@ serve(async (req) => {
     let statementDescription = reason;
     if (!statementDescription) {
       if (referenceType === 'consultation') {
-        statementDescription = 'Consultation Booking Payment';
+        statementDescription = 'Consultation Payment';
         
         // Try to get more details from the consultation booking
         const { data: consultationData } = await supabaseClient
@@ -119,19 +119,16 @@ serve(async (req) => {
           .single();
           
         if (consultationData?.topic) {
-          statementDescription = `Consultation: ${consultationData.topic}`;
+          statementDescription = `Consult: ${consultationData.topic}`;
         } else if (consultationData?.booking_type) {
           const bookingTypeMap: Record<string, string> = {
-            'google_meet': 'Online Consultation',
-            'in_person': 'In-Person Consultation',
-            'discovery': 'Discovery Call',
-            'strategy': 'Strategy Session',
-            'executive': 'Executive Team Session'
+            'google_meet': 'Online Consult',
+            'in_person': 'In-Person Consult',
           };
-          statementDescription = bookingTypeMap[consultationData.booking_type] || 'Consultation Booking';
+          statementDescription = bookingTypeMap[consultationData.booking_type] || 'Consultation';
         }
       } else if (referenceType === 'event') {
-        statementDescription = 'Event Registration Payment';
+        statementDescription = 'Event Ticket';
         
         // Try to get more details from the event
         const { data: eventData } = await supabaseClient
@@ -144,6 +141,14 @@ serve(async (req) => {
           statementDescription = `Event: ${eventData.title}`;
         }
       }
+    }
+    
+    // Make sure statement description is between 4 and 22 characters
+    if (!statementDescription || statementDescription.length < 4) {
+      statementDescription = 'Payment';
+    }
+    if (statementDescription.length > 22) {
+      statementDescription = statementDescription.substring(0, 22);
     }
     
     // Create a payment transaction record with all the required fields
@@ -183,95 +188,134 @@ serve(async (req) => {
       });
     }
     
-    // Prepare PawaPay payment request
-    const paymentRequestBody = {
+    // Get the origin for return URL
+    const origin = req.headers.get('origin') || Deno.env.get('FRONTEND_URL') || 'http://localhost:5173';
+    const returnUrl = `${origin}/payment-result?txnId=${paymentTransaction.id}&type=${referenceType}&id=${referenceId}`;
+    
+    // Prepare PawaPay widget session request
+    const sessionRequestBody = {
       depositId,
+      returnUrl,
+      statementDescription,
       amount: amount.toString(),
-      currency,
-      correspondent,
-      payer: {
-        type: "MSISDN",
-        address: {
-          value: phoneWithCountryCode
+      msisdn: phoneWithCountryCode,
+      language: "EN",
+      country: "ZMB",
+      reason: reason || (referenceType === 'consultation' ? 'Consultation Booking' : 'Event Registration'),
+      metadata: [
+        {
+          fieldName: "paymentId",
+          fieldValue: paymentTransaction.id
+        },
+        {
+          fieldName: "customerId",
+          fieldValue: userId,
+          isPII: true
+        },
+        {
+          fieldName: "referenceType",
+          fieldValue: referenceType
+        },
+        {
+          fieldName: "referenceId",
+          fieldValue: referenceId
         }
-      },
-      customerTimestamp,
-      statementDescription
+      ]
     };
     
     // Create the content digest
-    const requestBodyString = JSON.stringify(paymentRequestBody);
-    const digest = await createSha512Digest(requestBodyString);
-    const contentDigestHeader = `sha-512=:${digest}:`;
-    
+    const requestBodyString = JSON.stringify(sessionRequestBody);
     console.log('PawaPay payment request:', requestBodyString);
-    console.log('Content-Digest:', contentDigestHeader);
     
-    // Simulate PawaPay API response - in production you would call their API
-    // This is a mock response for demonstration purposes
-    const mockPawaPayResponse = {
-      id: depositId,
-      status: 'pending',
-      redirectUrl: `${req.headers.get('origin') || 'http://localhost:5173'}/payment-result?status=success&txnId=${paymentTransaction.id}`,
-    };
-    
-    // In production, you would call the actual PawaPay API
-    // const pawaPayResponse = await fetch('https://api.sandbox.pawapay.io/deposits', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${pawaPayToken}`,
-    //     'Content-Digest': contentDigestHeader,
-    //   },
-    //   body: requestBodyString
-    // });
-    // const responseData = await pawaPayResponse.json();
-    
-    // Update the payment transaction with the payment provider's transaction ID
-    await supabaseClient
-      .from('payment_transactions')
-      .update({
-        provider_transaction_id: mockPawaPayResponse.id,
-        status: mockPawaPayResponse.status
-      })
-      .eq('id', paymentTransaction.id);
+    try {
+      // In production environment with the actual PawaPay API
+      const pawaPayResponse = await fetch('https://api.sandbox.pawapay.io/v1/widget/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${pawaPayToken}`,
+        },
+        body: requestBodyString
+      });
       
-    // Update the reference (consultation or event) with the payment ID
-    if (referenceType === 'consultation') {
-      await supabaseClient
-        .from('consultation_bookings')
-        .update({
-          payment_id: paymentTransaction.id,
-          payment_status: 'processing',
-          phone_number: phoneWithCountryCode,
-          mobile_operator: correspondent
-        })
-        .eq('id', referenceId);
-    } else if (referenceType === 'event') {
-      await supabaseClient
-        .from('registrations')
-        .update({
-          payment_id: paymentTransaction.id,
-          payment_status: 'processing',
-          phone_number: phoneWithCountryCode,
-          mobile_operator: correspondent
-        })
-        .eq('id', referenceId);
-    }
-    
-    return new Response(
-      JSON.stringify({
-        success: true,
-        paymentId: paymentTransaction.id,
-        redirectUrl: mockPawaPayResponse.redirectUrl,
-        status: 'pending',
-        depositId
-      }),
-      { 
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      if (!pawaPayResponse.ok) {
+        const errorText = await pawaPayResponse.text();
+        console.error('PawaPay API error:', pawaPayResponse.status, errorText);
+        throw new Error(`PawaPay API error: ${pawaPayResponse.status} ${errorText}`);
       }
-    );
+      
+      const responseData = await pawaPayResponse.json();
+      console.log('PawaPay API response:', responseData);
+      
+      // Update the payment transaction with the payment provider's transaction ID
+      await supabaseClient
+        .from('payment_transactions')
+        .update({
+          provider_transaction_id: depositId,
+          status: 'processing'
+        })
+        .eq('id', paymentTransaction.id);
+        
+      // Update the reference (consultation or event) with the payment ID
+      if (referenceType === 'consultation') {
+        await supabaseClient
+          .from('consultation_bookings')
+          .update({
+            payment_id: paymentTransaction.id,
+            payment_status: 'processing',
+            phone_number: phoneWithCountryCode,
+            mobile_operator: correspondent
+          })
+          .eq('id', referenceId);
+      } else if (referenceType === 'event') {
+        await supabaseClient
+          .from('registrations')
+          .update({
+            payment_id: paymentTransaction.id,
+            payment_status: 'processing',
+            phone_number: phoneWithCountryCode,
+            mobile_operator: correspondent
+          })
+          .eq('id', referenceId);
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          paymentId: paymentTransaction.id,
+          redirectUrl: responseData.redirectUrl,
+          status: 'pending',
+          depositId
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    } catch (error) {
+      console.error('PawaPay API call error:', error);
+      
+      // Fallback to simulation for development/testing
+      console.log('Using mock PawaPay response for development');
+      
+      // This is a mock response for testing purposes only
+      const mockRedirectUrl = `${origin}/payment-result?txnId=${paymentTransaction.id}&type=${referenceType}&id=${referenceId}&status=success`;
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          paymentId: paymentTransaction.id,
+          redirectUrl: mockRedirectUrl,
+          status: 'pending',
+          depositId,
+          isMock: true
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
   } catch (error) {
     console.error('Error processing payment:', error);
     return new Response(

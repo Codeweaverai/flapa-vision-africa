@@ -182,7 +182,7 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
         payment_amount: price,
         payment_currency: currency,
         phone_number: formattedPhoneNumber,
-        mobile_operator: bookingData.mobile_operator || 'MTN_MOMO_ZMB' // Default to MTN if not provided
+        mobile_operator: bookingData.mobile_operator || null
       })
       .select()
       .single();
@@ -212,7 +212,11 @@ export const createConsultationBooking = async (bookingData: BookingFormData, us
       });
       
       if (response && response.redirectUrl) {
-        window.location.href = response.redirectUrl;
+        // Give a moment for the user to see the toast before redirecting
+        toast.success("Redirecting to payment page...");
+        setTimeout(() => {
+          window.location.href = response.redirectUrl;
+        }, 1000);
         return data;
       } else {
         toast.error("Failed to initialize payment");
@@ -291,6 +295,11 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
   mobileOperator?: string;
 }) => {
   try {
+    console.log('Initiating PawaPay payment with details:', {
+      ...paymentDetails,
+      phoneNumber: paymentDetails.phoneNumber ? '********' + paymentDetails.phoneNumber.slice(-4) : null,
+    });
+    
     const { data, error } = await supabase.functions.invoke('create-payment', {
       body: {
         bookingId,
@@ -307,9 +316,10 @@ const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
 
     if (error) {
       console.error('Error invoking payment function:', error);
-      throw new Error('Payment function error');
+      throw new Error(`Payment function error: ${error.message || 'Unknown error'}`);
     }
 
+    console.log('Payment initiation response:', data);
     return data;
   } catch (error) {
     console.error('Payment error:', error);
