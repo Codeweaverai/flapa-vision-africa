@@ -22,14 +22,25 @@ export interface Registration {
   id: string;
   event_id: string;
   user_id: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'attended';
-  payment_status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'attended' | string;
+  payment_status: 'pending' | 'processing' | 'completed' | 'failed' | string;
   payment_id: string | null;
   payment_amount: number | null;
   payment_currency: string | null;
   payment_method: string | null;
   phone_number: string | null;
   mobile_operator: string | null;
+  created_at?: string;
+  updated_at?: string;
+  events?: {
+    id: string;
+    title: string;
+    event_type: string;
+    start_time: string;
+    end_time: string;
+    location: string | null;
+    online_meeting_link: string | null;
+  };
 }
 
 export interface MobileOperator {

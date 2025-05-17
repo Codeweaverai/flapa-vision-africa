@@ -85,7 +85,7 @@ const ConsultPage = () => {
           topic,
           notes,
           phone_number: phoneNumber,
-          mobile_operator
+          mobile_operator: mobileOperator
         },
         user,
         price

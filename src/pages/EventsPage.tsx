@@ -42,7 +42,7 @@ const EventsPage = () => {
         // Fetch user registrations if logged in
         if (user) {
           const userRegs = await fetchUserRegistrations(user);
-          setRegistrations(userRegs);
+          setRegistrations(userRegs as Registration[]);
         }
       } catch (error) {
         console.error('Error loading events:', error);
@@ -66,7 +66,7 @@ const EventsPage = () => {
       if (result) {
         // Refresh registrations
         const userRegs = await fetchUserRegistrations(user);
-        setRegistrations(userRegs);
+        setRegistrations(userRegs as Registration[]);
       }
     } else {
       // For paid events, open dialog to collect phone number
