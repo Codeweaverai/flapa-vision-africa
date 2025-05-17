@@ -1,7 +1,7 @@
 
 import { Event } from '@/services/eventService';
 
-// Combined type for both registration types
+// Combined type for registration
 export interface CombinedRegistration {
   id: string;
   user_id: string;
@@ -11,7 +11,7 @@ export interface CombinedRegistration {
   created_at: string;
   phone_number: string | null;
   mobile_operator: string | null;
-  source_table: 'registrations' | 'event_bookings'; // Track which table it came from
+  source_table: 'event_bookings'; // Only using event_bookings now
   profiles?: {
     full_name: string | null;
     email: string | null;
@@ -20,12 +20,11 @@ export interface CombinedRegistration {
   payment_id?: string | null;
   payment_amount?: number | null;
   payment_currency?: string | null;
-  payment_method?: string | null;
   booking_date?: string | null;
 }
 
 export interface EventWithRegistrations extends Event {
-  registrations_count: number;
+  registrations_count: number; // Keeping for compatibility
   bookings_count: number;
   total_attendees: number;
 }

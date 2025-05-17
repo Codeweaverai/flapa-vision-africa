@@ -56,7 +56,6 @@ const RegistrationsTable = ({
               <TableHead>Registration Date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Payment</TableHead>
-              <TableHead>Source</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -71,7 +70,7 @@ const RegistrationsTable = ({
                 : 'No email';
                 
               return (
-                <TableRow key={`${registration.source_table}-${registration.id}`}>
+                <TableRow key={registration.id}>
                   <TableCell className="font-medium">
                     <div>
                       <p>{fullName || 'Unknown'}</p>
@@ -99,11 +98,6 @@ const RegistrationsTable = ({
                       'secondary'
                     }>
                       {registration.events?.is_free ? 'Free' : registration.payment_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {registration.source_table === 'registrations' ? 'Legacy' : 'New System'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">

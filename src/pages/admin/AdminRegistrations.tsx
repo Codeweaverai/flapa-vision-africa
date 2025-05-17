@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { toast } from 'sonner';
@@ -27,7 +28,6 @@ const AdminRegistrations = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState<CombinedRegistration | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>('all');
 
   useEffect(() => {
     fetchEvents();
@@ -35,13 +35,13 @@ const AdminRegistrations = () => {
 
   useEffect(() => {
     fetchRegistrations(selectedEvent);
-  }, [selectedEvent, activeTab]);
+  }, [selectedEvent]);
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
       
-      // Ensure the count functions exist in Supabase
+      // Ensure the count function exists in Supabase
       await ensureCountFunctions(supabase);
       
       // Get events data
@@ -52,22 +52,13 @@ const AdminRegistrations = () => {
       
       if (eventsError) throw eventsError;
       
-      // Count registrations by event_id from the old table
-      const { data: regCountsData, error: regError } = await supabase
-        .rpc('count_registrations_by_event') as { data: {event_id: string, count: string}[] | null, error: any };
+      // Count bookings by event_id from the table
+      const { data: bookingCountsData, error: bookingError } = await supabase
+        .rpc('count_bookings_by_event') as { data: {event_id: string, count: string}[] | null, error: any };
         
-      if (regError) {
-        console.error('Error counting registrations:', regError);
+      if (bookingError) {
+        console.error('Error counting bookings:', bookingError);
         // Fallback if RPC doesn't exist - fetch all and count manually
-        const { data: regData } = await supabase.from('registrations').select('event_id');
-        const regCountsMap = {};
-        if (regData) {
-          regData.forEach(reg => {
-            regCountsMap[reg.event_id] = (regCountsMap[reg.event_id] || 0) + 1;
-          });
-        }
-        
-        // Count bookings by event_id from the new table
         const { data: bookingData } = await supabase.from('event_bookings').select('event_id');
         const bookingCountsMap = {};
         if (bookingData) {
@@ -76,42 +67,22 @@ const AdminRegistrations = () => {
           });
         }
         
-        // Process and combine the data
+        // Process the data
         const eventsWithCounts = eventsData.map(event => {
-          // Count from registrations table
-          const regCount = regCountsMap[event.id] || 0;
-          
           // Count from bookings table
           const bookingCount = bookingCountsMap[event.id] || 0;
           
           return {
             ...event,
-            registrations_count: regCount,
+            registrations_count: 0, // We're not using registrations anymore
             bookings_count: bookingCount,
-            total_attendees: regCount + bookingCount
+            total_attendees: bookingCount
           };
         }) as EventWithRegistrations[];
         
         setEvents(eventsWithCounts);
       } else {
         // If RPC succeeded, use the results
-        // Get counts from event_bookings table
-        const { data: bookingCountsData, error: bookingError } = await supabase
-          .rpc('count_bookings_by_event') as { data: {event_id: string, count: string}[] | null, error: any };
-          
-        if (bookingError) {
-          console.error('Error counting bookings:', bookingError);
-          // Handle the error but continue
-        }
-        
-        // Process and combine the data
-        const regCountsMap = {};
-        if (regCountsData && Array.isArray(regCountsData)) {
-          regCountsData.forEach(item => {
-            regCountsMap[item.event_id] = parseInt(item.count);
-          });
-        }
-        
         const bookingCountsMap = {};
         if (bookingCountsData && Array.isArray(bookingCountsData)) {
           bookingCountsData.forEach(item => {
@@ -120,17 +91,14 @@ const AdminRegistrations = () => {
         }
         
         const eventsWithCounts = eventsData.map(event => {
-          // Count from registrations table
-          const regCount = regCountsMap[event.id] || 0;
-          
           // Count from bookings table
           const bookingCount = bookingCountsMap[event.id] || 0;
           
           return {
             ...event,
-            registrations_count: regCount,
+            registrations_count: 0, // We're not using registrations anymore
             bookings_count: bookingCount,
-            total_attendees: regCount + bookingCount
+            total_attendees: bookingCount
           };
         }) as EventWithRegistrations[];
         
@@ -150,73 +118,37 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
 
-      // Prepare arrays to hold results from both tables
-      let oldRegistrations: CombinedRegistration[] = [];
-      let newBookings: CombinedRegistration[] = [];
-
-      // Fetch from registrations table (if showing all or registrations tab)
-      if (activeTab === 'all' || activeTab === 'registrations') {
-        let regQuery = supabase
-          .from('registrations')
-          .select(`
-            *,
-            events(*),
-            profiles:user_id(full_name, email)
-          `)
-          .order('created_at', { ascending: false });
-        
-        if (eventId !== 'all') {
-          regQuery = regQuery.eq('event_id', eventId);
-        }
-        
-        const { data: regData, error: regError } = await regQuery;
-        
-        if (regError) {
-          console.error('Error fetching from registrations table:', regError);
-        } else {
-          oldRegistrations = (regData || []).map(reg => ({
-            ...reg,
-            created_at: reg.created_at || new Date().toISOString(),
-            phone_number: reg.phone_number || null,
-            mobile_operator: reg.mobile_operator || null,
-            source_table: 'registrations' as const
-          })) as unknown as CombinedRegistration[];
-        }
+      // Fetch from event_bookings table only
+      let bookingQuery = supabase
+        .from('event_bookings')
+        .select(`
+          *,
+          events(*),
+          profiles:user_id(full_name, email)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (eventId !== 'all') {
+        bookingQuery = bookingQuery.eq('event_id', eventId);
       }
+      
+      const { data: bookingData, error: bookingError } = await bookingQuery;
+      
+      if (bookingError) {
+        console.error('Error fetching from event_bookings table:', bookingError);
+        toast.error('Failed to load registrations');
+        setRegistrations([]);
+      } else {
+        const bookings = (bookingData || []).map(booking => ({
+          ...booking,
+          created_at: booking.created_at || new Date().toISOString(),
+          phone_number: booking.phone_number || null,
+          mobile_operator: booking.mobile_operator || null,
+          source_table: 'event_bookings' as const
+        })) as unknown as CombinedRegistration[];
 
-      // Fetch from event_bookings table (if showing all or bookings tab)
-      if (activeTab === 'all' || activeTab === 'bookings') {
-        let bookingQuery = supabase
-          .from('event_bookings')
-          .select(`
-            *,
-            events(*),
-            profiles:user_id(full_name, email)
-          `)
-          .order('created_at', { ascending: false });
-        
-        if (eventId !== 'all') {
-          bookingQuery = bookingQuery.eq('event_id', eventId);
-        }
-        
-        const { data: bookingData, error: bookingError } = await bookingQuery;
-        
-        if (bookingError) {
-          console.error('Error fetching from event_bookings table:', bookingError);
-        } else {
-          newBookings = (bookingData || []).map(booking => ({
-            ...booking,
-            created_at: booking.created_at || new Date().toISOString(),
-            phone_number: booking.phone_number || null,
-            mobile_operator: booking.mobile_operator || null,
-            source_table: 'event_bookings' as const
-          })) as unknown as CombinedRegistration[];
-        }
+        setRegistrations(bookings);
       }
-
-      // Combine both datasets
-      const combined = [...oldRegistrations, ...newBookings];
-      setRegistrations(combined);
     } catch (error) {
       console.error('Error fetching registrations:', error);
       toast.error('Failed to load registrations');
@@ -227,11 +159,8 @@ const AdminRegistrations = () => {
 
   const handleUpdateStatus = async (registration: CombinedRegistration, status: string, paymentStatus: string) => {
     try {
-      // Update in the correct table based on source
-      const table = registration.source_table;
-      
       const { error } = await supabase
-        .from(table)
+        .from('event_bookings')
         .update({ status, payment_status: paymentStatus })
         .eq('id', registration.id);
       
@@ -250,11 +179,8 @@ const AdminRegistrations = () => {
     if (!confirm('Are you sure you want to delete this registration?')) return;
     
     try {
-      // Delete from the correct table based on source
-      const table = registration.source_table;
-      
       const { error } = await supabase
-        .from(table)
+        .from('event_bookings')
         .delete()
         .eq('id', registration.id);
       
@@ -304,14 +230,6 @@ const AdminRegistrations = () => {
           <p className="text-muted-foreground">Manage event registrations and attendees.</p>
         </div>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="all">All Registrations</TabsTrigger>
-          <TabsTrigger value="registrations">Legacy Registrations</TabsTrigger>
-          <TabsTrigger value="bookings">New Bookings</TabsTrigger>
-        </TabsList>
-      </Tabs>
       
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="w-full sm:w-1/2">

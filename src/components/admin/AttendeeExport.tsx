@@ -39,7 +39,6 @@ const AttendeeExport = ({ events, registrations }: AttendeeExportProps) => {
         'Phone': reg.phone_number || 'Not provided',
         'Status': reg.status,
         'Payment Status': reg.payment_status,
-        'Source': reg.source_table === 'registrations' ? 'Legacy System' : 'New System',
         'Registration Date': formatDate(reg.created_at || new Date().toISOString())
       };
     });
@@ -64,14 +63,13 @@ const AttendeeExport = ({ events, registrations }: AttendeeExportProps) => {
       
       // Create the table
       autoTable(doc, {
-        head: [['Name', 'Email', 'Phone', 'Status', 'Payment Status', 'Source', 'Registration Date']],
+        head: [['Name', 'Email', 'Phone', 'Status', 'Payment Status', 'Registration Date']],
         body: exportData.map(row => [
           row.Name, 
           row.Email, 
           row.Phone, 
           row.Status, 
           row['Payment Status'],
-          row.Source,
           row['Registration Date']
         ]),
         startY: 40,
@@ -117,15 +115,9 @@ const AttendeeExport = ({ events, registrations }: AttendeeExportProps) => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <div className="text-sm grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-muted-foreground">Legacy System: </span> 
-                  <Badge variant="outline">{event.registrations_count}</Badge>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">New System: </span> 
-                  <Badge variant="outline">{event.bookings_count}</Badge>
-                </div>
+              <div className="text-sm">
+                <span className="text-muted-foreground">Bookings: </span> 
+                <Badge variant="outline">{event.bookings_count}</Badge>
               </div>
             </div>
           </Card>

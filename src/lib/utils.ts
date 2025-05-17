@@ -27,20 +27,15 @@ export const formatDate = (date: string | Date): string => {
   }
 };
 
-// Function to ensure the count functions exist in Supabase
+// Function to ensure the count function exists in Supabase
 export async function ensureCountFunctions(supabase: SupabaseClient) {
   try {
-    // Test if the count_registrations_by_event function exists
-    const { data: testReg, error: testRegError } = await supabase
-      .rpc('count_registrations_by_event') as { data: any, error: any };
-    
     // Test if the count_bookings_by_event function exists
-    const { data: testBooking, error: testBookingError } = await supabase
+    const { data, error } = await supabase
       .rpc('count_bookings_by_event') as { data: any, error: any };
     
-    // If either function doesn't exist or returned an error, we return false
-    // This will trigger the fallback code in AdminRegistrations.tsx
-    return !testRegError && !testBookingError;
+    // If function doesn't exist or returned an error, we return false
+    return !error;
   } catch (error) {
     console.error('Error testing count functions:', error);
     return false;
