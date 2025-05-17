@@ -73,7 +73,13 @@ const AdminEvents = () => {
         throw error;
       }
       
-      setEvents(data || []);
+      // Cast the event_type to ensure it meets the type constraints
+      const typedEvents = data?.map(event => ({
+        ...event,
+        event_type: event.event_type as 'webinar' | 'in-person' | 'mentorship'
+      })) as Event[];
+      
+      setEvents(typedEvents || []);
     } catch (error) {
       console.error('Error fetching events:', error);
       toast.error('Failed to load events');

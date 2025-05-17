@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -248,11 +247,24 @@ const EventForm = () => {
     setSaving(true);
     
     try {
-      const eventData = { 
-        ...formData,
-        // Handle is_free correctly with null values
+      // Make sure required fields are present
+      if (!formData.title || !formData.event_type || !formData.start_time || !formData.end_time) {
+        throw new Error('Missing required fields');
+      }
+      
+      // Create a properly typed event data object
+      const eventData = {
+        title: formData.title,
+        description: formData.description || null,
+        event_type: formData.event_type as 'webinar' | 'in-person' | 'mentorship',
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        location: formData.location || null,
+        online_meeting_link: formData.online_meeting_link || null,
+        capacity: formData.capacity,
         price: formData.is_free ? null : formData.price,
         currency: formData.is_free ? null : formData.currency,
+        is_free: formData.is_free
       };
 
       let response;
