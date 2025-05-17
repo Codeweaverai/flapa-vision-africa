@@ -79,7 +79,7 @@ const CourseForm = () => {
           setValue('summary', courseData.summary);
           setValue('description', courseData.description);
           setValue('category', courseData.category);
-          setValue('difficulty_level', courseData.difficulty_level);
+          setValue('difficulty_level', courseData.difficulty_level as "beginner" | "intermediate" | "advanced");
           setValue('duration_minutes', courseData.duration_minutes);
           setValue('price', courseData.price || 0);
           setValue('is_free', courseData.is_free || false);
@@ -130,20 +130,37 @@ const CourseForm = () => {
       setSaving(true);
       
       // Create or update the course
-      let courseData = { 
-        ...data, 
-        is_published: false, 
-        tags: [], 
-        thumbnail_url: null 
-      };
       let courseId: string;
       
       if (isEditMode) {
-        const updatedCourse = await updateCourse(id!, courseData);
-        courseId = id!;
+        const updatedCourse = await updateCourse(id!, {
+          title: data.title,
+          summary: data.summary,
+          description: data.description,
+          category: data.category,
+          difficulty_level: data.difficulty_level,
+          duration_minutes: data.duration_minutes,
+          price: data.price,
+          is_free: data.is_free,
+          certificate_enabled: data.certificate_enabled
+        });
+        
         if (!updatedCourse) throw new Error("Failed to update course");
+        courseId = id!;
       } else {
-        const newCourse = await createCourse(courseData);
+        const newCourse = await createCourse({
+          title: data.title,
+          summary: data.summary,
+          description: data.description,
+          category: data.category,
+          difficulty_level: data.difficulty_level,
+          duration_minutes: data.duration_minutes,
+          price: data.price,
+          is_free: data.is_free,
+          certificate_enabled: data.certificate_enabled,
+          is_published: false
+        });
+        
         if (!newCourse) throw new Error("Failed to create course");
         courseId = newCourse.id;
       }
@@ -465,7 +482,7 @@ const CourseForm = () => {
                     course_id: id,
                     title: result,
                     order_index: modules.length,
-                    description: null // Add the required description field
+                    description: ''
                   });
                   
                   if (newModule) {
@@ -508,7 +525,7 @@ const CourseForm = () => {
                           course_id: id,
                           title: result,
                           order_index: 0,
-                          description: null // Add the required description field
+                          description: ''
                         });
                         
                         if (newModule) {
@@ -598,7 +615,7 @@ const CourseForm = () => {
                               title: result,
                               order_index: module.lessons ? module.lessons.length : 0,
                               video_url: "",
-                              description: null, // Add required description field
+                              description: "",
                               materials_urls: [],
                             });
                             

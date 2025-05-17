@@ -63,7 +63,7 @@ export async function fetchPublishedCourses(): Promise<Course[]> {
       throw error;
     }
     
-    return data as Course[] || [];
+    return (data as Course[]) || [];
   } catch (error) {
     console.error('Error in fetchPublishedCourses:', error);
     toast({
@@ -124,6 +124,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
       })
     );
     
+    // Type assertion to ensure correct return type
     return {
       ...(course as Course),
       modules: modulesWithLessons as CourseWithModules['modules'],
@@ -499,7 +500,7 @@ export async function fetchAllCourses(): Promise<Course[]> {
       throw error;
     }
     
-    return data as Course[] || [];
+    return (data as Course[]) || [];
   } catch (error) {
     console.error('Error in fetchAllCourses:', error);
     toast({
