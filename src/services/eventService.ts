@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -82,7 +83,12 @@ export const fetchEvents = async (): Promise<Event[]> => {
   }
 };
 
-export const registerForEvent = async (event: Event, user: User | null): Promise<boolean> => {
+export const registerForEvent = async (
+  event: Event, 
+  user: User | null, 
+  phoneNumber?: string, 
+  mobileOperator?: string
+): Promise<boolean> => {
   if (!user) {
     toast.error("Please sign in to register for events");
     return false;
@@ -139,7 +145,13 @@ export const registerForEvent = async (event: Event, user: User | null): Promise
     }
 
     if (!event.is_free) {
-      // Initiate payment via Stripe Checkout
+      // For paid events, we need phone number and mobile operator
+      if (!phoneNumber || !mobileOperator) {
+        toast.error('Mobile money details are required for paid events');
+        return false;
+      }
+
+      // Initiate payment via PawaPay
       try {
         // Get the session token for authorization
         const { data: { session } } = await supabase.auth.getSession();
@@ -152,27 +164,39 @@ export const registerForEvent = async (event: Event, user: User | null): Promise
         // Get the supabase URL from the environment variable
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://rxqoczksnddbxcdwobnw.supabase.co";
         
-        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+        const response = await fetch(`${supabaseUrl}/functions/v1/create-payment`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
+            bookingId: bookingResult[0].id,
             amount: event.price,
             currency: event.currency || 'USD',
             referenceType: 'event',
             referenceId: bookingResult[0].id,
             userId: user.id,
-            eventTitle: event.title
+            phoneNumber: phoneNumber,
+            mobileOperator: mobileOperator,
+            reason: `Registration for ${event.title}`
           }),
         });
 
         const result = await response.json();
 
-        if (response.ok && result.url) {
-          // Open Stripe checkout in a new window
-          window.location.href = result.url;
+        if (response.ok && result.redirectUrl) {
+          // Update booking with phone and operator details
+          await supabase
+            .from('event_bookings')
+            .update({
+              phone_number: phoneNumber,
+              mobile_operator: mobileOperator
+            })
+            .eq('id', bookingResult[0].id);
+            
+          // Open payment page in same window
+          window.location.href = result.redirectUrl;
           return true;
         } else {
           console.error('Payment initiation failed:', result.error || 'Unknown error');

@@ -9,7 +9,10 @@ import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useMobileOperators } from '@/hooks/useMobileOperators';
 
 interface EventRegistrationFormProps {
   event: Event;
@@ -26,12 +29,22 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { mobileOperators } = useMobileOperators();
 
-  const formSchema = z.object({});
+  // For paid registrations
+  const formSchema = z.object({
+    phoneNumber: z.string()
+      .min(9, { message: "Phone number must be at least 9 digits" })
+      .max(15, { message: "Phone number cannot exceed 15 digits" }),
+    mobileOperator: z.string({ required_error: "Please select a mobile operator" })
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {},
+    defaultValues: {
+      phoneNumber: '',
+      mobileOperator: ''
+    },
   });
 
   const handleFreeRegistration = async () => {
@@ -56,7 +69,7 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
     }
   };
 
-  const onSubmit = async () => {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!user) {
       toast.error("Please sign in to register");
       navigate("/auth");
@@ -65,10 +78,11 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
     setLoading(true);
     try {
-      const result = await registerForEvent(event, user);
+      const result = await registerForEvent(event, user, data.phoneNumber, data.mobileOperator);
       
       if (result && onSuccess) {
-        onSuccess();
+        // Success will be handled by a redirect to the payment provider
+        // onSuccess() will be called after successful payment
       }
     } catch (error) {
       console.error("Error during paid registration:", error);
@@ -117,16 +131,55 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
                 Registration fee: {event.currency || 'USD'} {event.price}
               </p>
               <p className="text-sm mb-4">
-                You will be redirected to our secure payment provider to complete your registration.
+                Please provide your mobile money details to complete your registration.
               </p>
             </div>
+
+            <FormField
+              control={form.control}
+              name="phoneNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mobile Money Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. 0977123456" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="mobileOperator"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mobile Network</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select mobile operator" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {mobileOperators.map((operator) => (
+                        <SelectItem key={operator.code} value={operator.code}>
+                          {operator.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="flex justify-between pt-4">
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Processing..." : "Continue to Payment"}
+                {loading ? "Processing..." : "Pay Now"}
               </Button>
             </div>
           </form>
