@@ -8,7 +8,8 @@ import {
   Users,
   X, 
   Settings,
-  Mic 
+  Mic,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,6 +54,12 @@ const AdminLayout = ({ children, title = 'Dashboard' }: AdminLayoutProps) => {
       href: '/admin/speaking', 
       icon: <Mic className="mr-2 h-4 w-4" />, 
       active: location.pathname === '/admin/speaking' 
+    },
+    { 
+      name: 'Consultations', 
+      href: '/admin/consultations', 
+      icon: <CalendarIcon className="mr-2 h-4 w-4" />, 
+      active: location.pathname === '/admin/consultations' 
     },
     { 
       name: 'Settings', 
