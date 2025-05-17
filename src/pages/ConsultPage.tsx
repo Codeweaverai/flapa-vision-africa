@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -25,11 +26,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, addDays, setHours, setMinutes, isBefore } from 'date-fns';
 import { toast } from 'sonner';
-import { createConsultationBooking } from '@/services/consultationService';
+import { createConsultationBooking, fetchMobileOperators } from '@/services/consultationService';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { MobileOperator } from '@/services/eventService';
 
 const ConsultPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [bookingType, setBookingType] = useState<'google_meet' | 'in_person'>('google_meet');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
@@ -40,6 +43,7 @@ const ConsultPage = () => {
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [mobileOperator, setMobileOperator] = useState<string>('MTN_MOMO_ZMB');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mobileOperators, setMobileOperators] = useState<MobileOperator[]>([]);
 
   // Pricing information
   const priceMap = {
@@ -53,16 +57,34 @@ const ConsultPage = () => {
     '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'
   ];
 
+  // Fetch mobile operators on component mount
+  useState(() => {
+    const loadMobileOperators = async () => {
+      const operators = await fetchMobileOperators();
+      if (operators.length > 0) {
+        setMobileOperators(operators);
+      }
+    };
+    
+    loadMobileOperators();
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) {
       toast.error("Please sign in to book a consultation");
+      navigate("/auth");
       return;
     }
     
     if (!selectedDate || !selectedTime) {
       toast.error("Please select both a date and time");
+      return;
+    }
+
+    if (!phoneNumber) {
+      toast.error("Please provide a phone number for payment processing");
       return;
     }
 
@@ -76,7 +98,7 @@ const ConsultPage = () => {
     try {
       const price = priceMap[duration as keyof typeof priceMap] || 900;
       
-      await createConsultationBooking(
+      const result = await createConsultationBooking(
         {
           booking_type: bookingType,
           duration,
@@ -91,8 +113,10 @@ const ConsultPage = () => {
         price
       );
       
-      // Note: The createConsultationBooking function will handle the redirect for payment
-      // or success messages
+      if (result) {
+        toast.success("Booking created! You'll be redirected to complete payment.");
+        // Note: createConsultationBooking will handle the redirect for payment
+      }
       
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -323,15 +347,35 @@ const ConsultPage = () => {
                         <SelectValue placeholder="Select operator" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="MTN_MOMO_ZMB">MTN Mobile Money (Zambia)</SelectItem>
-                        <SelectItem value="AIRTEL_MONEY_ZMB">Airtel Money (Zambia)</SelectItem>
+                        {mobileOperators.length > 0 ? (
+                          mobileOperators.map(op => (
+                            <SelectItem key={op.code} value={op.code}>
+                              {op.name} ({op.country})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="MTN_MOMO_ZMB">MTN Mobile Money (Zambia)</SelectItem>
+                            <SelectItem value="AIRTEL_MONEY_ZMB">Airtel Money (Zambia)</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                   
-                  <Button type="submit" className="w-full" disabled={isSubmitting || !selectedDate || !selectedTime}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isSubmitting || !selectedDate || !selectedTime || !phoneNumber}
+                  >
                     {isSubmitting ? 'Processing...' : 'Book Consultation'}
                   </Button>
+                  
+                  {!user && (
+                    <div className="text-center text-sm text-muted-foreground mt-2">
+                      <p>You need to <Link to="/auth" className="font-medium text-primary hover:underline">sign in</Link> to book a consultation</p>
+                    </div>
+                  )}
                 </form>
               </CardContent>
             </Card>

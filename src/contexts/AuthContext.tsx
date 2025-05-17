@@ -3,7 +3,7 @@ import React, { createContext, useState, useContext, useEffect, ReactNode } from
 import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 interface AuthContextProps {
   user: User | null;
@@ -48,15 +48,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN') {
-          toast({
-            title: "Welcome!",
-            description: "You have successfully signed in.",
-          });
+          // Defer data fetch to prevent deadlocks
+          setTimeout(() => {
+            toast.success("Welcome! You have successfully signed in.");
+          }, 0);
         } else if (event === 'SIGNED_OUT') {
-          toast({
-            title: "Signed out",
-            description: "You have successfully signed out.",
-          });
+          toast.info("You have successfully signed out.");
         }
       }
     );
@@ -90,18 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      toast({
-        title: "Account created",
-        description: "Check your email to verify your account.",
-      });
-      
+      toast.success("Account created! Check your email to verify your account.");
       navigate('/');
     } catch (error: any) {
-      toast({
-        title: "Sign up failed",
-        description: error.message || "An error occurred during sign up",
-        variant: "destructive",
-      });
+      toast.error(error.message || "An error occurred during sign up");
+      throw error; // Re-throw to allow component to handle it
     } finally {
       setLoading(false);
     }
@@ -113,20 +103,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       cleanupAuthState();
       
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
       if (error) throw error;
       
-      navigate('/');
+      navigate('/account');
     } catch (error: any) {
-      toast({
-        title: "Sign in failed",
-        description: error.message || "An error occurred during sign in",
-        variant: "destructive",
-      });
+      toast.error(error.message || "An error occurred during sign in");
+      throw error; // Re-throw to allow component to handle it
     } finally {
       setLoading(false);
     }
@@ -140,13 +127,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       // Attempt global sign out
       await supabase.auth.signOut({ scope: 'global' });
-      navigate('/auth');
+      
+      // Force a page reload to ensure clean state
+      window.location.href = '/';
     } catch (error: any) {
-      toast({
-        title: "Sign out failed",
-        description: error.message || "An error occurred during sign out",
-        variant: "destructive",
-      });
+      toast.error(error.message || "An error occurred during sign out");
+      throw error;
     } finally {
       setLoading(false);
     }

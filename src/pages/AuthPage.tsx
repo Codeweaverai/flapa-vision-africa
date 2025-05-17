@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { 
   Card,
@@ -26,52 +26,80 @@ const AuthPage = () => {
   const [username, setUsername] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
+
+  useEffect(() => {
+    // Load from localStorage if available (for convenience)
+    const savedEmail = localStorage.getItem('lastAuthEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+    }
+  }, []);
 
   // Redirect if already authenticated
   if (!loading && user) {
-    return <Navigate to="/" />;
+    return <Navigate to="/account" />;
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
+    // Save email for convenience
+    if (email) {
+      localStorage.setItem('lastAuthEmail', email);
+    }
+    
     try {
       await signIn(email, password);
-      toast({
-        title: 'Success',
-        description: 'You have successfully signed in.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to sign in.',
-      });
+      // Success handling is done in AuthContext
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      toast.error(error.message || 'Failed to sign in. Please check your credentials.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
+    // Validate inputs
+    if (!fullName || !username || !email || !password) {
+      toast.error('All fields are required');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Save email for convenience
+    localStorage.setItem('lastAuthEmail', email);
+    
     try {
       await signUp(email, password, { full_name: fullName, username });
-      toast({
-        title: 'Success',
-        description: 'You have successfully signed up.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to sign up.',
-      });
+      // Success handling is done in AuthContext
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      toast.error(error.message || 'Failed to sign up. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   return (
     <div className="flex min-h-screen bg-light-purple">
       <div className="container max-w-md mx-auto py-20 bg-light-purple">
+        <div className="mb-8 text-center">
+          <Link to="/" className="text-2xl font-bold text-gradient inline-block mb-4">Mbolela Pule</Link>
+          <h1 className="text-3xl font-bold mb-2">Welcome</h1>
+          <p className="text-muted-foreground">Sign in to your account or create a new one</p>
+        </div>
+        
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
@@ -95,6 +123,7 @@ const AuthPage = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      autoComplete="email"
                     />
                   </div>
                   <div className="space-y-2">
@@ -105,6 +134,7 @@ const AuthPage = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      autoComplete="current-password"
                     />
                   </div>
                 </CardContent>
@@ -161,6 +191,7 @@ const AuthPage = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      autoComplete="email"
                     />
                   </div>
                   <div className="space-y-2">
@@ -171,7 +202,10 @@ const AuthPage = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      autoComplete="new-password"
+                      minLength={6}
                     />
+                    <p className="text-xs text-muted-foreground">Password must be at least 6 characters</p>
                   </div>
                 </CardContent>
                 <CardFooter>

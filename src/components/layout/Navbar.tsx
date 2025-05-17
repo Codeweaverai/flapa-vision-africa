@@ -109,6 +109,12 @@ const Navbar = () => {
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
+                    <Link to="/account" className="w-full cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>My Account</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link to="/consult" className="w-full cursor-pointer">
                       Book a Consultation
                     </Link>
@@ -203,6 +209,14 @@ const Navbar = () => {
                   </Avatar>
                   <span className="text-sm font-medium">{user.user_metadata.full_name || user.email}</span>
                 </div>
+                <Link 
+                  to="/account" 
+                  className="block text-foreground hover:text-primary transition-colors py-2"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User className="inline-block mr-2 h-4 w-4" />
+                  My Account
+                </Link>
                 <Button 
                   variant="outline" 
                   className="w-full justify-start" 

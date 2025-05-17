@@ -13,6 +13,7 @@ import LearningPage from "./pages/LearningPage";
 import EventsPage from "./pages/EventsPage";
 import ConsultPage from "./pages/ConsultPage";
 import AuthPage from "./pages/AuthPage";
+import AccountPage from "./pages/AccountPage";
 import PaymentResultPage from "./pages/PaymentResultPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import NotFound from "./pages/NotFound";
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/events" element={<EventsPage />} />
             <Route path="/consult" element={<ConsultPage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/account" element={<AccountPage />} />
             <Route path="/payment-result" element={<PaymentResultPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

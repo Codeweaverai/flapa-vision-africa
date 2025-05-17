@@ -1,40 +1,44 @@
 
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { fetchEvents, Event, Registration, registerForEvent, fetchUserRegistrations } from '@/services/eventService';
+import { Badge } from '@/components/ui/badge';
+import { Event, Registration, fetchEvents, registerForEvent, fetchUserRegistrations, cancelRegistration } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
-import { Calendar, Clock, MapPin, Tag, Info } from 'lucide-react';
-import { format } from 'date-fns';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CalendarIcon, Clock, MapPin, VideoIcon, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [phoneNumber, setPhoneNumber] = useState<string>('');
-  const [mobileOperator, setMobileOperator] = useState<string>('MTN_MOMO_ZMB');
-  const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [mobileOperator, setMobileOperator] = useState('MTN_MOMO_ZMB');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const getEvents = async () => {
-      setLoading(true);
+    const loadEvents = async () => {
       try {
         const eventsData = await fetchEvents();
         setEvents(eventsData);
@@ -46,219 +50,373 @@ const EventsPage = () => {
         }
       } catch (error) {
         console.error('Error loading events:', error);
+        toast.error("Failed to load events");
       } finally {
         setLoading(false);
       }
     };
-
-    getEvents();
+    
+    loadEvents();
   }, [user]);
 
   const handleRegister = async (event: Event) => {
     if (!user) {
       toast.error("Please sign in to register for events");
+      navigate("/auth");
       return;
     }
     
-    // For free events, register directly
-    if (event.is_free) {
+    // If event is free, directly register
+    if (event.is_free || !event.price) {
+      setIsRegistering(true);
       const result = await registerForEvent(event, user);
+      setIsRegistering(false);
+      
+      // Refresh registrations after successful registration
       if (result) {
-        // Refresh registrations
         const userRegs = await fetchUserRegistrations(user);
         setRegistrations(userRegs as Registration[]);
       }
     } else {
       // For paid events, open dialog to collect phone number
-      setRegisteringEventId(event.id);
+      setSelectedEvent(event);
+      setIsDialogOpen(true);
     }
   };
-
-  const handlePaymentSubmit = async () => {
-    if (!registeringEventId) return;
+  
+  const handlePaidRegistration = async () => {
+    if (!selectedEvent || !phoneNumber) return;
     
-    const event = events.find(e => e.id === registeringEventId);
-    if (!event) return;
-    
-    // Validate phone number
-    if (!phoneNumber) {
-      toast.error("Please enter a phone number for payment");
-      return;
+    setIsRegistering(true);
+    try {
+      await registerForEvent(selectedEvent, user, phoneNumber, mobileOperator);
+      // Payment and redirects are handled in the service
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error("Failed to process registration");
+    } finally {
+      setIsRegistering(false);
+      setIsDialogOpen(false);
     }
-    
-    await registerForEvent(event, user, phoneNumber, mobileOperator);
-    setRegisteringEventId(null);
   };
-
+  
+  const handleCancelRegistration = async (registrationId: string) => {
+    if (confirm('Are you sure you want to cancel this registration?')) {
+      const success = await cancelRegistration(registrationId, user);
+      if (success) {
+        // Update the registrations list by filtering out the cancelled one
+        setRegistrations(prev => prev.filter(reg => reg.id !== registrationId));
+      }
+    }
+  };
+  
   const isRegistered = (eventId: string) => {
-    return registrations.some(reg => reg.event_id === eventId);
+    return registrations.some(reg => reg.event_id === eventId && reg.status !== 'cancelled');
   };
+  
+  // Find registration for an event
+  const getRegistration = (eventId: string) => {
+    return registrations.find(reg => reg.event_id === eventId && reg.status !== 'cancelled');
+  };
+
+  const formatDateTime = (dateTimeStr: string) => {
+    try {
+      return format(parseISO(dateTimeStr), 'PPP p');
+    } catch (e) {
+      return dateTimeStr;
+    }
+  };
+
+  const formatTime = (dateTimeStr: string) => {
+    try {
+      return format(parseISO(dateTimeStr), 'p');
+    } catch (e) {
+      return dateTimeStr;
+    }
+  };
+  
+  const getEventTypeLabel = (type: string) => {
+    switch (type) {
+      case 'webinar':
+        return 'Online Webinar';
+      case 'in-person':
+        return 'In-Person Event';
+      case 'mentorship':
+        return 'Mentorship Session';
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+  
+  const sortedEvents = [...events].sort((a, b) => {
+    return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+  });
+  
+  const upcomingEvents = sortedEvents.filter(event => 
+    new Date(event.start_time) > new Date()
+  );
+  
+  const pastEvents = sortedEvents.filter(event => 
+    new Date(event.start_time) <= new Date()
+  );
 
   return (
     <Layout>
       <div className="section-container bg-light-purple">
-        <h1 className="heading-lg mb-8 text-gradient">Events</h1>
+        <h1 className="heading-lg mb-2 text-gradient text-center">Events</h1>
+        <p className="text-center mb-12 max-w-3xl mx-auto">
+          Join me at upcoming events, webinars, and workshops to learn about technology, 
+          entrepreneurship, and innovation.
+        </p>
         
-        <Tabs defaultValue="upcoming" className="w-full">
-          <TabsList className="mb-8">
+        <Tabs defaultValue="upcoming" className="w-full max-w-5xl mx-auto">
+          <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="upcoming">Upcoming Events</TabsTrigger>
-            <TabsTrigger value="my-events" disabled={!user}>My Registrations</TabsTrigger>
+            <TabsTrigger value="past">Past Events</TabsTrigger>
           </TabsList>
           
           <TabsContent value="upcoming">
             {loading ? (
-              <div className="flex justify-center">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-64 bg-slate-200 rounded-lg w-full max-w-3xl"></div>
-                </div>
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : events.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {events.filter(event => new Date(event.start_time) > new Date()).map((event) => (
-                  <Card key={event.id} className="bg-white/95 backdrop-blur shadow-lg hover:shadow-xl transition-all">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl mb-1">{event.title}</CardTitle>
-                          <CardDescription>
-                            <div className="flex items-center mt-1">
-                              <Calendar className="h-4 w-4 mr-1" />
-                              <span>{format(new Date(event.start_time), 'MMM d, yyyy')}</span>
-                            </div>
-                            <div className="flex items-center mt-1">
-                              <Clock className="h-4 w-4 mr-1" />
-                              <span>{format(new Date(event.start_time), 'h:mm a')} - {format(new Date(event.end_time), 'h:mm a')}</span>
-                            </div>
-                            {event.location && (
-                              <div className="flex items-center mt-1">
-                                <MapPin className="h-4 w-4 mr-1" />
-                                <span>{event.location}</span>
-                              </div>
-                            )}
-                          </CardDescription>
-                        </div>
-                        <Badge>{event.event_type}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="line-clamp-3 mb-4 text-sm">
-                        {event.description}
-                      </p>
-                      <div className="flex justify-between items-center mt-4">
-                        <div className="flex items-center">
-                          <Tag className="h-4 w-4 mr-1" />
-                          <span className="text-sm font-medium">
-                            {event.is_free ? 'Free' : `${event.price} ${event.currency || 'ZMW'}`}
-                          </span>
-                        </div>
-                        {isRegistered(event.id) ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
-                            Registered
+            ) : upcomingEvents.length === 0 ? (
+              <div className="text-center py-12 border rounded-lg bg-background/60">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-xl font-medium mb-2">No Upcoming Events</h3>
+                <p className="text-muted-foreground mb-6">Check back soon for new events</p>
+              </div>
+            ) : (
+              <div className="grid gap-8">
+                {upcomingEvents.map(event => (
+                  <Card key={event.id} className="overflow-hidden bg-background/95 shadow-md">
+                    <div className="grid md:grid-cols-3 gap-6">
+                      <div className="md:col-span-2 p-6">
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          <Badge variant="outline" className="bg-primary/10 text-primary">
+                            {getEventTypeLabel(event.event_type)}
                           </Badge>
+                          {event.is_free ? (
+                            <Badge variant="secondary">Free</Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              {event.currency} {event.price}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <h2 className="text-2xl font-bold mb-2">{event.title}</h2>
+                        
+                        <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                          <div className="flex items-start space-x-2">
+                            <CalendarIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
+                            <div>
+                              <p className="font-medium text-sm">Date & Time</p>
+                              <p>{formatDateTime(event.start_time)}</p>
+                              {event.end_time && (
+                                <p className="text-muted-foreground text-sm">
+                                  Until {formatTime(event.end_time)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start space-x-2">
+                            {event.event_type === 'webinar' ? (
+                              <>
+                                <VideoIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                <div>
+                                  <p className="font-medium text-sm">Location</p>
+                                  <p>Online Webinar</p>
+                                  {isRegistered(event.id) && event.online_meeting_link && (
+                                    <a 
+                                      href={event.online_meeting_link} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline text-sm"
+                                    >
+                                      Join Meeting
+                                    </a>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                <div>
+                                  <p className="font-medium text-sm">Location</p>
+                                  <p>{event.location || 'To be announced'}</p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {event.description && (
+                          <div className="mb-6">
+                            <p className="text-muted-foreground">{event.description}</p>
+                          </div>
+                        )}
+                        
+                        {isRegistered(event.id) ? (
+                          <div className="flex items-center space-x-4">
+                            <Badge variant="success" className="bg-green-100 text-green-800">
+                              Registered
+                            </Badge>
+                            {getRegistration(event.id)?.status === 'confirmed' && (
+                              <Badge variant="outline" className="bg-green-50">
+                                Confirmed
+                              </Badge>
+                            )}
+                            {getRegistration(event.id)?.status === 'pending' && (
+                              <Badge variant="outline" className="bg-yellow-50">
+                                Pending
+                              </Badge>
+                            )}
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                const reg = getRegistration(event.id);
+                                if (reg) handleCancelRegistration(reg.id);
+                              }}
+                            >
+                              Cancel Registration
+                            </Button>
+                          </div>
                         ) : (
-                          <Button onClick={() => handleRegister(event)} size="sm">
-                            Register
+                          <Button 
+                            onClick={() => handleRegister(event)} 
+                            disabled={isRegistering}
+                          >
+                            {isRegistering ? 'Registering...' : 'Register Now'}
                           </Button>
                         )}
                       </div>
-                    </CardContent>
+                      
+                      <CardContent className="p-0 bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center">
+                        <div className="text-center p-6">
+                          <div className="text-4xl font-bold text-primary">
+                            {format(parseISO(event.start_time), 'dd')}
+                          </div>
+                          <div className="text-xl font-medium text-primary/80">
+                            {format(parseISO(event.start_time), 'MMM')}
+                          </div>
+                          <div className="mt-4 flex items-center justify-center">
+                            <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              {format(parseISO(event.start_time), 'p')}
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </div>
                   </Card>
                 ))}
-              </div>
-            ) : (
-              <div className="text-center p-12 bg-white/70 rounded-lg">
-                <Info className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Upcoming Events</h3>
-                <p className="text-muted-foreground">Check back later for new events or subscribe to our newsletter.</p>
               </div>
             )}
           </TabsContent>
           
-          <TabsContent value="my-events">
-            {user ? (
-              registrations.length > 0 ? (
-                <div className="grid md:grid-cols-2 gap-6">
-                  {registrations.map((reg) => {
-                    const event = events.find(e => e.id === reg.event_id);
-                    if (!event) return null;
-                    
-                    return (
-                      <Card key={reg.id} className="bg-white/95">
-                        <CardHeader>
-                          <CardTitle className="text-lg">{event.title}</CardTitle>
-                          <CardDescription>
-                            <Badge className="mb-2">{reg.status}</Badge>
-                            <div className="flex items-center mt-1">
-                              <Calendar className="h-4 w-4 mr-1" />
-                              <span>{format(new Date(event.start_time), 'MMM d, yyyy')}</span>
-                            </div>
-                            <div className="flex items-center mt-1">
-                              <Clock className="h-4 w-4 mr-1" />
-                              <span>{format(new Date(event.start_time), 'h:mm a')}</span>
-                            </div>
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <Badge variant="outline">{reg.payment_status}</Badge>
-                            </div>
-                            {reg.status === 'pending' && (
-                              <Button variant="outline" size="sm">
-                                Cancel
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center p-12 bg-white/70 rounded-lg">
-                  <Info className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Registrations</h3>
-                  <p className="text-muted-foreground">You haven't registered for any events yet.</p>
-                </div>
-              )
+          <TabsContent value="past">
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : pastEvents.length === 0 ? (
+              <div className="text-center py-12 border rounded-lg bg-background/60">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-xl font-medium mb-2">No Past Events</h3>
+                <p className="text-muted-foreground mb-6">Check the upcoming events tab</p>
+              </div>
             ) : (
-              <div className="text-center p-12 bg-white/70 rounded-lg">
-                <Info className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Sign In Required</h3>
-                <p className="text-muted-foreground">Please sign in to view your event registrations.</p>
+              <div className="grid gap-6">
+                {pastEvents.map(event => (
+                  <Card key={event.id} className="bg-background/80">
+                    <div className="p-6">
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <Badge variant="outline">{getEventTypeLabel(event.event_type)}</Badge>
+                        <Badge variant="secondary" className="bg-muted/50">Past Event</Badge>
+                      </div>
+                      
+                      <h2 className="text-xl font-bold mb-2">{event.title}</h2>
+                      
+                      <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                        <div className="flex items-center space-x-2">
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                          <span>{formatDateTime(event.start_time)}</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          {event.event_type === 'webinar' ? (
+                            <>
+                              <VideoIcon className="h-4 w-4 text-muted-foreground" />
+                              <span>Online Webinar</span>
+                            </>
+                          ) : (
+                            <>
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              <span>{event.location || 'Location not specified'}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {event.description && (
+                        <p className="text-sm text-muted-foreground mb-4">{event.description}</p>
+                      )}
+                      
+                      {isRegistered(event.id) && (
+                        <Badge variant="outline" className="bg-muted">
+                          You attended this event
+                        </Badge>
+                      )}
+                    </div>
+                  </Card>
+                ))}
               </div>
             )}
           </TabsContent>
         </Tabs>
       </div>
       
-      {/* Payment Dialog for paid events */}
-      <Dialog open={!!registeringEventId} onOpenChange={(open) => !open && setRegisteringEventId(null)}>
-        <DialogContent>
+      {/* Payment Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Complete Registration</DialogTitle>
             <DialogDescription>
-              Please provide your mobile money details to complete payment.
+              {selectedEvent ? (
+                <>
+                  Enter your mobile money details to register for "{selectedEvent.title}".
+                  {selectedEvent.price && (
+                    <span className="font-medium block mt-2">
+                      Registration fee: {selectedEvent.currency} {selectedEvent.price}
+                    </span>
+                  )}
+                </>
+              ) : (
+                'Enter your payment details'
+              )}
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="phone">Mobile Money Number</Label>
-              <Input 
-                id="phone" 
-                placeholder="e.g., 26097XXXXXXX" 
-                value={phoneNumber} 
-                onChange={(e) => setPhoneNumber(e.target.value)} 
+              <Label htmlFor="phoneNumber">Mobile Money Number</Label>
+              <Input
+                id="phoneNumber"
+                placeholder="e.g. 260971234567"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">Enter your mobile money number without spaces or dashes</p>
+              <p className="text-sm text-muted-foreground">Enter your number with country code (260)</p>
             </div>
             
             <div className="grid gap-2">
               <Label htmlFor="operator">Mobile Operator</Label>
               <Select value={mobileOperator} onValueChange={setMobileOperator}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select operator" />
+                <SelectTrigger id="operator">
+                  <SelectValue placeholder="Select mobile operator" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MTN_MOMO_ZMB">MTN Mobile Money (Zambia)</SelectItem>
@@ -269,8 +427,16 @@ const EventsPage = () => {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRegisteringEventId(null)}>Cancel</Button>
-            <Button onClick={handlePaymentSubmit}>Proceed to Payment</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button 
+              type="submit" 
+              onClick={handlePaidRegistration}
+              disabled={isRegistering || !phoneNumber}
+            >
+              {isRegistering ? 'Processing...' : 'Continue to Payment'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
