@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -260,7 +259,7 @@ const EventsPage = () => {
                         
                         {isRegistered(event.id) ? (
                           <div className="flex items-center space-x-4">
-                            <Badge variant="success" className="bg-green-100 text-green-800">
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
                               Registered
                             </Badge>
                             {getRegistration(event.id)?.status === 'confirmed' && (
