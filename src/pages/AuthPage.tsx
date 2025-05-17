@@ -17,6 +17,7 @@ import {
   CardContent
 } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const AuthPage = () => {
   const { user, loading, signIn, signUp } = useAuth();
@@ -25,6 +26,7 @@ const AuthPage = () => {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,6 +45,7 @@ const AuthPage = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMessage(null);
     
     // Save email for convenience
     if (email) {
@@ -54,7 +57,7 @@ const AuthPage = () => {
       // Success handling is done in AuthContext
     } catch (error: any) {
       console.error('Sign in error:', error);
-      toast.error(error.message || 'Failed to sign in. Please check your credentials.');
+      setErrorMessage(error.message || 'Failed to sign in. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -63,16 +66,30 @@ const AuthPage = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMessage(null);
     
     // Validate inputs
     if (!fullName || !username || !email || !password) {
-      toast.error('All fields are required');
+      setErrorMessage('All fields are required');
       setIsSubmitting(false);
       return;
     }
     
     if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      setErrorMessage('Password must be at least 6 characters');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Additional username validation
+    if (username.length < 3) {
+      setErrorMessage('Username must be at least 3 characters');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setErrorMessage('Username can only contain letters, numbers, and underscores');
       setIsSubmitting(false);
       return;
     }
@@ -85,7 +102,7 @@ const AuthPage = () => {
       // Success handling is done in AuthContext
     } catch (error: any) {
       console.error('Sign up error:', error);
-      toast.error(error.message || 'Failed to sign up. Please try again.');
+      setErrorMessage(error.message || 'Failed to sign up. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -114,6 +131,11 @@ const AuthPage = () => {
               </CardHeader>
               <form onSubmit={handleSignIn}>
                 <CardContent className="space-y-4">
+                  {errorMessage && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{errorMessage}</AlertDescription>
+                    </Alert>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input 
@@ -162,6 +184,11 @@ const AuthPage = () => {
               </CardHeader>
               <form onSubmit={handleSignUp}>
                 <CardContent className="space-y-4">
+                  {errorMessage && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{errorMessage}</AlertDescription>
+                    </Alert>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="fullName">Full Name</Label>
                     <Input 
@@ -181,6 +208,9 @@ const AuthPage = () => {
                       onChange={(e) => setUsername(e.target.value)}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Username must be at least 3 characters and can only contain letters, numbers, and underscores
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="emailRegister">Email</Label>

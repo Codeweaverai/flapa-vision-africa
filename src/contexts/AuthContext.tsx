@@ -74,6 +74,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       cleanupAuthState();
       
       setLoading(true);
+      
+      // Check if username already exists
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', userData.username)
+        .limit(1);
+      
+      if (checkError) {
+        throw new Error('Error checking username availability');
+      }
+      
+      if (existingUsers && existingUsers.length > 0) {
+        throw new Error('Username already exists. Please choose a different username.');
+      }
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
