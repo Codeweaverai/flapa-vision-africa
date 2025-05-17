@@ -142,12 +142,20 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
 // Admin functions for course management
 export async function createCourse(courseData: Partial<Course>): Promise<Course | null> {
   try {
-    // Ensure required fields have default values
+    // Ensure required fields have default values and include all required fields
     const dataToInsert = {
-      ...courseData,
+      title: courseData.title || '',
+      summary: courseData.summary || '',
+      description: courseData.description || '',
+      category: courseData.category || '',
+      difficulty_level: courseData.difficulty_level || 'beginner',
+      duration_minutes: courseData.duration_minutes || 0,
       is_published: courseData.is_published ?? false,
       tags: courseData.tags ?? [],
-      thumbnail_url: courseData.thumbnail_url ?? null
+      thumbnail_url: courseData.thumbnail_url ?? null,
+      price: courseData.price ?? 0,
+      is_free: courseData.is_free ?? true,
+      certificate_enabled: courseData.certificate_enabled ?? false
     };
     
     const { data, error } = await supabase
@@ -240,10 +248,12 @@ export async function deleteCourse(courseId: string): Promise<boolean> {
 
 export async function createModule(moduleData: Partial<CourseModule>): Promise<CourseModule | null> {
   try {
-    // Ensure description is included
+    // Ensure all required fields are included
     const dataToInsert = {
-      ...moduleData,
-      description: moduleData.description ?? null
+      course_id: moduleData.course_id || '',
+      title: moduleData.title || '',
+      description: moduleData.description ?? null,
+      order_index: moduleData.order_index || 0
     };
     
     const { data, error } = await supabase
@@ -271,10 +281,14 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
 
 export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson | null> {
   try {
-    // Ensure description is included
+    // Ensure all required fields are included
     const dataToInsert = {
-      ...lessonData,
-      description: lessonData.description ?? null
+      module_id: lessonData.module_id || '',
+      title: lessonData.title || '',
+      description: lessonData.description ?? null,
+      video_url: lessonData.video_url ?? null,
+      order_index: lessonData.order_index || 0,
+      materials_urls: lessonData.materials_urls ?? []
     };
     
     const { data, error } = await supabase
