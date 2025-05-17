@@ -1,39 +1,29 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Event, Registration, fetchEvents, registerForEvent, fetchUserRegistrations, cancelRegistration } from '@/services/eventService';
+import { Event, Registration, fetchEvents, fetchUserRegistrations, cancelRegistration } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
-  DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarIcon, Clock, MapPin, VideoIcon, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import EventRegistrationForm from '@/components/EventRegistrationForm';
 
 const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [mobileOperator, setMobileOperator] = useState('MTN_MOMO_ZMB');
-  const [isRegistering, setIsRegistering] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -60,44 +50,24 @@ const EventsPage = () => {
     loadEvents();
   }, [user]);
 
-  const handleRegister = async (event: Event) => {
+  const handleRegister = (event: Event) => {
     if (!user) {
       toast.error("Please sign in to register for events");
       navigate("/auth");
       return;
     }
     
-    // If event is free, directly register
-    if (event.is_free || !event.price) {
-      setIsRegistering(true);
-      const result = await registerForEvent(event, user);
-      setIsRegistering(false);
-      
-      // Refresh registrations after successful registration
-      if (result) {
-        const userRegs = await fetchUserRegistrations(user);
-        setRegistrations(userRegs as Registration[]);
-      }
-    } else {
-      // For paid events, open dialog to collect phone number
-      setSelectedEvent(event);
-      setIsDialogOpen(true);
-    }
+    setSelectedEvent(event);
+    setIsDialogOpen(true);
   };
   
-  const handlePaidRegistration = async () => {
-    if (!selectedEvent || !phoneNumber) return;
+  const handleRegistrationComplete = async () => {
+    setIsDialogOpen(false);
     
-    setIsRegistering(true);
-    try {
-      await registerForEvent(selectedEvent, user, phoneNumber, mobileOperator);
-      // Payment and redirects are handled in the service
-    } catch (error) {
-      console.error('Registration error:', error);
-      toast.error("Failed to process registration");
-    } finally {
-      setIsRegistering(false);
-      setIsDialogOpen(false);
+    // Refresh registrations to show the updated status
+    if (user) {
+      const userRegs = await fetchUserRegistrations(user);
+      setRegistrations(userRegs as Registration[]);
     }
   };
   
@@ -286,11 +256,8 @@ const EventsPage = () => {
                             </Button>
                           </div>
                         ) : (
-                          <Button 
-                            onClick={() => handleRegister(event)} 
-                            disabled={isRegistering}
-                          >
-                            {isRegistering ? 'Registering...' : 'Register Now'}
+                          <Button onClick={() => handleRegister(event)}>
+                            Register Now
                           </Button>
                         )}
                       </div>
@@ -419,65 +386,17 @@ const EventsPage = () => {
         </Tabs>
       </div>
       
-      {/* Payment Dialog */}
+      {/* Registration Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Complete Registration</DialogTitle>
-            <DialogDescription>
-              {selectedEvent ? (
-                <>
-                  Enter your mobile money details to register for "{selectedEvent.title}".
-                  {selectedEvent.price && (
-                    <span className="font-medium block mt-2">
-                      Registration fee: {selectedEvent.currency} {selectedEvent.price}
-                    </span>
-                  )}
-                </>
-              ) : (
-                'Enter your payment details'
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="phoneNumber">Mobile Money Number</Label>
-              <Input
-                id="phoneNumber"
-                placeholder="e.g. 260971234567"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-              />
-              <p className="text-sm text-muted-foreground">Enter your number with country code (260)</p>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="operator">Mobile Operator</Label>
-              <Select value={mobileOperator} onValueChange={setMobileOperator}>
-                <SelectTrigger id="operator">
-                  <SelectValue placeholder="Select mobile operator" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MTN_MOMO_ZMB">MTN Mobile Money (Zambia)</SelectItem>
-                  <SelectItem value="AIRTEL_MONEY_ZMB">Airtel Money (Zambia)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button 
-              type="submit" 
-              onClick={handlePaidRegistration}
-              disabled={isRegistering || !phoneNumber}
-            >
-              {isRegistering ? 'Processing...' : 'Continue to Payment'}
-            </Button>
-          </DialogFooter>
+        <DialogContent className="sm:max-w-[500px]">
+          {selectedEvent && (
+            <EventRegistrationForm 
+              event={selectedEvent} 
+              user={user}
+              onSuccess={handleRegistrationComplete}
+              onCancel={() => setIsDialogOpen(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </Layout>

@@ -87,7 +87,7 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error('Error creating payment record:', paymentError);
-      return new Response(JSON.stringify({ error: 'Failed to create payment record' }), {
+      return new Response(JSON.stringify({ error: 'Failed to create payment record', details: paymentError }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });

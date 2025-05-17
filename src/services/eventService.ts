@@ -81,7 +81,7 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
       .eq('event_id', event.id)
       .maybeSingle(); // Changed from single() to maybeSingle() to avoid 406 errors
 
-    if (existingRegistrationError && existingRegistrationError.code !== 'PGRST116') {
+    if (existingRegistrationError) {
       console.error('Error checking existing registration:', existingRegistrationError);
       toast.error('Failed to check existing registration');
       return false;
@@ -93,7 +93,7 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
     }
 
     // Create registration data object with proper structure
-    let registrationData = {
+    const registrationData: any = {
       user_id: user.id,
       event_id: event.id,
       status: 'pending',
@@ -101,12 +101,9 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
     };
 
     if (phoneNumber && mobileOperator) {
-      registrationData = {
-        ...registrationData,
-        phone_number: phoneNumber,
-        mobile_operator: mobileOperator,
-        payment_method: 'mobile_money'
-      };
+      registrationData.phone_number = phoneNumber;
+      registrationData.mobile_operator = mobileOperator;
+      registrationData.payment_method = 'mobile_money';
     }
 
     const { data, error } = await supabase
@@ -131,7 +128,7 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
           return false;
         }
 
-        const response = await fetch(`${supabase.supabaseUrl}/functions/v1/initiate-payment`, {
+        const response = await fetch(`${supabase.url}/functions/v1/initiate-payment`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
