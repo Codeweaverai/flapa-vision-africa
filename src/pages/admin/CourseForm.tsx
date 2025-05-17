@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, Upload, X, DragHorizontal, GripVertical, ChevronLeft } from 'lucide-react';
+import { Plus, Trash2, Upload, X, Edit, GripVertical, ChevronLeft } from 'lucide-react';
 import { Course, CourseModule, Lesson, fetchCourseWithModulesAndLessons, createCourse, updateCourse, createModule, createLesson, uploadCourseThumbnail } from '@/services/courseService';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -130,7 +130,12 @@ const CourseForm = () => {
       setSaving(true);
       
       // Create or update the course
-      let courseData = { ...data };
+      let courseData = { 
+        ...data, 
+        is_published: false, 
+        tags: [], 
+        thumbnail_url: null 
+      };
       let courseId: string;
       
       if (isEditMode) {
@@ -460,6 +465,7 @@ const CourseForm = () => {
                     course_id: id,
                     title: result,
                     order_index: modules.length,
+                    description: null // Add the required description field
                   });
                   
                   if (newModule) {
@@ -502,6 +508,7 @@ const CourseForm = () => {
                           course_id: id,
                           title: result,
                           order_index: 0,
+                          description: null // Add the required description field
                         });
                         
                         if (newModule) {
@@ -591,6 +598,7 @@ const CourseForm = () => {
                               title: result,
                               order_index: module.lessons ? module.lessons.length : 0,
                               video_url: "",
+                              description: null, // Add required description field
                               materials_urls: [],
                             });
                             

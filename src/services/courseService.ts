@@ -28,6 +28,7 @@ export type CourseModule = {
   order_index: number;
   created_at: string | null;
   updated_at: string | null;
+  lessons?: Lesson[]; // Adding lessons as an optional property for UI convenience
 };
 
 export type Lesson = {
@@ -62,7 +63,7 @@ export async function fetchPublishedCourses(): Promise<Course[]> {
       throw error;
     }
     
-    return data || [];
+    return data as Course[] || [];
   } catch (error) {
     console.error('Error in fetchPublishedCourses:', error);
     toast({
@@ -124,8 +125,8 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
     );
     
     return {
-      ...course,
-      modules: modulesWithLessons,
+      ...(course as Course),
+      modules: modulesWithLessons as CourseWithModules['modules'],
     };
   } catch (error) {
     console.error('Error in fetchCourseWithModulesAndLessons:', error);
@@ -139,11 +140,19 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
 }
 
 // Admin functions for course management
-export async function createCourse(courseData: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<Course | null> {
+export async function createCourse(courseData: Partial<Course>): Promise<Course | null> {
   try {
+    // Ensure required fields have default values
+    const dataToInsert = {
+      ...courseData,
+      is_published: courseData.is_published ?? false,
+      tags: courseData.tags ?? [],
+      thumbnail_url: courseData.thumbnail_url ?? null
+    };
+    
     const { data, error } = await supabase
       .from('courses')
-      .insert(courseData)
+      .insert(dataToInsert)
       .select()
       .single();
     
@@ -162,7 +171,7 @@ export async function createCourse(courseData: Omit<Course, 'id' | 'created_at' 
       description: 'Course created successfully',
     });
     
-    return data;
+    return data as Course;
   } catch (error) {
     console.error('Error in createCourse:', error);
     return null;
@@ -193,7 +202,7 @@ export async function updateCourse(courseId: string, courseData: Partial<Course>
       description: 'Course updated successfully',
     });
     
-    return data;
+    return data as Course;
   } catch (error) {
     console.error('Error in updateCourse:', error);
     return null;
@@ -229,11 +238,17 @@ export async function deleteCourse(courseId: string): Promise<boolean> {
   }
 }
 
-export async function createModule(moduleData: Omit<CourseModule, 'id' | 'created_at' | 'updated_at'>): Promise<CourseModule | null> {
+export async function createModule(moduleData: Partial<CourseModule>): Promise<CourseModule | null> {
   try {
+    // Ensure description is included
+    const dataToInsert = {
+      ...moduleData,
+      description: moduleData.description ?? null
+    };
+    
     const { data, error } = await supabase
       .from('course_modules')
-      .insert(moduleData)
+      .insert(dataToInsert)
       .select()
       .single();
     
@@ -247,18 +262,24 @@ export async function createModule(moduleData: Omit<CourseModule, 'id' | 'create
       throw error;
     }
     
-    return data;
+    return data as CourseModule;
   } catch (error) {
     console.error('Error in createModule:', error);
     return null;
   }
 }
 
-export async function createLesson(lessonData: Omit<Lesson, 'id' | 'created_at' | 'updated_at'>): Promise<Lesson | null> {
+export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson | null> {
   try {
+    // Ensure description is included
+    const dataToInsert = {
+      ...lessonData,
+      description: lessonData.description ?? null
+    };
+    
     const { data, error } = await supabase
       .from('lessons')
-      .insert(lessonData)
+      .insert(dataToInsert)
       .select()
       .single();
     
@@ -272,7 +293,7 @@ export async function createLesson(lessonData: Omit<Lesson, 'id' | 'created_at' 
       throw error;
     }
     
-    return data;
+    return data as Lesson;
   } catch (error) {
     console.error('Error in createLesson:', error);
     return null;
@@ -464,7 +485,7 @@ export async function fetchAllCourses(): Promise<Course[]> {
       throw error;
     }
     
-    return data || [];
+    return data as Course[] || [];
   } catch (error) {
     console.error('Error in fetchAllCourses:', error);
     toast({
