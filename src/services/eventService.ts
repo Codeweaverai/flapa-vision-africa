@@ -44,7 +44,7 @@ export interface Registration {
   payment_id?: string;
   payment_currency?: string;
   payment_amount?: number;
-  events?: Event; // Add this to fix the AccountPage errors
+  events?: Event; // Join with events table
 }
 
 export const fetchEvents = async (): Promise<Event[]> => {
@@ -93,14 +93,14 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
       .eq('event_id', event.id)
       .single();
 
-    if (existingRegistrationError && existingRegistrationError.code !== '404') {
+    if (existingRegistrationError && existingRegistrationError.code !== 'PGRST116') {
       console.error('Error checking existing registration:', existingRegistrationError);
       toast.error('Failed to check existing registration');
       return false;
     }
 
     if (existingRegistration) {
-      toast.error('You are already registered for this event.'); // Changed from warn to error since sonner doesn't have warn
+      toast.error('You are already registered for this event.');
       return false;
     }
 
@@ -124,21 +124,25 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabase.auth.getSession()}`
             },
             body: JSON.stringify({
               registrationId: registrationId,
               amount: event.price,
-              currency: event.currency,
+              currency: event.currency || 'ZMW',
               phone_number: phoneNumber,
               mobile_operator: mobileOperator,
+              referenceType: 'event',
+              referenceId: registrationId,
+              userId: user.id
             }),
           });
 
           const result = await response.json();
 
-          if (response.ok && result.payment_url) {
+          if (response.ok && result.redirectUrl) {
             // Redirect user to payment URL
-            window.location.href = result.payment_url;
+            window.location.href = result.redirectUrl;
           } else {
             console.error('Payment initiation failed:', result.error || 'Unknown error');
             toast.error('Payment initiation failed. Please try again.');
@@ -183,7 +187,7 @@ export const fetchUserRegistrations = async (user: User | null): Promise<Registr
   try {
     const { data, error } = await supabase
       .from('registrations')
-      .select('*, events(*)') // Join with events table to get event details
+      .select('*, events(*)')  // Join with events table to get event details
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -225,5 +229,24 @@ export const cancelRegistration = async (registrationId: string, user: User | nu
     console.error('Error in cancelRegistration:', error);
     toast.error('An unexpected error occurred while cancelling registration.');
     return false;
+  }
+};
+
+// Add function to fetch mobile operators
+export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('mobile_operators')
+      .select('*');
+      
+    if (error) {
+      console.error('Error fetching mobile operators:', error);
+      return [];
+    }
+    
+    return data as MobileOperator[];
+  } catch (error) {
+    console.error('Error in fetchMobileOperators:', error);
+    return [];
   }
 };

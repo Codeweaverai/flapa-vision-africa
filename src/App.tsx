@@ -18,6 +18,7 @@ import PaymentResultPage from "./pages/PaymentResultPage";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminEvents from "./pages/admin/AdminEvents";
+import AdminRegistrations from "./pages/admin/AdminRegistrations";
 import EventForm from "./pages/admin/EventForm";
 import { AuthProvider } from "./contexts/AuthContext";
 import NotFound from "./pages/NotFound";
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
             <Route path="/admin/events/create" element={<AdminRoute><EventForm /></AdminRoute>} />
             <Route path="/admin/events/edit/:id" element={<AdminRoute><EventForm /></AdminRoute>} />
+            <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
