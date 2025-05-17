@@ -56,7 +56,7 @@ const RegistrationEditDialog = ({
           <div className="space-y-2">
             <h4 className="font-medium">{registration.events?.title}</h4>
             <p className="text-sm">Attendee: {fullName || 'Unknown'}</p>
-            <Badge>{registration.source_table === 'registrations' ? 'Legacy Registration' : 'New Booking'}</Badge>
+            <Badge>Event Booking</Badge>
           </div>
           
           <div className="grid gap-2">

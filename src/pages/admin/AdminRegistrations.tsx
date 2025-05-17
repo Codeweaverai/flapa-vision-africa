@@ -13,7 +13,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CombinedRegistration, EventWithRegistrations } from '@/types/eventTypes';
 import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
 import RegistrationsTable from '@/components/admin/RegistrationsTable';
@@ -118,13 +117,12 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
 
-      // Fetch from event_bookings table only
+      // Fetch from event_bookings table only - we need to get profiles separately
       let bookingQuery = supabase
         .from('event_bookings')
         .select(`
           *,
-          events(*),
-          profiles:user_id(full_name, email)
+          events(*)
         `)
         .order('created_at', { ascending: false });
       
@@ -138,17 +136,41 @@ const AdminRegistrations = () => {
         console.error('Error fetching from event_bookings table:', bookingError);
         toast.error('Failed to load registrations');
         setRegistrations([]);
-      } else {
-        const bookings = (bookingData || []).map(booking => ({
-          ...booking,
-          created_at: booking.created_at || new Date().toISOString(),
-          phone_number: booking.phone_number || null,
-          mobile_operator: booking.mobile_operator || null,
-          source_table: 'event_bookings' as const
-        })) as unknown as CombinedRegistration[];
+        return;
+      } 
 
-        setRegistrations(bookings);
+      // Now we need to get the profiles data separately for each user_id
+      const userIds = bookingData?.map(booking => booking.user_id) || [];
+      const uniqueUserIds = [...new Set(userIds)];
+      
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', uniqueUserIds);
+        
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
       }
+      
+      // Create a map of user_id to profile data
+      const profilesMap = {};
+      if (profilesData) {
+        profilesData.forEach(profile => {
+          profilesMap[profile.id] = { full_name: profile.full_name, email: profile.email };
+        });
+      }
+      
+      // Combine booking data with profile data
+      const bookings = (bookingData || []).map(booking => ({
+        ...booking,
+        created_at: booking.created_at || new Date().toISOString(),
+        phone_number: booking.phone_number || null,
+        mobile_operator: booking.mobile_operator || null,
+        source_table: 'event_bookings' as const,
+        profiles: profilesMap[booking.user_id] || { full_name: 'Unknown', email: null }
+      })) as unknown as CombinedRegistration[];
+
+      setRegistrations(bookings);
     } catch (error) {
       console.error('Error fetching registrations:', error);
       toast.error('Failed to load registrations');
