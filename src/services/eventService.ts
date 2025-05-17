@@ -1,6 +1,16 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
+
+export interface MobileOperator {
+  id: string;
+  code: string;
+  name: string;
+  country: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface Event {
   id: string;
@@ -32,6 +42,9 @@ export interface Registration {
   mobile_operator?: string;
   payment_method?: string;
   payment_id?: string;
+  payment_currency?: string;
+  payment_amount?: number;
+  events?: Event; // Add this to fix the AccountPage errors
 }
 
 export const fetchEvents = async (): Promise<Event[]> => {
@@ -87,7 +100,7 @@ export const registerForEvent = async (event: Event, user: User | null, phoneNum
     }
 
     if (existingRegistration) {
-      toast.warn('You are already registered for this event.');
+      toast.error('You are already registered for this event.'); // Changed from warn to error since sonner doesn't have warn
       return false;
     }
 
@@ -170,7 +183,7 @@ export const fetchUserRegistrations = async (user: User | null): Promise<Registr
   try {
     const { data, error } = await supabase
       .from('registrations')
-      .select('*')
+      .select('*, events(*)') // Join with events table to get event details
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 

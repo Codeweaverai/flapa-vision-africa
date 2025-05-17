@@ -1,266 +1,161 @@
-
-import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
-import { toast } from "sonner";
-import { createGoogleMeetEvent } from "./googleCalendarService";
-import { MobileOperator } from "./eventService";
+import { supabase } from '@/integrations/supabase/client';
+import { User } from '@supabase/supabase-js';
+import { toast } from 'sonner';
+// Import the MobileOperator from eventService
+import { MobileOperator } from './eventService';
 
 export interface ConsultationBooking {
   id: string;
   user_id: string;
   booking_type: 'google_meet' | 'in_person';
-  duration: number;
   scheduled_time: string;
-  location: string | null;
-  online_meeting_link: string | null;
-  topic: string | null;
-  notes: string | null;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  payment_status: 'pending' | 'processing' | 'completed' | 'failed';
-  payment_id: string | null;
-  payment_amount: number | null;
-  payment_currency: string | null;
-  payment_method: string | null;
-  phone_number: string | null;
-  mobile_operator: string | null;
-}
-
-export interface BookingFormData {
-  booking_type: 'google_meet' | 'in_person';
   duration: number;
-  scheduled_time: Date;
   location?: string;
   topic?: string;
   notes?: string;
+  status: string;
+  payment_status: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  created_at?: string;
+  updated_at?: string;
+  online_meeting_link?: string;
   phone_number?: string;
   mobile_operator?: string;
 }
 
-export const fetchUserBookings = async (user: User | null) => {
-  if (!user) return [];
-  
-  try {
-    const { data, error } = await supabase
-      .from('consultation_bookings')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('scheduled_time', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching bookings:', error);
-      toast.error("Failed to load your bookings");
-      return [];
-    }
-
-    // The data from Supabase might not have the phone_number field if it was just added
-    // We need to ensure each booking has the phone_number field, even if it's null
-    const bookingsWithPhoneNumber = data.map(booking => ({
-      ...booking,
-      phone_number: booking.phone_number || null,
-      mobile_operator: booking.mobile_operator || null
-    }));
-
-    return bookingsWithPhoneNumber as ConsultationBooking[];
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
-    return [];
-  }
-};
-
-export const fetchBookingById = async (id: string, user: User | null) => {
-  if (!user) return null;
-  
-  try {
-    const { data, error } = await supabase
-      .from('consultation_bookings')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error) {
-      console.error('Error fetching booking:', error);
-      toast.error("Failed to load booking details");
-      return null;
-    }
-
-    // Ensure the booking has the phone_number and mobile_operator fields, even if they're null
-    const bookingWithUpdatedFields = {
-      ...data,
-      phone_number: data.phone_number || null,
-      mobile_operator: data.mobile_operator || null
-    };
-
-    return bookingWithUpdatedFields as ConsultationBooking;
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
-    return null;
-  }
-};
-
-export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('mobile_operators')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      console.error('Error fetching mobile operators:', error);
-      toast.error("Failed to load mobile operators");
-      return [];
-    }
-
-    return data as MobileOperator[];
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
-    return [];
-  }
-};
-
-export const createConsultationBooking = async (bookingData: BookingFormData, user: User | null, price: number, currency: string = 'ZMW') => {
+export const createConsultationBooking = async (
+  bookingData: {
+    booking_type: 'google_meet' | 'in_person';
+    duration: number;
+    scheduled_time: Date;
+    location?: string;
+    topic?: string;
+    notes?: string;
+    phone_number: string;
+    mobile_operator: string;
+  },
+  user: User | null,
+  price: number
+): Promise<boolean> => {
   if (!user) {
     toast.error("Please sign in to book a consultation");
-    return null;
+    return false;
   }
 
   try {
-    // For Google Meet bookings, create a meeting link
-    let meetingLink = null;
-    if (bookingData.booking_type === 'google_meet') {
-      // Get the user's profile to use their email
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-        
-      const username = profileData?.full_name || user.email?.split('@')[0] || 'User';
-      
-      // Calculate end time
-      const endTime = new Date(bookingData.scheduled_time);
-      endTime.setMinutes(endTime.getMinutes() + bookingData.duration);
-      
-      // Create Google Meet event
-      meetingLink = await createGoogleMeetEvent({
-        title: `Consultation with ${username}: ${bookingData.topic || 'Business Consultation'}`,
-        description: `Consultation booking: ${bookingData.topic || ''}\n\nNotes: ${bookingData.notes || ''}`,
-        startTime: bookingData.scheduled_time,
-        endTime: endTime,
-        attendeeEmails: [user.email || '']
-      });
-      
-      console.log("Created meeting link:", meetingLink);
-    }
-
-    // Format phone number properly
-    let formattedPhoneNumber = null;
-    if (bookingData.phone_number) {
-      const cleaned = bookingData.phone_number.replace(/[^0-9]/g, '');
-      formattedPhoneNumber = cleaned.startsWith('260') 
-        ? cleaned 
-        : `260${cleaned.replace(/^0+/, '')}`;
-    }
-
-    // Create a new booking record
     const { data, error } = await supabase
       .from('consultation_bookings')
-      .insert({
-        user_id: user.id,
-        booking_type: bookingData.booking_type,
-        duration: bookingData.duration,
-        scheduled_time: bookingData.scheduled_time.toISOString(),
-        location: bookingData.location || null,
-        online_meeting_link: meetingLink || null,
-        topic: bookingData.topic || null,
-        notes: bookingData.notes || null,
-        status: 'pending',
-        payment_status: 'pending',
-        payment_amount: price,
-        payment_currency: currency,
-        phone_number: formattedPhoneNumber,
-        mobile_operator: bookingData.mobile_operator || null
-      })
+      .insert([
+        {
+          user_id: user.id,
+          booking_type: bookingData.booking_type,
+          scheduled_time: bookingData.scheduled_time.toISOString(),
+          duration: bookingData.duration,
+          location: bookingData.location,
+          topic: bookingData.topic,
+          notes: bookingData.notes,
+          status: 'pending',
+          payment_status: 'pending',
+          phone_number: bookingData.phone_number,
+          mobile_operator: bookingData.mobile_operator,
+        },
+      ])
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating booking:', error);
-      toast.error("Failed to create booking");
-      return null;
+      console.error('Error creating consultation booking:', error);
+      toast.error('Failed to create consultation booking');
+      return false;
     }
 
-    // Now initiate payment process
-    try {
-      // Generate appropriate description for the payment
-      const description = bookingData.topic 
-        ? `Consultation: ${bookingData.topic}` 
-        : getConsultationTypeDescription(bookingData.booking_type, bookingData.duration);
-      
-      const response = await initiatePawaPayPayment(data.id, {
-        amount: price,
-        currency: currency,
-        description: description,
-        userId: user.id,
-        referenceType: 'consultation',
-        referenceId: data.id,
-        phoneNumber: formattedPhoneNumber, 
-        mobileOperator: bookingData.mobile_operator || 'MTN_MOMO_ZMB'
-      });
-      
-      if (response && response.redirectUrl) {
-        // Give a moment for the user to see the toast before redirecting
-        toast.success("Redirecting to payment page...");
-        setTimeout(() => {
-          window.location.href = response.redirectUrl;
-        }, 1000);
-        return data;
-      } else {
-        toast.error("Failed to initialize payment");
-        return null;
+    // Initiate payment via Supabase Edge Function
+    const initiatePayment = async (bookingId: string) => {
+      try {
+        const response = await fetch('/api/initiate-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            bookingId: bookingId,
+            amount: price,
+            currency: 'ZMW', // Default currency
+            phone_number: bookingData.phone_number,
+            mobile_operator: bookingData.mobile_operator,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.payment_url) {
+          // Redirect user to payment URL
+          window.location.href = result.payment_url;
+        } else {
+          console.error('Payment initiation failed:', result.error || 'Unknown error');
+          toast.error('Payment initiation failed. Please try again.');
+          // Optionally, update booking status to failed
+          await supabase
+            .from('consultation_bookings')
+            .update({ status: 'failed', payment_status: 'failed' })
+            .eq('id', bookingId);
+        }
+      } catch (err) {
+        console.error('Error initiating payment:', err);
+        toast.error('Error initiating payment. Please try again.');
+        // Optionally, update booking status to failed
+        if (data?.id) {
+          await supabase
+            .from('consultation_bookings')
+            .update({ status: 'failed', payment_status: 'failed' })
+            .eq('id', data.id);
+        }
       }
-    } catch (paymentError) {
-      console.error('Payment initiation error:', paymentError);
-      toast.error("Payment initiation failed");
-      
-      // Cleanup the pending booking
-      await supabase
-        .from('consultation_bookings')
-        .delete()
-        .eq('id', data.id);
-        
-      return null;
-    }
+    };
+
+    await initiatePayment(data.id);
+
+    return true;
   } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
-    return null;
+    console.error('Error in createConsultationBooking:', error);
+    toast.error('An unexpected error occurred during booking.');
+    return false;
   }
 };
 
-// Helper function to get a descriptive consultation type
-const getConsultationTypeDescription = (bookingType: string, duration: number): string => {
-  if (bookingType === 'in_person') return 'In-Person Consultation';
-  
-  // For Google Meet consultations, classify by duration
-  switch (duration) {
-    case 30:
-      return 'Discovery Call (30 min)';
-    case 60:
-      return 'Strategy Session (60 min)';
-    case 90:
-      return 'Executive Team Session (90 min)';
-    default:
-      return `Online Consultation (${duration} min)`;
+export const fetchUserBookings = async (user: User | null): Promise<ConsultationBooking[]> => {
+  if (!user) {
+    console.log('No user, returning empty bookings');
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('consultation_bookings')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('scheduled_time', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching user bookings:', error);
+      toast.error('Failed to load bookings');
+      return [];
+    }
+
+    return data as ConsultationBooking[];
+  } catch (error) {
+    console.error('Error in fetchUserBookings:', error);
+    return [];
   }
 };
 
-export const cancelBooking = async (bookingId: string, user: User | null) => {
-  if (!user) return false;
-  
+export const cancelBooking = async (bookingId: string, user: User | null): Promise<boolean> => {
+  if (!user) {
+    toast.error("Please sign in to cancel booking");
+    return false;
+  }
+
   try {
     const { error } = await supabase
       .from('consultation_bookings')
@@ -270,59 +165,34 @@ export const cancelBooking = async (bookingId: string, user: User | null) => {
 
     if (error) {
       console.error('Error cancelling booking:', error);
-      toast.error("Failed to cancel booking");
+      toast.error('Failed to cancel booking');
       return false;
     }
 
-    toast.success("Booking cancelled successfully");
+    toast.success('Booking cancelled successfully.');
     return true;
   } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
+    console.error('Error in cancelBooking:', error);
+    toast.error('An unexpected error occurred while cancelling booking.');
     return false;
   }
 };
 
-// Helper function to initiate PawaPay payment
-const initiatePawaPayPayment = async (bookingId: string, paymentDetails: {
-  amount: number;
-  currency: string;
-  description: string;
-  userId: string;
-  referenceType: 'event' | 'consultation';
-  referenceId: string;
-  phoneNumber?: string;
-  mobileOperator?: string;
-}) => {
+export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
   try {
-    console.log('Initiating PawaPay payment with details:', {
-      ...paymentDetails,
-      phoneNumber: paymentDetails.phoneNumber ? '********' + paymentDetails.phoneNumber.slice(-4) : null,
-    });
-    
-    const { data, error } = await supabase.functions.invoke('create-payment', {
-      body: {
-        bookingId,
-        amount: paymentDetails.amount,
-        currency: paymentDetails.currency,
-        reason: paymentDetails.description,
-        userId: paymentDetails.userId,
-        referenceType: paymentDetails.referenceType,
-        referenceId: paymentDetails.referenceId,
-        phoneNumber: paymentDetails.phoneNumber,
-        mobileOperator: paymentDetails.mobileOperator
-      }
-    });
+    const { data, error } = await supabase
+      .from('mobile_operators')
+      .select('*');
 
     if (error) {
-      console.error('Error invoking payment function:', error);
-      throw new Error(`Payment function error: ${error.message || 'Unknown error'}`);
+      console.error('Error fetching mobile operators:', error);
+      toast.error('Failed to load mobile operators');
+      return [];
     }
 
-    console.log('Payment initiation response:', data);
-    return data;
+    return data as MobileOperator[];
   } catch (error) {
-    console.error('Payment error:', error);
-    throw error;
+    console.error('Error in fetchMobileOperators:', error);
+    return [];
   }
 };
