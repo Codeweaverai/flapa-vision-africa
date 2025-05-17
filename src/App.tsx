@@ -15,9 +15,14 @@ import ConsultPage from "./pages/ConsultPage";
 import AuthPage from "./pages/AuthPage";
 import AccountPage from "./pages/AccountPage";
 import PaymentResultPage from "./pages/PaymentResultPage";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminEvents from "./pages/admin/AdminEvents";
+import EventForm from "./pages/admin/EventForm";
 import { AuthProvider } from "./contexts/AuthContext";
 import NotFound from "./pages/NotFound";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import AdminRoute from "./components/admin/AdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +45,14 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/payment-result" element={<PaymentResultPage />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin-login" element={<AdminLogin />} />
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
+            <Route path="/admin/events/create" element={<AdminRoute><EventForm /></AdminRoute>} />
+            <Route path="/admin/events/edit/:id" element={<AdminRoute><EventForm /></AdminRoute>} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>
