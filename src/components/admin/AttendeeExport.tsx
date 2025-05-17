@@ -28,16 +28,21 @@ const AttendeeExport = ({ events, registrations }: AttendeeExportProps) => {
     // Filter registrations for the selected event
     const filteredRegistrations = registrations.filter(reg => reg.event_id === eventId);
     
-    // Convert to export format
-    const exportData = filteredRegistrations.map(reg => ({
-      'Name': reg.profiles?.full_name || 'Unknown',
-      'Email': reg.profiles?.email || 'Unknown',
-      'Phone': reg.phone_number || 'Not provided',
-      'Status': reg.status,
-      'Payment Status': reg.payment_status,
-      'Source': reg.source_table === 'registrations' ? 'Legacy System' : 'New System',
-      'Registration Date': formatDate(reg.created_at || new Date().toISOString())
-    }));
+    // Convert to export format - safely access profile properties
+    const exportData = filteredRegistrations.map(reg => {
+      const fullName = reg.profiles && 'full_name' in reg.profiles ? reg.profiles.full_name : 'Unknown';
+      const email = reg.profiles && 'email' in reg.profiles ? reg.profiles.email : 'Unknown';
+      
+      return {
+        'Name': fullName || 'Unknown',
+        'Email': email || 'Unknown',
+        'Phone': reg.phone_number || 'Not provided',
+        'Status': reg.status,
+        'Payment Status': reg.payment_status,
+        'Source': reg.source_table === 'registrations' ? 'Legacy System' : 'New System',
+        'Registration Date': formatDate(reg.created_at || new Date().toISOString())
+      };
+    });
     
     if (format === 'xlsx') {
       // Create workbook and worksheet

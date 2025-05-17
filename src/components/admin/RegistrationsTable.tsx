@@ -61,62 +61,72 @@ const RegistrationsTable = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {registrations.map((registration) => (
-              <TableRow key={`${registration.source_table}-${registration.id}`}>
-                <TableCell className="font-medium">
-                  <div>
-                    <p>{registration.profiles?.full_name || 'Unknown'}</p>
-                    <p className="text-sm text-muted-foreground">{registration.profiles?.email || 'No email'}</p>
-                    {registration.phone_number && (
-                      <p className="text-xs text-muted-foreground">{registration.phone_number}</p>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>{registration.events?.title || 'Unknown Event'}</TableCell>
-                <TableCell>{formatDate(registration.created_at)}</TableCell>
-                <TableCell>
-                  <Badge variant={
-                    registration.status === 'confirmed' ? 'default' : 
-                    registration.status === 'cancelled' ? 'destructive' :
-                    'secondary'
-                  }>
-                    {registration.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={
-                    registration.payment_status === 'confirmed' ? 'outline' : 
-                    registration.payment_status === 'failed' ? 'destructive' :
-                    'secondary'
-                  }>
-                    {registration.events?.is_free ? 'Free' : registration.payment_status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {registration.source_table === 'registrations' ? 'Legacy' : 'New System'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end space-x-2">
-                    <Button 
-                      size="sm" 
-                      variant="ghost"
-                      onClick={() => onEdit(registration)}
-                    >
-                      Edit
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="destructive"
-                      onClick={() => onDelete(registration)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {registrations.map((registration) => {
+              // Safely get the profile properties
+              const fullName = registration.profiles && 'full_name' in registration.profiles 
+                ? registration.profiles.full_name 
+                : 'Unknown';
+              const email = registration.profiles && 'email' in registration.profiles 
+                ? registration.profiles.email 
+                : 'No email';
+                
+              return (
+                <TableRow key={`${registration.source_table}-${registration.id}`}>
+                  <TableCell className="font-medium">
+                    <div>
+                      <p>{fullName || 'Unknown'}</p>
+                      <p className="text-sm text-muted-foreground">{email || 'No email'}</p>
+                      {registration.phone_number && (
+                        <p className="text-xs text-muted-foreground">{registration.phone_number}</p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{registration.events?.title || 'Unknown Event'}</TableCell>
+                  <TableCell>{formatDate(registration.created_at)}</TableCell>
+                  <TableCell>
+                    <Badge variant={
+                      registration.status === 'confirmed' ? 'default' : 
+                      registration.status === 'cancelled' ? 'destructive' :
+                      'secondary'
+                    }>
+                      {registration.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={
+                      registration.payment_status === 'confirmed' ? 'outline' : 
+                      registration.payment_status === 'failed' ? 'destructive' :
+                      'secondary'
+                    }>
+                      {registration.events?.is_free ? 'Free' : registration.payment_status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {registration.source_table === 'registrations' ? 'Legacy' : 'New System'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end space-x-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => onEdit(registration)}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => onDelete(registration)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

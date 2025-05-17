@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { CombinedRegistration, EventWithRegistrations } from '@/types/eventTypes
 import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
 import RegistrationsTable from '@/components/admin/RegistrationsTable';
 import AttendeeExport from '@/components/admin/AttendeeExport';
+import { ensureCountFunctions } from '@/lib/utils';
 
 const AdminRegistrations = () => {
   const [events, setEvents] = useState<EventWithRegistrations[]>([]);
@@ -40,6 +42,9 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
       
+      // Ensure the count functions exist in Supabase
+      await ensureCountFunctions(supabase);
+      
       // Get events data
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
@@ -49,7 +54,7 @@ const AdminRegistrations = () => {
       if (eventsError) throw eventsError;
       
       // Count registrations by event_id from the old table
-      const { data: regCounts, error: regError } = await supabase
+      const { data: regCountsData, error: regError } = await supabase
         .rpc('count_registrations_by_event');
         
       if (regError) {
@@ -88,7 +93,7 @@ const AdminRegistrations = () => {
       } else {
         // If RPC succeeded, use the results
         // Get counts from event_bookings table
-        const { data: bookingCounts, error: bookingError } = await supabase
+        const { data: bookingCountsData, error: bookingError } = await supabase
           .rpc('count_bookings_by_event');
           
         if (bookingError) {
@@ -98,14 +103,18 @@ const AdminRegistrations = () => {
         
         // Process and combine the data
         const regCountsMap = {};
-        regCounts?.forEach(item => {
-          regCountsMap[item.event_id] = parseInt(item.count);
-        });
+        if (regCountsData && Array.isArray(regCountsData)) {
+          regCountsData.forEach(item => {
+            regCountsMap[item.event_id] = parseInt(item.count);
+          });
+        }
         
         const bookingCountsMap = {};
-        bookingCounts?.forEach(item => {
-          bookingCountsMap[item.event_id] = parseInt(item.count);
-        });
+        if (bookingCountsData && Array.isArray(bookingCountsData)) {
+          bookingCountsData.forEach(item => {
+            bookingCountsMap[item.event_id] = parseInt(item.count);
+          });
+        }
         
         const eventsWithCounts = eventsData.map(event => {
           // Count from registrations table
@@ -256,8 +265,15 @@ const AdminRegistrations = () => {
     if (!searchQuery) return registrations;
     
     return registrations.filter(reg => {
-      const fullName = reg.profiles?.full_name?.toLowerCase() || '';
-      const email = reg.profiles?.email?.toLowerCase() || '';
+      // Safely get the profile properties
+      const fullName = reg.profiles && 'full_name' in reg.profiles 
+        ? (reg.profiles.full_name?.toLowerCase() || '') 
+        : '';
+      
+      const email = reg.profiles && 'email' in reg.profiles 
+        ? (reg.profiles.email?.toLowerCase() || '') 
+        : '';
+      
       const phone = reg.phone_number?.toLowerCase() || '';
       const eventTitle = reg.events?.title?.toLowerCase() || '';
       

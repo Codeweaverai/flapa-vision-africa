@@ -37,6 +37,11 @@ const RegistrationEditDialog = ({
 }: RegistrationEditDialogProps) => {
   if (!registration) return null;
   
+  // Safely get the full name
+  const fullName = registration.profiles && 'full_name' in registration.profiles 
+    ? registration.profiles.full_name 
+    : 'Unknown';
+  
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[425px]">
@@ -50,7 +55,7 @@ const RegistrationEditDialog = ({
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <h4 className="font-medium">{registration.events?.title}</h4>
-            <p className="text-sm">Attendee: {registration.profiles?.full_name || 'Unknown'}</p>
+            <p className="text-sm">Attendee: {fullName || 'Unknown'}</p>
             <Badge>{registration.source_table === 'registrations' ? 'Legacy Registration' : 'New Booking'}</Badge>
           </div>
           
