@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { fetchEvents, Event } from '@/services/eventService';
 import { Calendar, Clock, Tag } from 'lucide-react';
 import { format } from 'date-fns';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 const EventsSection = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -54,7 +55,18 @@ const EventsSection = () => {
         ) : events.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
             {events.map((event) => (
-              <Card key={event.id} className="bg-white/95 backdrop-blur shadow-lg hover:shadow-xl transition-all">
+              <Card key={event.id} className="bg-white/95 backdrop-blur shadow-lg hover:shadow-xl transition-all overflow-hidden">
+                {event.image_url && (
+                  <div className="w-full">
+                    <AspectRatio ratio={16/9}>
+                      <img 
+                        src={event.image_url} 
+                        alt={event.title}
+                        className="w-full h-full object-cover" 
+                      />
+                    </AspectRatio>
+                  </div>
+                )}
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div>

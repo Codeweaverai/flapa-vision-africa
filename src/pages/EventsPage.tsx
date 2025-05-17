@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -23,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarIcon, Clock, MapPin, VideoIcon, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -293,21 +295,47 @@ const EventsPage = () => {
                         )}
                       </div>
                       
-                      <CardContent className="p-0 bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center">
-                        <div className="text-center p-6">
-                          <div className="text-4xl font-bold text-primary">
-                            {format(parseISO(event.start_time), 'dd')}
+                      <CardContent className="p-0 bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center relative">
+                        {event.image_url ? (
+                          <div className="w-full h-full absolute inset-0">
+                            <img 
+                              src={event.image_url} 
+                              alt={event.title}
+                              className="w-full h-full object-cover" 
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-4">
+                              <div className="text-center text-white">
+                                <div className="text-4xl font-bold">
+                                  {format(parseISO(event.start_time), 'dd')}
+                                </div>
+                                <div className="text-xl font-medium">
+                                  {format(parseISO(event.start_time), 'MMM')}
+                                </div>
+                                <div className="mt-2 flex items-center justify-center">
+                                  <Clock className="h-4 w-4 mr-1" />
+                                  <span className="text-sm">
+                                    {format(parseISO(event.start_time), 'p')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-xl font-medium text-primary/80">
-                            {format(parseISO(event.start_time), 'MMM')}
+                        ) : (
+                          <div className="text-center p-6">
+                            <div className="text-4xl font-bold text-primary">
+                              {format(parseISO(event.start_time), 'dd')}
+                            </div>
+                            <div className="text-xl font-medium text-primary/80">
+                              {format(parseISO(event.start_time), 'MMM')}
+                            </div>
+                            <div className="mt-4 flex items-center justify-center">
+                              <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                {format(parseISO(event.start_time), 'p')}
+                              </span>
+                            </div>
                           </div>
-                          <div className="mt-4 flex items-center justify-center">
-                            <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">
-                              {format(parseISO(event.start_time), 'p')}
-                            </span>
-                          </div>
-                        </div>
+                        )}
                       </CardContent>
                     </div>
                   </Card>
@@ -330,45 +358,58 @@ const EventsPage = () => {
             ) : (
               <div className="grid gap-6">
                 {pastEvents.map(event => (
-                  <Card key={event.id} className="bg-background/80">
-                    <div className="p-6">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <Badge variant="outline">{getEventTypeLabel(event.event_type)}</Badge>
-                        <Badge variant="secondary" className="bg-muted/50">Past Event</Badge>
-                      </div>
-                      
-                      <h2 className="text-xl font-bold mb-2">{event.title}</h2>
-                      
-                      <div className="grid sm:grid-cols-2 gap-3 mb-4">
-                        <div className="flex items-center space-x-2">
-                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                          <span>{formatDateTime(event.start_time)}</span>
+                  <Card key={event.id} className="bg-background/80 overflow-hidden">
+                    <div className="md:grid md:grid-cols-4 gap-4">
+                      {event.image_url && (
+                        <div className="col-span-1">
+                          <AspectRatio ratio={1}>
+                            <img 
+                              src={event.image_url} 
+                              alt={event.title} 
+                              className="w-full h-full object-cover"
+                            />
+                          </AspectRatio>
+                        </div>
+                      )}
+                      <div className={`p-6 ${event.image_url ? 'col-span-3' : 'col-span-4'}`}>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <Badge variant="outline">{getEventTypeLabel(event.event_type)}</Badge>
+                          <Badge variant="secondary" className="bg-muted/50">Past Event</Badge>
                         </div>
                         
-                        <div className="flex items-center space-x-2">
-                          {event.event_type === 'webinar' ? (
-                            <>
-                              <VideoIcon className="h-4 w-4 text-muted-foreground" />
-                              <span>Online Webinar</span>
-                            </>
-                          ) : (
-                            <>
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span>{event.location || 'Location not specified'}</span>
-                            </>
-                          )}
+                        <h2 className="text-xl font-bold mb-2">{event.title}</h2>
+                        
+                        <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                          <div className="flex items-center space-x-2">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            <span>{formatDateTime(event.start_time)}</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            {event.event_type === 'webinar' ? (
+                              <>
+                                <VideoIcon className="h-4 w-4 text-muted-foreground" />
+                                <span>Online Webinar</span>
+                              </>
+                            ) : (
+                              <>
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                <span>{event.location || 'Location not specified'}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
+                        
+                        {event.description && (
+                          <p className="text-sm text-muted-foreground mb-4">{event.description}</p>
+                        )}
+                        
+                        {isRegistered(event.id) && (
+                          <Badge variant="outline" className="bg-muted">
+                            You attended this event
+                          </Badge>
+                        )}
                       </div>
-                      
-                      {event.description && (
-                        <p className="text-sm text-muted-foreground mb-4">{event.description}</p>
-                      )}
-                      
-                      {isRegistered(event.id) && (
-                        <Badge variant="outline" className="bg-muted">
-                          You attended this event
-                        </Badge>
-                      )}
                     </div>
                   </Card>
                 ))}

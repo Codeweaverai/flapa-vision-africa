@@ -1,267 +1,198 @@
-
-import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
-import { toast } from "sonner";
+import { supabase } from '@/integrations/supabase/client';
+import { User } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 export interface Event {
   id: string;
   title: string;
-  description: string | null;
-  event_type: 'webinar' | 'in-person' | 'mentorship';
+  description?: string;
+  event_type: string;
   start_time: string;
   end_time: string;
-  location: string | null;
-  online_meeting_link: string | null;
-  capacity: number | null;
-  price: number | null;
-  currency: string | null;
-  is_free: boolean | null;
+  location?: string;
+  online_meeting_link?: string;
+  capacity?: number;
+  is_free?: boolean;
+  price?: number;
+  currency?: string;
+  created_at?: string;
+  updated_at?: string;
+  image_url?: string;
 }
 
 export interface Registration {
   id: string;
-  event_id: string;
   user_id: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'attended' | string;
-  payment_status: 'pending' | 'processing' | 'completed' | 'failed' | string;
-  payment_id: string | null;
-  payment_amount: number | null;
-  payment_currency: string | null;
-  payment_method: string | null;
-  phone_number: string | null;
-  mobile_operator: string | null;
+  event_id: string;
+  status: string;
+  payment_status: string;
   created_at?: string;
   updated_at?: string;
-  events?: {
-    id: string;
-    title: string;
-    event_type: string;
-    start_time: string;
-    end_time: string;
-    location: string | null;
-    online_meeting_link: string | null;
-  };
+  phone_number?: string;
+  mobile_operator?: string;
+  payment_method?: string;
+  payment_id?: string;
 }
 
-export interface MobileOperator {
-  id: string;
-  name: string;
-  code: string;
-  country: string;
-}
-
-export const fetchEvents = async () => {
+export const fetchEvents = async (): Promise<Event[]> => {
   try {
     const { data, error } = await supabase
       .from('events')
       .select('*')
       .order('start_time', { ascending: true });
-
+    
     if (error) {
       console.error('Error fetching events:', error);
-      toast.error("Failed to load events");
-      return [];
+      throw error;
     }
-
+    
     return data as Event[];
   } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
+    console.error('Error in fetchEvents:', error);
     return [];
   }
 };
 
-export const fetchEventById = async (id: string) => {
+export const registerForEvent = async (event: Event, user: User | null, phoneNumber?: string, mobileOperator?: string): Promise<boolean> => {
+  if (!user) {
+    toast.error("Please sign in to register for events");
+    return false;
+  }
+
   try {
-    const { data, error } = await supabase
-      .from('events')
+    let registrationData: any = {
+      user_id: user.id,
+      event_id: event.id,
+      status: 'pending',
+      payment_status: event.is_free ? 'confirmed' : 'pending',
+    };
+
+    if (phoneNumber && mobileOperator) {
+      registrationData.phone_number = phoneNumber;
+      registrationData.mobile_operator = mobileOperator;
+      registrationData.payment_method = 'mobile_money';
+    }
+
+    const { data: existingRegistration, error: existingRegistrationError } = await supabase
+      .from('registrations')
       .select('*')
-      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('event_id', event.id)
+      .single();
+
+    if (existingRegistrationError && existingRegistrationError.code !== '404') {
+      console.error('Error checking existing registration:', existingRegistrationError);
+      toast.error('Failed to check existing registration');
+      return false;
+    }
+
+    if (existingRegistration) {
+      toast.warn('You are already registered for this event.');
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from('registrations')
+      .insert([registrationData])
+      .select()
       .single();
 
     if (error) {
-      console.error('Error fetching event:', error);
-      toast.error("Failed to load event details");
-      return null;
+      console.error('Error registering for event:', error);
+      toast.error('Failed to register for event');
+      return false;
     }
 
-    return data as Event;
+    if (!event.is_free && phoneNumber && mobileOperator) {
+      // Initiate payment via Supabase Edge Function
+      const initiatePayment = async (registrationId: string) => {
+        try {
+          const response = await fetch('/api/initiate-payment', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              registrationId: registrationId,
+              amount: event.price,
+              currency: event.currency,
+              phone_number: phoneNumber,
+              mobile_operator: mobileOperator,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.payment_url) {
+            // Redirect user to payment URL
+            window.location.href = result.payment_url;
+          } else {
+            console.error('Payment initiation failed:', result.error || 'Unknown error');
+            toast.error('Payment initiation failed. Please try again.');
+            // Optionally, update registration status to failed
+            await supabase
+              .from('registrations')
+              .update({ status: 'failed', payment_status: 'failed' })
+              .eq('id', registrationId);
+          }
+        } catch (err) {
+          console.error('Error initiating payment:', err);
+          toast.error('Error initiating payment. Please try again.');
+          // Optionally, update registration status to failed
+          if (data?.id) {
+            await supabase
+              .from('registrations')
+              .update({ status: 'failed', payment_status: 'failed' })
+              .eq('id', data.id);
+          }
+        }
+      };
+
+      await initiatePayment(data.id);
+    } else {
+      toast.success('Successfully registered for the event!');
+    }
+
+    return true;
   } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
-    return null;
+    console.error('Error in registerForEvent:', error);
+    toast.error('An unexpected error occurred during registration.');
+    return false;
   }
 };
 
-export const fetchUserRegistrations = async (user: User | null) => {
-  if (!user) return [];
-  
+export const fetchUserRegistrations = async (user: User | null): Promise<Registration[]> => {
+  if (!user) {
+    console.log('No user, returning empty registrations');
+    return [];
+  }
+
   try {
     const { data, error } = await supabase
       .from('registrations')
-      .select(`
-        *,
-        events:event_id (
-          id, 
-          title, 
-          event_type,
-          start_time, 
-          end_time,
-          location,
-          online_meeting_link
-        )
-      `)
-      .eq('user_id', user.id);
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching user registrations:', error);
-      toast.error("Failed to load your registrations");
+      toast.error('Failed to load registrations');
       return [];
     }
 
-    return data;
+    return data as Registration[];
   } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
+    console.error('Error in fetchUserRegistrations:', error);
     return [];
   }
 };
 
-export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('mobile_operators')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      console.error('Error fetching mobile operators:', error);
-      toast.error("Failed to load mobile operators");
-      return [];
-    }
-
-    return data as MobileOperator[];
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
-    return [];
-  }
-};
-
-export const registerForEvent = async (event: Event, user: User | null, phoneNumber?: string, mobileOperator?: string) => {
+export const cancelRegistration = async (registrationId: string, user: User | null): Promise<boolean> => {
   if (!user) {
-    toast.error("Please sign in to register for events");
-    return null;
+    toast.error("Please sign in to cancel registration");
+    return false;
   }
 
-  try {
-    // For free events
-    if (event.is_free || !event.price) {
-      const { data, error } = await supabase
-        .from('registrations')
-        .insert({
-          event_id: event.id,
-          user_id: user.id,
-          status: 'confirmed',
-          payment_status: 'completed',
-          phone_number: phoneNumber || null,
-          mobile_operator: mobileOperator || null
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error registering for event:', error);
-        if (error.code === '23505') {
-          toast.error("You are already registered for this event");
-        } else {
-          toast.error("Failed to register for event");
-        }
-        return null;
-      }
-
-      toast.success("Registration successful!");
-      return data;
-    } 
-    // For paid events, we'll initiate the payment flow
-    else {
-      // Check if phone number is provided for paid events
-      if (!phoneNumber) {
-        toast.error("Please provide a phone number for mobile money payment");
-        return null;
-      }
-      
-      // First create a pending registration
-      const { data, error } = await supabase
-        .from('registrations')
-        .insert({
-          event_id: event.id,
-          user_id: user.id,
-          status: 'pending',
-          payment_status: 'pending',
-          payment_amount: event.price,
-          payment_currency: event.currency || 'ZMW',
-          phone_number: phoneNumber,
-          mobile_operator: mobileOperator || 'MTN_MOMO_ZMB'
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating pending registration:', error);
-        if (error.code === '23505') {
-          toast.error("You are already registered for this event");
-        } else {
-          toast.error("Failed to register for event");
-        }
-        return null;
-      }
-
-      // Now initiate payment process
-      try {
-        const description = `Registration for ${event.title}`;
-        
-        const response = await initiatePawaPayPayment(data.id, {
-          amount: event.price,
-          currency: event.currency || 'ZMW',
-          description: description,
-          userId: user.id,
-          referenceType: 'event',
-          referenceId: event.id,
-          phoneNumber: phoneNumber,
-          mobileOperator: mobileOperator || 'MTN_MOMO_ZMB'
-        });
-        
-        if (response && response.redirectUrl) {
-          window.location.href = response.redirectUrl;
-          return data;
-        } else {
-          toast.error("Failed to initialize payment");
-          return null;
-        }
-      } catch (paymentError) {
-        console.error('Payment initiation error:', paymentError);
-        toast.error("Payment initiation failed");
-        
-        // Cleanup the pending registration
-        await supabase
-          .from('registrations')
-          .delete()
-          .eq('id', data.id);
-          
-        return null;
-      }
-    }
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
-    return null;
-  }
-};
-
-export const cancelRegistration = async (registrationId: string, user: User | null) => {
-  if (!user) return false;
-  
   try {
     const { error } = await supabase
       .from('registrations')
@@ -271,53 +202,15 @@ export const cancelRegistration = async (registrationId: string, user: User | nu
 
     if (error) {
       console.error('Error cancelling registration:', error);
-      toast.error("Failed to cancel registration");
+      toast.error('Failed to cancel registration');
       return false;
     }
 
-    toast.success("Registration cancelled successfully");
+    toast.success('Registration cancelled successfully.');
     return true;
   } catch (error) {
-    console.error('Unexpected error:', error);
-    toast.error("An unexpected error occurred");
+    console.error('Error in cancelRegistration:', error);
+    toast.error('An unexpected error occurred while cancelling registration.');
     return false;
-  }
-};
-
-// Helper function to initiate PawaPay payment
-const initiatePawaPayPayment = async (registrationId: string, paymentDetails: {
-  amount: number;
-  currency: string;
-  description: string;
-  userId: string;
-  referenceType: 'event' | 'consultation';
-  referenceId: string;
-  phoneNumber?: string;
-  mobileOperator?: string;
-}) => {
-  try {
-    const { data, error } = await supabase.functions.invoke('create-payment', {
-      body: {
-        bookingId: registrationId,
-        amount: paymentDetails.amount,
-        currency: paymentDetails.currency,
-        reason: paymentDetails.description,
-        userId: paymentDetails.userId,
-        referenceType: paymentDetails.referenceType,
-        referenceId: paymentDetails.referenceId,
-        phoneNumber: paymentDetails.phoneNumber,
-        mobileOperator: paymentDetails.mobileOperator
-      }
-    });
-
-    if (error) {
-      console.error('Error invoking payment function:', error);
-      throw new Error('Payment function error');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Payment error:', error);
-    throw error;
   }
 };

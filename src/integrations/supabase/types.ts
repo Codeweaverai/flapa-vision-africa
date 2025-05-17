@@ -84,6 +84,7 @@ export type Database = {
           end_time: string
           event_type: string
           id: string
+          image_url: string | null
           is_free: boolean | null
           location: string | null
           online_meeting_link: string | null
@@ -100,6 +101,7 @@ export type Database = {
           end_time: string
           event_type: string
           id?: string
+          image_url?: string | null
           is_free?: boolean | null
           location?: string | null
           online_meeting_link?: string | null
@@ -116,6 +118,7 @@ export type Database = {
           end_time?: string
           event_type?: string
           id?: string
+          image_url?: string | null
           is_free?: boolean | null
           location?: string | null
           online_meeting_link?: string | null

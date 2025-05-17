@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Event } from '@/services/eventService';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const AdminEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -112,6 +114,7 @@ const AdminEvents = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Image</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Date</TableHead>
@@ -122,6 +125,12 @@ const AdminEvents = () => {
             <TableBody>
               {events.map((event) => (
                 <TableRow key={event.id}>
+                  <TableCell>
+                    <Avatar className="h-10 w-10 rounded-md">
+                      <AvatarImage src={event.image_url || ''} alt={event.title} />
+                      <AvatarFallback className="rounded-md bg-muted">EV</AvatarFallback>
+                    </Avatar>
+                  </TableCell>
                   <TableCell className="font-medium">{event.title}</TableCell>
                   <TableCell>
                     <Badge variant="outline">{getEventTypeLabel(event.event_type)}</Badge>

@@ -52,6 +52,7 @@ const EventForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
 
   const form = useForm<EventFormValues>({
     defaultValues: {
@@ -113,6 +114,12 @@ const EventForm = () => {
           price: event.price || 0,
           currency: event.currency || 'ZMW',
         });
+        
+        // Set the current image URL if it exists
+        if (event.image_url) {
+          setCurrentImageUrl(event.image_url);
+          setImagePreview(event.image_url);
+        }
       }
     } catch (error) {
       console.error('Error fetching event:', error);
@@ -126,13 +133,13 @@ const EventForm = () => {
     setSubmitting(true);
     try {
       // Handle image upload if there's a file
-      let imagePath = null;
+      let imagePath = currentImageUrl;
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `event-images/${fileName}`;
+        const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
         
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError, data } = await supabase.storage
           .from('event-images')
           .upload(filePath, imageFile);
         
