@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
 }
 
 serve(async (req) => {
@@ -20,27 +21,29 @@ serve(async (req) => {
     if (!type || !userId) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameters' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        { headers: corsHeaders, status: 400 }
       )
     }
 
-    // Create Supabase client
+    // Create Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL') as string
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
 
     // Get user email
-    const { data: user, error: userError } = await supabase
-      .from('profiles')
-      .select('id, email:auth.users!id(email)')
-      .eq('id', userId)
-      .single()
+    const { data: userAuth, error: userAuthError } = await supabase.auth.admin
+      .getUserById(userId);
 
-    if (userError || !user || !user.email) {
-      throw new Error(`Error fetching user: ${userError?.message || 'User not found'}`)
+    if (userAuthError || !userAuth || !userAuth.user?.email) {
+      throw new Error(`Error fetching user: ${userAuthError?.message || 'User not found'}`)
     }
 
-    const userEmail = user.email.email
+    const userEmail = userAuth.user.email;
 
     let emailSubject = ''
     let emailContent = ''
@@ -139,26 +142,23 @@ serve(async (req) => {
     console.log(`Subject: ${emailSubject}`)
     console.log(`Content: ${emailContent}`)
 
-    // In a real implementation, you would send the email here
-    // For example, using SendGrid:
-    // await sendgrid.send({
-    //   to: userEmail,
-    //   from: 'your-verified-sender@example.com',
-    //   subject: emailSubject,
-    //   text: emailContent,
-    // });
-
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Email notification prepared (would be sent in production)'
+        message: 'Email notification prepared (would be sent in production)',
+        details: {
+          to: userEmail,
+          subject: emailSubject,
+          content: emailContent.trim()
+        }
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      { headers: corsHeaders, status: 200 }
     )
   } catch (error) {
+    console.error('Error in send-course-email function:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      { headers: corsHeaders, status: 500 }
     )
   }
 })

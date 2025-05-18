@@ -16,7 +16,12 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
-  const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+  const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
 
   try {
     // Check if authenticated
@@ -126,6 +131,19 @@ serve(async (req) => {
     // Generate verification code
     const verificationCode = generateVerificationCode();
 
+    // Check if course-materials bucket exists
+    const { data: buckets } = await supabaseClient.storage.listBuckets();
+    if (!buckets?.find(b => b.name === "course-materials")) {
+      // Create bucket with service role key
+      await supabaseClient.storage.createBucket("course-materials", {
+        public: true,
+        fileSizeLimit: 10485760, // 10MB
+      });
+      
+      // Ensure public access to certificates folder
+      await supabaseClient.storage.from("course-materials").createSignedUrl("certificates/dummy.txt", 60);
+    }
+
     // Create certificate record
     const { data: certificate, error: createError } = await supabaseClient
       .from("certificates")
@@ -133,7 +151,7 @@ serve(async (req) => {
         enrollment_id: enrollmentId,
         verification_code: verificationCode,
         issue_date: new Date().toISOString(),
-        pdf_url: `https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`
+        pdf_url: `${supabaseUrl}/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`
       })
       .select()
       .single();
@@ -148,18 +166,6 @@ serve(async (req) => {
         }
       );
     }
-
-    // Create storage bucket if it doesn't exist
-    const { data: buckets } = await supabaseClient.storage.listBuckets();
-    if (!buckets?.find(b => b.name === "course-materials")) {
-      await supabaseClient.storage.createBucket("course-materials", {
-        public: true
-      });
-    }
-
-    // Here we would normally generate a PDF certificate and upload it
-    // Since we don't have PDF generation in this edge function, we'll mock this
-    // In a real implementation, you'd use a PDF library to create the certificate
 
     return new Response(
       JSON.stringify({ 
