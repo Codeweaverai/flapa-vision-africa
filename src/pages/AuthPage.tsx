@@ -1,13 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 import { 
   Card,
   CardHeader,
@@ -53,8 +51,13 @@ const AuthPage = () => {
     }
     
     try {
-      await signIn(email, password);
-      // Success handling is done in AuthContext
+      const result = await signIn(email, password);
+      if (result.success) {
+        // Navigate after successful sign in
+        navigate('/account');
+      } else {
+        setErrorMessage(result.error?.message || 'Failed to sign in. Please check your credentials.');
+      }
     } catch (error: any) {
       console.error('Sign in error:', error);
       setErrorMessage(error.message || 'Failed to sign in. Please check your credentials.');
@@ -100,6 +103,7 @@ const AuthPage = () => {
     try {
       await signUp(email, password, { full_name: fullName, username });
       // Success handling is done in AuthContext
+      navigate('/'); // Navigate to home after signup
     } catch (error: any) {
       console.error('Sign up error:', error);
       setErrorMessage(error.message || 'Failed to sign up. Please try again.');

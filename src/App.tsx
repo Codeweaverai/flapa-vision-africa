@@ -35,8 +35,8 @@ import { Toaster as ToastProvider } from './components/ui/toaster';
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/about" element={<AboutPage />} />
@@ -155,8 +155,8 @@ function App() {
         </Routes>
         <Toaster />
         <ToastProvider />
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
