@@ -1,5 +1,6 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -9,7 +10,7 @@ interface AuthContextProps {
   session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string, userData: { full_name: string; username: string }) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Clean up auth state helper
   const cleanupAuthState = () => {
@@ -111,6 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log('Sign up successful:', data);
       toast.success("Account created! Check your email to verify your account.");
+      navigate('/');
     } catch (error: any) {
       console.error('Sign up error catch:', error);
       toast.error(error.message || "An error occurred during sign up");
@@ -138,11 +141,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       console.log('Sign in successful:', data);
-      return { success: true };
+      navigate('/account');
     } catch (error: any) {
       console.error('Sign in error catch:', error);
       toast.error(error.message || "An error occurred during sign in");
-      return { success: false, error };
+      throw error; // Re-throw to allow component to handle it
     } finally {
       setLoading(false);
     }
@@ -157,8 +160,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Attempt global sign out
       await supabase.auth.signOut({ scope: 'global' });
       
-      // We no longer redirect here - we'll let individual components handle this
-      return;
+      // Force a page reload to ensure clean state
+      window.location.href = '/';
     } catch (error: any) {
       console.error('Sign out error:', error);
       toast.error(error.message || "An error occurred during sign out");

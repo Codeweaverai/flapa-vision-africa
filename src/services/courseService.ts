@@ -9,7 +9,7 @@ export type Course = {
   summary: string;
   description: string;
   category: string;
-  difficulty_level: 'Beginner' | 'Intermediate' | 'Advanced';
+  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
   duration_minutes: number;
   thumbnail_url: string | null;
   tags: string[] | null;
@@ -19,9 +19,6 @@ export type Course = {
   certificate_enabled: boolean | null;
   created_at: string | null;
   updated_at: string | null;
-  video_playlist_url?: string;
-  provides_certificate?: boolean;
-  modules?: CourseModule[]; // Add modules property to Course type
 };
 
 export type CourseModule = {
@@ -132,54 +129,6 @@ export async function fetchPublishedCourses(): Promise<Course[]> {
       variant: 'destructive',
     });
     return [];
-  }
-}
-
-// Function to fetch a course by ID
-export async function fetchCourseById(courseId: string): Promise<Course | null> {
-  try {
-    // Get the course details
-    const { data, error } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('id', courseId)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching course by ID:', error);
-      throw error;
-    }
-    
-    if (!data) {
-      return null;
-    }
-
-    // Get modules for this course
-    const { data: modules, error: modulesError } = await supabase
-      .from('course_modules')
-      .select('*')
-      .eq('course_id', courseId)
-      .order('order_index', { ascending: true });
-    
-    if (modulesError) {
-      console.error('Error fetching modules:', modulesError);
-      // Still return the course, but without modules
-      return data as Course;
-    }
-
-    // Return course with modules
-    return {
-      ...(data as Course),
-      modules: modules || []
-    };
-  } catch (error) {
-    console.error('Error in fetchCourseById:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to load course details. Please try again later.',
-      variant: 'destructive',
-    });
-    return null;
   }
 }
 
@@ -312,16 +261,14 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course 
       summary: courseData.summary || '',
       description: courseData.description || '',
       category: courseData.category || '',
-      difficulty_level: courseData.difficulty_level || 'Beginner',
+      difficulty_level: courseData.difficulty_level || 'beginner',
       duration_minutes: courseData.duration_minutes || 0,
       is_published: courseData.is_published ?? false,
       tags: courseData.tags ?? [],
       thumbnail_url: courseData.thumbnail_url ?? null,
       price: courseData.price ?? 0,
       is_free: courseData.is_free ?? true,
-      certificate_enabled: courseData.certificate_enabled ?? false,
-      video_playlist_url: courseData.video_playlist_url,
-      provides_certificate: courseData.provides_certificate
+      certificate_enabled: courseData.certificate_enabled ?? false
     };
     
     const { data, error } = await supabase

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
 
 const AdminLogin = () => {
   const { user, loading, signIn } = useAuth();
@@ -60,11 +61,8 @@ const AdminLogin = () => {
     
     try {
       // Sign in with Supabase
-      const result = await signIn(email, password);
-      if (!result.success) {
-        setErrorMessage(result.error?.message || 'Failed to login. Please check your credentials.');
-        setIsSubmitting(false);
-      }
+      await signIn(email, password);
+      
       // Admin check will happen in useEffect
     } catch (error: any) {
       console.error('Login error:', error);

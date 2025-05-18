@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock } from 'lucide-react';
@@ -9,17 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { Course, fetchAllCourses, deleteCourse, updateCourse } from '@/services/courseService';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 
 const AdminCourses = () => {
-  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
@@ -66,28 +56,10 @@ const AdminCourses = () => {
     }
   };
 
-  const handleEditCourse = (courseId: string) => {
-    navigate(`/admin/courses/edit/${courseId}`);
-  };
-
   return (
     <AdminLayout title="Course Management">
       <div className="min-h-screen bg-light-purple">
         <div className="container mx-auto py-8">
-          <Breadcrumb className="mb-4">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link to="/admin">Dashboard</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Courses</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Course Management</h1>
@@ -167,13 +139,11 @@ const AdminCourses = () => {
                     </CardContent>
                     
                     <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleEditCourse(course.id)}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/admin/courses/edit/${course.id}`}>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Link>
                       </Button>
                       
                       <Button
