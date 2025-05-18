@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -717,774 +716,776 @@ const CourseForm = () => {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">
-          {isEditing ? 'Edit Course' : 'Create Course'}
-        </h1>
-        <Button onClick={() => navigate('/admin/courses')} variant="outline">
-          Back to Courses
-        </Button>
-      </div>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full mb-8">
-          <TabsTrigger value="details" className="flex-1">Course Details</TabsTrigger>
-          {isEditing && (
-            <>
-              <TabsTrigger value="modules" className="flex-1">Modules & Lessons</TabsTrigger>
-              <TabsTrigger value="preview" className="flex-1">Preview</TabsTrigger>
-            </>
-          )}
-        </TabsList>
+    <div className="min-h-screen bg-light-purple">
+      <div className="container mx-auto py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">
+            {isEditing ? 'Edit Course' : 'Create Course'}
+          </h1>
+          <Button onClick={() => navigate('/admin/courses')} variant="outline">
+            Back to Courses
+          </Button>
+        </div>
         
-        <TabsContent value="details">
-          <Card>
-            <CardHeader>
-              <CardTitle>Course Information</CardTitle>
-            </CardHeader>
-            <form onSubmit={handleSubmitCourse(onCourseSubmit)}>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Course Title</Label>
-                    <Input 
-                      id="title" 
-                      placeholder="Enter course title" 
-                      {...registerCourse('title')}
-                      className={courseErrors.title ? 'border-red-500' : ''}
-                    />
-                    {courseErrors.title && (
-                      <p className="text-red-500 text-sm">{courseErrors.title.message}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input 
-                      id="category" 
-                      placeholder="Category (e.g. Programming, Design)" 
-                      {...registerCourse('category')}
-                      className={courseErrors.category ? 'border-red-500' : ''}
-                    />
-                    {courseErrors.category && (
-                      <p className="text-red-500 text-sm">{courseErrors.category.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="summary">Summary</Label>
-                  <Input
-                    id="summary"
-                    placeholder="Brief summary of the course"
-                    {...registerCourse('summary')}
-                    className={courseErrors.summary ? 'border-red-500' : ''}
-                  />
-                  {courseErrors.summary && (
-                    <p className="text-red-500 text-sm">{courseErrors.summary.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Full course description"
-                    rows={6}
-                    {...registerCourse('description')}
-                    className={courseErrors.description ? 'border-red-500' : ''}
-                  />
-                  {courseErrors.description && (
-                    <p className="text-red-500 text-sm">{courseErrors.description.message}</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="difficulty_level">Difficulty Level</Label>
-                    <Select 
-                      defaultValue={getValuesCourse('difficulty_level')}
-                      onValueChange={(value) => setValueCourse('difficulty_level', value as 'beginner' | 'intermediate' | 'advanced')}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select difficulty level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="beginner">Beginner</SelectItem>
-                        <SelectItem value="intermediate">Intermediate</SelectItem>
-                        <SelectItem value="advanced">Advanced</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="duration_minutes">Duration (minutes)</Label>
-                    <Input 
-                      id="duration_minutes" 
-                      type="number" 
-                      min="1"
-                      placeholder="Course duration in minutes"
-                      {...registerCourse('duration_minutes', { valueAsNumber: true })}
-                      className={courseErrors.duration_minutes ? 'border-red-500' : ''}
-                    />
-                    {courseErrors.duration_minutes && (
-                      <p className="text-red-500 text-sm">{courseErrors.duration_minutes.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="is_free"
-                      checked={isFree}
-                      onCheckedChange={(checked) => {
-                        setValueCourse('is_free', checked);
-                        if (checked) {
-                          setValueCourse('price', 0);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="is_free">Free Course</Label>
-                  </div>
-                  
-                  {!isFree && (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full mb-8">
+            <TabsTrigger value="details" className="flex-1">Course Details</TabsTrigger>
+            {isEditing && (
+              <>
+                <TabsTrigger value="modules" className="flex-1">Modules & Lessons</TabsTrigger>
+                <TabsTrigger value="preview" className="flex-1">Preview</TabsTrigger>
+              </>
+            )}
+          </TabsList>
+          
+          <TabsContent value="details">
+            <Card>
+              <CardHeader>
+                <CardTitle>Course Information</CardTitle>
+              </CardHeader>
+              <form onSubmit={handleSubmitCourse(onCourseSubmit)}>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="price">Price</Label>
+                      <Label htmlFor="title">Course Title</Label>
                       <Input 
-                        id="price" 
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Course price"
-                        {...registerCourse('price', { valueAsNumber: true })}
-                        className={courseErrors.price ? 'border-red-500' : ''}
+                        id="title" 
+                        placeholder="Enter course title" 
+                        {...registerCourse('title')}
+                        className={courseErrors.title ? 'border-red-500' : ''}
                       />
-                      {courseErrors.price && (
-                        <p className="text-red-500 text-sm">{courseErrors.price.message}</p>
+                      {courseErrors.title && (
+                        <p className="text-red-500 text-sm">{courseErrors.title.message}</p>
                       )}
                     </div>
-                  )}
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch 
-                    id="certificate_enabled"
-                    {...registerCourse('certificate_enabled')}
-                  />
-                  <Label htmlFor="certificate_enabled">Enable Course Completion Certificate</Label>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="thumbnail">Course Thumbnail</Label>
-                  <div className="flex flex-col space-y-4">
-                    {thumbnailPreview && (
-                      <div className="relative w-full max-w-md">
-                        <img 
-                          src={thumbnailPreview} 
-                          alt="Thumbnail preview" 
-                          className="rounded-lg shadow-sm object-cover w-full h-48"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2"
-                          onClick={() => {
-                            setThumbnailPreview(null);
-                            setThumbnailFile(null);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
                     
-                    {!thumbnailPreview && (
-                      <div className="flex items-center justify-center w-full">
-                        <label
-                          htmlFor="thumbnail-upload"
-                          className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                        >
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <Upload className="w-8 h-8 text-gray-500" />
-                            <p className="mt-2 text-sm text-gray-500">
-                              Click to upload thumbnail
-                            </p>
-                          </div>
-                          <input
-                            id="thumbnail-upload"
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleThumbnailChange}
-                          />
-                        </label>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Input 
+                        id="category" 
+                        placeholder="Category (e.g. Programming, Design)" 
+                        {...registerCourse('category')}
+                        className={courseErrors.category ? 'border-red-500' : ''}
+                      />
+                      {courseErrors.category && (
+                        <p className="text-red-500 text-sm">{courseErrors.category.message}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="summary">Summary</Label>
+                    <Input
+                      id="summary"
+                      placeholder="Brief summary of the course"
+                      {...registerCourse('summary')}
+                      className={courseErrors.summary ? 'border-red-500' : ''}
+                    />
+                    {courseErrors.summary && (
+                      <p className="text-red-500 text-sm">{courseErrors.summary.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Full course description"
+                      rows={6}
+                      {...registerCourse('description')}
+                      className={courseErrors.description ? 'border-red-500' : ''}
+                    />
+                    {courseErrors.description && (
+                      <p className="text-red-500 text-sm">{courseErrors.description.message}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="difficulty_level">Difficulty Level</Label>
+                      <Select 
+                        defaultValue={getValuesCourse('difficulty_level')}
+                        onValueChange={(value) => setValueCourse('difficulty_level', value as 'beginner' | 'intermediate' | 'advanced')}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select difficulty level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="duration_minutes">Duration (minutes)</Label>
+                      <Input 
+                        id="duration_minutes" 
+                        type="number" 
+                        min="1"
+                        placeholder="Course duration in minutes"
+                        {...registerCourse('duration_minutes', { valueAsNumber: true })}
+                        className={courseErrors.duration_minutes ? 'border-red-500' : ''}
+                      />
+                      {courseErrors.duration_minutes && (
+                        <p className="text-red-500 text-sm">{courseErrors.duration_minutes.message}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="is_free"
+                        checked={isFree}
+                        onCheckedChange={(checked) => {
+                          setValueCourse('is_free', checked);
+                          if (checked) {
+                            setValueCourse('price', 0);
+                          }
+                        }}
+                      />
+                      <Label htmlFor="is_free">Free Course</Label>
+                    </div>
+                    
+                    {!isFree && (
+                      <div className="space-y-2">
+                        <Label htmlFor="price">Price</Label>
+                        <Input 
+                          id="price" 
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Course price"
+                          {...registerCourse('price', { valueAsNumber: true })}
+                          className={courseErrors.price ? 'border-red-500' : ''}
+                        />
+                        {courseErrors.price && (
+                          <p className="text-red-500 text-sm">{courseErrors.price.message}</p>
+                        )}
                       </div>
                     )}
                   </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => navigate('/admin/courses')} disabled={loading}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Saving...' : isEditing ? 'Update Course' : 'Create Course'}
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
-        </TabsContent>
-        
-        {isEditing && (
-          <TabsContent value="modules">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Left sidebar - Module list */}
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Course Modules</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {modules.length === 0 ? (
-                      <p className="text-gray-500 text-center py-4">No modules yet</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {modules.map((module) => (
-                          <li key={module.id}>
-                            <Button
-                              variant={selectedModuleId === module.id ? "default" : "outline"}
-                              className="w-full justify-between flex items-center"
-                              onClick={() => handleSelectModule(module.id)}
-                            >
-                              <span className="truncate text-left">{module.title}</span>
-                              <div className="flex items-center">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditModule(module);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteModule(module.id);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </div>
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                {/* Module form */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{editingModuleId ? 'Edit Module' : 'Add Module'}</CardTitle>
-                  </CardHeader>
-                  <form onSubmit={handleSubmitModule(onModuleSubmit)}>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="module-title">Title</Label>
-                        <Input 
-                          id="module-title" 
-                          placeholder="Module title" 
-                          {...registerModule('title')}
-                          className={moduleErrors.title ? 'border-red-500' : ''}
-                        />
-                        {moduleErrors.title && (
-                          <p className="text-red-500 text-sm">{moduleErrors.title.message}</p>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="module-description">Description (optional)</Label>
-                        <Textarea 
-                          id="module-description" 
-                          placeholder="Module description" 
-                          rows={3}
-                          {...registerModule('description')}
-                        />
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      {editingModuleId ? (
-                        <>
-                          <Button type="button" variant="outline" onClick={handleCancelEditModule}>
-                            Cancel
+
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="certificate_enabled"
+                      {...registerCourse('certificate_enabled')}
+                    />
+                    <Label htmlFor="certificate_enabled">Enable Course Completion Certificate</Label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="thumbnail">Course Thumbnail</Label>
+                    <div className="flex flex-col space-y-4">
+                      {thumbnailPreview && (
+                        <div className="relative w-full max-w-md">
+                          <img 
+                            src={thumbnailPreview} 
+                            alt="Thumbnail preview" 
+                            className="rounded-lg shadow-sm object-cover w-full h-48"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              setThumbnailPreview(null);
+                              setThumbnailFile(null);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
                           </Button>
-                          <Button type="submit" disabled={loading}>
-                            {loading ? 'Saving...' : 'Update Module'}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button type="submit" className="w-full" disabled={loading}>
-                          {loading ? 'Adding...' : 'Add Module'}
-                        </Button>
-                      )}
-                    </CardFooter>
-                  </form>
-                </Card>
-              </div>
-              
-              {/* Right panel - Module content (lessons or quiz) */}
-              <div className="md:col-span-2 space-y-6">
-                {selectedModuleId ? (
-                  <>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Lessons</CardTitle>
-                        <div>
-                          {modules.find(m => m.id === selectedModuleId)?.lessons?.length || 0} Lessons
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {modules.find(m => m.id === selectedModuleId)?.lessons?.length === 0 ? (
-                            <p className="text-gray-500 text-center py-4">No lessons yet</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {modules.find(m => m.id === selectedModuleId)?.lessons?.map((lesson) => (
-                                <div 
-                                  key={lesson.id}
-                                  className="p-4 border rounded-md flex justify-between items-center"
-                                >
-                                  <div className="flex-1">
-                                    <h4 className="font-medium">{lesson.title}</h4>
-                                    {lesson.video_url && (
-                                      <span className="text-sm text-gray-500">
-                                        Has video
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <Button
-                                      variant="ghost" 
-                                      size="sm"
-                                      onClick={() => handleEditLesson(lesson)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost" 
-                                      size="sm"
-                                      onClick={() => handleDeleteLesson(lesson.id, selectedModuleId)}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
+                      )}
+                      
+                      {!thumbnailPreview && (
+                        <div className="flex items-center justify-center w-full">
+                          <label
+                            htmlFor="thumbnail-upload"
+                            className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                          >
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Upload className="w-8 h-8 text-gray-500" />
+                              <p className="mt-2 text-sm text-gray-500">
+                                Click to upload thumbnail
+                              </p>
                             </div>
+                            <input
+                              id="thumbnail-upload"
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleThumbnailChange}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" onClick={() => navigate('/admin/courses')} disabled={loading}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? 'Saving...' : isEditing ? 'Update Course' : 'Create Course'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </TabsContent>
+          
+          {isEditing && (
+            <TabsContent value="modules">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Left sidebar - Module list */}
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Course Modules</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {modules.length === 0 ? (
+                        <p className="text-gray-500 text-center py-4">No modules yet</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {modules.map((module) => (
+                            <li key={module.id}>
+                              <Button
+                                variant={selectedModuleId === module.id ? "default" : "outline"}
+                                className="w-full justify-between flex items-center"
+                                onClick={() => handleSelectModule(module.id)}
+                              >
+                                <span className="truncate text-left">{module.title}</span>
+                                <div className="flex items-center">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditModule(module);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteModule(module.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Module form */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>{editingModuleId ? 'Edit Module' : 'Add Module'}</CardTitle>
+                    </CardHeader>
+                    <form onSubmit={handleSubmitModule(onModuleSubmit)}>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="module-title">Title</Label>
+                          <Input 
+                            id="module-title" 
+                            placeholder="Module title" 
+                            {...registerModule('title')}
+                            className={moduleErrors.title ? 'border-red-500' : ''}
+                          />
+                          {moduleErrors.title && (
+                            <p className="text-red-500 text-sm">{moduleErrors.title.message}</p>
                           )}
                         </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="module-description">Description (optional)</Label>
+                          <Textarea 
+                            id="module-description" 
+                            placeholder="Module description" 
+                            rows={3}
+                            {...registerModule('description')}
+                          />
+                        </div>
                       </CardContent>
-                    </Card>
-                    
-                    {/* Lesson form */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>{editingLessonId ? 'Edit Lesson' : 'Add Lesson'}</CardTitle>
-                      </CardHeader>
-                      <form onSubmit={handleSubmitLesson(onLessonSubmit)}>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="lesson-title">Title</Label>
-                            <Input 
-                              id="lesson-title" 
-                              placeholder="Lesson title" 
-                              {...registerLesson('title')}
-                              className={lessonErrors.title ? 'border-red-500' : ''}
-                            />
-                            {lessonErrors.title && (
-                              <p className="text-red-500 text-sm">{lessonErrors.title.message}</p>
-                            )}
+                      <CardFooter className="flex justify-between">
+                        {editingModuleId ? (
+                          <>
+                            <Button type="button" variant="outline" onClick={handleCancelEditModule}>
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={loading}>
+                              {loading ? 'Saving...' : 'Update Module'}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button type="submit" className="w-full" disabled={loading}>
+                            {loading ? 'Adding...' : 'Add Module'}
+                          </Button>
+                        )}
+                      </CardFooter>
+                    </form>
+                  </Card>
+                </div>
+                
+                {/* Right panel - Module content (lessons or quiz) */}
+                <div className="md:col-span-2 space-y-6">
+                  {selectedModuleId ? (
+                    <>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <CardTitle>Lessons</CardTitle>
+                          <div>
+                            {modules.find(m => m.id === selectedModuleId)?.lessons?.length || 0} Lessons
                           </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="lesson-description">Description (optional)</Label>
-                            <Textarea 
-                              id="lesson-description" 
-                              placeholder="Lesson description" 
-                              rows={3}
-                              {...registerLesson('description')}
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="video_url">Video URL (YouTube)</Label>
-                            <Input 
-                              id="video_url" 
-                              placeholder="YouTube video URL" 
-                              {...registerLesson('video_url')}
-                            />
-                            
-                            {videoUrl && isYoutubeUrl(videoUrl) && (
-                              <div className="mt-4">
-                                <Label className="mb-2 block">Video Preview</Label>
-                                <div className="relative pt-[56.25%] w-full">
-                                  <iframe 
-                                    className="absolute top-0 left-0 w-full h-full rounded-md"
-                                    src={getVideoEmbedUrl(videoUrl) || ''}
-                                    title="Video preview"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                  ></iframe>
-                                </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {modules.find(m => m.id === selectedModuleId)?.lessons?.length === 0 ? (
+                              <p className="text-gray-500 text-center py-4">No lessons yet</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {modules.find(m => m.id === selectedModuleId)?.lessons?.map((lesson) => (
+                                  <div 
+                                    key={lesson.id}
+                                    className="p-4 border rounded-md flex justify-between items-center"
+                                  >
+                                    <div className="flex-1">
+                                      <h4 className="font-medium">{lesson.title}</h4>
+                                      {lesson.video_url && (
+                                        <span className="text-sm text-gray-500">
+                                          Has video
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Button
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={() => handleEditLesson(lesson)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={() => handleDeleteLesson(lesson.id, selectedModuleId)}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            )}
-                            
-                            {videoUrl && !isYoutubeUrl(videoUrl) && videoUrl.length > 0 && (
-                              <p className="text-red-500 text-sm mt-1">
-                                Please enter a valid YouTube URL
-                              </p>
                             )}
                           </div>
                         </CardContent>
-                        <CardFooter className="flex justify-between">
-                          {editingLessonId ? (
-                            <>
-                              <Button type="button" variant="outline" onClick={handleCancelEditLesson}>
-                                Cancel
-                              </Button>
-                              <Button type="submit" disabled={loading}>
-                                {loading ? 'Saving...' : 'Update Lesson'}
-                              </Button>
-                            </>
-                          ) : (
-                            <Button type="submit" className="w-full" disabled={loading}>
-                              {loading ? 'Adding...' : 'Add Lesson'}
-                            </Button>
-                          )}
-                        </CardFooter>
-                      </form>
-                    </Card>
-                    
-                    {/* Quiz section */}
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Module Quiz</CardTitle>
-                        {modules.find(m => m.id === selectedModuleId)?.quiz && (
-                          <Badge variant="secondary">
-                            Quiz Added
-                          </Badge>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        {modules.find(m => m.id === selectedModuleId)?.quiz ? (
-                          <div className="p-4 border rounded-md">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <h4 className="font-medium">
-                                  {modules.find(m => m.id === selectedModuleId)?.quiz?.title}
-                                </h4>
-                                <p className="text-sm text-gray-500">
-                                  Passing score: {modules.find(m => m.id === selectedModuleId)?.quiz?.passing_score}%
-                                </p>
-                                {modules.find(m => m.id === selectedModuleId)?.quiz?.questions?.length && (
-                                  <p className="text-sm text-gray-500">
-                                    {modules.find(m => m.id === selectedModuleId)?.quiz?.questions?.length} questions
-                                  </p>
-                                )}
-                              </div>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  const quiz = modules.find(m => m.id === selectedModuleId)?.quiz;
-                                  if (quiz) handleEditQuiz(quiz);
-                                }}
-                              >
-                                Edit Quiz
-                              </Button>
+                      </Card>
+                      
+                      {/* Lesson form */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>{editingLessonId ? 'Edit Lesson' : 'Add Lesson'}</CardTitle>
+                        </CardHeader>
+                        <form onSubmit={handleSubmitLesson(onLessonSubmit)}>
+                          <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="lesson-title">Title</Label>
+                              <Input 
+                                id="lesson-title" 
+                                placeholder="Lesson title" 
+                                {...registerLesson('title')}
+                                className={lessonErrors.title ? 'border-red-500' : ''}
+                              />
+                              {lessonErrors.title && (
+                                <p className="text-red-500 text-sm">{lessonErrors.title.message}</p>
+                              )}
                             </div>
-                          </div>
-                        ) : (
-                          <>
-                            {!isEditingQuiz ? (
-                              <div className="text-center py-8">
-                                <p className="text-gray-500 mb-4">No quiz added to this module yet</p>
-                                <Button onClick={() => setIsEditingQuiz(true)}>
-                                  Add Quiz
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="lesson-description">Description (optional)</Label>
+                              <Textarea 
+                                id="lesson-description" 
+                                placeholder="Lesson description" 
+                                rows={3}
+                                {...registerLesson('description')}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="video_url">Video URL (YouTube)</Label>
+                              <Input 
+                                id="video_url" 
+                                placeholder="YouTube video URL" 
+                                {...registerLesson('video_url')}
+                              />
+                              
+                              {videoUrl && isYoutubeUrl(videoUrl) && (
+                                <div className="mt-4">
+                                  <Label className="mb-2 block">Video Preview</Label>
+                                  <div className="relative pt-[56.25%] w-full">
+                                    <iframe 
+                                      className="absolute top-0 left-0 w-full h-full rounded-md"
+                                      src={getVideoEmbedUrl(videoUrl) || ''}
+                                      title="Video preview"
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    ></iframe>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {videoUrl && !isYoutubeUrl(videoUrl) && videoUrl.length > 0 && (
+                                <p className="text-red-500 text-sm mt-1">
+                                  Please enter a valid YouTube URL
+                                </p>
+                              )}
+                            </div>
+                          </CardContent>
+                          <CardFooter className="flex justify-between">
+                            {editingLessonId ? (
+                              <>
+                                <Button type="button" variant="outline" onClick={handleCancelEditLesson}>
+                                  Cancel
                                 </Button>
-                              </div>
+                                <Button type="submit" disabled={loading}>
+                                  {loading ? 'Saving...' : 'Update Lesson'}
+                                </Button>
+                              </>
                             ) : (
-                              <form onSubmit={handleSubmitQuiz(onQuizSubmit)} className="space-y-6">
-                                <div className="space-y-2">
-                                  <Label htmlFor="quiz-title">Quiz Title</Label>
-                                  <Input 
-                                    id="quiz-title" 
-                                    placeholder="Quiz title" 
-                                    {...registerQuiz('title')}
-                                    className={quizErrors.title ? 'border-red-500' : ''}
-                                  />
-                                  {quizErrors.title && (
-                                    <p className="text-red-500 text-sm">{quizErrors.title.message}</p>
+                              <Button type="submit" className="w-full" disabled={loading}>
+                                {loading ? 'Adding...' : 'Add Lesson'}
+                              </Button>
+                            )}
+                          </CardFooter>
+                        </form>
+                      </Card>
+                      
+                      {/* Quiz section */}
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <CardTitle>Module Quiz</CardTitle>
+                          {modules.find(m => m.id === selectedModuleId)?.quiz && (
+                            <Badge variant="secondary">
+                              Quiz Added
+                            </Badge>
+                          )}
+                        </CardHeader>
+                        <CardContent>
+                          {modules.find(m => m.id === selectedModuleId)?.quiz ? (
+                            <div className="p-4 border rounded-md">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h4 className="font-medium">
+                                    {modules.find(m => m.id === selectedModuleId)?.quiz?.title}
+                                  </h4>
+                                  <p className="text-sm text-gray-500">
+                                    Passing score: {modules.find(m => m.id === selectedModuleId)?.quiz?.passing_score}%
+                                  </p>
+                                  {modules.find(m => m.id === selectedModuleId)?.quiz?.questions?.length && (
+                                    <p className="text-sm text-gray-500">
+                                      {modules.find(m => m.id === selectedModuleId)?.quiz?.questions?.length} questions
+                                    </p>
                                   )}
                                 </div>
-                                
-                                <div className="space-y-2">
-                                  <Label htmlFor="quiz-description">Description (optional)</Label>
-                                  <Textarea 
-                                    id="quiz-description" 
-                                    placeholder="Quiz description" 
-                                    rows={2}
-                                    {...registerQuiz('description')}
-                                  />
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    const quiz = modules.find(m => m.id === selectedModuleId)?.quiz;
+                                    if (quiz) handleEditQuiz(quiz);
+                                  }}
+                                >
+                                  Edit Quiz
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              {!isEditingQuiz ? (
+                                <div className="text-center py-8">
+                                  <p className="text-gray-500 mb-4">No quiz added to this module yet</p>
+                                  <Button onClick={() => setIsEditingQuiz(true)}>
+                                    Add Quiz
+                                  </Button>
                                 </div>
-                                
-                                <div className="space-y-2">
-                                  <Label htmlFor="passing_score">Passing Score (%)</Label>
-                                  <Input 
-                                    id="passing_score" 
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    placeholder="70"
-                                    {...registerQuiz('passing_score', { valueAsNumber: true })}
-                                  />
-                                </div>
-                                
-                                <Separator />
-                                
-                                <div>
-                                  <h3 className="text-lg font-medium mb-4">Questions</h3>
+                              ) : (
+                                <form onSubmit={handleSubmitQuiz(onQuizSubmit)} className="space-y-6">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="quiz-title">Quiz Title</Label>
+                                    <Input 
+                                      id="quiz-title" 
+                                      placeholder="Quiz title" 
+                                      {...registerQuiz('title')}
+                                      className={quizErrors.title ? 'border-red-500' : ''}
+                                    />
+                                    {quizErrors.title && (
+                                      <p className="text-red-500 text-sm">{quizErrors.title.message}</p>
+                                    )}
+                                  </div>
                                   
-                                  {questionFields.map((field, questionIndex) => (
-                                    <div key={field.id} className="border rounded-md p-4 mb-6">
-                                      <div className="flex justify-between items-center mb-4">
-                                        <h4 className="font-medium">Question {questionIndex + 1}</h4>
-                                        {questionIndex > 0 && (
-                                          <Button 
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => removeQuestion(questionIndex)}
-                                          >
-                                            <Trash2 className="h-4 w-4 text-red-500" />
-                                          </Button>
-                                        )}
-                                      </div>
-                                      
-                                      <div className="space-y-4">
-                                        <div>
-                                          <Label htmlFor={`question-${questionIndex}`}>Question Text</Label>
-                                          <Input 
-                                            id={`question-${questionIndex}`}
-                                            placeholder="Enter question"
-                                            {...registerQuiz(`questions.${questionIndex}.question`)}
-                                          />
-                                          {quizErrors.questions?.[questionIndex]?.question && (
-                                            <p className="text-red-500 text-sm">
-                                              {quizErrors.questions[questionIndex]?.question?.message}
-                                            </p>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="quiz-description">Description (optional)</Label>
+                                    <Textarea 
+                                      id="quiz-description" 
+                                      placeholder="Quiz description" 
+                                      rows={2}
+                                      {...registerQuiz('description')}
+                                    />
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    <Label htmlFor="passing_score">Passing Score (%)</Label>
+                                    <Input 
+                                      id="passing_score" 
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      placeholder="70"
+                                      {...registerQuiz('passing_score', { valueAsNumber: true })}
+                                    />
+                                  </div>
+                                  
+                                  <Separator />
+                                  
+                                  <div>
+                                    <h3 className="text-lg font-medium mb-4">Questions</h3>
+                                    
+                                    {questionFields.map((field, questionIndex) => (
+                                      <div key={field.id} className="border rounded-md p-4 mb-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                          <h4 className="font-medium">Question {questionIndex + 1}</h4>
+                                          {questionIndex > 0 && (
+                                            <Button 
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => removeQuestion(questionIndex)}
+                                            >
+                                              <Trash2 className="h-4 w-4 text-red-500" />
+                                            </Button>
                                           )}
                                         </div>
                                         
-                                        <div className="space-y-2">
-                                          <Label>Answer Options</Label>
-                                          
-                                          <div className="space-y-3">
-                                            {/* Use Controller to map through answer fields */}
-                                            <Controller
-                                              control={quizControl}
-                                              name={`questions.${questionIndex}.answers`}
-                                              render={({ field }) => (
-                                                <>
-                                                  {field.value?.map((answer, answerIndex) => (
-                                                    <div 
-                                                      key={answerIndex}
-                                                      className="flex items-center gap-2"
-                                                    >
-                                                      <Controller
-                                                        control={quizControl}
-                                                        name={`questions.${questionIndex}.answers.${answerIndex}.is_correct`}
-                                                        render={({ field: isCorrectField }) => (
-                                                          <Switch
-                                                            checked={isCorrectField.value}
-                                                            onCheckedChange={isCorrectField.onChange}
-                                                          />
-                                                        )}
-                                                      />
-                                                      
-                                                      <Input
-                                                        placeholder="Answer text"
-                                                        {...registerQuiz(`questions.${questionIndex}.answers.${answerIndex}.answer`)}
-                                                        className="flex-1"
-                                                      />
-                                                      
-                                                      {answerIndex > 1 && (
-                                                        <Button
-                                                          type="button"
-                                                          variant="ghost"
-                                                          size="icon"
-                                                          onClick={() => {
-                                                            const newAnswers = [...field.value];
-                                                            newAnswers.splice(answerIndex, 1);
-                                                            field.onChange(newAnswers);
-                                                          }}
-                                                        >
-                                                          <X className="h-4 w-4" />
-                                                        </Button>
-                                                      )}
-                                                    </div>
-                                                  ))}
-                                                </>
-                                              )}
+                                        <div className="space-y-4">
+                                          <div>
+                                            <Label htmlFor={`question-${questionIndex}`}>Question Text</Label>
+                                            <Input 
+                                              id={`question-${questionIndex}`}
+                                              placeholder="Enter question"
+                                              {...registerQuiz(`questions.${questionIndex}.question`)}
                                             />
+                                            {quizErrors.questions?.[questionIndex]?.question && (
+                                              <p className="text-red-500 text-sm">
+                                                {quizErrors.questions[questionIndex]?.question?.message}
+                                              </p>
+                                            )}
                                           </div>
                                           
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleAddAnswer(questionIndex)}
-                                            className="mt-2"
-                                          >
-                                            <Plus className="h-4 w-4 mr-2" /> Add Answer
-                                          </Button>
+                                          <div className="space-y-2">
+                                            <Label>Answer Options</Label>
+                                            
+                                            <div className="space-y-3">
+                                              {/* Use Controller to map through answer fields */}
+                                              <Controller
+                                                control={quizControl}
+                                                name={`questions.${questionIndex}.answers`}
+                                                render={({ field }) => (
+                                                  <>
+                                                    {field.value?.map((answer, answerIndex) => (
+                                                      <div 
+                                                        key={answerIndex}
+                                                        className="flex items-center gap-2"
+                                                      >
+                                                        <Controller
+                                                          control={quizControl}
+                                                          name={`questions.${questionIndex}.answers.${answerIndex}.is_correct`}
+                                                          render={({ field: isCorrectField }) => (
+                                                            <Switch
+                                                              checked={isCorrectField.value}
+                                                              onCheckedChange={isCorrectField.onChange}
+                                                            />
+                                                          )}
+                                                        />
+                                                        
+                                                        <Input
+                                                          placeholder="Answer text"
+                                                          {...registerQuiz(`questions.${questionIndex}.answers.${answerIndex}.answer`)}
+                                                          className="flex-1"
+                                                        />
+                                                        
+                                                        {answerIndex > 1 && (
+                                                          <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => {
+                                                              const newAnswers = [...field.value];
+                                                              newAnswers.splice(answerIndex, 1);
+                                                              field.onChange(newAnswers);
+                                                            }}
+                                                          >
+                                                            <X className="h-4 w-4" />
+                                                          </Button>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </>
+                                                )}
+                                              />
+                                            </div>
+                                            
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => handleAddAnswer(questionIndex)}
+                                              className="mt-2"
+                                            >
+                                              <Plus className="h-4 w-4 mr-2" /> Add Answer
+                                            </Button>
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    ))}
+                                    
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleAddQuestion}
+                                      className="w-full mt-4"
+                                    >
+                                      <Plus className="h-4 w-4 mr-2" /> Add Question
+                                    </Button>
+                                  </div>
                                   
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleAddQuestion}
-                                    className="w-full mt-4"
-                                  >
-                                    <Plus className="h-4 w-4 mr-2" /> Add Question
-                                  </Button>
-                                </div>
-                                
-                                <div className="flex justify-between">
-                                  <Button 
-                                    type="button" 
-                                    variant="outline"
-                                    onClick={handleCancelEditQuiz}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button type="submit">
-                                    {editingQuizId ? 'Update Quiz' : 'Create Quiz'}
-                                  </Button>
-                                </div>
-                              </form>
-                            )}
-                          </>
-                        )}
+                                  <div className="flex justify-between">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline"
+                                      onClick={handleCancelEditQuiz}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button type="submit">
+                                      {editingQuizId ? 'Update Quiz' : 'Create Quiz'}
+                                    </Button>
+                                  </div>
+                                </form>
+                              )}
+                            </>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </>
+                  ) : (
+                    <Card>
+                      <CardContent className="py-10 text-center">
+                        <p className="text-gray-500">Select a module to view or add content</p>
                       </CardContent>
                     </Card>
-                  </>
-                ) : (
-                  <Card>
-                    <CardContent className="py-10 text-center">
-                      <p className="text-gray-500">Select a module to view or add content</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-        )}
-        
-        {isEditing && (
-          <TabsContent value="preview">
-            <Card>
-              <CardHeader>
-                <CardTitle>Course Preview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {thumbnailPreview && (
-                    <div className="w-full max-w-2xl mx-auto">
-                      <img 
-                        src={thumbnailPreview} 
-                        alt={getValuesCourse('title')} 
-                        className="rounded-lg shadow-sm object-cover w-full h-64"
-                      />
-                    </div>
                   )}
-                  
-                  <div>
-                    <h2 className="text-2xl font-bold">{getValuesCourse('title')}</h2>
-                    <p className="text-gray-500 mt-1">{getValuesCourse('summary')}</p>
-                    
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      <Badge variant="secondary">{getValuesCourse('difficulty_level')}</Badge>
-                      <Badge variant="outline">{getValuesCourse('category')}</Badge>
-                      <Badge variant="outline">{getValuesCourse('duration_minutes')} minutes</Badge>
-                      {getValuesCourse('certificate_enabled') && (
-                        <Badge variant="secondary">Certificate</Badge>
-                      )}
-                      {getValuesCourse('is_free') ? (
-                        <Badge className="bg-green-500">Free</Badge>
-                      ) : (
-                        <Badge>${getValuesCourse('price')}</Badge>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">About This Course</h3>
-                    <p className="whitespace-pre-wrap">{getValuesCourse('description')}</p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-xl font-bold mb-4">Course Content</h3>
-                    {modules.length === 0 ? (
-                      <p className="text-gray-500">No course content yet</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {modules.map((module, index) => (
-                          <div key={module.id} className="border rounded-md p-4">
-                            <h4 className="font-medium">Module {index + 1}: {module.title}</h4>
-                            {module.description && (
-                              <p className="text-gray-500 text-sm mt-1">{module.description}</p>
-                            )}
-                            
-                            {module.lessons && module.lessons.length > 0 && (
-                              <div className="ml-4 mt-2">
-                                <p className="text-sm font-medium mb-1">Lessons:</p>
-                                <ul className="list-disc list-inside text-sm text-gray-600">
-                                  {module.lessons.map((lesson) => (
-                                    <li key={lesson.id}>{lesson.title}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            
-                            {module.quiz && (
-                              <div className="ml-4 mt-2">
-                                <p className="text-sm font-medium">
-                                  <Badge variant="outline" className="ml-1">Quiz: {module.quiz.title}</Badge>
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                </div>
+              </div>
+            </TabsContent>
+          )}
+          
+          {isEditing && (
+            <TabsContent value="preview">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Course Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {thumbnailPreview && (
+                      <div className="w-full max-w-2xl mx-auto">
+                        <img 
+                          src={thumbnailPreview} 
+                          alt={getValuesCourse('title')} 
+                          className="rounded-lg shadow-sm object-cover w-full h-64"
+                        />
                       </div>
                     )}
+                    
+                    <div>
+                      <h2 className="text-2xl font-bold">{getValuesCourse('title')}</h2>
+                      <p className="text-gray-500 mt-1">{getValuesCourse('summary')}</p>
+                      
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <Badge variant="secondary">{getValuesCourse('difficulty_level')}</Badge>
+                        <Badge variant="outline">{getValuesCourse('category')}</Badge>
+                        <Badge variant="outline">{getValuesCourse('duration_minutes')} minutes</Badge>
+                        {getValuesCourse('certificate_enabled') && (
+                          <Badge variant="secondary">Certificate</Badge>
+                        )}
+                        {getValuesCourse('is_free') ? (
+                          <Badge className="bg-green-500">Free</Badge>
+                        ) : (
+                          <Badge>${getValuesCourse('price')}</Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-xl font-bold mb-2">About This Course</h3>
+                      <p className="whitespace-pre-wrap">{getValuesCourse('description')}</p>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-xl font-bold mb-4">Course Content</h3>
+                      {modules.length === 0 ? (
+                        <p className="text-gray-500">No course content yet</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {modules.map((module, index) => (
+                            <div key={module.id} className="border rounded-md p-4">
+                              <h4 className="font-medium">Module {index + 1}: {module.title}</h4>
+                              {module.description && (
+                                <p className="text-gray-500 text-sm mt-1">{module.description}</p>
+                              )}
+                              
+                              {module.lessons && module.lessons.length > 0 && (
+                                <div className="ml-4 mt-2">
+                                  <p className="text-sm font-medium mb-1">Lessons:</p>
+                                  <ul className="list-disc list-inside text-sm text-gray-600">
+                                    {module.lessons.map((lesson) => (
+                                      <li key={lesson.id}>{lesson.title}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              {module.quiz && (
+                                <div className="ml-4 mt-2">
+                                  <p className="text-sm font-medium">
+                                    <Badge variant="outline" className="ml-1">Quiz: {module.quiz.title}</Badge>
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-      </Tabs>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
     </div>
   );
 };
