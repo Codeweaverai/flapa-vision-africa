@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,8 @@ import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
 import LessonFormDialog from '@/components/admin/LessonFormDialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
+type DifficultyLevel = "beginner" | "intermediate" | "advanced";
+
 const CourseForm = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -22,7 +25,7 @@ const CourseForm = () => {
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [description, setDescription] = useState('');
-  const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("beginner");
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>("beginner");
   const [category, setCategory] = useState('');
   const [durationHours, setDurationHours] = useState('1');
   const [durationMinutes, setDurationMinutes] = useState('0');
@@ -53,7 +56,7 @@ const CourseForm = () => {
           setTitle(course.title);
           setSummary(course.summary);
           setDescription(course.description);
-          setDifficulty(course.difficulty_level as "beginner" | "intermediate" | "advanced");
+          setDifficulty(course.difficulty_level as DifficultyLevel);
           setCategory(course.category);
           setDurationHours(Math.floor(course.duration_minutes / 60).toString());
           setDurationMinutes((course.duration_minutes % 60).toString());
@@ -106,9 +109,8 @@ const CourseForm = () => {
         tags: tags.length > 0 ? tags.split(',').map(tag => tag.trim()) : []
       };
 
-      // Use the courseData directly (it's already complete with required fields)
       if (editingCourse) {
-        // When updating, we don't need to include all fields
+        // Type assertion to address the error
         const updatedCourse = await updateCourse(editingCourse.id, courseData);
         if (updatedCourse) {
           toast({
@@ -123,8 +125,9 @@ const CourseForm = () => {
           });
         }
       } else {
-        // When creating, we're already passing a complete object
-        const newCourse = await createCourse(courseData as Omit<Course, 'id' | 'created_at' | 'updated_at'>);
+        // Type assertion to address the error
+        const fullCourseData = courseData as Omit<Course, 'id' | 'created_at' | 'updated_at'>;
+        const newCourse = await createCourse(fullCourseData);
         if (newCourse) {
           toast({
             title: "Course Created",

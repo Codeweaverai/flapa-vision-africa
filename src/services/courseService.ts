@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabaseClient";
 
 // Course Type Interfaces
@@ -22,7 +23,10 @@ export interface Course {
 
 export interface CourseWithModules extends Course {
   modules: (CourseModule & {
-    lessons: Lesson[];
+    lessons: (Lesson & {
+      quizzes?: Quiz[];
+    })[];
+    quiz?: Quiz; // Added quiz property for module level quizzes
   })[];
 }
 
@@ -35,6 +39,7 @@ export interface CourseModule {
   created_at?: string;
   updated_at?: string;
   lessons?: Lesson[];
+  quiz?: Quiz; // Added quiz property for module level quizzes
 }
 
 export interface Lesson {
@@ -262,9 +267,18 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
         };
       }));
       
+      // Check if the module has a quiz
+      const { data: moduleQuizzes, error: moduleQuizzesError } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('module_id', module.id);
+      
+      if (moduleQuizzesError) throw moduleQuizzesError;
+      
       return {
         ...module,
-        lessons: lessonsWithQuizzes || []
+        lessons: lessonsWithQuizzes || [],
+        quiz: moduleQuizzes && moduleQuizzes.length > 0 ? moduleQuizzes[0] : undefined
       };
     }));
     
