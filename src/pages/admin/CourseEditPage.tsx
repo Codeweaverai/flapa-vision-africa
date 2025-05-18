@@ -59,7 +59,7 @@ const courseSchema = z.object({
   category: z.string().min(1, "Category is required"),
   thumbnail_url: z.string().optional(),
   price: z.number().min(0, "Price cannot be negative"),
-  tags: z.array(z.string()).default([]),
+  tags: z.string().optional(), // Changed to string for form handling
   is_free: z.boolean().default(false),
   is_published: z.boolean().default(false),
   video_playlist_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
@@ -92,7 +92,7 @@ const CourseEditPage = () => {
       video_playlist_url: "",
       difficulty_level: "Beginner",
       duration_minutes: 60,
-      tags: "",
+      tags: "", // Initialize as empty string
       provides_certificate: false,
       is_published: false,
     },
@@ -120,7 +120,7 @@ const CourseEditPage = () => {
             video_playlist_url: courseData.video_playlist_url || "",
             difficulty_level: courseData.difficulty_level || "Beginner",
             duration_minutes: courseData.duration_minutes || 60,
-            tags: courseData.tags?.join(", ") || "",
+            tags: courseData.tags?.join(", ") || "", // Join array to string
             provides_certificate: courseData.provides_certificate || false,
             is_published: courseData.is_published || false,
           });

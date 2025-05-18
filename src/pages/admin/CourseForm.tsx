@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -72,7 +71,7 @@ export default function CourseForm() {
       price: 0,
       is_free: true,
       video_playlist_url: "",
-      difficulty_level: "Beginner",  // Changed to "Beginner" to match type
+      difficulty_level: "Beginner",
       duration_minutes: 60,
       tags: "",
       certificate_enabled: false,
@@ -162,14 +161,14 @@ export default function CourseForm() {
           <Breadcrumb className="mb-6">
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink as={Link} to="/admin/dashboard">
-                  Dashboard
+                <BreadcrumbLink asChild>
+                  <Link to="/admin/dashboard">Dashboard</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink as={Link} to="/admin/courses">
-                  Courses
+                <BreadcrumbLink asChild>
+                  <Link to="/admin/courses">Courses</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
