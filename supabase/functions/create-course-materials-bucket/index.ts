@@ -1,68 +1,103 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'https://deno.land/std@0.131.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Content-Type': 'application/json',
-}
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 })
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
-    // Create Supabase client with service role key to bypass RLS
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
+    // Create a Supabase client with the Admin key
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
 
     // Check if bucket already exists
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets()
-    
+    const { data: existingBuckets, error: listError } = await supabaseAdmin.storage.listBuckets();
     if (listError) {
-      throw new Error(`Error listing buckets: ${listError.message}`)
+      throw new Error(`Error listing buckets: ${listError.message}`);
     }
 
-    const bucketExists = buckets?.some(bucket => bucket.name === 'course-materials')
-    
-    if (!bucketExists) {
-      // Create the bucket
-      const { error: createError } = await supabase.storage.createBucket('course-materials', {
+    const bucketExists = existingBuckets.some(bucket => bucket.name === 'course-materials');
+
+    if (bucketExists) {
+      // Bucket already exists, just make sure it has public access
+      await supabaseAdmin.storage.updateBucket('course-materials', {
         public: true,
-        fileSizeLimit: 10485760, // 10MB file size limit
-      })
-      
-      if (createError) {
-        throw new Error(`Error creating bucket: ${createError.message}`)
-      }
-      
-      // Add public policy to the bucket - this is important for RLS
-      await supabase.storage.from('course-materials').createSignedUrl('dummy.txt', 60)
-      
-      return new Response(
-        JSON.stringify({ success: true, message: 'Created course-materials bucket' }),
-        { headers: corsHeaders, status: 200 }
-      )
-    } else {
+        allowedMimeTypes: [
+          'image/jpg',
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+          'image/svg+xml',
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/zip',
+          'text/plain',
+          'text/csv',
+        ],
+        fileSizeLimit: 10485760, // 10MB
+      });
+
       return new Response(
         JSON.stringify({ success: true, message: 'course-materials bucket already exists' }),
-        { headers: corsHeaders, status: 200 }
-      )
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    // Create the bucket
+    const { data, error } = await supabaseAdmin.storage.createBucket('course-materials', {
+      public: true, // Make the bucket publicly accessible
+      allowedMimeTypes: [
+        'image/jpg',
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'image/svg+xml',
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/zip',
+        'text/plain',
+        'text/csv',
+      ],
+      fileSizeLimit: 10485760, // 10MB
+    });
+
+    if (error) {
+      throw new Error(`Error creating bucket: ${error.message}`);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Course materials bucket created successfully' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+    
   } catch (error) {
-    console.error('Error in create-course-materials-bucket function:', error)
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { headers: corsHeaders, status: 500 }
-    )
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
-})
+});

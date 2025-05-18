@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLocation } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,6 +78,10 @@ const CourseForm = () => {
   const navigate = useNavigate();
   const { courseId } = useParams();
   const isEditMode = !!courseId;
+  const location = useLocation();
+  
+  // Check if we need to navigate to content tab directly
+  const initialTab = location.hash === '#content' ? 'content' : 'details';
 
   // Course form state
   const courseForm = useForm<CourseFormValues>({
@@ -98,7 +101,7 @@ const CourseForm = () => {
   // Module state
   const [modules, setModules] = useState<(CourseModule & { expanded?: boolean; lessons?: Lesson[]; quiz?: Quiz | null })[]>([]);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
-  const [currentTab, setCurrentTab] = useState<'details' | 'content'>('details');
+  const [currentTab, setCurrentTab] = useState<'details' | 'content'>(initialTab as 'details' | 'content');
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -193,6 +196,11 @@ const CourseForm = () => {
                 setActiveModuleId(formattedModules[0].id);
               }
             }
+            
+            // If location hash is #content, switch to content tab
+            if (location.hash === '#content') {
+              setCurrentTab('content');
+            }
           }
         } catch (error) {
           toast({
@@ -206,7 +214,7 @@ const CourseForm = () => {
 
       loadCourse();
     }
-  }, [courseId]);
+  }, [courseId, location.hash]);
 
   // Handle thumbnail change
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -311,6 +319,13 @@ const CourseForm = () => {
         toast({
           title: 'Success',
           description: 'Module added successfully',
+        });
+      } else {
+        // Show error toast if module creation failed
+        toast({
+          title: 'Error',
+          description: 'Failed to create module. Please try again.',
+          variant: 'destructive',
         });
       }
     } catch (error) {
@@ -443,6 +458,11 @@ const CourseForm = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  // Fix the issue with the lessonForm and video_url
+  const handleLessonSubmit = (data: LessonFormValues) => {
+    handleAddLesson(data);
   };
 
   // Handle lesson update
@@ -1225,7 +1245,7 @@ const CourseForm = () => {
                             <CardTitle>Add Lesson</CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <form onSubmit={lessonForm.handleSubmit(handleAddLesson)} className="space-y-4">
+                            <form onSubmit={lessonForm.handleSubmit(handleLessonSubmit)} className="space-y-4">
                               <div>
                                 <Label htmlFor="lesson-title">Title</Label>
                                 <Input 

@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { Course, fetchAllCourses, deleteCourse, updateCourse } from '@/services/courseService';
 
@@ -162,6 +162,13 @@ const AdminCourses = () => {
                       </>
                     )}
                   </Button>
+
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/admin/courses/edit/${course.id}#content`}>
+                      <BookOpen className="h-4 w-4 mr-1" />
+                      Course Content
+                    </Link>
+                  </Button>
                   
                   <Button variant="outline" size="sm" asChild>
                     <Link to={`/learning/course/${course.id}`} target="_blank">
@@ -193,6 +200,9 @@ const AdminCourses = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Course</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the course and all related content.
+            </DialogDescription>
           </DialogHeader>
           <p className="py-4">
             Are you sure you want to delete <strong>{courseToDelete?.title}</strong>? 

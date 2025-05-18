@@ -249,7 +249,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
 // Admin functions for course management
 export async function createCourse(courseData: Partial<Course>): Promise<Course | null> {
   try {
-    // First, ensure course-materials bucket exists
+    // Ensure course materials bucket exists
     await createCourseMaterialsBucket();
     
     // Ensure required fields have default values and include all required fields
@@ -270,7 +270,7 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course 
     
     const { data, error } = await supabase
       .from('courses')
-      .insert(dataToInsert)
+      .insert([dataToInsert])
       .select()
       .single();
     
@@ -1228,23 +1228,29 @@ export async function fetchAllCourses(): Promise<Course[]> {
 }
 
 // Function to create a storage bucket for course materials if it doesn't exist
-export async function createCourseMaterialsBucket(): Promise<boolean> {
+export const createCourseMaterialsBucket = async (): Promise<boolean> => {
   try {
-    // Using Supabase edge function to create bucket (bypasses RLS)
-    const { data, error } = await supabase.functions.invoke('create-course-materials-bucket');
-    
-    if (error) {
-      console.error('Error creating course-materials bucket:', error);
-      return false;
-    }
-    
-    console.log('Course materials bucket response:', data);
-    return data?.success || false;
+    console.log('Creating course materials bucket...');
+    const response = await fetch(
+      `https://rxqoczksnddbxcdwobnw.supabase.co/functions/v1/create-course-materials-bucket`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token)}`,
+        },
+      }
+    );
+
+    const jsonResponse = await response.json();
+    console.log('Course materials bucket response:', jsonResponse);
+
+    return jsonResponse.success;
   } catch (error) {
     console.error('Error creating course-materials bucket:', error);
     return false;
   }
-}
+};
 
 // Call this function when the app initializes to ensure the bucket exists
 createCourseMaterialsBucket().catch(err => {
