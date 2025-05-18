@@ -52,7 +52,7 @@ import { toast } from '@/hooks/use-toast';
 // Import the course service functions
 import { Course, fetchCourseById, updateCourse } from '@/services/courseService';
 
-// Define schema for course form
+// Define schema for course form with proper difficulty level enum
 const courseSchema = z.object({
   title: z.string().min(1, "Course title is required"),
   summary: z.string().min(1, "Short description is required"),
@@ -62,7 +62,7 @@ const courseSchema = z.object({
   price: z.number().min(0, "Price cannot be negative"),
   is_free: z.boolean().default(false),
   video_playlist_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  difficulty_level: z.string().min(1, "Difficulty level is required"),
+  difficulty_level: z.enum(["Beginner", "Intermediate", "Advanced"]),
   duration_minutes: z.number().min(1, "Duration must be at least 1 minute"),
   tags: z.string().optional(),
   provides_certificate: z.boolean().default(false),
@@ -221,7 +221,7 @@ const CourseEditPage = () => {
   }
   
   return (
-    <AdminLayout title={`Edit Course: ${course.title}`}>
+    <AdminLayout title={`Edit Course: ${course?.title || ""}`}>
       <div className="min-h-screen bg-light-purple">
         <div className="container mx-auto py-8">
           <Breadcrumb className="mb-6">
@@ -243,7 +243,7 @@ const CourseEditPage = () => {
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>Edit Course: {course.title}</BreadcrumbPage>
+                <BreadcrumbPage>Edit Course: {course?.title || ""}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -600,7 +600,7 @@ const CourseEditPage = () => {
             <TabsContent value="modules" className="mt-4">
               <CourseModuleEditor 
                 courseId={courseId || ""} 
-                existingModules={course.modules}
+                existingModules={course?.modules || []}
                 onSaveComplete={() => {
                   toast({
                     title: "Modules Saved",
