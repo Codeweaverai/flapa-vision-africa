@@ -65,3 +65,4 @@ multi_schema = false
 
 [functions]
 [functions.generate-certificate]
+

@@ -847,70 +847,41 @@ export async function generateCertificate(enrollmentId: string): Promise<Certifi
       return existingCert as Certificate;
     }
     
-    // Get enrollment details with user and course information
-    const { data: enrollment, error: enrollmentError } = await supabase
-      .from('course_enrollments')
-      .select(`
-        id,
-        user_id,
-        course_id,
-        courses:course_id (title),
-        profiles:user_id (full_name)
-      `)
-      .eq('id', enrollmentId)
-      .single();
+    // Call the serverless function to generate certificate
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
+      throw new Error('User not authenticated');
+    }
+
+    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-certificate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${user.user.aud === 'authenticated' ? (await supabase.auth.getSession()).data.session?.access_token : ''}`,
+      },
+      body: JSON.stringify({ enrollmentId }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response from certificate function:', errorText);
+      throw new Error(`Failed to generate certificate: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
     
-    if (enrollmentError || !enrollment) {
-      console.error('Error fetching enrollment details:', enrollmentError);
-      throw enrollmentError || new Error('Enrollment not found');
+    if (result.success && result.certificate) {
+      return result.certificate as Certificate;
     }
     
-    // Generate unique verification code
-    const verificationCode = generateVerificationCode();
-    
-    // Create certificate record
-    const { data: certificate, error: createError } = await supabase
-      .from('certificates')
-      .insert({
-        enrollment_id: enrollmentId,
-        verification_code: verificationCode,
-        issue_date: new Date().toISOString()
-      })
-      .select()
-      .single();
-    
-    if (createError) {
-      console.error('Error creating certificate:', createError);
-      throw createError;
-    }
-    
-    // Generate PDF certificate
-    const pdfUrl = await createCertificatePDF(
-      enrollment.profiles.full_name,
-      enrollment.courses.title,
-      verificationCode,
-      new Date().toLocaleDateString()
-    );
-    
-    // Update certificate with PDF URL if available
-    if (pdfUrl) {
-      const { data: updatedCert, error: updateError } = await supabase
-        .from('certificates')
-        .update({ pdf_url: pdfUrl })
-        .eq('id', certificate.id)
-        .select()
-        .single();
-      
-      if (updateError) {
-        console.error('Error updating certificate with PDF URL:', updateError);
-      } else {
-        return updatedCert as Certificate;
-      }
-    }
-    
-    return certificate as Certificate;
+    throw new Error('Certificate generation failed');
   } catch (error) {
     console.error('Error in generateCertificate:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to generate certificate. Please try again.',
+      variant: 'destructive',
+    });
     return null;
   }
 }
@@ -923,9 +894,9 @@ export async function verifyCertificate(code: string): Promise<{ valid: boolean;
       .select(`
         id,
         issue_date,
-        course_enrollments:enrollment_id (
-          courses:course_id (title),
-          profiles:user_id (full_name)
+        course_enrollments!inner(
+          courses!inner(title),
+          profiles!inner(full_name)
         )
       `)
       .eq('verification_code', code)

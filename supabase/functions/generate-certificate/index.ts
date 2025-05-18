@@ -133,7 +133,7 @@ serve(async (req) => {
         enrollment_id: enrollmentId,
         verification_code: verificationCode,
         issue_date: new Date().toISOString(),
-        pdf_url: `https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`
+        pdf_url: `${supabaseUrl}/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`
       })
       .select()
       .single();
