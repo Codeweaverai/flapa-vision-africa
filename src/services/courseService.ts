@@ -1,6 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export type Course = {
   id: string;
@@ -29,6 +31,7 @@ export type CourseModule = {
   created_at: string | null;
   updated_at: string | null;
   lessons?: Lesson[]; // Adding lessons as an optional property for UI convenience
+  quiz?: Quiz; // Add quiz to module
 };
 
 export type Lesson = {
@@ -43,9 +46,59 @@ export type Lesson = {
   updated_at: string | null;
 };
 
+export type Quiz = {
+  id: string;
+  module_id: string | null;
+  lesson_id: string | null;
+  title: string;
+  description: string | null;
+  passing_score: number;
+  questions?: QuizQuestion[];
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type QuizQuestion = {
+  id: string;
+  quiz_id: string;
+  question: string;
+  order_index: number;
+  answers?: QuizAnswer[];
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type QuizAnswer = {
+  id: string;
+  question_id: string;
+  answer: string;
+  is_correct: boolean;
+  order_index: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type LessonProgress = {
+  id: string;
+  enrollment_id: string;
+  lesson_id: string;
+  is_completed: boolean;
+  last_position_seconds: number;
+  completion_date: string | null;
+};
+
+export type Certificate = {
+  id: string;
+  enrollment_id: string;
+  verification_code: string;
+  pdf_url: string | null;
+  issue_date: string | null;
+};
+
 export type CourseWithModules = Course & {
   modules: (CourseModule & {
     lessons: Lesson[];
+    quiz: Quiz | null;
   })[];
 };
 
@@ -75,7 +128,7 @@ export async function fetchPublishedCourses(): Promise<Course[]> {
   }
 }
 
-// Function to fetch a course by ID with its modules and lessons
+// Function to fetch a course by ID with its modules, lessons, and quizzes
 export async function fetchCourseWithModulesAndLessons(courseId: string): Promise<CourseWithModules | null> {
   try {
     // First, get the course details
@@ -106,9 +159,10 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
       throw modulesError;
     }
     
-    // For each module, get its lessons
-    const modulesWithLessons = await Promise.all(
+    // For each module, get its lessons and quiz
+    const modulesWithLessonsAndQuizzes = await Promise.all(
       (modules || []).map(async (module) => {
+        // Fetch lessons for this module
         const { data: lessons, error: lessonsError } = await supabase
           .from('lessons')
           .select('*')
@@ -117,17 +171,70 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
         
         if (lessonsError) {
           console.error(`Error fetching lessons for module ${module.id}:`, lessonsError);
-          return { ...module, lessons: [] };
+          return { ...module, lessons: [], quiz: null };
+        }
+
+        // Fetch quiz for this module
+        const { data: quiz, error: quizError } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('module_id', module.id)
+          .maybeSingle();
+
+        if (quizError) {
+          console.error(`Error fetching quiz for module ${module.id}:`, quizError);
+          return { ...module, lessons: lessons || [], quiz: null };
+        }
+
+        // If quiz exists, fetch its questions and answers
+        let quizWithQuestionsAndAnswers = quiz;
+        if (quiz) {
+          const { data: questions, error: questionsError } = await supabase
+            .from('quiz_questions')
+            .select('*')
+            .eq('quiz_id', quiz.id)
+            .order('order_index', { ascending: true });
+
+          if (questionsError) {
+            console.error(`Error fetching questions for quiz ${quiz.id}:`, questionsError);
+          } else if (questions && questions.length > 0) {
+            // For each question, get its answers
+            const questionsWithAnswers = await Promise.all(
+              questions.map(async (question) => {
+                const { data: answers, error: answersError } = await supabase
+                  .from('quiz_answers')
+                  .select('*')
+                  .eq('question_id', question.id)
+                  .order('order_index', { ascending: true });
+
+                if (answersError) {
+                  console.error(`Error fetching answers for question ${question.id}:`, answersError);
+                  return { ...question, answers: [] };
+                }
+
+                return { ...question, answers: answers || [] };
+              })
+            );
+
+            quizWithQuestionsAndAnswers = {
+              ...quiz,
+              questions: questionsWithAnswers,
+            };
+          }
         }
         
-        return { ...module, lessons: lessons || [] };
+        return { 
+          ...module, 
+          lessons: lessons || [],
+          quiz: quizWithQuestionsAndAnswers || null
+        };
       })
     );
     
     // Type assertion to ensure correct return type
     return {
       ...(course as Course),
-      modules: modulesWithLessons as CourseWithModules['modules'],
+      modules: modulesWithLessonsAndQuizzes as CourseWithModules['modules'],
     };
   } catch (error) {
     console.error('Error in fetchCourseWithModulesAndLessons:', error);
@@ -280,6 +387,66 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
   }
 }
 
+export async function updateModule(moduleId: string, moduleData: Partial<CourseModule>): Promise<CourseModule | null> {
+  try {
+    const { data, error } = await supabase
+      .from('course_modules')
+      .update(moduleData)
+      .eq('id', moduleId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating module:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update module. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    toast({
+      title: 'Success',
+      description: 'Module updated successfully',
+    });
+    
+    return data as CourseModule;
+  } catch (error) {
+    console.error('Error in updateModule:', error);
+    return null;
+  }
+}
+
+export async function deleteModule(moduleId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('course_modules')
+      .delete()
+      .eq('id', moduleId);
+    
+    if (error) {
+      console.error('Error deleting module:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete module. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    toast({
+      title: 'Success',
+      description: 'Module deleted successfully',
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error in deleteModule:', error);
+    return false;
+  }
+}
+
 export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson | null> {
   try {
     // Ensure all required fields are included
@@ -311,6 +478,572 @@ export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson 
     return data as Lesson;
   } catch (error) {
     console.error('Error in createLesson:', error);
+    return null;
+  }
+}
+
+export async function updateLesson(lessonId: string, lessonData: Partial<Lesson>): Promise<Lesson | null> {
+  try {
+    const { data, error } = await supabase
+      .from('lessons')
+      .update(lessonData)
+      .eq('id', lessonId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating lesson:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update lesson. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    toast({
+      title: 'Success',
+      description: 'Lesson updated successfully',
+    });
+    
+    return data as Lesson;
+  } catch (error) {
+    console.error('Error in updateLesson:', error);
+    return null;
+  }
+}
+
+export async function deleteLesson(lessonId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('lessons')
+      .delete()
+      .eq('id', lessonId);
+    
+    if (error) {
+      console.error('Error deleting lesson:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete lesson. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    toast({
+      title: 'Success',
+      description: 'Lesson deleted successfully',
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error in deleteLesson:', error);
+    return false;
+  }
+}
+
+// Quiz management functions
+export async function createQuiz(quizData: Partial<Quiz>): Promise<Quiz | null> {
+  try {
+    const dataToInsert = {
+      module_id: quizData.module_id || null,
+      lesson_id: quizData.lesson_id || null,
+      title: quizData.title || '',
+      description: quizData.description || null,
+      passing_score: quizData.passing_score || 70
+    };
+    
+    const { data, error } = await supabase
+      .from('quizzes')
+      .insert(dataToInsert)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating quiz:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create quiz. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    return data as Quiz;
+  } catch (error) {
+    console.error('Error in createQuiz:', error);
+    return null;
+  }
+}
+
+export async function createQuizQuestion(questionData: Partial<QuizQuestion>): Promise<QuizQuestion | null> {
+  try {
+    const dataToInsert = {
+      quiz_id: questionData.quiz_id || '',
+      question: questionData.question || '',
+      order_index: questionData.order_index || 0
+    };
+    
+    const { data, error } = await supabase
+      .from('quiz_questions')
+      .insert(dataToInsert)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating quiz question:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create quiz question. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    return data as QuizQuestion;
+  } catch (error) {
+    console.error('Error in createQuizQuestion:', error);
+    return null;
+  }
+}
+
+export async function createQuizAnswer(answerData: Partial<QuizAnswer>): Promise<QuizAnswer | null> {
+  try {
+    const dataToInsert = {
+      question_id: answerData.question_id || '',
+      answer: answerData.answer || '',
+      is_correct: answerData.is_correct || false,
+      order_index: answerData.order_index || 0
+    };
+    
+    const { data, error } = await supabase
+      .from('quiz_answers')
+      .insert(dataToInsert)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating quiz answer:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create quiz answer. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    return data as QuizAnswer;
+  } catch (error) {
+    console.error('Error in createQuizAnswer:', error);
+    return null;
+  }
+}
+
+export async function updateQuiz(quizId: string, quizData: Partial<Quiz>): Promise<Quiz | null> {
+  try {
+    const { data, error } = await supabase
+      .from('quizzes')
+      .update(quizData)
+      .eq('id', quizId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating quiz:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update quiz. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    toast({
+      title: 'Success',
+      description: 'Quiz updated successfully',
+    });
+    
+    return data as Quiz;
+  } catch (error) {
+    console.error('Error in updateQuiz:', error);
+    return null;
+  }
+}
+
+export async function deleteQuiz(quizId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('quizzes')
+      .delete()
+      .eq('id', quizId);
+    
+    if (error) {
+      console.error('Error deleting quiz:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete quiz. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+    
+    toast({
+      title: 'Success',
+      description: 'Quiz deleted successfully',
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error in deleteQuiz:', error);
+    return false;
+  }
+}
+
+// Function to track lesson progress
+export async function saveLessonProgress(enrollmentId: string, lessonId: string, position: number, completed: boolean = false): Promise<LessonProgress | null> {
+  try {
+    // Check if a progress record exists
+    const { data: existingProgress, error: fetchError } = await supabase
+      .from('lesson_progress')
+      .select('*')
+      .eq('enrollment_id', enrollmentId)
+      .eq('lesson_id', lessonId)
+      .maybeSingle();
+    
+    if (fetchError) {
+      console.error('Error fetching lesson progress:', fetchError);
+      throw fetchError;
+    }
+
+    let completionDate = null;
+    if (completed) {
+      completionDate = new Date().toISOString();
+    }
+    
+    if (existingProgress) {
+      // Update existing progress
+      const { data: updatedProgress, error: updateError } = await supabase
+        .from('lesson_progress')
+        .update({
+          last_position_seconds: position,
+          is_completed: completed || existingProgress.is_completed,
+          completion_date: completed ? completionDate : existingProgress.completion_date
+        })
+        .eq('id', existingProgress.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating lesson progress:', updateError);
+        throw updateError;
+      }
+      
+      return updatedProgress as LessonProgress;
+    } else {
+      // Create new progress entry
+      const { data: newProgress, error: insertError } = await supabase
+        .from('lesson_progress')
+        .insert({
+          enrollment_id: enrollmentId,
+          lesson_id: lessonId,
+          last_position_seconds: position,
+          is_completed: completed,
+          completion_date: completed ? completionDate : null
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Error creating lesson progress:', insertError);
+        throw insertError;
+      }
+      
+      return newProgress as LessonProgress;
+    }
+  } catch (error) {
+    console.error('Error in saveLessonProgress:', error);
+    return null;
+  }
+}
+
+// Function to check course completion and issue certificate
+export async function checkCourseCompletion(courseId: string, enrollmentId: string): Promise<boolean> {
+  try {
+    // Get all lessons for the course
+    const { data: modules, error: modulesError } = await supabase
+      .from('course_modules')
+      .select('id')
+      .eq('course_id', courseId);
+    
+    if (modulesError) {
+      console.error('Error fetching modules:', modulesError);
+      throw modulesError;
+    }
+    
+    if (!modules || modules.length === 0) {
+      return false;
+    }
+    
+    const moduleIds = modules.map(m => m.id);
+    
+    const { data: lessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('id')
+      .in('module_id', moduleIds);
+    
+    if (lessonsError) {
+      console.error('Error fetching lessons:', lessonsError);
+      throw lessonsError;
+    }
+    
+    if (!lessons || lessons.length === 0) {
+      return false;
+    }
+    
+    const lessonIds = lessons.map(l => l.id);
+    
+    // Get completed lessons for this enrollment
+    const { data: completedLessons, error: completedError } = await supabase
+      .from('lesson_progress')
+      .select('id')
+      .eq('enrollment_id', enrollmentId)
+      .eq('is_completed', true)
+      .in('lesson_id', lessonIds);
+    
+    if (completedError) {
+      console.error('Error fetching completed lessons:', completedError);
+      throw completedError;
+    }
+    
+    // Check if all lessons are completed
+    const allLessonsCompleted = completedLessons && completedLessons.length === lessons.length;
+    
+    // Check if all quizzes are passed (if there are any)
+    // This would require additional logic to check quiz attempts and scores
+    
+    return allLessonsCompleted;
+  } catch (error) {
+    console.error('Error in checkCourseCompletion:', error);
+    return false;
+  }
+}
+
+// Function to generate and issue certificate
+export async function generateCertificate(enrollmentId: string): Promise<Certificate | null> {
+  try {
+    // Check if certificate already exists
+    const { data: existingCert, error: certError } = await supabase
+      .from('certificates')
+      .select('*')
+      .eq('enrollment_id', enrollmentId)
+      .maybeSingle();
+    
+    if (certError) {
+      console.error('Error checking existing certificate:', certError);
+      throw certError;
+    }
+    
+    if (existingCert) {
+      return existingCert as Certificate;
+    }
+    
+    // Get enrollment details with user and course information
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('course_enrollments')
+      .select(`
+        id,
+        user_id,
+        course_id,
+        courses:course_id (title),
+        profiles:user_id (full_name)
+      `)
+      .eq('id', enrollmentId)
+      .single();
+    
+    if (enrollmentError || !enrollment) {
+      console.error('Error fetching enrollment details:', enrollmentError);
+      throw enrollmentError || new Error('Enrollment not found');
+    }
+    
+    // Generate unique verification code
+    const verificationCode = generateVerificationCode();
+    
+    // Create certificate record
+    const { data: certificate, error: createError } = await supabase
+      .from('certificates')
+      .insert({
+        enrollment_id: enrollmentId,
+        verification_code: verificationCode,
+        issue_date: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (createError) {
+      console.error('Error creating certificate:', createError);
+      throw createError;
+    }
+    
+    // Generate PDF certificate
+    const pdfUrl = await createCertificatePDF(
+      enrollment.profiles.full_name,
+      enrollment.courses.title,
+      verificationCode,
+      new Date().toLocaleDateString()
+    );
+    
+    // Update certificate with PDF URL if available
+    if (pdfUrl) {
+      const { data: updatedCert, error: updateError } = await supabase
+        .from('certificates')
+        .update({ pdf_url: pdfUrl })
+        .eq('id', certificate.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating certificate with PDF URL:', updateError);
+      } else {
+        return updatedCert as Certificate;
+      }
+    }
+    
+    return certificate as Certificate;
+  } catch (error) {
+    console.error('Error in generateCertificate:', error);
+    return null;
+  }
+}
+
+// Function to verify a certificate by verification code
+export async function verifyCertificate(code: string): Promise<{ valid: boolean; details?: any }> {
+  try {
+    const { data, error } = await supabase
+      .from('certificates')
+      .select(`
+        id,
+        issue_date,
+        course_enrollments:enrollment_id (
+          courses:course_id (title),
+          profiles:user_id (full_name)
+        )
+      `)
+      .eq('verification_code', code)
+      .single();
+    
+    if (error || !data) {
+      console.error('Error verifying certificate:', error);
+      return { valid: false };
+    }
+    
+    return {
+      valid: true,
+      details: {
+        studentName: data.course_enrollments?.profiles?.full_name || 'Student',
+        courseName: data.course_enrollments?.courses?.title || 'Course',
+        issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString() : 'Unknown',
+        verificationCode: code
+      }
+    };
+  } catch (error) {
+    console.error('Error in verifyCertificate:', error);
+    return { valid: false };
+  }
+}
+
+// Helper function to generate a random verification code
+function generateVerificationCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// Helper function to create a certificate PDF
+async function createCertificatePDF(
+  studentName: string,
+  courseName: string,
+  verificationCode: string,
+  issueDate: string
+): Promise<string | null> {
+  try {
+    // Create PDF using jsPDF
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    // Add decorative border
+    doc.setDrawColor(0, 0, 128);
+    doc.setLineWidth(1);
+    doc.rect(10, 10, doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 20);
+    doc.setLineWidth(0.5);
+    doc.rect(15, 15, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 30);
+    
+    // Add title
+    doc.setFontSize(30);
+    doc.setTextColor(0, 0, 128);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Certificate of Completion', doc.internal.pageSize.width / 2, 40, { align: 'center' });
+    
+    // Add content
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.text('This certifies that', doc.internal.pageSize.width / 2, 70, { align: 'center' });
+    
+    // Add student name
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text(studentName, doc.internal.pageSize.width / 2, 85, { align: 'center' });
+    
+    // Add course info
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'normal');
+    doc.text('has successfully completed the course', doc.internal.pageSize.width / 2, 105, { align: 'center' });
+    
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(courseName, doc.internal.pageSize.width / 2, 120, { align: 'center' });
+    
+    // Add date and verification code
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Issue Date: ${issueDate}`, doc.internal.pageSize.width / 2, 145, { align: 'center' });
+    doc.text(`Verification Code: ${verificationCode}`, doc.internal.pageSize.width / 2, 155, { align: 'center' });
+    
+    // Add verification URL
+    const verifyUrl = `${window.location.origin}/verify-certificate/${verificationCode}`;
+    doc.setFontSize(10);
+    doc.text(`Verify at: ${verifyUrl}`, doc.internal.pageSize.width / 2, 165, { align: 'center' });
+    
+    // Convert PDF to blob and upload to Supabase Storage
+    const pdfBlob = doc.output('blob');
+    const fileName = `certificates/${verificationCode}.pdf`;
+    
+    const { data, error } = await supabase.storage
+      .from('course-materials')
+      .upload(fileName, pdfBlob, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error('Error uploading certificate PDF:', error);
+      return null;
+    }
+    
+    const { data: urlData } = supabase.storage
+      .from('course-materials')
+      .getPublicUrl(fileName);
+    
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error creating certificate PDF:', error);
     return null;
   }
 }
@@ -511,3 +1244,36 @@ export async function fetchAllCourses(): Promise<Course[]> {
     return [];
   }
 }
+
+// Function to create a storage bucket for course materials if it doesn't exist
+export async function createCourseMaterialsBucket(): Promise<boolean> {
+  try {
+    const { data: buckets, error: getBucketsError } = await supabase.storage.listBuckets();
+    
+    if (getBucketsError) {
+      console.error('Error listing buckets:', getBucketsError);
+      return false;
+    }
+    
+    const bucketExists = buckets?.some(bucket => bucket.name === 'course-materials');
+    
+    if (!bucketExists) {
+      const { error: createBucketError } = await supabase.storage.createBucket('course-materials', {
+        public: true
+      });
+      
+      if (createBucketError) {
+        console.error('Error creating course-materials bucket:', createBucketError);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in createCourseMaterialsBucket:', error);
+    return false;
+  }
+}
+
+// Call this function when the app initializes to ensure the bucket exists
+createCourseMaterialsBucket();
