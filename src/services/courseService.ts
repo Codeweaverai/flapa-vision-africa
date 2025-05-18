@@ -253,6 +253,10 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course 
     // Ensure course materials bucket exists
     await createCourseMaterialsBucket();
     
+    // Log authentication state before creating course
+    const { data: authData } = await supabase.auth.getSession();
+    console.log('Auth session before creating course:', authData);
+    
     // Ensure required fields have default values and include all required fields
     const dataToInsert = {
       title: courseData.title || '',
@@ -281,7 +285,7 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course 
       console.error('Error creating course:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create course. Please try again.',
+        description: `Failed to create course: ${error.message}`,
         variant: 'destructive',
       });
       throw error;
@@ -302,6 +306,9 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course 
 
 export async function updateCourse(courseId: string, courseData: Partial<Course>): Promise<Course | null> {
   try {
+    console.log('Updating course with ID:', courseId);
+    console.log('Course update data:', courseData);
+    
     const { data, error } = await supabase
       .from('courses')
       .update(courseData)
@@ -313,7 +320,7 @@ export async function updateCourse(courseId: string, courseData: Partial<Course>
       console.error('Error updating course:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update course. Please try again.',
+        description: `Failed to update course: ${error.message}`,
         variant: 'destructive',
       });
       throw error;
@@ -324,6 +331,7 @@ export async function updateCourse(courseId: string, courseData: Partial<Course>
       description: 'Course updated successfully',
     });
     
+    console.log('Course updated successfully:', data);
     return data as Course;
   } catch (error) {
     console.error('Error in updateCourse:', error);
@@ -368,7 +376,7 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
       console.error('Error: course_id is required for module creation');
       toast({
         title: 'Error',
-        description: 'Please save the course details first',
+        description: 'Course ID is missing. Please save the course details first.',
         variant: 'destructive',
       });
       return null;
@@ -379,13 +387,23 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
       .from('courses')
       .select('id')
       .eq('id', moduleData.course_id)
-      .single();
+      .maybeSingle();
     
-    if (courseError || !course) {
-      console.error('Error: Course not found for module creation:', courseError);
+    if (courseError) {
+      console.error('Error checking if course exists:', courseError);
       toast({
         title: 'Error',
-        description: 'Please save the course details first',
+        description: `Course lookup failed: ${courseError.message}`,
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
+    if (!course) {
+      console.error('Error: Course not found for module creation');
+      toast({
+        title: 'Error',
+        description: 'Course not found. Please save the course details first.',
         variant: 'destructive',
       });
       return null;
@@ -393,11 +411,13 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
     
     // Ensure all required fields are included
     const dataToInsert = {
-      course_id: moduleData.course_id || '',
+      course_id: moduleData.course_id,
       title: moduleData.title || '',
       description: moduleData.description ?? null,
       order_index: moduleData.order_index || 0
     };
+    
+    console.log('Inserting module with data:', dataToInsert);
     
     const { data, error } = await supabase
       .from('course_modules')
@@ -409,7 +429,7 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
       console.error('Error creating module:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create module. Please try again.',
+        description: `Failed to create module: ${error.message}`,
         variant: 'destructive',
       });
       throw error;
@@ -1362,7 +1382,7 @@ export const createCourseMaterialsBucket = async (): Promise<boolean> => {
     const accessToken = sessionData?.session?.access_token;
     
     if (!accessToken) {
-      console.error('No access token available');
+      console.error('No access token available for bucket creation');
       return false;
     }
     

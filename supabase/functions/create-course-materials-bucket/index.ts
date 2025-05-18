@@ -1,13 +1,14 @@
 
-import { serve } from 'https://deno.land/std@0.131.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Define CORS headers for browser compatibility
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -16,23 +17,24 @@ serve(async (req) => {
     });
   }
 
-  try {
-    // Extract the authorization token
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
-    }
-
-    // Create a Supabase client with the user's token
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+  // Get authorization header
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return new Response(
+      JSON.stringify({ error: 'Authorization header is required' }),
       {
-        global: {
-          headers: {
-            Authorization: authHeader,
-          },
-        },
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  try {
+    // Create Supabase admin client
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
         auth: {
           autoRefreshToken: false,
           persistSession: false,
@@ -40,93 +42,139 @@ serve(async (req) => {
       }
     );
 
-    // Create a Supabase admin client with the service role key
-    const supabaseAdmin = createClient(
+    // Create Supabase client with user token
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
     );
 
-    console.log('Checking for existing buckets...');
-    
-    // Check if bucket already exists
-    const { data: existingBuckets, error: listError } = await supabaseAdmin.storage.listBuckets();
-    if (listError) {
-      throw new Error(`Error listing buckets: ${listError.message}`);
-    }
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
 
-    const bucketExists = existingBuckets.some(bucket => bucket.name === 'course-materials');
-
-    if (bucketExists) {
-      console.log('Bucket already exists, updating public access settings');
-      // Bucket already exists, just make sure it has public access
-      await supabaseAdmin.storage.updateBucket('course-materials', {
-        public: true,
-        allowedMimeTypes: [
-          'image/jpg',
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'image/webp',
-          'image/svg+xml',
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/zip',
-          'text/plain',
-          'text/csv',
-        ],
-        fileSizeLimit: 10485760, // 10MB
-      });
-
+    if (authError || !user) {
+      console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ success: true, message: 'course-materials bucket already exists' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Unauthorized', details: authError }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
       );
     }
 
-    console.log('Creating new bucket...');
+    console.log('Checking for existing buckets...');
     
-    // Create the bucket
-    const { data, error } = await supabaseAdmin.storage.createBucket('course-materials', {
-      public: true, // Make the bucket publicly accessible
-      allowedMimeTypes: [
-        'image/jpg',
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'image/svg+xml',
-        'application/pdf',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/zip',
-        'text/plain',
-        'text/csv',
-      ],
-      fileSizeLimit: 10485760, // 10MB
-    });
-
-    if (error) {
-      throw new Error(`Error creating bucket: ${error.message}`);
+    // Check if the bucket exists
+    const { data: buckets, error: bucketsError } = await supabaseAdmin
+      .storage
+      .listBuckets();
+      
+    if (bucketsError) {
+      console.error('Error listing buckets:', bucketsError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to list buckets', details: bucketsError }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    console.log('Bucket created successfully');
-    
+    let bucketExists = false;
+    if (buckets) {
+      bucketExists = buckets.some(b => b.name === 'course-materials');
+    }
+
+    if (bucketExists) {
+      console.log('Bucket already exists, updating public access settings');
+      
+      // Update bucket settings
+      const { error: updateError } = await supabaseAdmin
+        .storage
+        .updateBucket('course-materials', {
+          public: true,
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
+          allowedMimeTypes: [
+            'image/png', 
+            'image/jpeg', 
+            'image/gif', 
+            'application/pdf',
+            'video/mp4',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          ]
+        });
+        
+      if (updateError) {
+        console.error('Error updating bucket:', updateError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to update bucket', details: updateError }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    } else {
+      console.log('Creating new course-materials bucket');
+      
+      // Create the bucket
+      const { error: createError } = await supabaseAdmin
+        .storage
+        .createBucket('course-materials', {
+          public: true,
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
+          allowedMimeTypes: [
+            'image/png', 
+            'image/jpeg', 
+            'image/gif', 
+            'application/pdf',
+            'video/mp4',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          ]
+        });
+        
+      if (createError) {
+        console.error('Error creating bucket:', createError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create bucket', details: createError }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // Return success response
     return new Response(
-      JSON.stringify({ success: true, message: 'Course materials bucket created successfully' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, message: 'Course materials bucket is ready' }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
-    
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }

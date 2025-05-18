@@ -84,7 +84,7 @@ const AdminCourses = () => {
               <Card className="border-dashed">
                 <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
                   <div className="mb-4 rounded-full bg-primary/10 p-6">
-                    <PlusCircle className="h-8 w-8 text-primary" />
+                    <BookOpen className="h-8 w-8 text-primary" />
                   </div>
                   <CardTitle className="mb-2">No courses yet</CardTitle>
                   <CardDescription className="mb-6">
@@ -164,7 +164,7 @@ const AdminCourses = () => {
                   </Button>
 
                   <Button variant="outline" size="sm" asChild>
-                    <Link to={`/admin/courses/edit/${course.id}#content`}>
+                    <Link to={`/admin/courses/content/${course.id}`}>
                       <BookOpen className="h-4 w-4 mr-1" />
                       Course Content
                     </Link>
