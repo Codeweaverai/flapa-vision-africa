@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -55,11 +56,6 @@ export type Quiz = {
   questions?: QuizQuestion[];
   created_at: string | null;
   updated_at: string | null;
-};
-
-// Explicitly adding the questions property to the QuizWithQuestions type
-export type QuizWithQuestionsAndAnswers = Quiz & {
-  questions: QuizQuestion[];
 };
 
 export type QuizQuestion = {
@@ -191,7 +187,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
         }
 
         // If quiz exists, fetch its questions and answers
-        let quizWithQuestionsAndAnswers: QuizWithQuestionsAndAnswers | null = null;
+        let quizWithQuestionsAndAnswers = quiz;
         if (quiz) {
           const { data: questions, error: questionsError } = await supabase
             .from('quiz_questions')
@@ -220,7 +216,6 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
               })
             );
 
-            // Create a new object with the quiz and its questions
             quizWithQuestionsAndAnswers = {
               ...quiz,
               questions: questionsWithAnswers,
@@ -231,7 +226,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
         return { 
           ...module, 
           lessons: lessons || [],
-          quiz: quizWithQuestionsAndAnswers 
+          quiz: quizWithQuestionsAndAnswers || null
         };
       })
     );
@@ -852,41 +847,70 @@ export async function generateCertificate(enrollmentId: string): Promise<Certifi
       return existingCert as Certificate;
     }
     
-    // Call the serverless function to generate certificate
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) {
-      throw new Error('User not authenticated');
-    }
-
-    const response = await fetch(`https://rxqoczksnddbxcdwobnw.supabase.co/functions/v1/generate-certificate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.user.aud === 'authenticated' ? (await supabase.auth.getSession()).data.session?.access_token : ''}`,
-      },
-      body: JSON.stringify({ enrollmentId }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response from certificate function:', errorText);
-      throw new Error(`Failed to generate certificate: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json();
+    // Get enrollment details with user and course information
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('course_enrollments')
+      .select(`
+        id,
+        user_id,
+        course_id,
+        courses:course_id (title),
+        profiles:user_id (full_name)
+      `)
+      .eq('id', enrollmentId)
+      .single();
     
-    if (result.success && result.certificate) {
-      return result.certificate as Certificate;
+    if (enrollmentError || !enrollment) {
+      console.error('Error fetching enrollment details:', enrollmentError);
+      throw enrollmentError || new Error('Enrollment not found');
     }
     
-    throw new Error('Certificate generation failed');
+    // Generate unique verification code
+    const verificationCode = generateVerificationCode();
+    
+    // Create certificate record
+    const { data: certificate, error: createError } = await supabase
+      .from('certificates')
+      .insert({
+        enrollment_id: enrollmentId,
+        verification_code: verificationCode,
+        issue_date: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (createError) {
+      console.error('Error creating certificate:', createError);
+      throw createError;
+    }
+    
+    // Generate PDF certificate
+    const pdfUrl = await createCertificatePDF(
+      enrollment.profiles.full_name,
+      enrollment.courses.title,
+      verificationCode,
+      new Date().toLocaleDateString()
+    );
+    
+    // Update certificate with PDF URL if available
+    if (pdfUrl) {
+      const { data: updatedCert, error: updateError } = await supabase
+        .from('certificates')
+        .update({ pdf_url: pdfUrl })
+        .eq('id', certificate.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating certificate with PDF URL:', updateError);
+      } else {
+        return updatedCert as Certificate;
+      }
+    }
+    
+    return certificate as Certificate;
   } catch (error) {
     console.error('Error in generateCertificate:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to generate certificate. Please try again.',
-      variant: 'destructive',
-    });
     return null;
   }
 }
@@ -899,9 +923,9 @@ export async function verifyCertificate(code: string): Promise<{ valid: boolean;
       .select(`
         id,
         issue_date,
-        course_enrollments!inner(
-          courses!inner(title),
-          user_id
+        course_enrollments:enrollment_id (
+          courses:course_id (title),
+          profiles:user_id (full_name)
         )
       `)
       .eq('verification_code', code)
@@ -912,30 +936,15 @@ export async function verifyCertificate(code: string): Promise<{ valid: boolean;
       return { valid: false };
     }
     
-    // Get user profile for the full name
-    if (data.course_enrollments?.user_id) {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', data.course_enrollments.user_id)
-        .single();
-      
-      if (profileError || !profileData) {
-        console.error('Error fetching user profile:', profileError);
+    return {
+      valid: true,
+      details: {
+        studentName: data.course_enrollments?.profiles?.full_name || 'Student',
+        courseName: data.course_enrollments?.courses?.title || 'Course',
+        issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString() : 'Unknown',
+        verificationCode: code
       }
-      
-      return {
-        valid: true,
-        details: {
-          studentName: profileData?.full_name || 'Student',
-          courseName: data.course_enrollments?.courses?.title || 'Course',
-          issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString() : 'Unknown',
-          verificationCode: code
-        }
-      };
-    }
-    
-    return { valid: false };
+    };
   } catch (error) {
     console.error('Error in verifyCertificate:', error);
     return { valid: false };
@@ -1028,11 +1037,11 @@ async function createCertificatePDF(
       return null;
     }
     
-    const { data: publicUrlData } = supabase.storage
+    const { data: urlData } = supabase.storage
       .from('course-materials')
       .getPublicUrl(fileName);
     
-    return publicUrlData.publicUrl;
+    return urlData.publicUrl;
   } catch (error) {
     console.error('Error creating certificate PDF:', error);
     return null;
@@ -1249,10 +1258,14 @@ export async function createCourseMaterialsBucket(): Promise<boolean> {
     const bucketExists = buckets?.some(bucket => bucket.name === 'course-materials');
     
     if (!bucketExists) {
-      // We need to handle this differently since the bucket creation has RLS issues
-      // For now, we'll skip the automatic creation since it requires admin privileges
-      console.log("The 'course-materials' bucket needs to be created by an admin.");
-      return false;
+      const { error: createBucketError } = await supabase.storage.createBucket('course-materials', {
+        public: true
+      });
+      
+      if (createBucketError) {
+        console.error('Error creating course-materials bucket:', createBucketError);
+        return false;
+      }
     }
     
     return true;
@@ -1262,7 +1275,5 @@ export async function createCourseMaterialsBucket(): Promise<boolean> {
   }
 }
 
-// Try to create the bucket, but don't block if it fails due to RLS
-createCourseMaterialsBucket().catch(error => {
-  console.error('Failed to create course-materials bucket:', error);
-});
+// Call this function when the app initializes to ensure the bucket exists
+createCourseMaterialsBucket();
