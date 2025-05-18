@@ -876,8 +876,8 @@ export async function verifyCertificate(code: string): Promise<{ valid: boolean;
         id,
         issue_date,
         course_enrollments:enrollment_id (
-          courses:course_id (title),
-          profiles:user_id (full_name)
+          user_id,
+          courses:course_id (title)
         )
       `)
       .eq('verification_code', code)
@@ -888,10 +888,34 @@ export async function verifyCertificate(code: string): Promise<{ valid: boolean;
       return { valid: false };
     }
     
+    // Get the user's full name from the profiles table
+    if (data.course_enrollments?.user_id) {
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', data.course_enrollments.user_id)
+        .single();
+      
+      if (userError) {
+        console.error('Error fetching user details:', userError);
+        return { valid: false };
+      }
+      
+      return {
+        valid: true,
+        details: {
+          studentName: userData?.full_name || 'Student',
+          courseName: data.course_enrollments?.courses?.title || 'Course',
+          issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString() : 'Unknown',
+          verificationCode: code
+        }
+      };
+    }
+    
     return {
       valid: true,
       details: {
-        studentName: data.course_enrollments?.profiles?.full_name || 'Student',
+        studentName: 'Student',
         courseName: data.course_enrollments?.courses?.title || 'Course',
         issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString() : 'Unknown',
         verificationCode: code
