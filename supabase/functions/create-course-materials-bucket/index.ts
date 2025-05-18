@@ -17,13 +17,38 @@ serve(async (req) => {
   }
 
   try {
-    // Create a Supabase client with the Admin key
+    // Extract the authorization token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing Authorization header');
+    }
+
+    // Create a Supabase client with the user's token
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    // Create a Supabase admin client with the service role key
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    console.log('Checking for existing buckets...');
+    
     // Check if bucket already exists
     const { data: existingBuckets, error: listError } = await supabaseAdmin.storage.listBuckets();
     if (listError) {
@@ -33,6 +58,7 @@ serve(async (req) => {
     const bucketExists = existingBuckets.some(bucket => bucket.name === 'course-materials');
 
     if (bucketExists) {
+      console.log('Bucket already exists, updating public access settings');
       // Bucket already exists, just make sure it has public access
       await supabaseAdmin.storage.updateBucket('course-materials', {
         public: true,
@@ -60,6 +86,8 @@ serve(async (req) => {
       );
     }
 
+    console.log('Creating new bucket...');
+    
     // Create the bucket
     const { data, error } = await supabaseAdmin.storage.createBucket('course-materials', {
       public: true, // Make the bucket publicly accessible
@@ -85,6 +113,8 @@ serve(async (req) => {
       throw new Error(`Error creating bucket: ${error.message}`);
     }
 
+    console.log('Bucket created successfully');
+    
     return new Response(
       JSON.stringify({ success: true, message: 'Course materials bucket created successfully' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

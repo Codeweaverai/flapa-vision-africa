@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -268,6 +269,8 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course 
       certificate_enabled: courseData.certificate_enabled ?? false
     };
     
+    console.log('Creating course with data:', dataToInsert);
+    
     const { data, error } = await supabase
       .from('courses')
       .insert([dataToInsert])
@@ -289,6 +292,7 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course 
       description: 'Course created successfully',
     });
     
+    console.log('Course created successfully:', data);
     return data as Course;
   } catch (error) {
     console.error('Error in createCourse:', error);
@@ -358,6 +362,35 @@ export async function deleteCourse(courseId: string): Promise<boolean> {
 
 export async function createModule(moduleData: Partial<CourseModule>): Promise<CourseModule | null> {
   try {
+    console.log('Creating module with data:', moduleData);
+    
+    if (!moduleData.course_id) {
+      console.error('Error: course_id is required for module creation');
+      toast({
+        title: 'Error',
+        description: 'Please save the course details first',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
+    // Check if the course exists
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('id')
+      .eq('id', moduleData.course_id)
+      .single();
+    
+    if (courseError || !course) {
+      console.error('Error: Course not found for module creation:', courseError);
+      toast({
+        title: 'Error',
+        description: 'Please save the course details first',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
     // Ensure all required fields are included
     const dataToInsert = {
       course_id: moduleData.course_id || '',
@@ -382,6 +415,12 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
       throw error;
     }
     
+    toast({
+      title: 'Success',
+      description: 'Module created successfully',
+    });
+    
+    console.log('Module created successfully:', data);
     return data as CourseModule;
   } catch (error) {
     console.error('Error in createModule:', error);
@@ -451,6 +490,31 @@ export async function deleteModule(moduleId: string): Promise<boolean> {
 
 export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson | null> {
   try {
+    // Ensure module exists
+    if (!lessonData.module_id) {
+      toast({
+        title: 'Error',
+        description: 'Please select a module for this lesson',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
+    const { data: moduleExists, error: moduleError } = await supabase
+      .from('course_modules')
+      .select('id')
+      .eq('id', lessonData.module_id)
+      .single();
+      
+    if (moduleError || !moduleExists) {
+      toast({
+        title: 'Error',
+        description: 'Please create a module first',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
     // Ensure all required fields are included
     const dataToInsert = {
       module_id: lessonData.module_id || '',
@@ -460,6 +524,8 @@ export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson 
       order_index: lessonData.order_index || 0,
       materials_urls: lessonData.materials_urls ?? []
     };
+    
+    console.log('Creating lesson with data:', dataToInsert);
     
     const { data, error } = await supabase
       .from('lessons')
@@ -477,6 +543,12 @@ export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson 
       throw error;
     }
     
+    toast({
+      title: 'Success',
+      description: 'Lesson created successfully',
+    });
+    
+    console.log('Lesson created successfully:', data);
     return data as Lesson;
   } catch (error) {
     console.error('Error in createLesson:', error);
@@ -547,6 +619,52 @@ export async function deleteLesson(lessonId: string): Promise<boolean> {
 // Quiz management functions
 export async function createQuiz(quizData: Partial<Quiz>): Promise<Quiz | null> {
   try {
+    // Check if we have either module_id or lesson_id
+    if (!quizData.module_id && !quizData.lesson_id) {
+      toast({
+        title: 'Error',
+        description: 'Please assign the quiz to a module or lesson',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
+    // Validate module exists if module_id is provided
+    if (quizData.module_id) {
+      const { data: moduleExists, error: moduleError } = await supabase
+        .from('course_modules')
+        .select('id')
+        .eq('id', quizData.module_id)
+        .single();
+        
+      if (moduleError || !moduleExists) {
+        toast({
+          title: 'Error',
+          description: 'Please create a module first',
+          variant: 'destructive',
+        });
+        return null;
+      }
+    }
+    
+    // Validate lesson exists if lesson_id is provided
+    if (quizData.lesson_id) {
+      const { data: lessonExists, error: lessonError } = await supabase
+        .from('lessons')
+        .select('id')
+        .eq('id', quizData.lesson_id)
+        .single();
+        
+      if (lessonError || !lessonExists) {
+        toast({
+          title: 'Error',
+          description: 'Please create a lesson first',
+          variant: 'destructive',
+        });
+        return null;
+      }
+    }
+    
     const dataToInsert = {
       module_id: quizData.module_id || null,
       lesson_id: quizData.lesson_id || null,
@@ -554,6 +672,8 @@ export async function createQuiz(quizData: Partial<Quiz>): Promise<Quiz | null> 
       description: quizData.description || null,
       passing_score: quizData.passing_score || 70
     };
+    
+    console.log('Creating quiz with data:', dataToInsert);
     
     const { data, error } = await supabase
       .from('quizzes')
@@ -571,6 +691,12 @@ export async function createQuiz(quizData: Partial<Quiz>): Promise<Quiz | null> 
       throw error;
     }
     
+    toast({
+      title: 'Success',
+      description: 'Quiz created successfully',
+    });
+    
+    console.log('Quiz created successfully:', data);
     return data as Quiz;
   } catch (error) {
     console.error('Error in createQuiz:', error);
@@ -1231,13 +1357,22 @@ export async function fetchAllCourses(): Promise<Course[]> {
 export const createCourseMaterialsBucket = async (): Promise<boolean> => {
   try {
     console.log('Creating course materials bucket...');
+    // First get auth session to use in the function call
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    
+    if (!accessToken) {
+      console.error('No access token available');
+      return false;
+    }
+    
     const response = await fetch(
       `https://rxqoczksnddbxcdwobnw.supabase.co/functions/v1/create-course-materials-bucket`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token)}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
       }
     );
