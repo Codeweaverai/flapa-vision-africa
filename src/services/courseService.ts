@@ -52,9 +52,14 @@ export type Quiz = {
   title: string;
   description: string | null;
   passing_score: number;
-  questions?: QuizQuestion[]; // Make sure this is defined in the type
+  questions?: QuizQuestion[];
   created_at: string | null;
   updated_at: string | null;
+};
+
+// Explicitly adding the questions property to the QuizWithQuestions type
+export type QuizWithQuestionsAndAnswers = Quiz & {
+  questions: QuizQuestion[];
 };
 
 export type QuizQuestion = {
@@ -186,7 +191,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
         }
 
         // If quiz exists, fetch its questions and answers
-        let quizWithQuestionsAndAnswers = quiz;
+        let quizWithQuestionsAndAnswers: QuizWithQuestionsAndAnswers | null = null;
         if (quiz) {
           const { data: questions, error: questionsError } = await supabase
             .from('quiz_questions')
@@ -215,6 +220,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
               })
             );
 
+            // Create a new object with the quiz and its questions
             quizWithQuestionsAndAnswers = {
               ...quiz,
               questions: questionsWithAnswers,
@@ -225,7 +231,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
         return { 
           ...module, 
           lessons: lessons || [],
-          quiz: quizWithQuestionsAndAnswers || null
+          quiz: quizWithQuestionsAndAnswers 
         };
       })
     );
