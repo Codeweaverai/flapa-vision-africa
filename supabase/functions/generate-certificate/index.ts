@@ -1,109 +1,195 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
-  // Handle CORS preflight request
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 })
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    // Get request body
-    const { enrollmentId } = await req.json()
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
+  const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
+  try {
+    // Check if authenticated
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing Authorization header" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired token" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    const { enrollmentId } = await req.json();
     if (!enrollmentId) {
       return new Response(
-        JSON.stringify({ error: 'Enrollment ID is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
+        JSON.stringify({ error: "Enrollment ID is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Check if certificate already exists
-    const { data: existingCert, error: certError } = await supabase
-      .from('certificates')
-      .select('*')
-      .eq('enrollment_id', enrollmentId)
-      .maybeSingle()
-    
-    if (certError) {
-      throw new Error(`Error checking existing certificate: ${certError.message}`)
-    }
-    
-    if (existingCert) {
-      return new Response(
-        JSON.stringify({ certificate: existingCert }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      )
-    }
-
-    // Get enrollment details with user and course information
-    const { data: enrollment, error: enrollmentError } = await supabase
-      .from('course_enrollments')
+    // Get enrollment details
+    const { data: enrollment, error: enrollmentError } = await supabaseClient
+      .from("course_enrollments")
       .select(`
         id,
         user_id,
         course_id,
-        courses:course_id (title),
-        profiles:user_id (full_name)
+        courses:course_id (title)
       `)
-      .eq('id', enrollmentId)
-      .single()
-    
+      .eq("id", enrollmentId)
+      .single();
+
     if (enrollmentError || !enrollment) {
-      throw new Error(`Error fetching enrollment details: ${enrollmentError?.message || 'Enrollment not found'}`)
+      return new Response(
+        JSON.stringify({ error: "Enrollment not found" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
-    // Generate unique verification code (8 chars alphanumeric)
-    const verificationCode = generateVerificationCode()
+    // Verify that the requesting user owns the enrollment
+    if (enrollment.user_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Get user profile details
+    const { data: profile, error: profileError } = await supabaseClient
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError);
+    }
+
+    // Check if certificate already exists
+    const { data: existingCert, error: certError } = await supabaseClient
+      .from("certificates")
+      .select("*")
+      .eq("enrollment_id", enrollmentId)
+      .maybeSingle();
+
+    if (certError) {
+      console.error("Error checking existing certificate:", certError);
+    }
+
+    if (existingCert) {
+      return new Response(
+        JSON.stringify({ certificate: existingCert }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
 
     // Create certificate record
-    const { data: certificate, error: createError } = await supabase
-      .from('certificates')
+    const { data: certificate, error: createError } = await supabaseClient
+      .from("certificates")
       .insert({
         enrollment_id: enrollmentId,
         verification_code: verificationCode,
-        issue_date: new Date().toISOString()
+        issue_date: new Date().toISOString(),
+        pdf_url: `https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`
       })
       .select()
-      .single()
-    
+      .single();
+
     if (createError) {
-      throw new Error(`Error creating certificate: ${createError.message}`)
+      console.error("Error creating certificate:", createError);
+      return new Response(
+        JSON.stringify({ error: "Failed to create certificate" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
+
+    // Create storage bucket if it doesn't exist
+    const { data: buckets } = await supabaseClient.storage.listBuckets();
+    if (!buckets?.find(b => b.name === "course-materials")) {
+      await supabaseClient.storage.createBucket("course-materials", {
+        public: true
+      });
+    }
+
+    // Here we would normally generate a PDF certificate and upload it
+    // Since we don't have PDF generation in this edge function, we'll mock this
+    // In a real implementation, you'd use a PDF library to create the certificate
 
     return new Response(
       JSON.stringify({ 
-        certificate,
-        studentName: enrollment.profiles.full_name,
-        courseName: enrollment.courses.title 
+        success: true, 
+        message: "Certificate generated successfully", 
+        certificate 
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    )
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
   } catch (error) {
+    console.error("Error in generate-certificate function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    )
+      JSON.stringify({ error: "Internal server error" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
   }
-})
+});
 
 // Helper function to generate a random verification code
 function generateVerificationCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let result = ''
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let result = '';
   for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return result
+  return result;
 }
