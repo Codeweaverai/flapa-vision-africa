@@ -84,9 +84,10 @@ const EventsSection = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="line-clamp-3 mb-4">
+                  {/* Fixed: Removed the <p> tag that was causing nesting issues */}
+                  <div className="line-clamp-3 mb-4">
                     {event.description}
-                  </p>
+                  </div>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
                       <Tag className="h-4 w-4 mr-1" />

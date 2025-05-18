@@ -34,6 +34,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { Toaster as ToastProvider } from './components/ui/toaster';
 
 function App() {
+  // Place BrowserRouter outside of AuthProvider to fix the router context error
   return (
     <BrowserRouter>
       <AuthProvider>
