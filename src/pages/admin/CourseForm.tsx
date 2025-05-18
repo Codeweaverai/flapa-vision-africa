@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -301,6 +300,7 @@ const CourseForm = () => {
           });
           
           // Navigate to edit page and show modules tab
+          setActiveTab('modules');
           navigate(`/admin/courses/edit/${finalCourse.id}`, { replace: true });
         }
       }

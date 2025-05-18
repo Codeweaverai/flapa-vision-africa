@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock } from 'lucide-react';
@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { Course, fetchAllCourses, deleteCourse, updateCourse } from '@/services/courseService';
 
 const AdminCourses = () => {
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
@@ -55,6 +56,10 @@ const AdminCourses = () => {
         description: `${updatedCourse.title} has been ${updatedCourse.is_published ? 'published' : 'unpublished'}.`,
       });
     }
+  };
+
+  const handleEditCourse = (courseId: string) => {
+    navigate(`/admin/courses/edit/${courseId}`);
   };
 
   return (
@@ -140,11 +145,13 @@ const AdminCourses = () => {
                     </CardContent>
                     
                     <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/admin/courses/edit/${course.id}`}>
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </Link>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleEditCourse(course.id)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
                       </Button>
                       
                       <Button
