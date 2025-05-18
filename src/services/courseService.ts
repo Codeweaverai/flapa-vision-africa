@@ -218,7 +218,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
             quizWithQuestionsAndAnswers = {
               ...quiz,
               questions: questionsWithAnswers,
-            };
+            } as Quiz;
           }
         }
         
