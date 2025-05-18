@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -209,6 +210,11 @@ const CourseForm = () => {
             
             // Set modules
             setModules(courseData.modules || []);
+            
+            // If we have modules, automatically show the modules tab
+            if (courseData.modules && courseData.modules.length > 0) {
+              setActiveTab('modules');
+            }
           }
         } catch (error) {
           console.error('Error loading course:', error);
@@ -267,7 +273,9 @@ const CourseForm = () => {
             title: 'Success',
             description: 'Course updated successfully',
           });
-          navigate(`/admin/courses`);
+          
+          // Automatically switch to modules tab after updating
+          setActiveTab('modules');
         }
       } else {
         const newCourse = await createCourse({
@@ -275,24 +283,25 @@ const CourseForm = () => {
           thumbnail_url: null, // We'll update this after creation
         });
         
-        if (newCourse && thumbnailFile) {
-          // Now that we have the course ID, upload the thumbnail
-          const uploadedUrl = await uploadCourseThumbnail(thumbnailFile, newCourse.id);
-          if (uploadedUrl) {
-            await updateCourse(newCourse.id, { thumbnail_url: uploadedUrl });
+        if (newCourse) {
+          // Now that we have the course ID, upload the thumbnail if it exists
+          let finalCourse = newCourse;
+          
+          if (thumbnailFile) {
+            // Upload thumbnail now that we have the course ID
+            const uploadedUrl = await uploadCourseThumbnail(thumbnailFile, newCourse.id);
+            if (uploadedUrl) {
+              finalCourse = await updateCourse(newCourse.id, { thumbnail_url: uploadedUrl });
+            }
           }
           
           toast({
             title: 'Success',
-            description: 'Course created successfully',
+            description: 'Course created successfully. You can now add modules and lessons.',
           });
-          navigate(`/admin/courses/edit/${newCourse.id}`);
-        } else if (newCourse) {
-          toast({
-            title: 'Success',
-            description: 'Course created successfully',
-          });
-          navigate(`/admin/courses/edit/${newCourse.id}`);
+          
+          // Navigate to edit page and show modules tab
+          navigate(`/admin/courses/edit/${finalCourse.id}`, { replace: true });
         }
       }
     } catch (error) {
@@ -343,6 +352,9 @@ const CourseForm = () => {
         if (newModule) {
           // Update local state
           setModules(prev => [...prev, newModule]);
+          
+          // Select the newly created module
+          setSelectedModuleId(newModule.id);
           
           toast({
             title: 'Success',
@@ -562,6 +574,11 @@ const CourseForm = () => {
       if (success) {
         // Update local state
         setModules(prev => prev.filter(mod => mod.id !== moduleId));
+        
+        // If the deleted module was selected, clear the selection
+        if (selectedModuleId === moduleId) {
+          setSelectedModuleId(null);
+        }
         
         toast({
           title: 'Success',
