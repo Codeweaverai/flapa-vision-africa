@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -250,19 +249,28 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
 // Admin functions for course management
 export async function createCourse(courseData: Partial<Course>): Promise<Course | null> {
   try {
-    // Ensure course materials bucket exists
-    await createCourseMaterialsBucket();
-    
     // Log authentication state before creating course
     const { data: authData } = await supabase.auth.getSession();
     console.log('Auth session before creating course:', authData);
     
+    if (!authData.session) {
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to create a course',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
+    // Ensure course materials bucket exists
+    await createCourseMaterialsBucket();
+    
     // Ensure required fields have default values and include all required fields
     const dataToInsert = {
-      title: courseData.title || '',
+      title: courseData.title || 'Untitled Course',
       summary: courseData.summary || '',
       description: courseData.description || '',
-      category: courseData.category || '',
+      category: courseData.category || 'General',
       difficulty_level: courseData.difficulty_level || 'beginner',
       duration_minutes: courseData.duration_minutes || 0,
       is_published: courseData.is_published ?? false,
@@ -401,18 +409,34 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
     
     if (!course) {
       console.error('Error: Course not found for module creation');
-      toast({
-        title: 'Error',
-        description: 'Course not found. Please save the course details first.',
-        variant: 'destructive',
+      
+      // Attempt to create a default course if none exists
+      const defaultCourse = await createCourse({
+        title: 'Untitled Course',
+        summary: 'This course was automatically created',
+        description: 'This course was automatically created as a parent for a new module',
+        category: 'General',
+        difficulty_level: 'beginner',
+        duration_minutes: 0
       });
-      return null;
+      
+      if (!defaultCourse) {
+        toast({
+          title: 'Error',
+          description: 'Course not found and could not create a default course',
+          variant: 'destructive',
+        });
+        return null;
+      }
+      
+      // Use the newly created course ID
+      moduleData.course_id = defaultCourse.id;
     }
     
     // Ensure all required fields are included
     const dataToInsert = {
       course_id: moduleData.course_id,
-      title: moduleData.title || '',
+      title: moduleData.title || 'New Module',
       description: moduleData.description ?? null,
       order_index: moduleData.order_index || 0
     };
@@ -1386,6 +1410,8 @@ export const createCourseMaterialsBucket = async (): Promise<boolean> => {
       return false;
     }
     
+    console.log('Access token available, calling edge function');
+    
     const response = await fetch(
       `https://rxqoczksnddbxcdwobnw.supabase.co/functions/v1/create-course-materials-bucket`,
       {
@@ -1407,10 +1433,21 @@ export const createCourseMaterialsBucket = async (): Promise<boolean> => {
   }
 };
 
-// Call this function when the app initializes to ensure the bucket exists
-createCourseMaterialsBucket().catch(err => {
-  console.info('The course-materials bucket needs to be created by an admin.');
-});
+// Initialize the bucket creation in the background, but don't block other operations
+(async () => {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session) {
+      createCourseMaterialsBucket().catch(err => {
+        console.info('The course-materials bucket needs to be created by an admin.');
+      });
+    } else {
+      console.info('User not logged in. The course-materials bucket will be created after login.');
+    }
+  } catch (error) {
+    console.error('Error checking session for bucket creation:', error);
+  }
+})();
 
 // Function to send course-related emails
 export async function sendCourseEmail(

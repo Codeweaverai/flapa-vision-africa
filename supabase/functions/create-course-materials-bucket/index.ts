@@ -30,6 +30,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('Auth header:', authHeader);
+    
     // Create Supabase admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

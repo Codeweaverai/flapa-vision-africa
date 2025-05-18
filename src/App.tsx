@@ -32,6 +32,7 @@ import CourseDetailPage from "./pages/CourseDetailPage";
 import AdminCourses from "./pages/admin/AdminCourses";
 import CourseForm from "./pages/admin/CourseForm";
 import CoursePlayerPage from "./pages/CoursePlayerPage";
+import CourseContentPage from "./pages/admin/CourseContentPage";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
             <Route path="/admin/courses/create" element={<AdminRoute><CourseForm /></AdminRoute>} />
             <Route path="/admin/courses/edit/:id" element={<AdminRoute><CourseForm /></AdminRoute>} />
+            <Route path="/admin/courses/content/:courseId" element={<AdminRoute><CourseContentPage /></AdminRoute>} />
             <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
             
             <Route path="*" element={<NotFound />} />
