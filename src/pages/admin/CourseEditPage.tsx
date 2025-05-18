@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -60,13 +59,13 @@ const courseSchema = z.object({
   category: z.string().min(1, "Category is required"),
   thumbnail_url: z.string().optional(),
   price: z.number().min(0, "Price cannot be negative"),
+  tags: z.array(z.string()).default([]),
   is_free: z.boolean().default(false),
+  is_published: z.boolean().default(false),
   video_playlist_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   difficulty_level: z.enum(["Beginner", "Intermediate", "Advanced"]),
   duration_minutes: z.number().min(1, "Duration must be at least 1 minute"),
-  tags: z.string().optional(),
   provides_certificate: z.boolean().default(false),
-  is_published: z.boolean().default(false),
 });
 
 type CourseFormValues = z.infer<typeof courseSchema>;
@@ -413,22 +412,21 @@ const CourseEditPage = () => {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Difficulty Level</FormLabel>
-                                <FormControl>
-                                  <Select 
-                                    onValueChange={field.onChange} 
-                                    defaultValue={field.value}
-                                    value={field.value}
-                                  >
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
                                     <SelectTrigger>
-                                      <SelectValue />
+                                      <SelectValue placeholder="Select difficulty level" />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Beginner">Beginner</SelectItem>
-                                      <SelectItem value="Intermediate">Intermediate</SelectItem>
-                                      <SelectItem value="Advanced">Advanced</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </FormControl>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Beginner">Beginner</SelectItem>
+                                    <SelectItem value="Intermediate">Intermediate</SelectItem>
+                                    <SelectItem value="Advanced">Advanced</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
