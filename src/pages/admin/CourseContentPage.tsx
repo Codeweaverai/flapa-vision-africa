@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle, ArrowLeft } from 'lucide-react';
@@ -12,9 +12,15 @@ import {
   createModule, 
   updateModule, 
   deleteModule,
+  deleteLesson,
   CourseModule,
-  Course
+  Course,
+  Lesson
 } from '@/services/courseService';
+import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
+import LessonFormDialog from '@/components/admin/LessonFormDialog';
+import QuizFormDialog from '@/components/admin/QuizFormDialog';
+import ModuleAccordion from '@/components/admin/ModuleAccordion';
 
 const CourseContentPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -22,6 +28,15 @@ const CourseContentPage = () => {
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('modules');
+  
+  // Dialog states
+  const [moduleFormOpen, setModuleFormOpen] = useState(false);
+  const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
+  const [lessonFormOpen, setLessonFormOpen] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [currentModuleId, setCurrentModuleId] = useState<string | null>(null);
+  const [quizFormOpen, setQuizFormOpen] = useState(false);
+  const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId) return;
@@ -47,25 +62,180 @@ const CourseContentPage = () => {
     loadCourseContent();
   }, [courseId]);
 
-  const handleCreateModule = async () => {
-    if (!courseId || !course) return;
+  const handleCreateModule = () => {
+    setEditingModule(null);
+    setModuleFormOpen(true);
+  };
+  
+  const handleEditModule = (module: CourseModule) => {
+    setEditingModule(module);
+    setModuleFormOpen(true);
+  };
+  
+  const handleModuleSaved = (savedModule: CourseModule) => {
+    if (editingModule) {
+      // Update existing module
+      setModules(modules.map(m => m.id === savedModule.id ? { ...savedModule, lessons: m.lessons } : m));
+    } else {
+      // Add new module
+      setModules([...modules, { ...savedModule, lessons: [] }]);
+    }
+  };
+
+  const handleDeleteModule = async (moduleId: string) => {
+    const success = await deleteModule(moduleId);
     
-    const newModuleData = {
-      course_id: courseId,
-      title: `New Module ${modules.length + 1}`,
-      description: '',
-      order_index: modules.length
-    };
-    
-    const newModule = await createModule(newModuleData);
-    
-    if (newModule) {
-      setModules([...modules, newModule]);
+    if (success) {
+      setModules(modules.filter(m => m.id !== moduleId));
       toast({
-        title: "Module Created",
-        description: "New module has been created successfully",
+        title: "Module Deleted",
+        description: "Module and its lessons have been deleted",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to delete the module",
+        variant: "destructive",
       });
     }
+  };
+  
+  const handleAddLesson = (moduleId: string) => {
+    setEditingLesson(null);
+    setCurrentModuleId(moduleId);
+    setLessonFormOpen(true);
+  };
+  
+  const handleEditLesson = (lesson: Lesson) => {
+    setEditingLesson(lesson);
+    setCurrentModuleId(lesson.module_id);
+    setLessonFormOpen(true);
+  };
+  
+  const handleLessonSaved = (savedLesson: Lesson) => {
+    const updatedModules = [...modules];
+    const moduleIndex = updatedModules.findIndex(m => m.id === savedLesson.module_id);
+    
+    if (moduleIndex !== -1) {
+      if (!updatedModules[moduleIndex].lessons) {
+        updatedModules[moduleIndex].lessons = [];
+      }
+      
+      if (editingLesson) {
+        // Update existing lesson
+        updatedModules[moduleIndex].lessons = updatedModules[moduleIndex].lessons!.map(
+          l => l.id === savedLesson.id ? savedLesson : l
+        );
+      } else {
+        // Add new lesson
+        updatedModules[moduleIndex].lessons!.push(savedLesson);
+      }
+      
+      setModules(updatedModules);
+    }
+  };
+  
+  const handleDeleteLesson = async (lessonId: string) => {
+    const success = await deleteLesson(lessonId);
+    
+    if (success) {
+      const updatedModules = modules.map(module => ({
+        ...module,
+        lessons: module.lessons ? module.lessons.filter(lesson => lesson.id !== lessonId) : []
+      }));
+      
+      setModules(updatedModules);
+      
+      toast({
+        title: "Lesson Deleted",
+        description: "Lesson has been deleted successfully",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to delete the lesson",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleAddQuiz = (lessonId: string, moduleId: string) => {
+    setCurrentLessonId(lessonId);
+    setCurrentModuleId(moduleId);
+    setQuizFormOpen(true);
+  };
+  
+  const handleQuizSaved = () => {
+    // Reload the course content to get the updated quiz data
+    if (courseId) {
+      loadCourseContent();
+    }
+  };
+  
+  const loadCourseContent = async () => {
+    if (!courseId) return;
+    
+    setLoading(true);
+    const courseData = await fetchCourseWithModulesAndLessons(courseId);
+    
+    if (courseData) {
+      setCourse(courseData);
+      setModules(courseData.modules || []);
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not reload course content",
+        variant: "destructive"
+      });
+    }
+    
+    setLoading(false);
+  };
+  
+  const handleMoveModuleUp = (index: number) => {
+    if (index <= 0) return;
+    
+    const updatedModules = [...modules];
+    const moduleToMove = updatedModules[index];
+    const moduleToSwap = updatedModules[index - 1];
+    
+    // Swap order_index values
+    const tempOrderIndex = moduleToMove.order_index;
+    moduleToMove.order_index = moduleToSwap.order_index;
+    moduleToSwap.order_index = tempOrderIndex;
+    
+    // Update in database
+    updateModule(moduleToMove.id, { order_index: moduleToMove.order_index });
+    updateModule(moduleToSwap.id, { order_index: moduleToSwap.order_index });
+    
+    // Swap positions in array
+    updatedModules[index] = moduleToSwap;
+    updatedModules[index - 1] = moduleToMove;
+    
+    setModules(updatedModules);
+  };
+  
+  const handleMoveModuleDown = (index: number) => {
+    if (index >= modules.length - 1) return;
+    
+    const updatedModules = [...modules];
+    const moduleToMove = updatedModules[index];
+    const moduleToSwap = updatedModules[index + 1];
+    
+    // Swap order_index values
+    const tempOrderIndex = moduleToMove.order_index;
+    moduleToMove.order_index = moduleToSwap.order_index;
+    moduleToSwap.order_index = tempOrderIndex;
+    
+    // Update in database
+    updateModule(moduleToMove.id, { order_index: moduleToMove.order_index });
+    updateModule(moduleToSwap.id, { order_index: moduleToSwap.order_index });
+    
+    // Swap positions in array
+    updatedModules[index] = moduleToSwap;
+    updatedModules[index + 1] = moduleToMove;
+    
+    setModules(updatedModules);
   };
 
   return (
@@ -114,26 +284,17 @@ const CourseContentPage = () => {
                 </Card>
               ) : (
                 <div className="space-y-4">
-                  {modules.map((module, index) => (
-                    <Card key={module.id}>
-                      <CardHeader>
-                        <CardTitle className="flex justify-between">
-                          <span>Module {index + 1}: {module.title}</span>
-                          <div className="text-sm font-normal text-muted-foreground">
-                            {module.lessons?.length || 0} Lessons
-                          </div>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="mb-4">{module.description || 'No description'}</p>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Edit Module</Button>
-                          <Button variant="outline" size="sm">Add Lesson</Button>
-                          <Button variant="outline" size="sm">Add Quiz</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  <ModuleAccordion 
+                    modules={modules}
+                    onEditModule={handleEditModule}
+                    onDeleteModule={handleDeleteModule}
+                    onAddLesson={handleAddLesson}
+                    onEditLesson={handleEditLesson}
+                    onDeleteLesson={handleDeleteLesson}
+                    onAddQuiz={handleAddQuiz}
+                    onMoveUp={handleMoveModuleUp}
+                    onMoveDown={handleMoveModuleDown}
+                  />
                 </div>
               )}
             </TabsContent>
@@ -142,7 +303,7 @@ const CourseContentPage = () => {
               <h2 className="text-xl font-semibold mb-4">Course Quizzes</h2>
               <Card>
                 <CardContent className="p-6">
-                  <p className="text-muted-foreground">Quiz management coming soon</p>
+                  <p className="text-muted-foreground">Manage all course quizzes in one place (coming soon)</p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -151,12 +312,46 @@ const CourseContentPage = () => {
               <h2 className="text-xl font-semibold mb-4">Content Settings</h2>
               <Card>
                 <CardContent className="p-6">
-                  <p className="text-muted-foreground">Content settings coming soon</p>
+                  <p className="text-muted-foreground">Configure course completion settings, certificates, and more (coming soon)</p>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         </>
+      )}
+      
+      {/* Module Form Dialog */}
+      <ModuleFormDialog 
+        open={moduleFormOpen}
+        onOpenChange={setModuleFormOpen}
+        courseId={courseId || ''}
+        onModuleSaved={handleModuleSaved}
+        editingModule={editingModule}
+        modules={modules}
+      />
+      
+      {/* Lesson Form Dialog */}
+      {currentModuleId && (
+        <LessonFormDialog 
+          open={lessonFormOpen}
+          onOpenChange={setLessonFormOpen}
+          moduleId={currentModuleId}
+          onLessonSaved={handleLessonSaved}
+          editingLesson={editingLesson}
+          lessons={modules.find(m => m.id === currentModuleId)?.lessons || []}
+          courseId={courseId || ''}
+        />
+      )}
+      
+      {/* Quiz Form Dialog */}
+      {currentLessonId && currentModuleId && (
+        <QuizFormDialog 
+          open={quizFormOpen}
+          onOpenChange={setQuizFormOpen}
+          lessonId={currentLessonId}
+          moduleId={currentModuleId}
+          onQuizSaved={handleQuizSaved}
+        />
       )}
     </AdminLayout>
   );
