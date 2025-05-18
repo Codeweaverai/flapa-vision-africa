@@ -20,6 +20,12 @@ export interface Course {
   modules?: CourseModule[];
 }
 
+export interface CourseWithModules extends Course {
+  modules: (CourseModule & {
+    lessons: Lesson[];
+  })[];
+}
+
 export interface CourseModule {
   id: string;
   course_id: string;
@@ -42,6 +48,15 @@ export interface Lesson {
   created_at?: string;
   updated_at?: string;
   quizzes?: Quiz[];
+}
+
+export interface LessonProgress {
+  id: string;
+  enrollment_id: string;
+  lesson_id: string;
+  is_completed: boolean;
+  completion_date?: string;
+  last_position_seconds: number;
 }
 
 export interface Quiz {
@@ -117,6 +132,27 @@ export const fetchAllCourses = async (): Promise<Course[]> => {
   }
 };
 
+// Function to fetch published courses
+export const fetchPublishedCourses = async (): Promise<Course[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('is_published', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching published courses:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching published courses:', error);
+    return [];
+  }
+};
+
 // Function to fetch a single course by ID
 export const fetchCourseById = async (courseId: string): Promise<Course | null> => {
   try {
@@ -181,7 +217,7 @@ export const deleteCourse = async (courseId: string): Promise<boolean> => {
 };
 
 // Function to fetch a course with all its modules and lessons
-export const fetchCourseWithModulesAndLessons = async (courseId: string): Promise<Course | null> => {
+export const fetchCourseWithModulesAndLessons = async (courseId: string): Promise<CourseWithModules | null> => {
   try {
     // First fetch the course
     const { data: course, error: courseError } = await supabase
@@ -405,6 +441,52 @@ export const createQuiz = async (quizData: {
   }
 };
 
+// Update an existing quiz
+export const updateQuiz = async (
+  quizId: string,
+  quizData: Partial<Quiz>
+): Promise<Quiz | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('quizzes')
+      .update(quizData)
+      .eq('id', quizId)
+      .select('*')
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating quiz:', error);
+    return null;
+  }
+};
+
+// Delete a quiz
+export const deleteQuiz = async (quizId: string): Promise<boolean> => {
+  try {
+    // First delete all questions associated with this quiz
+    const { error: questionsError } = await supabase
+      .from('quiz_questions')
+      .delete()
+      .eq('quiz_id', quizId);
+    
+    if (questionsError) throw questionsError;
+    
+    // Then delete the quiz
+    const { error } = await supabase
+      .from('quizzes')
+      .delete()
+      .eq('id', quizId);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting quiz:', error);
+    return false;
+  }
+};
+
 // Create a new quiz question
 export const createQuizQuestion = async (questionData: {
   quiz_id: string;
@@ -444,6 +526,140 @@ export const createQuizAnswer = async (answerData: {
     return data;
   } catch (error) {
     console.error('Error creating quiz answer:', error);
+    return null;
+  }
+};
+
+// User enrollment related functions
+export const enrollInCourse = async (courseId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('course_enrollments')
+      .insert([{
+        course_id: courseId,
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        payment_status: 'completed'
+      }]);
+    
+    if (error) {
+      console.error('Error enrolling in course:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error enrolling in course:', error);
+    return false;
+  }
+};
+
+export const checkEnrollmentStatus = async (courseId: string): Promise<boolean> => {
+  try {
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) return false;
+    
+    const { data, error } = await supabase
+      .from('course_enrollments')
+      .select('*')
+      .eq('course_id', courseId)
+      .eq('user_id', user.id)
+      .single();
+    
+    if (error) return false;
+    
+    return !!data;
+  } catch (error) {
+    console.error('Error checking enrollment status:', error);
+    return false;
+  }
+};
+
+// Lesson progress tracking functions
+export const saveLessonProgress = async (
+  enrollmentId: string,
+  lessonId: string,
+  positionSeconds: number,
+  isCompleted: boolean = false
+): Promise<LessonProgress | null> => {
+  try {
+    // Check if progress record exists
+    const { data: existingProgress, error: fetchError } = await supabase
+      .from('lesson_progress')
+      .select('*')
+      .eq('enrollment_id', enrollmentId)
+      .eq('lesson_id', lessonId)
+      .single();
+    
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+      throw fetchError;
+    }
+    
+    if (existingProgress) {
+      // Update existing progress
+      const updateData: any = { last_position_seconds: positionSeconds };
+      if (isCompleted && !existingProgress.is_completed) {
+        updateData.is_completed = true;
+        updateData.completion_date = new Date().toISOString();
+      }
+      
+      const { data, error } = await supabase
+        .from('lesson_progress')
+        .update(updateData)
+        .eq('id', existingProgress.id)
+        .select('*')
+        .single();
+        
+      if (error) throw error;
+      return data;
+    } else {
+      // Create new progress record
+      const newProgressData = {
+        enrollment_id: enrollmentId,
+        lesson_id: lessonId,
+        last_position_seconds: positionSeconds,
+        is_completed: isCompleted,
+        completion_date: isCompleted ? new Date().toISOString() : null
+      };
+      
+      const { data, error } = await supabase
+        .from('lesson_progress')
+        .insert([newProgressData])
+        .select('*')
+        .single();
+        
+      if (error) throw error;
+      return data;
+    }
+  } catch (error) {
+    console.error('Error saving lesson progress:', error);
+    return null;
+  }
+};
+
+// Function to upload course thumbnail
+export const uploadCourseThumbnail = async (courseId: string, file: File): Promise<string | null> => {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${courseId}-thumbnail.${fileExt}`;
+    const filePath = `courses/${courseId}/${fileName}`;
+    
+    const { error } = await supabase
+      .storage
+      .from('course_materials')
+      .upload(filePath, file, {
+        upsert: true
+      });
+    
+    if (error) throw error;
+    
+    const { data } = supabase
+      .storage
+      .from('course_materials')
+      .getPublicUrl(filePath);
+    
+    return data.publicUrl;
+  } catch (error) {
+    console.error('Error uploading course thumbnail:', error);
     return null;
   }
 };
