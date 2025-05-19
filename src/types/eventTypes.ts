@@ -71,3 +71,32 @@ export interface CourseWithEnrollment {
   }[];
   [key: string]: any; // Allow for additional properties
 }
+
+// Add simplified non-recursive types for CoursePlayerPage
+export interface SimplifiedLesson {
+  id: string;
+  title: string;
+  description: string | null;
+  video_url: string | null;
+  module_id: string;
+  order_index: number;
+  content_type?: string;
+  content?: any;
+  is_completed?: boolean;
+}
+
+export interface SimplifiedModule {
+  id: string;
+  title: string;
+  description: string | null;
+  course_id: string;
+  order_index: number;
+  lessons: SimplifiedLesson[];
+}
+
+export interface SimplifiedCourse {
+  id: string;
+  title: string;
+  description: string;
+  modules: SimplifiedModule[];
+}

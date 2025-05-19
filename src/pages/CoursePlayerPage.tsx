@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-// Types with non-recursive definitions to avoid excessive type instantiation
+// Use explicit non-recursive interface definitions
 interface SimplifiedLesson {
   id: string;
   title: string;
@@ -25,7 +25,7 @@ interface SimplifiedLesson {
   video_url: string | null;
   module_id: string;
   order_index: number;
-  content_type?: 'video' | 'quiz';
+  content_type?: string;
   content?: any;
   is_completed?: boolean;
 }
@@ -249,28 +249,47 @@ const CoursePlayerPage = () => {
         console.error('Error fetching lesson progress:', err);
       }
       
-      // Format the data with minimal typing to avoid deep instantiation
-      const modules = modulesData.map((module: any) => {
+      // Format the data with explicit type casting to avoid deep instantiation
+      const modules = modulesData.map((moduleItem) => {
         const moduleLessons = lessonsData
-          .filter((lesson: any) => lesson.module_id === module.id)
-          .sort((a: any, b: any) => a.order_index - b.order_index)
-          .map((lesson: any) => ({
-            ...lesson,
-            content_type: lesson.video_url ? 'video' : 'quiz',
-            content: lesson.video_url ? null : { questions: [], pass_percentage: 70 },
-            is_completed: progressData.some(p => p.lesson_id === lesson.id && p.is_completed) || false
-          }));
+          .filter((lessonItem) => lessonItem.module_id === moduleItem.id)
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((lessonItem) => {
+            // Simplify by creating a new object instead of spreading
+            const lesson: SimplifiedLesson = {
+              id: lessonItem.id,
+              title: lessonItem.title,
+              description: lessonItem.description,
+              video_url: lessonItem.video_url,
+              module_id: lessonItem.module_id,
+              order_index: lessonItem.order_index,
+              content_type: lessonItem.video_url ? 'video' : 'quiz',
+              content: lessonItem.video_url ? null : { questions: [], pass_percentage: 70 },
+              is_completed: progressData.some(p => p.lesson_id === lessonItem.id && p.is_completed) || false
+            };
+            return lesson;
+          });
         
-        return {
-          ...module,
+        // Create a new module object instead of spreading
+        const moduleObj: SimplifiedModule = {
+          id: moduleItem.id,
+          title: moduleItem.title,
+          description: moduleItem.description,
+          course_id: moduleItem.course_id,
+          order_index: moduleItem.order_index,
           lessons: moduleLessons
         };
+        
+        return moduleObj;
       });
       
-      setCourse({
+      // Create a new course object with typed modules
+      const typedCourse: SimplifiedCourse = {
         ...courseData,
-        modules
-      });
+        modules: modules
+      };
+      
+      setCourse(typedCourse);
       
       // Find first incomplete lesson
       let foundIncomplete = false;
