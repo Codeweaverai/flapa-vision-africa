@@ -74,7 +74,7 @@ const Navbar = () => {
             <Link to="/speaking" className="text-foreground hover:text-primary transition-colors">
               Speaking & Media
             </Link>
-            <Link to="/ai-animations" className="text-foreground hover:text-primary transition-colors">
+            <Link to="/animations" className="text-foreground hover:text-primary transition-colors">
               AI Animations
             </Link>
             <Link to="/learning" className="text-foreground hover:text-primary transition-colors">
@@ -179,7 +179,7 @@ const Navbar = () => {
               Speaking & Media
             </Link>
             <Link 
-              to="/ai-animations" 
+              to="/animations" 
               className="block text-foreground hover:text-primary transition-colors py-2"
               onClick={() => setIsMenuOpen(false)}
             >

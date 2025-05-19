@@ -155,6 +155,35 @@ export type Database = {
           },
         ]
       }
+      course_favorites: {
+        Row: {
+          added_at: string
+          course_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          course_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          course_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_favorites_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_modules: {
         Row: {
           course_id: string
