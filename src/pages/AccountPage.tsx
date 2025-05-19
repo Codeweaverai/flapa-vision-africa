@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -13,7 +14,8 @@ import { toast } from 'sonner';
 import { ConsultationBooking, fetchUserBookings, cancelBooking } from '@/services/consultationService';
 import { Registration, fetchUserRegistrations, cancelRegistration } from '@/services/eventService';
 import { Course, fetchCourseById } from '@/services/courseService';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
+import { useFavorites } from '@/hooks/useFavorites';
 
 interface UserCourse {
   id: string;
@@ -34,6 +36,7 @@ const AccountPage = () => {
   const [enrolledCourses, setEnrolledCourses] = useState<UserCourse[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
     if (!loading) {
@@ -46,6 +49,18 @@ const AccountPage = () => {
       loadEnrolledCourses();
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    // Update enrolled courses when favorites change
+    if (enrolledCourses.length > 0 && favorites) {
+      setEnrolledCourses(prev => 
+        prev.map(course => ({
+          ...course,
+          is_favorite: isFavorite(course.course_id)
+        }))
+      );
+    }
+  }, [favorites]);
 
   const loadUserData = async () => {
     setLoadingData(true);
@@ -75,17 +90,7 @@ const AccountPage = () => {
         .eq('user_id', user.id);
 
       if (enrollmentsError) throw enrollmentsError;
-      
-      // Get favorite courses info
-      const { data: favorites, error: favoritesError } = await supabase
-        .from('course_favorites')
-        .select('course_id')
-        .eq('user_id', user.id);
-        
-      if (favoritesError) throw favoritesError;
-      
-      const favoriteCoursesIds = new Set((favorites || []).map(fav => fav.course_id));
-      
+            
       // For each enrollment, get the actual course data and progress
       const coursesWithDetails = await Promise.all((enrollments || []).map(async (enrollment) => {
         // Get the course data
@@ -123,9 +128,9 @@ const AccountPage = () => {
           id: enrollment.id,
           enrollment_id: enrollment.id,
           course_id: enrollment.course_id,
-          enrollment_date: enrollment.enrollment_date,
+          enrollment_date: enrollment.enrollment_date || "",
           is_completed: enrollment.is_completed || false,
-          is_favorite: favoriteCoursesIds.has(enrollment.course_id),
+          is_favorite: isFavorite(enrollment.course_id),
           course,
           progress_percentage: progressPercentage
         };
@@ -160,19 +165,13 @@ const AccountPage = () => {
     }
   };
 
-  const handleToggleFavorite = async (courseId: string, isFavorite: boolean) => {
+  const handleToggleFavorite = async (courseId: string, isFavorited: boolean) => {
     if (!user) return;
     
     try {
-      if (isFavorite) {
+      if (isFavorited) {
         // Remove from favorites
-        const { error } = await supabase
-          .from('course_favorites')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('course_id', courseId);
-          
-        if (error) throw error;
+        await removeFavorite(courseId);
         
         setEnrolledCourses(prev => 
           prev.map(course => 
@@ -185,15 +184,7 @@ const AccountPage = () => {
         toast.success('Course removed from favorites');
       } else {
         // Add to favorites
-        const { error } = await supabase
-          .from('course_favorites')
-          .insert({
-            user_id: user.id,
-            course_id: courseId,
-            added_at: new Date().toISOString()
-          });
-          
-        if (error) throw error;
+        await addFavorite(courseId);
         
         setEnrolledCourses(prev => 
           prev.map(course => 
