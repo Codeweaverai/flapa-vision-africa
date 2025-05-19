@@ -45,6 +45,39 @@ interface Course {
   modules: Module[];
 }
 
+// Define interfaces for database tables to make TypeScript happy
+interface DbCourse {
+  id: string;
+  title: string;
+  description: string;
+  [key: string]: any; // Allow additional properties
+}
+
+interface DbModule {
+  id: string;
+  title: string;
+  description: string | null;
+  course_id: string;
+  order_index: number;
+  [key: string]: any; // Allow additional properties
+}
+
+interface DbLesson {
+  id: string;
+  title: string;
+  description: string | null;
+  video_url: string | null;
+  module_id: string;
+  order_index: number;
+  [key: string]: any; // Allow additional properties
+}
+
+interface DbProgress {
+  lesson_id: string;
+  is_completed: boolean;
+  [key: string]: any; // Allow additional properties
+}
+
 const CoursePlayerPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
@@ -227,21 +260,24 @@ const CoursePlayerPage = () => {
       // Get all lesson IDs for querying progress
       const lessonIds = lessonsData.map(lesson => lesson.id);
       
-      // Get user progress
-      const { data: progressData, error: progressError } = await supabase
+      // Get user progress - use explicit type casting to avoid deep type instantiation
+      const progressQuery = await supabase
         .from('lesson_progress')
         .select('*')
         .eq('user_id', user.id)
         .in('lesson_id', lessonIds);
       
+      const progressData = progressQuery.data as DbProgress[] | null;
+      const progressError = progressQuery.error;
+      
       if (progressError) throw progressError;
       
-      // Format the data
-      const modules: Module[] = modulesData.map(module => {
+      // Format the data - ensure we're using our explicit interfaces
+      const modules: Module[] = modulesData.map((module: DbModule) => {
         const moduleLessons: Lesson[] = lessonsData
-          .filter(lesson => lesson.module_id === module.id)
-          .sort((a, b) => a.order_index - b.order_index)
-          .map(lesson => ({
+          .filter((lesson: DbLesson) => lesson.module_id === module.id)
+          .sort((a: DbLesson, b: DbLesson) => a.order_index - b.order_index)
+          .map((lesson: DbLesson) => ({
             ...lesson,
             content_type: lesson.video_url ? 'video' as const : 'quiz' as const,
             content: lesson.video_url ? null : { questions: [], pass_percentage: 70 }, // Default content for now
@@ -306,7 +342,8 @@ const CoursePlayerPage = () => {
         throw new Error('No enrollment found for this course');
       }
       
-      const { error } = await supabase
+      // Explicitly type the response to avoid TypeScript issues
+      const progressResponse = await supabase
         .from('lesson_progress')
         .insert({
           user_id: user.id,
@@ -316,6 +353,8 @@ const CoursePlayerPage = () => {
           last_position_seconds: 0,
           completion_date: new Date().toISOString()
         });
+      
+      const error = progressResponse.error;
       
       if (error) throw error;
       
