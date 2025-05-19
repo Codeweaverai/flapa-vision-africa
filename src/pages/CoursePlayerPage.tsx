@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -195,32 +194,56 @@ const CoursePlayerPage = () => {
       
       if (modulesError) throw modulesError;
       
-      // Get lessons for this course
+      if (!modulesData || modulesData.length === 0) {
+        setCourse({
+          ...courseData,
+          modules: []
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Get all module IDs for querying lessons
+      const moduleIds = modulesData.map(module => module.id);
+      
+      // Get lessons for all modules
       const { data: lessonsData, error: lessonsError } = await supabase
         .from('lessons')
         .select('*')
-        .eq('module_id', modulesData.map(module => module.id))
+        .in('module_id', moduleIds)
         .order('order_index', { ascending: true });
       
       if (lessonsError) throw lessonsError;
+      
+      if (!lessonsData || lessonsData.length === 0) {
+        setCourse({
+          ...courseData,
+          modules: modulesData.map(module => ({ ...module, lessons: [] }))
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Get all lesson IDs for querying progress
+      const lessonIds = lessonsData.map(lesson => lesson.id);
       
       // Get user progress
       const { data: progressData, error: progressError } = await supabase
         .from('lesson_progress')
         .select('*')
         .eq('user_id', user.id)
-        .eq('lesson_id', lessonsData.map(lesson => lesson.id));
+        .in('lesson_id', lessonIds);
       
       if (progressError) throw progressError;
       
       // Format the data
       const modules: Module[] = modulesData.map(module => {
-        const moduleLessons = lessonsData
+        const moduleLessons: Lesson[] = lessonsData
           .filter(lesson => lesson.module_id === module.id)
           .sort((a, b) => a.order_index - b.order_index)
           .map(lesson => ({
             ...lesson,
-            content_type: lesson.video_url ? 'video' : 'quiz',
+            content_type: lesson.video_url ? 'video' as const : 'quiz' as const,
             content: lesson.video_url ? null : { questions: [], pass_percentage: 70 }, // Default content for now
             is_completed: progressData?.some(p => p.lesson_id === lesson.id && p.is_completed) || false
           }));
