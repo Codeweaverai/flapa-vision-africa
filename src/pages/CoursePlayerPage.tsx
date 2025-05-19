@@ -260,15 +260,22 @@ const CoursePlayerPage = () => {
       // Get all lesson IDs for querying progress
       const lessonIds = lessonsData.map(lesson => lesson.id);
       
-      // Get user progress - use explicit type casting to avoid deep type instantiation
-      const progressQuery = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', user.id)
-        .in('lesson_id', lessonIds);
+      // Get user progress - avoid deep type instantiation
+      let progressData: any[] = [];
+      let progressError = null;
       
-      const progressData = progressQuery.data as DbProgress[] | null;
-      const progressError = progressQuery.error;
+      try {
+        const progressResult = await supabase
+          .from('lesson_progress')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('lesson_id', lessonIds);
+        
+        progressData = progressResult.data || [];
+        progressError = progressResult.error;
+      } catch (err) {
+        progressError = err;
+      }
       
       if (progressError) throw progressError;
       
@@ -342,8 +349,8 @@ const CoursePlayerPage = () => {
         throw new Error('No enrollment found for this course');
       }
       
-      // Explicitly type the response to avoid TypeScript issues
-      const progressResponse = await supabase
+      // Simplify the insert operation to avoid type issues
+      const { error } = await supabase
         .from('lesson_progress')
         .insert({
           user_id: user.id,
@@ -353,8 +360,6 @@ const CoursePlayerPage = () => {
           last_position_seconds: 0,
           completion_date: new Date().toISOString()
         });
-      
-      const error = progressResponse.error;
       
       if (error) throw error;
       
