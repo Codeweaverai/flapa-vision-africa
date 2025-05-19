@@ -1,764 +1,547 @@
 
-import { useState, useEffect } from 'react';
-import { useParams, Navigate, Link } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { 
-  CourseWithModules, 
-  fetchCourseWithModulesAndLessons, 
-  checkEnrollmentStatus,
-  saveLessonProgress,
-  LessonProgress,
-  QuizAnswer
-} from '@/services/courseService';
-import { Separator } from '@/components/ui/separator';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { 
-  CheckCircle, 
-  PlayCircle, 
-  FileText, 
-  Download, 
-  BookOpen, 
-  ChevronLeft, 
-  ChevronRight,
-  CheckSquare,
-  Award,
-  PenSquare
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+// Define YT type for TypeScript
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  description: string | null;
+  video_url: string | null;
+  module_id: string;
+  order_index: number;
+  content_type: 'video' | 'quiz';
+  content: any;
+  is_completed?: boolean;
+}
+
+interface Module {
+  id: string;
+  title: string;
+  description: string | null;
+  course_id: string;
+  order_index: number;
+  lessons: Lesson[];
+}
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  modules: Module[];
+}
 
 const CoursePlayerPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
-  const [course, setCourse] = useState<CourseWithModules | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isEnrolled, setIsEnrolled] = useState<boolean>(false);
-  const [activeModuleIndex, setActiveModuleIndex] = useState<number>(0);
-  const [activeLessonIndex, setActiveLessonIndex] = useState<number>(0);
   const { user } = useAuth();
-  const [enrollmentId, setEnrollmentId] = useState<string>('');
-  const [lessonProgress, setLessonProgress] = useState<Record<string, LessonProgress>>({});
-  const [videoPosition, setVideoPosition] = useState<number>(0);
-  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
-  const [progressPercentage, setProgressPercentage] = useState<number>(0);
-  const [quizDialogOpen, setQuizDialogOpen] = useState<boolean>(false);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
-  const [quizScore, setQuizScore] = useState<number | null>(null);
-  const [quizPassed, setQuizPassed] = useState<boolean>(false);
-  const [videoElement, setVideoElement] = useState<HTMLIFrameElement | null>(null);
-  const [certificateDialogOpen, setCertificateDialogOpen] = useState<boolean>(false);
-  const [certificateUrl, setCertificateUrl] = useState<string | null>(null);
-
-  // Track video progress with a timer
+  const [course, setCourse] = useState<Course | null>(null);
+  const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
+  const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [player, setPlayer] = useState<any>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [totalLessons, setTotalLessons] = useState(0);
+  const [completedLessons, setCompletedLessons] = useState(0);
+  const [progressPercentage, setProgressPercentage] = useState(0);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (videoElement && videoElement.contentWindow) {
-        // Try to get current time from YouTube iframe
-        // This is a simplified version - actual implementation would need YouTube API
-        const currentTime = videoPosition + 1;
-        setVideoPosition(currentTime);
-        
-        // Save progress every 10 seconds
-        if (currentTime % 10 === 0 && enrollmentId && activeLesson?.id) {
-          saveVideoProgress(activeLesson.id, currentTime);
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [videoElement, videoPosition, enrollmentId]);
-
-  useEffect(() => {
-    const loadCourse = async () => {
-      if (!courseId) return;
-
-      setLoading(true);
-      const courseData = await fetchCourseWithModulesAndLessons(courseId);
-      setCourse(courseData);
-      
-      if (user) {
-        const enrolled = await checkEnrollmentStatus(courseId);
-        setIsEnrolled(enrolled);
-        
-        if (enrolled) {
-          await loadEnrollmentData();
-        }
-      }
-      
-      setLoading(false);
+    // Load YouTube API
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    
+    window.onYouTubeIframeAPIReady = () => {
+      console.log('YouTube API ready');
     };
-
-    loadCourse();
-  }, [courseId, user]);
-
-  // Load enrollment data, progress, and last position
-  const loadEnrollmentData = async () => {
-    if (!user || !courseId) return;
     
-    try {
-      // Get enrollment ID
-      const { data: enrollmentData } = await supabase
-        .from('course_enrollments')
-        .select('id')
-        .eq('course_id', courseId)
-        .eq('user_id', user.id)
-        .single();
-      
-      if (enrollmentData) {
-        setEnrollmentId(enrollmentData.id);
-        
-        // Get all lesson progress for this enrollment
-        const { data: progressData } = await supabase
-          .from('lesson_progress')
-          .select('*')
-          .eq('enrollment_id', enrollmentData.id);
-        
-        if (progressData) {
-          // Create a map of lesson_id -> progress
-          const progressMap: Record<string, LessonProgress> = {};
-          const completed = new Set<string>();
-          
-          progressData.forEach((progress: LessonProgress) => {
-            progressMap[progress.lesson_id] = progress;
-            if (progress.is_completed) {
-              completed.add(progress.lesson_id);
-            }
-          });
-          
-          setLessonProgress(progressMap);
-          setCompletedLessons(completed);
-          
-          // Calculate overall progress
-          if (course) {
-            const totalLessons = course.modules.reduce(
-              (total, module) => total + module.lessons.length, 
-              0
-            );
-            
-            setProgressPercentage(totalLessons > 0 
-              ? (completed.size / totalLessons) * 100 
-              : 0);
-          }
-          
-          // Find last watched lesson
-          if (progressData.length > 0) {
-            // Find the most recently updated lesson
-            let lastLessonId = progressData[0].lesson_id;
-            let lastUpdated = new Date(progressData[0].completion_date || 0).getTime();
-            
-            progressData.forEach((progress: LessonProgress) => {
-              const updateTime = new Date(progress.completion_date || 0).getTime();
-              if (updateTime > lastUpdated) {
-                lastUpdated = updateTime;
-                lastLessonId = progress.lesson_id;
-              }
-            });
-            
-            // Find module and lesson indices
-            if (course) {
-              for (let moduleIndex = 0; moduleIndex < course.modules.length; moduleIndex++) {
-                const lessonIndex = course.modules[moduleIndex].lessons.findIndex(
-                  l => l.id === lastLessonId
-                );
-                
-                if (lessonIndex !== -1) {
-                  setActiveModuleIndex(moduleIndex);
-                  setActiveLessonIndex(lessonIndex);
-                  
-                  // Set video position
-                  const progress = progressMap[lastLessonId];
-                  if (progress) {
-                    setVideoPosition(progress.last_position_seconds);
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        }
+    fetchCourseData();
+    
+    return () => {
+      if (player) {
+        player.destroy();
       }
-    } catch (error) {
-      console.error('Error loading enrollment data:', error);
-    }
-  };
-
-  // Save video progress
-  const saveVideoProgress = async (lessonId: string, position: number) => {
-    if (!enrollmentId) return;
-    
-    try {
-      await saveLessonProgress(enrollmentId, lessonId, position);
-    } catch (error) {
-      console.error('Error saving video progress:', error);
-    }
-  };
-
-  // Mark lesson as complete
-  const markLessonComplete = async () => {
-    if (!activeLesson || !enrollmentId) return;
-    
-    try {
-      const result = await saveLessonProgress(enrollmentId, activeLesson.id, videoPosition, true);
+    };
+  }, [courseId]);
+  
+  useEffect(() => {
+    if (course && course.modules.length > 0) {
+      let totalCount = 0;
+      let completedCount = 0;
       
-      if (result) {
-        // Update local state
-        setLessonProgress(prev => ({
-          ...prev,
-          [activeLesson.id]: result
-        }));
-        
-        setCompletedLessons(prev => {
-          const updated = new Set(prev);
-          updated.add(activeLesson.id);
-          return updated;
+      course.modules.forEach(module => {
+        totalCount += module.lessons.length;
+        module.lessons.forEach(lesson => {
+          if (lesson.is_completed) completedCount++;
         });
-        
-        // Update progress percentage
-        if (course) {
-          const totalLessons = course.modules.reduce(
-            (total, module) => total + module.lessons.length, 
-            0
-          );
-          setProgressPercentage(totalLessons > 0 
-            ? ((completedLessons.size + 1) / totalLessons) * 100 
-            : 0);
-        }
-        
-        toast({
-          title: 'Lesson completed',
-          description: 'Your progress has been saved.',
-        });
-      }
-    } catch (error) {
-      console.error('Error marking lesson as complete:', error);
-      toast({
-        title: 'Error',
-        description: 'Could not mark lesson as complete.',
-        variant: 'destructive',
       });
+      
+      setTotalLessons(totalCount);
+      setCompletedLessons(completedCount);
+      setProgressPercentage(totalCount > 0 ? (completedCount / totalCount) * 100 : 0);
     }
-  };
-
-  // Function to get the active lesson
-  const getActiveLesson = () => {
-    if (!course || !course.modules[activeModuleIndex]) return null;
-    return course.modules[activeModuleIndex].lessons[activeLessonIndex];
-  };
-
-  // Get active module
-  const getActiveModule = () => {
-    if (!course) return null;
-    return course.modules[activeModuleIndex];
-  };
-
-  // Check if the current active item is a quiz
-  const isCurrentItemQuiz = () => {
-    const module = getActiveModule();
-    return module?.quiz && activeLessonIndex === module.lessons.length - 1;
-  };
-
-  // Navigation functions
-  const goToNextLesson = () => {
-    if (!course) return;
-    
-    const currentModule = course.modules[activeModuleIndex];
-    if (activeLessonIndex < currentModule.lessons.length - 1) {
-      // Next lesson in the same module
-      setActiveLessonIndex(activeLessonIndex + 1);
-      setVideoPosition(0);
-    } else if (activeModuleIndex < course.modules.length - 1) {
-      // First lesson in the next module
-      setActiveModuleIndex(activeModuleIndex + 1);
-      setActiveLessonIndex(0);
-      setVideoPosition(0);
-    }
-  };
-
-  const goToPreviousLesson = () => {
-    if (!course) return;
-    
-    if (activeLessonIndex > 0) {
-      // Previous lesson in the same module
-      setActiveLessonIndex(activeLessonIndex - 1);
-      setVideoPosition(0);
-    } else if (activeModuleIndex > 0) {
-      // Last lesson in the previous module
-      setActiveModuleIndex(activeModuleIndex - 1);
-      const prevModule = course.modules[activeModuleIndex - 1];
-      setActiveLessonIndex(prevModule.lessons.length - 1);
-      setVideoPosition(0);
-    }
-  };
-
-  const selectLesson = (moduleIndex: number, lessonIndex: number) => {
-    setActiveModuleIndex(moduleIndex);
-    setActiveLessonIndex(lessonIndex);
-    setVideoPosition(0);
-  };
-
-  const startQuiz = () => {
-    setSelectedAnswers({});
-    setQuizScore(null);
-    setQuizPassed(false);
-    setQuizDialogOpen(true);
-  };
-
-  const handleAnswerChange = (questionId: string, answerId: string) => {
-    setSelectedAnswers(prev => ({
-      ...prev,
-      [questionId]: answerId
-    }));
-  };
-
-  const submitQuiz = () => {
-    const activeModule = getActiveModule();
-    if (!activeModule?.quiz || !activeModule.quiz.questions) {
-      return;
-    }
-    
-    const quiz = activeModule.quiz;
-    let correctCount = 0;
-    let totalQuestions = quiz.questions.length;
-    
-    quiz.questions.forEach(question => {
-      const selectedAnswerId = selectedAnswers[question.id];
-      if (selectedAnswerId) {
-        const selectedAnswer = question.answers?.find(a => a.id === selectedAnswerId);
-        if (selectedAnswer && selectedAnswer.is_correct) {
-          correctCount++;
+  }, [course]);
+  
+  useEffect(() => {
+    if (course && course.modules.length > 0) {
+      const currentLesson = getCurrentLesson();
+      
+      if (currentLesson?.content_type === 'video' && currentLesson.video_url) {
+        const videoId = extractVideoId(currentLesson.video_url);
+        
+        if (videoId) {
+          // Initialize YouTube player if YouTube API is loaded
+          if (window.YT && window.YT.Player) {
+            initializePlayer(videoId);
+          } else {
+            // Wait for YouTube API to load
+            const checkYouTubeAPI = setInterval(() => {
+              if (window.YT && window.YT.Player) {
+                clearInterval(checkYouTubeAPI);
+                initializePlayer(videoId);
+              }
+            }, 100);
+          }
         }
+      }
+    }
+  }, [currentModuleIndex, currentLessonIndex, course]);
+  
+  const initializePlayer = (videoId: string) => {
+    if (!playerContainerRef.current) return;
+    
+    // Clear any existing player
+    if (player) {
+      player.destroy();
+    }
+    
+    // Clear container
+    while (playerContainerRef.current.firstChild) {
+      playerContainerRef.current.removeChild(playerContainerRef.current.firstChild);
+    }
+    
+    // Create player element
+    const playerElement = document.createElement('div');
+    playerElement.id = 'youtube-player';
+    playerContainerRef.current.appendChild(playerElement);
+    
+    // Create new player
+    const newPlayer = new window.YT.Player('youtube-player', {
+      height: '360',
+      width: '640',
+      videoId: videoId,
+      playerVars: {
+        autoplay: 0,
+        controls: 1,
+        modestbranding: 1,
+        rel: 0
+      },
+      events: {
+        onStateChange: onPlayerStateChange
       }
     });
     
-    const score = Math.round((correctCount / totalQuestions) * 100);
-    const passed = score >= (quiz.passing_score || 70);
-    
-    setQuizScore(score);
-    setQuizPassed(passed);
+    setPlayer(newPlayer);
   };
-
-  const completeQuiz = async () => {
-    if (!quizPassed || !enrollmentId || !courseId || !course) return;
-    
-    // Close quiz dialog
-    setQuizDialogOpen(false);
-    
-    // Check if all modules are complete
-    let allModulesComplete = true;
-    for (const module of course.modules) {
-      for (const lesson of module.lessons) {
-        if (!completedLessons.has(lesson.id)) {
-          allModulesComplete = false;
-          break;
-        }
+  
+  const onPlayerStateChange = (event: any) => {
+    // Mark lesson as completed when video ends
+    if (event.data === window.YT.PlayerState.ENDED) {
+      const currentLesson = getCurrentLesson();
+      if (currentLesson) {
+        markLessonAsCompleted(currentLesson.id);
       }
-      if (!allModulesComplete) break;
     }
+  };
+  
+  const fetchCourseData = async () => {
+    if (!courseId || !user) return;
     
-    if (allModulesComplete && course.certificate_enabled) {
-      // Generate certificate
-      try {
-        const response = await fetch(`https://rxqoczksnddbxcdwobnw.supabase.co/functions/v1/generate-certificate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await supabase.auth.getSession().then(res => res.data.session?.access_token)}`,
-          },
-          body: JSON.stringify({
-            enrollmentId: enrollmentId
-          })
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          if (result.certificate && result.certificate.pdf_url) {
-            setCertificateUrl(result.certificate.pdf_url);
-            setCertificateDialogOpen(true);
+    try {
+      setLoading(true);
+      
+      // Get course with modules
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
+      
+      if (courseError) throw courseError;
+      
+      // Get modules for this course
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('course_modules')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: true });
+      
+      if (modulesError) throw modulesError;
+      
+      // Get lessons for this course
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('course_lessons')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: true });
+      
+      if (lessonsError) throw lessonsError;
+      
+      // Get user progress
+      const { data: progressData, error: progressError } = await supabase
+        .from('course_progress')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId);
+      
+      if (progressError) throw progressError;
+      
+      // Format the data
+      const modules = modulesData.map(module => ({
+        ...module,
+        lessons: lessonsData
+          .filter(lesson => lesson.module_id === module.id)
+          .sort((a, b) => a.order_index - b.order_index)
+          .map(lesson => ({
+            ...lesson,
+            is_completed: progressData.some(p => p.lesson_id === lesson.id)
+          }))
+      }));
+      
+      setCourse({
+        ...courseData,
+        modules
+      });
+      
+      // Find first incomplete lesson
+      let foundIncomplete = false;
+      
+      for (let mi = 0; mi < modules.length; mi++) {
+        const module = modules[mi];
+        for (let li = 0; li < module.lessons.length; li++) {
+          const lesson = module.lessons[li];
+          if (!lesson.is_completed && !foundIncomplete) {
+            setCurrentModuleIndex(mi);
+            setCurrentLessonIndex(li);
+            foundIncomplete = true;
+            break;
           }
         }
-      } catch (error) {
-        console.error('Error generating certificate:', error);
+        if (foundIncomplete) break;
       }
+      
+    } catch (error) {
+      console.error('Error fetching course data:', error);
+      toast.error('Failed to load course data');
+    } finally {
+      setLoading(false);
     }
   };
-
-  const activeLesson = getActiveLesson();
-
+  
+  const markLessonAsCompleted = async (lessonId: string) => {
+    if (!user || !courseId) return;
+    
+    try {
+      // Check if already marked as completed
+      const currentLesson = getCurrentLesson();
+      if (currentLesson?.is_completed) return;
+      
+      const { error } = await supabase
+        .from('course_progress')
+        .insert({
+          user_id: user.id,
+          course_id: courseId,
+          lesson_id: lessonId,
+          completed_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      toast.success('Lesson completed');
+      
+      // Update local state
+      setCourse(prevCourse => {
+        if (!prevCourse) return null;
+        
+        const updatedModules = prevCourse.modules.map(module => ({
+          ...module,
+          lessons: module.lessons.map(lesson => 
+            lesson.id === lessonId 
+              ? { ...lesson, is_completed: true } 
+              : lesson
+          )
+        }));
+        
+        return {
+          ...prevCourse,
+          modules: updatedModules
+        };
+      });
+      
+      setCompletedLessons(prev => prev + 1);
+      setProgressPercentage(totalLessons > 0 ? ((completedLessons + 1) / totalLessons) * 100 : 0);
+      
+    } catch (error) {
+      console.error('Error marking lesson as completed:', error);
+      toast.error('Failed to update progress');
+    }
+  };
+  
+  const submitQuiz = async () => {
+    const currentLesson = getCurrentLesson();
+    if (!currentLesson || currentLesson.content_type !== 'quiz') return;
+    
+    const quizContent = currentLesson.content;
+    const questions = quizContent?.questions || [];
+    
+    let correct = 0;
+    let total = questions.length;
+    
+    questions.forEach((question: any) => {
+      if (quizAnswers[question.id] === question.correct_answer) {
+        correct++;
+      }
+    });
+    
+    const passPercentage = quizContent?.pass_percentage || 70;
+    const score = total > 0 ? (correct / total) * 100 : 0;
+    const passed = score >= passPercentage;
+    
+    if (passed) {
+      markLessonAsCompleted(currentLesson.id);
+      toast.success(`Quiz completed! Score: ${score.toFixed(0)}%`);
+    } else {
+      toast.error(`Try again. Score: ${score.toFixed(0)}%. Required: ${passPercentage}%`);
+    }
+  };
+  
+  const handleAnswerChange = (questionId: string, answer: string) => {
+    setQuizAnswers(prev => ({
+      ...prev,
+      [questionId]: answer
+    }));
+  };
+  
+  const goToNextLesson = () => {
+    const currentModule = course?.modules[currentModuleIndex];
+    if (!currentModule) return;
+    
+    if (currentLessonIndex < currentModule.lessons.length - 1) {
+      // Next lesson in same module
+      setCurrentLessonIndex(currentLessonIndex + 1);
+    } else if (currentModuleIndex < (course?.modules.length || 0) - 1) {
+      // First lesson in next module
+      setCurrentModuleIndex(currentModuleIndex + 1);
+      setCurrentLessonIndex(0);
+    }
+  };
+  
+  const goToPrevLesson = () => {
+    if (currentLessonIndex > 0) {
+      // Previous lesson in same module
+      setCurrentLessonIndex(currentLessonIndex - 1);
+    } else if (currentModuleIndex > 0) {
+      // Last lesson in previous module
+      setCurrentModuleIndex(currentModuleIndex - 1);
+      const prevModuleLessons = course?.modules[currentModuleIndex - 1].lessons.length || 0;
+      setCurrentLessonIndex(Math.max(0, prevModuleLessons - 1));
+    }
+  };
+  
+  const getCurrentLesson = (): Lesson | null => {
+    if (!course) return null;
+    
+    const currentModule = course.modules[currentModuleIndex];
+    if (!currentModule) return null;
+    
+    return currentModule.lessons[currentLessonIndex] || null;
+  };
+  
+  const extractVideoId = (url: string): string | null => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return match && match[2].length === 11 ? match[2] : null;
+  };
+  
+  const currentLesson = getCurrentLesson();
+  const currentModule = course?.modules[currentModuleIndex];
+  
   if (loading) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="flex justify-center items-center min-h-[40vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-full mb-6"></div>
+            <div className="h-64 bg-gray-200 rounded w-full mb-4"></div>
           </div>
         </div>
       </Layout>
     );
   }
-
+  
   if (!course) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="text-center py-16">
-            <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
-            <p>The course you are looking for could not be found.</p>
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold mb-2">Course Not Found</h2>
+            <p>The course you're looking for doesn't exist or you don't have access to it.</p>
           </div>
         </div>
       </Layout>
     );
   }
-
-  // Guard against non-enrolled users
-  if (!loading && (!user || !isEnrolled)) {
-    return <Navigate to={`/learning/course/${courseId}`} />;
-  }
-
-  const isLessonCompleted = activeLesson && completedLessons.has(activeLesson.id);
-
+  
   return (
     <Layout>
-      <div className="section-container pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main content area */}
-          <div className="lg:col-span-3 space-y-8">
-            {/* Course title and navigation */}
-            <div>
-              <h1 className="text-2xl font-bold">{course.title}</h1>
-              <div className="flex items-center text-sm text-muted-foreground mt-1">
-                <span>Module {activeModuleIndex + 1}</span>
-                <span className="mx-2">•</span>
-                <span>Lesson {activeLessonIndex + 1}</span>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Main content */}
+          <div className="flex-1">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold mb-2">{course.title}</h1>
+              <div className="flex items-center gap-3 mb-4">
+                <Progress value={progressPercentage} className="w-full h-2" />
+                <span className="text-sm font-medium whitespace-nowrap">
+                  {completedLessons}/{totalLessons} lessons
+                </span>
               </div>
-              {/* Progress bar */}
-              <div className="mt-4">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Course Progress</span>
-                  <span>{Math.round(progressPercentage)}%</span>
-                </div>
-                <Progress value={progressPercentage} className="h-2" />
-              </div>
-            </div>
-            
-            {/* Video player or Quiz button */}
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {isCurrentItemQuiz() ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-6">
-                  <PenSquare className="h-16 w-16 mb-4" />
-                  <h2 className="text-xl font-bold mb-2">Module Quiz</h2>
-                  <p className="text-center mb-6">
-                    Complete this quiz to test your knowledge from this module.
-                    {getActiveModule()?.quiz && (
-                      <span className="block mt-2">
-                        Passing score: {getActiveModule()?.quiz.passing_score || 70}%
-                      </span>
-                    )}
-                  </p>
-                  <Button onClick={startQuiz}>
-                    Start Quiz
-                  </Button>
-                </div>
-              ) : activeLesson?.video_url ? (
-                <iframe
-                  ref={(el) => setVideoElement(el)}
-                  src={`${activeLesson.video_url.replace('watch?v=', 'embed/')}?start=${videoPosition}`}
-                  title={activeLesson.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full h-full"
-                ></iframe>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <BookOpen className="h-16 w-16 text-gray-500" />
-                  <p className="ml-4 text-white">No video available for this lesson</p>
-                </div>
-              )}
-            </div>
-            
-            {/* Lesson title and navigation buttons */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
-                {isCurrentItemQuiz() 
-                  ? `Quiz: ${getActiveModule()?.quiz?.title || 'Module Quiz'}` 
-                  : activeLesson?.title}
-              </h2>
-              <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={goToPreviousLesson}
-                  disabled={activeModuleIndex === 0 && activeLessonIndex === 0}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={goToNextLesson}
-                  disabled={
-                    activeModuleIndex === course.modules.length - 1 && 
-                    activeLessonIndex === course.modules[activeModuleIndex].lessons.length - 1
-                  }
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Lesson content tabs */}
-            <Tabs defaultValue="content" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="content">Content</TabsTrigger>
-                <TabsTrigger value="resources">Resources</TabsTrigger>
-                <TabsTrigger value="discussion">Discussion</TabsTrigger>
-              </TabsList>
               
-              <TabsContent value="content" className="p-4 border rounded-lg mt-2">
-                {isCurrentItemQuiz() ? (
-                  <div className="prose max-w-none">
-                    <p className="whitespace-pre-line">
-                      {getActiveModule()?.quiz?.description || 
-                        'This quiz will test your understanding of the concepts covered in this module. Click the "Start Quiz" button above to begin.'}
-                    </p>
-                  </div>
-                ) : (
-                  activeLesson?.description ? (
-                    <div className="prose max-w-none">
-                      <p className="whitespace-pre-line">{activeLesson.description}</p>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No additional content available for this lesson.</p>
-                  )
+              {/* Module and Lesson title */}
+              <div className="flex items-center mb-2">
+                <h2 className="text-lg font-semibold">
+                  {currentModule?.title}: {currentLesson?.title}
+                </h2>
+                {currentLesson?.is_completed && (
+                  <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
                 )}
-              </TabsContent>
-              
-              <TabsContent value="resources" className="p-4 border rounded-lg mt-2">
-                {activeLesson?.materials_urls && activeLesson.materials_urls.length > 0 ? (
-                  <div className="space-y-3">
-                    {activeLesson.materials_urls.map((url, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded-md">
-                        <div className="flex items-center">
-                          <FileText className="h-5 w-5 text-primary mr-2" />
-                          <span>Resource {index + 1}</span>
-                        </div>
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={url} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 mr-1" />
-                            Download
-                          </a>
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">No downloadable resources available for this lesson.</p>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="discussion" className="p-4 border rounded-lg mt-2">
-                <p className="text-muted-foreground">Discussion board coming soon!</p>
-              </TabsContent>
-            </Tabs>
-
-            {/* Mark as complete button */}
-            {!isCurrentItemQuiz() && (
-              <div className="flex justify-end">
-                <Button 
-                  variant={isLessonCompleted ? "outline" : "default"}
-                  onClick={markLessonComplete}
-                  disabled={isLessonCompleted}
-                >
-                  <CheckSquare className="h-5 w-5 mr-2" />
-                  {isLessonCompleted ? 'Completed' : 'Mark as Complete'}
-                </Button>
               </div>
+            </div>
+            
+            {/* Lesson content */}
+            {currentLesson?.content_type === 'video' && (
+              <Card className="mb-6">
+                <CardContent className="p-0">
+                  <div ref={playerContainerRef} className="w-full aspect-video bg-black">
+                    {/* YouTube player will be inserted here */}
+                  </div>
+                </CardContent>
+              </Card>
             )}
+            
+            {currentLesson?.content_type === 'quiz' && (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-semibold mb-4">Quiz: {currentLesson.title}</h3>
+                  
+                  {currentLesson.content?.questions?.map((question: any, index: number) => (
+                    <div key={question.id} className="mb-6">
+                      <h4 className="text-lg font-medium mb-3">Question {index + 1}: {question.text}</h4>
+                      <div className="space-y-2">
+                        {question.options.map((option: string, optIndex: number) => (
+                          <div key={optIndex} className="flex items-center">
+                            <input
+                              type="radio"
+                              id={`q${question.id}-opt${optIndex}`}
+                              name={`question-${question.id}`}
+                              value={option}
+                              checked={quizAnswers[question.id] === option}
+                              onChange={() => handleAnswerChange(question.id, option)}
+                              className="mr-2"
+                            />
+                            <label htmlFor={`q${question.id}-opt${optIndex}`}>{option}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Button onClick={submitQuiz} className="mt-4">
+                    Submit Quiz
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Navigation buttons */}
+            <div className="flex justify-between">
+              <Button 
+                variant="outline" 
+                onClick={goToPrevLesson}
+                disabled={currentModuleIndex === 0 && currentLessonIndex === 0}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Previous Lesson
+              </Button>
+              
+              <Button 
+                onClick={goToNextLesson}
+                disabled={currentModuleIndex === course.modules.length - 1 && 
+                         currentLessonIndex === course.modules[currentModuleIndex].lessons.length - 1}
+              >
+                Next Lesson
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
           
-          {/* Sidebar with course content */}
-          <div className="lg:col-span-1">
-            <div className="bg-card rounded-lg border p-4 sticky top-8">
-              <h3 className="font-semibold mb-4">Course Content</h3>
-              <div className="text-sm text-muted-foreground mb-4">
-                {course.modules.length} modules • {course.modules.reduce((acc, m) => acc + m.lessons.length, 0)} lessons • {Math.ceil(course.duration_minutes / 60)} hours
-              </div>
+          {/* Sidebar */}
+          <div className="md:w-1/3 lg:w-1/4">
+            <div className="bg-muted rounded-lg p-4">
+              <h3 className="font-medium text-lg mb-3">Course Content</h3>
               
-              <Separator className="my-2" />
-              
-              <Accordion 
-                type="multiple" 
-                className="w-full"
-                defaultValue={[course.modules[activeModuleIndex]?.id || '']}
-              >
-                {course.modules.map((module, moduleIndex) => (
-                  <AccordionItem 
-                    key={module.id} 
-                    value={module.id}
-                    className="border-b border-border"
-                  >
-                    <AccordionTrigger className="text-sm hover:no-underline py-3">
-                      <div className="text-left">
-                        <div>Module {moduleIndex + 1}: {module.title}</div>
-                        <div className="text-xs text-muted-foreground">{module.lessons.length} lessons</div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-1 pl-1">
-                        {module.lessons.map((lesson, lessonIndex) => (
-                          <Button
-                            key={lesson.id}
-                            variant="ghost"
-                            size="sm"
-                            className={`w-full justify-start text-xs py-1 px-2 h-auto ${
-                              moduleIndex === activeModuleIndex && lessonIndex === activeLessonIndex
-                                ? 'bg-primary/10 text-primary'
-                                : ''
-                            }`}
-                            onClick={() => selectLesson(moduleIndex, lessonIndex)}
-                          >
-                            {completedLessons.has(lesson.id) ? (
-                              <CheckCircle className="h-3 w-3 mr-2 flex-shrink-0 text-green-500" />
-                            ) : moduleIndex === activeModuleIndex && lessonIndex === activeLessonIndex ? (
-                              <PlayCircle className="h-3 w-3 mr-2 flex-shrink-0" />
-                            ) : (
-                              <CheckCircle className="h-3 w-3 mr-2 flex-shrink-0 text-muted-foreground" />
-                            )}
-                            <span className="truncate text-left">{lessonIndex + 1}. {lesson.title}</span>
-                          </Button>
-                        ))}
-                        
-                        {/* Quiz button at the end of each module */}
-                        {module.quiz && (
-                          <Button
-                            key={`quiz-${module.id}`}
-                            variant="ghost"
-                            size="sm"
-                            className={`w-full justify-start text-xs py-1 px-2 h-auto ${
-                              moduleIndex === activeModuleIndex && 
-                              activeLessonIndex === module.lessons.length - 1 &&
-                              isCurrentItemQuiz()
-                                ? 'bg-primary/10 text-primary'
-                                : ''
-                            }`}
-                            onClick={() => {
-                              setActiveModuleIndex(moduleIndex);
-                              setActiveLessonIndex(module.lessons.length - 1);
-                            }}
-                          >
-                            <PenSquare className="h-3 w-3 mr-2 flex-shrink-0" />
-                            <span className="truncate text-left">Module Quiz</span>
-                          </Button>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+              <div className="space-y-3">
+                {course.modules.map((module, mIndex) => (
+                  <div key={module.id}>
+                    <div className="font-medium mb-1">{module.title}</div>
+                    <ul className="space-y-1 pl-4">
+                      {module.lessons.map((lesson, lIndex) => (
+                        <li 
+                          key={lesson.id}
+                          className={`text-sm py-1 px-2 rounded cursor-pointer flex items-center justify-between
+                                    ${currentModuleIndex === mIndex && currentLessonIndex === lIndex 
+                                      ? 'bg-primary text-primary-foreground' 
+                                      : lesson.is_completed
+                                      ? 'text-muted-foreground'
+                                      : 'hover:bg-muted-foreground/10'
+                                    }`}
+                          onClick={() => { 
+                            setCurrentModuleIndex(mIndex);
+                            setCurrentLessonIndex(lIndex);
+                          }}
+                        >
+                          <span>{lesson.title}</span>
+                          {lesson.is_completed && (
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </Accordion>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Quiz Dialog */}
-      <Dialog open={quizDialogOpen} onOpenChange={setQuizDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{getActiveModule()?.quiz?.title || 'Module Quiz'}</DialogTitle>
-          </DialogHeader>
-          
-          {quizScore === null ? (
-            <>
-              <div className="space-y-6">
-                {getActiveModule()?.quiz?.questions?.map((question, index) => (
-                  <div key={question.id} className="border p-4 rounded-lg">
-                    <h3 className="font-medium mb-3">Question {index + 1}: {question.question}</h3>
-                    
-                    <RadioGroup
-                      value={selectedAnswers[question.id] || ''}
-                      onValueChange={(value) => handleAnswerChange(question.id, value)}
-                    >
-                      {question.answers?.map((answer) => (
-                        <div key={answer.id} className="flex items-center space-x-2 my-2">
-                          <RadioGroupItem value={answer.id} id={answer.id} />
-                          <Label htmlFor={answer.id}>{answer.answer}</Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="flex justify-end">
-                <Button onClick={submitQuiz}>Submit Quiz</Button>
-              </div>
-            </>
-          ) : (
-            <div className="space-y-6">
-              <div className="text-center p-6">
-                <div className="text-4xl font-bold mb-2">{quizScore}%</div>
-                <div className="text-xl mb-4">
-                  {quizPassed ? (
-                    <span className="text-green-500">Passed!</span>
-                  ) : (
-                    <span className="text-red-500">Failed</span>
-                  )}
-                </div>
-                <p className="mb-6">
-                  {quizPassed 
-                    ? 'Congratulations! You have passed the quiz.' 
-                    : `You did not meet the passing score of ${getActiveModule()?.quiz?.passing_score || 70}%. Please try again.`}
-                </p>
-                
-                {quizPassed ? (
-                  <Button onClick={completeQuiz}>Continue</Button>
-                ) : (
-                  <Button variant="outline" onClick={() => setQuizScore(null)}>Try Again</Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-      
-      {/* Certificate Dialog */}
-      <Dialog open={certificateDialogOpen} onOpenChange={setCertificateDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Congratulations!</DialogTitle>
-          </DialogHeader>
-          
-          <div className="text-center p-6 space-y-6">
-            <Award className="h-16 w-16 mx-auto text-primary" />
-            
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold">You've completed the course!</h2>
-              <p>You have successfully completed all modules and quizzes for this course.</p>
-            </div>
-            
-            {certificateUrl && (
-              <div className="space-y-4">
-                <p>Your certificate is ready to download.</p>
-                
-                <div className="flex justify-center">
-                  <Button asChild>
-                    <a href={certificateUrl} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Certificate
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </Layout>
   );
 };
