@@ -1,3 +1,53 @@
+
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
+import { User } from '@supabase/supabase-js';
+
+// Define Event type
+export interface Event {
+  id: string;
+  title: string;
+  description?: string;
+  event_type: string;
+  start_time: string;
+  end_time: string;
+  location?: string;
+  online_meeting_link?: string;
+  capacity?: number;
+  is_free: boolean;
+  price?: number;
+  currency?: string;
+  image_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  creator_id?: string;
+}
+
+// Define Registration type
+export interface Registration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: string;
+  payment_status: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  payment_method?: string;
+  payment_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  phone_number?: string;
+  mobile_operator?: string;
+}
+
+// Define MobileOperator type
+export interface MobileOperator {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
+}
+
 // Add a function to create an event with creator_id
 export const createEventWithCreator = async (
   eventData: Partial<Event>, 

@@ -12,9 +12,10 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMobileOperators } from '@/hooks/useMobileOperators';
+import { Event, registerForEvent } from '@/services/eventService';
 
 export interface EventRegistrationFormProps {
-  event: any; // Using any temporarily until we define the Event type
+  event: Event; 
   user: User | null;
   onRegistrationSuccess?: () => void;
   onCancel?: () => void;
@@ -55,7 +56,6 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
     setLoading(true);
     try {
-      // Temporarily using any until we define the registerForEvent function
       const result = await registerForEvent(event, user);
       if (result) {
         toast.success(`Successfully registered for ${event.title}`);
@@ -78,12 +78,11 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
     setLoading(true);
     try {
-      // Temporarily using any until we define the registerForEvent function
       const result = await registerForEvent(event, user, data.phoneNumber, data.mobileOperator);
       
       if (result && onRegistrationSuccess) {
         // Success will be handled by a redirect to the payment provider
-        // onRegistrationSuccess() will be called after successful payment
+        onRegistrationSuccess();
       }
     } catch (error) {
       console.error("Error during paid registration:", error);
@@ -188,13 +187,6 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
       </CardContent>
     </Card>
   );
-};
-
-// Temporary function until we define it properly in eventService.ts
-const registerForEvent = async (event: any, user: User, phoneNumber?: string, mobileOperator?: string) => {
-  // This is a placeholder that will be replaced by the actual implementation
-  console.log('Registering for event', event.id, user.id, phoneNumber, mobileOperator);
-  return { success: true };
 };
 
 export default EventRegistrationForm;

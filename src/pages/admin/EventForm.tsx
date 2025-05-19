@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,6 +22,28 @@ import { Event } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
 import { createEventWithCreator } from '@/services/eventService';
 
+// Define a type for the form values
+type FormValues = z.infer<typeof formSchema>;
+
+// Define a type for creating a new event
+interface NewEvent {
+  title: string;
+  description: string;
+  event_type: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  online_meeting_link: string | null;
+  capacity: number | null;
+  is_free: boolean;
+  price: number;
+  currency: string;
+}
+
+interface EventFormProps {
+  isCreator?: boolean;
+}
+
 const formSchema = z.object({
   title: z.string().min(3, { message: 'Title must be at least 3 characters.' }),
   description: z.string().min(20, { message: 'Description must be at least 20 characters.' }),
@@ -36,12 +57,6 @@ const formSchema = z.object({
   price: z.number().min(0).optional(),
   currency: z.string().default('USD'),
 });
-
-type FormValues = z.infer<typeof formSchema>;
-
-interface EventFormProps {
-  isCreator?: boolean;
-}
 
 const EventForm = ({ isCreator = false }: EventFormProps) => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -95,7 +110,7 @@ const EventForm = ({ isCreator = false }: EventFormProps) => {
               online_meeting_link: data.online_meeting_link || '',
               capacity: data.capacity || undefined,
               is_free: data.is_free,
-              price: data.price || 0,
+              price: data.is_free ? 0 : data.price,
               currency: data.currency || 'USD',
             });
             
@@ -151,7 +166,7 @@ const EventForm = ({ isCreator = false }: EventFormProps) => {
         toast.success('Event updated successfully!');
       } else {
         // Create new event
-        const newEventData = {
+        const newEventData: NewEvent = {
           title: data.title,
           description: data.description,
           event_type: data.event_type,
@@ -161,7 +176,7 @@ const EventForm = ({ isCreator = false }: EventFormProps) => {
           online_meeting_link: data.online_meeting_link || null,
           capacity: data.capacity || null,
           is_free: data.is_free,
-          price: data.is_free ? 0 : data.price,
+          price: data.is_free ? 0 : (data.price || 0),
           currency: data.currency,
         };
         

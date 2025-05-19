@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { CalendarDays, Clock, MapPin, User, Users, Share2, ArrowLeft } from 'lucide-react';
