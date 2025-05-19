@@ -152,7 +152,7 @@ const AccountPage = () => {
                   <div className="flex items-center justify-between mb-2">
                     <div className="space-x-2">
                       {registration.status === 'confirmed' && (
-                        <Badge variant="success" className="bg-green-500">Confirmed</Badge>
+                        <Badge variant="default" className="bg-green-500">Confirmed</Badge>
                       )}
                       {registration.status === 'cancelled' && (
                         <Badge variant="destructive">Cancelled</Badge>

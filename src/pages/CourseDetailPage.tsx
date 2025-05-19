@@ -1,6 +1,18 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, BookOpen, Award, Check, ExternalLink } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Calendar, 
+  Clock, 
+  BookOpen, 
+  Award, 
+  Check, 
+  ExternalLink, 
+  FileText as FileCheck, 
+  Play as PlayCircle, 
+  Lock 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +65,6 @@ const CourseDetailPage = () => {
   const handleEnroll = async () => {
     if (!user) {
       toast({
-        title: "Authentication Required",
         description: "Please sign in to enroll in this course",
         variant: "destructive",
       });
@@ -62,14 +73,14 @@ const CourseDetailPage = () => {
 
     if (!courseId) return;
 
-    const success = await enrollInCourse(courseId);
+    const success = await enrollInCourse(courseId, user);
     if (success) {
       setIsEnrolled(true);
     }
   };
 
-  const lessonCount = course?.modules.reduce(
-    (count, module) => count + module.lessons.length,
+  const lessonCount = course?.modules?.reduce(
+    (count, module) => count + (module.lessons?.length || 0),
     0
   ) || 0;
 
@@ -132,7 +143,7 @@ const CourseDetailPage = () => {
                 </div>
                 <div className="flex items-center">
                   <BookOpen className="mr-2 h-5 w-5 text-primary" />
-                  <span>{course.modules.length} modules</span>
+                  <span>{course.modules?.length || 0} modules</span>
                 </div>
                 <div className="flex items-center">
                   <FileCheck className="mr-2 h-5 w-5 text-primary" />
@@ -199,10 +210,10 @@ const CourseDetailPage = () => {
             <div>
               <h2 className="text-2xl font-semibold mb-4">What You'll Learn</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {course.modules.flatMap((module) => 
-                  module.lessons.slice(0, 2).map((lesson) => (
+                {course.modules?.flatMap((module) => 
+                  module.lessons?.slice(0, 2).map((lesson) => (
                     <div key={lesson.id} className="flex items-start">
-                      <CheckCircle className="h-5 w-5 text-primary mr-2 mt-1 flex-shrink-0" />
+                      <Check className="h-5 w-5 text-primary mr-2 mt-1 flex-shrink-0" />
                       <span>{lesson.title}</span>
                     </div>
                   ))
@@ -214,20 +225,20 @@ const CourseDetailPage = () => {
               <h2 className="text-2xl font-semibold mb-4">Course Content</h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{course.modules.length} modules • {lessonCount} lessons</span>
+                  <span>{course.modules?.length || 0} modules • {lessonCount} lessons</span>
                   <span>Total: {Math.ceil(course.duration_minutes / 60)} hours</span>
                 </div>
                 
                 <div className="space-y-3">
-                  {course.modules.map((module) => (
+                  {course.modules?.map((module) => (
                     <div key={module.id} className="border rounded-lg">
                       <div className="p-4 bg-muted/40">
                         <h3 className="font-medium">{module.title}</h3>
-                        <div className="text-sm text-muted-foreground">{module.lessons.length} lessons • {Math.ceil((module.lessons.length * 15) / 60)} hours</div>
+                        <div className="text-sm text-muted-foreground">{module.lessons?.length || 0} lessons • {Math.ceil(((module.lessons?.length || 0) * 15) / 60)} hours</div>
                       </div>
                       <Separator />
                       <div className="p-4 space-y-2">
-                        {module.lessons.slice(0, 3).map((lesson) => (
+                        {module.lessons?.slice(0, 3).map((lesson) => (
                           <div key={lesson.id} className="flex items-center justify-between">
                             <div className="flex items-center">
                               {isEnrolled ? (
@@ -241,9 +252,9 @@ const CourseDetailPage = () => {
                           </div>
                         ))}
                         
-                        {module.lessons.length > 3 && (
+                        {(module.lessons?.length || 0) > 3 && (
                           <div className="text-sm text-muted-foreground pl-6">
-                            + {module.lessons.length - 3} more lessons
+                            + {(module.lessons?.length || 0) - 3} more lessons
                           </div>
                         )}
                       </div>
