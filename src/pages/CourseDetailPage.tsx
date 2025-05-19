@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
@@ -66,8 +65,7 @@ const CourseDetailPage = () => {
   const handleEnroll = async () => {
     if (!user) {
       toast({
-        description: "Please sign in to enroll in this course",
-        variant: "destructive",
+        title: "Please sign in to enroll in this course",
       });
       return;
     }
