@@ -49,12 +49,17 @@ namespace YT {
   }
 
   interface Events {
-    onReady?: (event: CustomEvent) => void;
-    onStateChange?: (event: CustomEvent) => void;
-    onPlaybackQualityChange?: (event: CustomEvent) => void;
-    onPlaybackRateChange?: (event: CustomEvent) => void;
-    onError?: (event: CustomEvent) => void;
-    onApiChange?: (event: CustomEvent) => void;
+    onReady?: (event: YT.PlayerEvent) => void;
+    onStateChange?: (event: YT.PlayerEvent) => void;
+    onPlaybackQualityChange?: (event: YT.PlayerEvent) => void;
+    onPlaybackRateChange?: (event: YT.PlayerEvent) => void;
+    onError?: (event: YT.PlayerEvent) => void;
+    onApiChange?: (event: YT.PlayerEvent) => void;
+  }
+
+  interface PlayerEvent {
+    target: YT.Player;
+    data: any;
   }
 
   interface Player {
