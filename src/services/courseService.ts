@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabaseClient";
 
 // Course Type Interfaces
@@ -117,22 +116,47 @@ export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' 
   }
 };
 
-// Function to fetch all courses
-export const fetchAllCourses = async (): Promise<Course[]> => {
+// Add a function to create a course with creator_id
+export const createCourseWithCreator = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
   try {
     const { data, error } = await supabase
       .from('courses')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .insert([{ ...courseData, creator_id: creatorId }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating course:', error);
+      throw error;
+    }
+
+    return data as Course;
+  } catch (error) {
+    console.error('Error in createCourseWithCreator:', error);
+    return null;
+  }
+};
+
+// Function to fetch all courses
+export const fetchAllCourses = async (creatorId?: string): Promise<Course[]> => {
+  try {
+    let query = supabase.from('courses').select('*');
+    
+    // If creatorId is provided, filter by it
+    if (creatorId) {
+      query = query.eq('creator_id', creatorId);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching courses:', error);
-      return [];
+      throw error;
     }
 
-    return data || [];
+    return data as Course[];
   } catch (error) {
-    console.error('Error fetching courses:', error);
+    console.error('Error in fetchAllCourses:', error);
     return [];
   }
 };

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,19 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { CalendarIcon, Clock, MapPin, X, ExternalLink, Calendar, CreditCard, Settings, BookOpen, Star, Heart } from 'lucide-react';
+import { 
+  CalendarIcon, 
+  Clock, 
+  MapPin, 
+  X, 
+  ExternalLink, 
+  Calendar, 
+  BookOpen, 
+  Star, 
+  Heart,
+  Rocket,
+  Plus
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { ConsultationBooking, fetchUserBookings, cancelBooking } from '@/services/consultationService';
@@ -16,6 +28,7 @@ import { Registration, fetchUserRegistrations, cancelRegistration } from '@/serv
 import { Course, fetchCourseById } from '@/services/courseService';
 import { supabase } from '@/lib/supabaseClient';
 import { useFavorites } from '@/hooks/useFavorites';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface UserCourse {
   id: string;
@@ -36,6 +49,8 @@ const AccountPage = () => {
   const [enrolledCourses, setEnrolledCourses] = useState<UserCourse[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const [isCreator, setIsCreator] = useState(false);
+  const [processingCreatorSwitch, setProcessingCreatorSwitch] = useState(false);
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
@@ -47,8 +62,51 @@ const AccountPage = () => {
       
       loadUserData();
       loadEnrolledCourses();
+      checkCreatorStatus();
     }
   }, [user, loading, navigate]);
+
+  const checkCreatorStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_creator')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) throw error;
+      
+      setIsCreator(data?.is_creator || false);
+    } catch (error) {
+      console.error('Error checking creator status:', error);
+    }
+  };
+
+  const handleSwitchToCreator = async () => {
+    if (!user) return;
+    
+    setProcessingCreatorSwitch(true);
+    
+    try {
+      // Update the user's profile to set is_creator to true
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_creator: true })
+        .eq('id', user.id);
+        
+      if (error) throw error;
+      
+      setIsCreator(true);
+      toast.success('You are now a creator! You can create courses and events.');
+    } catch (error) {
+      console.error('Error switching to creator mode:', error);
+      toast.error('Failed to switch to creator mode. Please try again.');
+    } finally {
+      setProcessingCreatorSwitch(false);
+    }
+  };
 
   useEffect(() => {
     // Update enrolled courses when favorites change
@@ -262,34 +320,107 @@ const AccountPage = () => {
                   </Avatar>
                   <h2 className="text-xl font-bold">{user.user_metadata.full_name || 'User'}</h2>
                   <p className="text-muted-foreground">{user.email}</p>
+                  
+                  {isCreator && (
+                    <Badge className="mt-2 bg-gradient-to-r from-purple-500 to-indigo-500">Creator</Badge>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/consult">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Book Consultation
-                    </a>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/events">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      View Events
-                    </a>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/learning">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Browse Courses
-                    </a>
-                  </Button>
+                  {!isCreator ? (
+                    <Button 
+                      variant="default" 
+                      className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+                      onClick={handleSwitchToCreator}
+                      disabled={processingCreatorSwitch}
+                    >
+                      <Rocket className="mr-2 h-4 w-4" />
+                      {processingCreatorSwitch ? 'Switching...' : 'Switch to Creator'}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" className="w-full justify-start" asChild>
+                        <Link to="/creator/dashboard">
+                          <Rocket className="mr-2 h-4 w-4" />
+                          Creator Dashboard
+                        </Link>
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" asChild>
+                        <Link to="/creator/courses">
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          My Courses
+                        </Link>
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" asChild>
+                        <Link to="/creator/events">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          My Events
+                        </Link>
+                      </Button>
+                    </>
+                  )}
+                  
+                  <div className="border-t my-2 pt-2">
+                    <Button variant="outline" className="w-full justify-start" asChild>
+                      <Link to="/consult">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        Book Consultation
+                      </Link>
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" asChild>
+                      <Link to="/events">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        View Events
+                      </Link>
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" asChild>
+                      <Link to="/learning">
+                        <BookOpen className="mr-2 h-4 w-4" />
+                        Browse Courses
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+            
+            {isCreator && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle>Creator Tools</CardTitle>
+                  <CardDescription>
+                    Create and manage your content
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button className="w-full" asChild>
+                    <Link to="/creator/courses/create">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create New Course
+                    </Link>
+                  </Button>
+                  <Button className="w-full" asChild>
+                    <Link to="/creator/events/create">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create New Event
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
           
           {/* Main content */}
           <div className="lg:col-span-3">
+            {isCreator && (
+              <Alert className="mb-6 bg-gradient-to-r from-purple-100 to-indigo-100 border-purple-200">
+                <Rocket className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>You're now a creator!</strong> Explore your creator dashboard to start creating courses and events.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Tabs defaultValue="consultations">
               <TabsList className="grid w-full grid-cols-3 mb-8">
                 <TabsTrigger value="consultations">My Consultations</TabsTrigger>

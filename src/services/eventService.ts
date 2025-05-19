@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -365,5 +364,29 @@ export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
   } catch (error) {
     console.error('Error in fetchMobileOperators:', error);
     return [];
+  }
+};
+
+// Add a function to create an event with creator_id
+export const createEventWithCreator = async (
+  eventData: Partial<Event>, 
+  creatorId: string
+): Promise<Event | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .insert([{ ...eventData, creator_id: creatorId }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating event:', error);
+      throw error;
+    }
+
+    return data as Event;
+  } catch (error) {
+    console.error('Error in createEventWithCreator:', error);
+    return null;
   }
 };

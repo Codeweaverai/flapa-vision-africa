@@ -1,85 +1,83 @@
+// Import React and routing dependencies
+import { Routes, Route } from 'react-router-dom';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+// Import pages
+import HomePage from '@/pages/HomePage';
+import AboutPage from '@/pages/AboutPage';
+import ConsultPage from '@/pages/ConsultPage';
+import EventsPage from '@/pages/EventsPage';
+import EventDetailPage from '@/pages/EventDetailPage';
+import LearningPage from '@/pages/LearningPage';
+import CourseDetailPage from '@/pages/CourseDetailPage';
+import CourseLearningPage from '@/pages/CourseLearningPage';
+import AccountPage from '@/pages/AccountPage';
+import AuthPage from '@/pages/AuthPage';
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
+import PaymentCancelPage from '@/pages/PaymentCancelPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
-import Index from "./pages/Index";
-import AboutPage from "./pages/AboutPage";
-import VenturesPage from "./pages/VenturesPage";
-import SpeakingPage from "./pages/SpeakingPage";
-import AnimationsPage from "./pages/AnimationsPage";
-import LearningPage from "./pages/LearningPage";
-import EventsPage from "./pages/EventsPage";
-import ConsultPage from "./pages/ConsultPage";
-import AuthPage from "./pages/AuthPage";
-import AccountPage from "./pages/AccountPage";
-import PaymentResultPage from "./pages/PaymentResultPage";
-import AdminLogin from "./pages/admin/AdminLogin";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminEvents from "./pages/admin/AdminEvents";
-import AdminRegistrations from "./pages/admin/AdminRegistrations";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminSpeaking from "./pages/admin/AdminSpeaking";
-import AdminConsultations from "./pages/admin/AdminConsultations";
-import AdminSettings from "./pages/admin/AdminSettings";
-import EventForm from "./pages/admin/EventForm";
-import { AuthProvider } from "./contexts/AuthContext";
-import NotFound from "./pages/NotFound";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import AdminRoute from "./components/admin/AdminRoute";
-import CourseDetailPage from "./pages/CourseDetailPage";
-import AdminCourses from "./pages/admin/AdminCourses";
-import CourseForm from "./pages/admin/CourseForm";
-import CoursePlayerPage from "./pages/CoursePlayerPage";
-import CourseContentPage from "./pages/admin/CourseContentPage";
+// Import admin pages
+import AdminDashboard from '@/pages/admin/AdminDashboard';
+import AdminConsultations from '@/pages/admin/AdminConsultations';
+import AdminEvents from '@/pages/admin/AdminEvents';
+import AdminCourses from '@/pages/admin/AdminCourses';
+import AdminUsers from '@/pages/admin/AdminUsers';
+import AdminSettings from '@/pages/admin/AdminSettings';
+import EventForm from '@/pages/admin/EventForm';
+import CourseForm from '@/pages/admin/CourseForm';
+import CourseContentPage from '@/pages/admin/CourseContentPage';
 
-const queryClient = new QueryClient();
+// Import creator pages
+import CreatorDashboard from '@/pages/creator/CreatorDashboard';
+import CreatorCourses from '@/pages/creator/CreatorCourses';
+import CreatorEvents from '@/pages/creator/CreatorEvents';
+import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
+import CreatorEventForm from '@/pages/creator/CreatorEventForm';
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/ventures" element={<VenturesPage />} />
-            <Route path="/speaking" element={<SpeakingPage />} />
-            <Route path="/ai-animations" element={<AnimationsPage />} />
-            <Route path="/learning" element={<LearningPage />} />
-            <Route path="/learning/course/:courseId" element={<CourseDetailPage />} />
-            <Route path="/learning/player/:courseId" element={<CoursePlayerPage />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/consult" element={<ConsultPage />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/account" element={<AccountPage />} />
-            <Route path="/payment-result" element={<PaymentResultPage />} />
-            
-            {/* Admin Routes */}
-            <Route path="/admin-login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-            <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
-            <Route path="/admin/events/create" element={<AdminRoute><EventForm /></AdminRoute>} />
-            <Route path="/admin/events/edit/:id" element={<AdminRoute><EventForm /></AdminRoute>} />
-            <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
-            <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-            <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
-            <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
-            <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
-            <Route path="/admin/courses/create" element={<AdminRoute><CourseForm /></AdminRoute>} />
-            <Route path="/admin/courses/edit/:id" element={<AdminRoute><CourseForm /></AdminRoute>} />
-            <Route path="/admin/courses/content/:courseId" element={<AdminRoute><CourseContentPage /></AdminRoute>} />
-            <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<HomePage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/consult" element={<ConsultPage />} />
+      <Route path="/events" element={<EventsPage />} />
+      <Route path="/events/:eventId" element={<EventDetailPage />} />
+      <Route path="/learning" element={<LearningPage />} />
+      <Route path="/learning/course/:courseId" element={<CourseDetailPage />} />
+      <Route path="/learning/course/:courseId/learn" element={<CourseLearningPage />} />
+      <Route path="/account" element={<AccountPage />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/payment/success" element={<PaymentSuccessPage />} />
+      <Route path="/payment/cancel" element={<PaymentCancelPage />} />
+      
+      {/* Admin routes */}
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/consultations" element={<AdminConsultations />} />
+      <Route path="/admin/events" element={<AdminEvents />} />
+      <Route path="/admin/events/create" element={<EventForm />} />
+      <Route path="/admin/events/edit/:eventId" element={<EventForm />} />
+      <Route path="/admin/courses" element={<AdminCourses />} />
+      <Route path="/admin/courses/create" element={<CourseForm />} />
+      <Route path="/admin/courses/edit/:courseId" element={<CourseForm />} />
+      <Route path="/admin/courses/content/:courseId" element={<CourseContentPage />} />
+      <Route path="/admin/users" element={<AdminUsers />} />
+      <Route path="/admin/settings" element={<AdminSettings />} />
+      
+      {/* Creator Routes */}
+      <Route path="/creator/dashboard" element={<CreatorDashboard />} />
+      <Route path="/creator/courses" element={<CreatorCourses />} />
+      <Route path="/creator/events" element={<CreatorEvents />} />
+      <Route path="/creator/courses/create" element={<CreatorCourseForm />} />
+      <Route path="/creator/courses/edit/:courseId" element={<CreatorCourseForm />} />
+      <Route path="/creator/courses/content/:courseId" element={<CourseContentPage />} />
+      <Route path="/creator/events/create" element={<CreatorEventForm />} />
+      <Route path="/creator/events/edit/:eventId" element={<CreatorEventForm />} />
+      
+      {/* Catch-all route */}
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  );
+}
 
 export default App;
