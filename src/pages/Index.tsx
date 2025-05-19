@@ -7,7 +7,6 @@ import SpeakingSection from '@/components/home/SpeakingSection';
 import AnimationsSection from '@/components/home/AnimationsSection';
 import LearningSection from '@/components/home/LearningSection';
 import EventsSection from '@/components/home/EventsSection';
-import CoursesSection from '@/components/home/CoursesSection';
 import CallToAction from '@/components/home/CallToAction';
 
 const Index = () => {
@@ -16,7 +15,6 @@ const Index = () => {
       <HeroSection />
       <AboutSection />
       <VenturesSection />
-      <CoursesSection />
       <AnimationsSection />
       <SpeakingSection />
       <LearningSection />
