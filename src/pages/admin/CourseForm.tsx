@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,6 +26,7 @@ const formSchema = z.object({
   is_free: z.boolean().default(true),
   price: z.coerce.number().min(0, { message: 'Price cannot be negative.' }),
   certificate_enabled: z.boolean().default(false),
+  is_published: z.boolean().default(false), // Added missing is_published property
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -57,6 +57,7 @@ const CourseForm = ({ isCreator = false }: CourseFormProps) => {
       is_free: true,
       price: 0,
       certificate_enabled: false,
+      is_published: false, // Added default value for is_published
     },
   });
 
@@ -77,6 +78,7 @@ const CourseForm = ({ isCreator = false }: CourseFormProps) => {
             is_free: courseData.is_free,
             price: courseData.price,
             certificate_enabled: courseData.certificate_enabled,
+            is_published: courseData.is_published || false, // Added is_published
           });
           
           if (courseData.thumbnail_url) {

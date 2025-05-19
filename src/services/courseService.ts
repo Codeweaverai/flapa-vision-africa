@@ -122,9 +122,24 @@ export const createCourseWithCreator = async (
   creatorId: string
 ): Promise<Course | null> => {
   try {
+    // Make sure required fields are present
+    if (!courseData.title || !courseData.description || !courseData.summary || 
+        !courseData.category || !courseData.difficulty_level || 
+        courseData.duration_minutes === undefined) {
+      console.error('Error creating course: Missing required fields');
+      return null;
+    }
+    
+    // Create the complete course object with required fields
+    const courseWithCreator = {
+      ...courseData,
+      creator_id: creatorId,
+      is_published: courseData.is_published ?? false,
+    };
+
     const { data, error } = await supabase
       .from('courses')
-      .insert([{ ...courseData, creator_id: creatorId }])
+      .insert([courseWithCreator])
       .select()
       .single();
 

@@ -373,9 +373,22 @@ export const createEventWithCreator = async (
   creatorId: string
 ): Promise<Event | null> => {
   try {
+    // Make sure required fields are present
+    if (!eventData.title || !eventData.event_type || 
+        !eventData.start_time || !eventData.end_time) {
+      console.error('Error creating event: Missing required fields');
+      return null;
+    }
+    
+    // Create the complete event object with required fields
+    const eventWithCreator = {
+      ...eventData,
+      creator_id: creatorId,
+    };
+
     const { data, error } = await supabase
       .from('events')
-      .insert([{ ...eventData, creator_id: creatorId }])
+      .insert([eventWithCreator])
       .select()
       .single();
 
