@@ -8,35 +8,18 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { CalendarIcon, Clock, MapPin, X, ExternalLink, Calendar, CreditCard, Settings, BookOpen, Star, Heart } from 'lucide-react';
+import { CalendarIcon, Clock, MapPin, X, ExternalLink, Calendar, CreditCard, Settings } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { ConsultationBooking, fetchUserBookings, cancelBooking } from '@/services/consultationService';
 import { Registration, fetchUserRegistrations, cancelRegistration } from '@/services/eventService';
-import { Course, fetchCourseById } from '@/services/courseService';
-import { supabase } from '@/lib/supabaseClient';
-import { useFavorites } from '@/hooks/useFavorites';
-
-interface UserCourse {
-  id: string;
-  enrollment_id: string;
-  course_id: string;
-  enrollment_date: string;
-  is_completed: boolean;
-  is_favorite: boolean;
-  course: Course | null;
-  progress_percentage: number;
-}
 
 const AccountPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<ConsultationBooking[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [enrolledCourses, setEnrolledCourses] = useState<UserCourse[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [loadingCourses, setLoadingCourses] = useState(true);
-  const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
     if (!loading) {
@@ -46,21 +29,8 @@ const AccountPage = () => {
       }
       
       loadUserData();
-      loadEnrolledCourses();
     }
   }, [user, loading, navigate]);
-
-  useEffect(() => {
-    // Update enrolled courses when favorites change
-    if (enrolledCourses.length > 0 && favorites) {
-      setEnrolledCourses(prev => 
-        prev.map(course => ({
-          ...course,
-          is_favorite: isFavorite(course.course_id)
-        }))
-      );
-    }
-  }, [favorites]);
 
   const loadUserData = async () => {
     setLoadingData(true);
@@ -75,73 +45,6 @@ const AccountPage = () => {
       toast.error('Failed to load your account data');
     } finally {
       setLoadingData(false);
-    }
-  };
-
-  const loadEnrolledCourses = async () => {
-    if (!user) return;
-    
-    setLoadingCourses(true);
-    try {
-      // Get all enrollments for the user
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('course_enrollments')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (enrollmentsError) throw enrollmentsError;
-            
-      // For each enrollment, get the actual course data and progress
-      const coursesWithDetails = await Promise.all((enrollments || []).map(async (enrollment) => {
-        // Get the course data
-        const course = await fetchCourseById(enrollment.course_id);
-        
-        // Get progress data for this enrollment
-        const { data: progresses, error: progressError } = await supabase
-          .from('lesson_progress')
-          .select('*')
-          .eq('enrollment_id', enrollment.id);
-          
-        if (progressError) throw progressError;
-        
-        // Calculate progress percentage (if there are lessons)
-        let progressPercentage = 0;
-        if (course?.modules?.length) {
-          let totalLessons = 0;
-          let completedLessons = 0;
-          
-          course.modules.forEach(module => {
-            if (module.lessons) {
-              totalLessons += module.lessons.length;
-              module.lessons.forEach(lesson => {
-                if ((progresses || []).some(p => p.lesson_id === lesson.id && p.is_completed)) {
-                  completedLessons++;
-                }
-              });
-            }
-          });
-          
-          progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-        }
-        
-        return {
-          id: enrollment.id,
-          enrollment_id: enrollment.id,
-          course_id: enrollment.course_id,
-          enrollment_date: enrollment.enrollment_date || "",
-          is_completed: enrollment.is_completed || false,
-          is_favorite: isFavorite(enrollment.course_id),
-          course,
-          progress_percentage: progressPercentage
-        };
-      }));
-      
-      setEnrolledCourses(coursesWithDetails);
-    } catch (error) {
-      console.error('Error loading enrolled courses:', error);
-      toast.error('Failed to load your courses');
-    } finally {
-      setLoadingCourses(false);
     }
   };
 
@@ -162,43 +65,6 @@ const AccountPage = () => {
         setRegistrations(prev => prev.filter(reg => reg.id !== registrationId));
         toast.success('Event registration cancelled successfully');
       }
-    }
-  };
-
-  const handleToggleFavorite = async (courseId: string, isFavorited: boolean) => {
-    if (!user) return;
-    
-    try {
-      if (isFavorited) {
-        // Remove from favorites
-        await removeFavorite(courseId);
-        
-        setEnrolledCourses(prev => 
-          prev.map(course => 
-            course.course_id === courseId 
-              ? {...course, is_favorite: false} 
-              : course
-          )
-        );
-        
-        toast.success('Course removed from favorites');
-      } else {
-        // Add to favorites
-        await addFavorite(courseId);
-        
-        setEnrolledCourses(prev => 
-          prev.map(course => 
-            course.course_id === courseId 
-              ? {...course, is_favorite: true} 
-              : course
-          )
-        );
-        
-        toast.success('Course added to favorites');
-      }
-    } catch (error) {
-      console.error('Error updating course favorite status:', error);
-      toast.error('Failed to update favorite status');
     }
   };
 
@@ -277,12 +143,6 @@ const AccountPage = () => {
                       View Events
                     </a>
                   </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/learning">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Browse Courses
-                    </a>
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -291,10 +151,9 @@ const AccountPage = () => {
           {/* Main content */}
           <div className="lg:col-span-3">
             <Tabs defaultValue="consultations">
-              <TabsList className="grid w-full grid-cols-3 mb-8">
+              <TabsList className="grid w-full grid-cols-2 mb-8">
                 <TabsTrigger value="consultations">My Consultations</TabsTrigger>
                 <TabsTrigger value="events">Event Registrations</TabsTrigger>
-                <TabsTrigger value="courses">My Courses</TabsTrigger>
               </TabsList>
               
               <TabsContent value="consultations">
@@ -493,107 +352,6 @@ const AccountPage = () => {
                                       Cancel
                                     </Button>
                                   )}
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="courses">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>My Learning Journey</CardTitle>
-                    <CardDescription>
-                      View and access your enrolled courses
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {loadingCourses ? (
-                      <div className="py-8 text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                        <p className="mt-2 text-muted-foreground">Loading your courses...</p>
-                      </div>
-                    ) : enrolledCourses.length === 0 ? (
-                      <div className="py-12 text-center border rounded-lg bg-muted/10">
-                        <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="font-medium text-lg mt-4 mb-2">No courses enrolled yet</h3>
-                        <p className="text-muted-foreground mb-6">Explore our courses and start your learning journey</p>
-                        <Button asChild>
-                          <a href="/learning">Browse Courses</a>
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {enrolledCourses.map((course) => (
-                          <Card key={course.enrollment_id} className="overflow-hidden">
-                            <div className="grid md:grid-cols-3 gap-4">
-                              <div className="md:col-span-1">
-                                {course.course?.thumbnail_url ? (
-                                  <img 
-                                    src={course.course.thumbnail_url} 
-                                    alt={course.course.title} 
-                                    className="w-full h-full object-cover min-h-[180px]"
-                                  />
-                                ) : (
-                                  <div className="flex items-center justify-center bg-muted h-full min-h-[180px]">
-                                    <BookOpen className="h-16 w-16 text-muted-foreground/40" />
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="md:col-span-2 p-4 md:p-6 flex flex-col h-full">
-                                <div className="flex items-start justify-between mb-2">
-                                  <div>
-                                    <div className="flex gap-2 mb-2">
-                                      <Badge variant="outline">{course.course?.category || 'Course'}</Badge>
-                                      <Badge variant="outline">{course.course?.difficulty_level || 'All Levels'}</Badge>
-                                      {course.is_completed && (
-                                        <Badge variant="default" className="bg-green-500">Completed</Badge>
-                                      )}
-                                    </div>
-                                    <h3 className="text-xl font-bold mb-1">{course.course?.title}</h3>
-                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{course.course?.summary}</p>
-                                  </div>
-                                  
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    onClick={() => handleToggleFavorite(course.course_id, course.is_favorite)}
-                                    className={course.is_favorite ? "text-red-500" : "text-muted-foreground"}
-                                  >
-                                    <Heart className={course.is_favorite ? "fill-current" : ""} />
-                                  </Button>
-                                </div>
-                                
-                                <div className="mt-auto">
-                                  <div className="flex items-center mb-2">
-                                    <div className="text-sm font-medium mr-2">Progress:</div>
-                                    <div className="w-full bg-muted rounded-full h-2.5">
-                                      <div 
-                                        className="bg-primary h-2.5 rounded-full" 
-                                        style={{ width: `${Math.round(course.progress_percentage)}%` }}
-                                      ></div>
-                                    </div>
-                                    <div className="ml-2 text-sm font-medium">{Math.round(course.progress_percentage)}%</div>
-                                  </div>
-                                  
-                                  <div className="flex items-center text-sm text-muted-foreground mb-4">
-                                    <Calendar className="h-4 w-4 mr-1" />
-                                    <span>Enrolled: {formatDateTime(course.enrollment_date)}</span>
-                                  </div>
-                                  
-                                  <div className="flex justify-end">
-                                    <Button asChild>
-                                      <a href={`/learning/course/${course.course_id}`}>
-                                        {course.progress_percentage > 0 ? 'Continue Learning' : 'Start Course'}
-                                      </a>
-                                    </Button>
-                                  </div>
                                 </div>
                               </div>
                             </div>
