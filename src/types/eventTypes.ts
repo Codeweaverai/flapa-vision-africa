@@ -4,9 +4,22 @@ export interface EventWithRegistrations {
   id: string;
   title: string;
   description: string;
-  date: string;
+  // Allow both date and start_time fields for flexibility
+  date?: string;
+  start_time?: string;
   location: string;
   registrations: CombinedRegistration[];
+  // Additional fields from the API
+  registrations_count?: number;
+  bookings_count?: any;
+  total_attendees?: any;
+  capacity?: number;
+  created_at?: string;
+  creator_id?: string;
+  currency?: string;
+  end_time?: string;
+  event_type?: string;
+  updated_at?: string;
   [key: string]: any; // Allow for additional properties
 }
 
@@ -31,6 +44,7 @@ export interface CourseWithEnrollment {
   title: string;
   description: string;
   thumbnail_url?: string;
+  image_url?: string; // Add this field
   duration_minutes?: number;
   price?: number;
   is_free?: boolean;

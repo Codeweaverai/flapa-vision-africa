@@ -59,10 +59,7 @@ const AccountPage = () => {
           }
         } catch (error: any) {
           console.error("Error fetching profile:", error.message);
-          toast({
-            description: "Failed to fetch profile data.",
-            // variant: "destructive",
-          });
+          toast("Failed to fetch profile data.");
         } finally {
           setLoading(false);
         }
@@ -103,26 +100,23 @@ const AccountPage = () => {
         avatar_url: newAvatarUrl,
       }));
 
-      // Update AuthContext if needed (if it manages more than just the user object)
-      updateUser({
-        ...user,
-        user_metadata: {
-          ...user?.user_metadata,
-          full_name: newFullName,
-          avatar_url: newAvatarUrl,
-        },
-      });
+      // Update AuthContext if needed
+      if (user) {
+        updateUser({
+          ...user,
+          user_metadata: {
+            ...user?.user_metadata,
+            full_name: newFullName,
+            avatar_url: newAvatarUrl,
+          },
+        });
+      }
 
-      toast({
-        description: "Profile updated successfully!",
-      });
+      toast("Profile updated successfully!");
       setEditMode(false);
     } catch (error: any) {
       console.error("Error updating profile:", error.message);
-      toast({
-        description: "Failed to update profile.",
-        // variant: "destructive",
-      });
+      toast("Failed to update profile.");
     } finally {
       setLoading(false);
     }
@@ -147,15 +141,10 @@ const AccountPage = () => {
         is_creator: true,
       }));
       
-      toast({
-        description: "Creator access requested!",
-      });
+      toast("Creator access requested!");
     } catch (error: any) {
       console.error("Error requesting creator access:", error.message);
-      toast({
-        description: "Failed to request creator access.",
-        // variant: "destructive",
-      });
+      toast("Failed to request creator access.");
     } finally {
       setLoading(false);
     }
