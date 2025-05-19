@@ -9,9 +9,10 @@ import {
   Award, 
   Check, 
   ExternalLink, 
-  FileText as FileCheck, 
-  Play as PlayCircle, 
-  Lock 
+  FileText, 
+  Play, 
+  Lock,
+  CheckCircle 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -146,7 +147,7 @@ const CourseDetailPage = () => {
                   <span>{course.modules?.length || 0} modules</span>
                 </div>
                 <div className="flex items-center">
-                  <FileCheck className="mr-2 h-5 w-5 text-primary" />
+                  <FileText className="mr-2 h-5 w-5 text-primary" />
                   <span>{lessonCount} lessons</span>
                 </div>
                 {course.certificate_enabled && (
@@ -160,7 +161,7 @@ const CourseDetailPage = () => {
               {isEnrolled ? (
                 <Button size="lg" asChild>
                   <Link to={`/learning/player/${course.id}`}>
-                    <PlayCircle className="mr-2 h-5 w-5" />
+                    <Play className="mr-2 h-5 w-5" />
                     Continue Learning
                   </Link>
                 </Button>
@@ -242,7 +243,7 @@ const CourseDetailPage = () => {
                           <div key={lesson.id} className="flex items-center justify-between">
                             <div className="flex items-center">
                               {isEnrolled ? (
-                                <PlayCircle className="h-4 w-4 text-primary mr-2" />
+                                <Play className="h-4 w-4 text-primary mr-2" />
                               ) : (
                                 <Lock className="h-4 w-4 text-muted-foreground mr-2" />
                               )}
@@ -273,11 +274,11 @@ const CourseDetailPage = () => {
                   <h3 className="font-semibold mb-2">This course includes:</h3>
                   <ul className="space-y-3">
                     <li className="flex items-center">
-                      <PlayCircle className="h-5 w-5 text-primary mr-2" />
+                      <Play className="h-5 w-5 text-primary mr-2" />
                       <span>{Math.ceil(course.duration_minutes / 60)} hours of video content</span>
                     </li>
                     <li className="flex items-center">
-                      <FileCheck className="h-5 w-5 text-primary mr-2" />
+                      <FileText className="h-5 w-5 text-primary mr-2" />
                       <span>{lessonCount} lessons</span>
                     </li>
                     {course.certificate_enabled && (
@@ -298,7 +299,7 @@ const CourseDetailPage = () => {
                 {isEnrolled ? (
                   <Button className="w-full" asChild>
                     <Link to={`/learning/player/${course.id}`}>
-                      <PlayCircle className="mr-2 h-5 w-5" />
+                      <Play className="mr-2 h-5 w-5" />
                       Continue Learning
                     </Link>
                   </Button>

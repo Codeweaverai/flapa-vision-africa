@@ -76,13 +76,17 @@ const AccountPage = () => {
               : reg
           )
         );
-        toast.success("Registration cancelled successfully");
+        toast("Registration cancelled successfully");
       } else {
-        toast.error("Failed to cancel registration");
+        toast("Failed to cancel registration", {
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error("Error cancelling registration:", error);
-      toast.error("An error occurred while cancelling your registration");
+      toast("An error occurred while cancelling your registration", {
+        variant: "destructive"
+      });
     } finally {
       setCancellingId(null);
     }
