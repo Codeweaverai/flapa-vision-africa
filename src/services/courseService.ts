@@ -256,7 +256,7 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
       const lessonsWithQuizzes = await Promise.all(lessons.map(async (lesson) => {
         const { data: quizzes, error: quizzesError } = await supabase
           .from('quizzes')
-          .select('*, questions:quiz_questions(*,answers:quiz_answers(*))')
+          .select('*')
           .eq('lesson_id', lesson.id);
         
         if (quizzesError) throw quizzesError;
@@ -270,7 +270,7 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
       // Check if the module has a quiz
       const { data: moduleQuizzes, error: moduleQuizzesError } = await supabase
         .from('quizzes')
-        .select('*, questions:quiz_questions(*,answers:quiz_answers(*))')
+        .select('*')
         .eq('module_id', module.id);
       
       if (moduleQuizzesError) throw moduleQuizzesError;
