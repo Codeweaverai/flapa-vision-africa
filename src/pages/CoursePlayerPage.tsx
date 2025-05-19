@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-// Simplified types to avoid excessive type instantiation
+// Types with non-recursive definitions to avoid excessive type instantiation
 interface SimplifiedLesson {
   id: string;
   title: string;
@@ -46,15 +46,12 @@ interface SimplifiedCourse {
   modules: SimplifiedModule[];
 }
 
-// Simplified component props to avoid deep instantiation
-interface CoursePlayerProps {
-  moduleId?: string;
-  lessonId?: string;
-}
-
-// Remove nested recursive types causing deep instantiation
-const CoursePlayerPage: React.FC<CoursePlayerProps> = () => {
-  const { courseId, moduleId, lessonId } = useParams();
+const CoursePlayerPage = () => {
+  const { courseId, moduleId, lessonId } = useParams<{
+    courseId?: string;
+    moduleId?: string;
+    lessonId?: string;
+  }>();
   const { user } = useAuth();
   const [course, setCourse] = useState<SimplifiedCourse | null>(null);
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
@@ -178,7 +175,6 @@ const CoursePlayerPage: React.FC<CoursePlayerProps> = () => {
     }
   };
   
-  // Simplified fetch function to avoid deep type instantiation
   const fetchCourseData = async () => {
     if (!courseId || !user) return;
     

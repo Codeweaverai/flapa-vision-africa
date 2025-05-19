@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Player } from '@vimeo/player';
+import Player from '@vimeo/player';
 import { toast } from 'sonner';
 import Layout from '@/components/layout/Layout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,13 +14,11 @@ import {
   saveLessonProgress
 } from '@/services/courseService';
 
-interface CourseLearningPageParams {
-  courseId?: string;
-  lessonId?: string;
-}
-
 const CourseLearningPage = () => {
-  const { courseId, lessonId } = useParams<CourseLearningPageParams>();
+  const params = useParams<{courseId: string; lessonId?: string}>();
+  const courseId = params.courseId;
+  const lessonId = params.lessonId;
+  
   const [course, setCourse] = useState<Course | null>(null);
   const [currentModule, setCurrentModule] = useState<Module | null>(null);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
@@ -53,14 +52,18 @@ const CourseLearningPage = () => {
 
   useEffect(() => {
     if (currentLesson && currentLesson.video_url) {
-      const newPlayer = new Player('vimeo-player', {
-        id: parseInt(currentLesson.video_url.split('/').pop() || '0', 10),
+      const videoContainer = document.getElementById('vimeo-player');
+      if (!videoContainer) return;
+      
+      const videoId = currentLesson.video_url.split('/').pop() || '0';
+      const newPlayer = new Player(videoContainer, {
+        id: parseInt(videoId, 10),
         width: 640
       });
 
       setPlayer(newPlayer);
 
-      newPlayer.on('timeupdate', (data) => {
+      newPlayer.on('timeupdate', (data: any) => {
         setProgress(data.percent);
       });
 
@@ -143,7 +146,12 @@ const CourseLearningPage = () => {
               <p>{currentLesson?.description}</p>
             </div>
 
-            <button onClick={handleSaveProgress}>Save Progress</button>
+            <button 
+              onClick={handleSaveProgress}
+              className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition"
+            >
+              Save Progress
+            </button>
           </div>
 
           {/* Sidebar */}

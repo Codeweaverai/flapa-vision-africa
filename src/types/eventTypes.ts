@@ -1,35 +1,49 @@
 
-import { Event, Registration } from '@/services/eventService';
-import { Course } from '@/services/courseService';
-
-export interface RegistrationWithEvent extends Registration {
-  event: Event;
+// Add missing types for events and registrations
+export interface EventWithRegistrations {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  registrations: CombinedRegistration[];
+  [key: string]: any; // Allow for additional properties
 }
 
-export interface CourseWithEnrollment extends Course {
+export interface CombinedRegistration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  registration_date: string;
+  status: string;
+  payment_status: string;
+  user: {
+    email: string;
+    full_name: string;
+    [key: string]: any;
+  };
+  [key: string]: any; // Allow for additional properties
+}
+
+// Course interfaces
+export interface CourseWithEnrollment {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail_url?: string;
+  duration_minutes?: number;
+  price?: number;
+  is_free?: boolean;
+  category?: string;
+  difficulty_level?: string;
+  created_at?: string;
+  updated_at?: string;
+  creator_id?: string;
   enrollment?: {
     id: string;
     enrollment_date: string;
     completion_date?: string;
     is_completed: boolean;
   };
-  image_url?: string; // Adding this property
-}
-
-// New interfaces needed for admin components
-export interface CombinedRegistration extends Registration {
-  events?: Event;
-  profiles?: {
-    id: string;
-    full_name?: string;
-    email?: string;
-    avatar_url?: string;
-  };
-  source_table?: 'event_bookings' | 'registrations';
-}
-
-export interface EventWithRegistrations extends Event {
-  registrations_count: number;
-  bookings_count: number;
-  total_attendees: number;
+  [key: string]: any; // Allow for additional properties
 }
