@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 
 const CoursePlayerPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -51,28 +51,137 @@ const CoursePlayerPage = () => {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [quizScore, setQuizScore] = useState<number | null>(null);
   const [quizPassed, setQuizPassed] = useState<boolean>(false);
-  const [videoElement, setVideoElement] = useState<HTMLIFrameElement | null>(null);
   const [certificateDialogOpen, setCertificateDialogOpen] = useState<boolean>(false);
   const [certificateUrl, setCertificateUrl] = useState<string | null>(null);
+  
+  // Video player reference
+  const videoPlayerRef = useRef<HTMLDivElement>(null);
+  const youtubePlayerRef = useRef<any>(null);
+  const playerTimerRef = useRef<number | null>(null);
+
+  // Load YouTube API
+  useEffect(() => {
+    // Add YouTube API script if it's not already added
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+    
+    // Define the onYouTubeIframeAPIReady function
+    window.onYouTubeIframeAPIReady = loadVideoIfReady;
+    
+    return () => {
+      // Cleanup timer when component unmounts
+      if (playerTimerRef.current) {
+        clearInterval(playerTimerRef.current);
+      }
+    };
+  }, []);
+  
+  // Initialize YouTube player when active lesson changes
+  useEffect(() => {
+    loadVideoIfReady();
+  }, [activeLessonIndex, activeModuleIndex, course]);
+  
+  // Function to load the YouTube player
+  const loadVideoIfReady = () => {
+    const activeLesson = getActiveLesson();
+    
+    // Clean up existing player and interval
+    if (youtubePlayerRef.current) {
+      youtubePlayerRef.current.destroy();
+      youtubePlayerRef.current = null;
+    }
+    
+    if (playerTimerRef.current) {
+      clearInterval(playerTimerRef.current);
+      playerTimerRef.current = null;
+    }
+    
+    // Only proceed if we have a video URL
+    if (!activeLesson?.video_url || !window.YT || !window.YT.Player || isCurrentItemQuiz()) {
+      return;
+    }
+    
+    // Extract video ID from YouTube URL
+    const videoId = extractYouTubeVideoId(activeLesson.video_url);
+    if (!videoId) return;
+    
+    // Create YouTube Player
+    if (videoPlayerRef.current) {
+      try {
+        youtubePlayerRef.current = new window.YT.Player(videoPlayerRef.current, {
+          videoId: videoId,
+          playerVars: {
+            start: videoPosition,
+            controls: 1,
+            modestbranding: 1,
+            rel: 0,
+            showinfo: 0,
+            fs: 1,
+            playsinline: 1
+          },
+          events: {
+            onReady: onPlayerReady,
+            onStateChange: onPlayerStateChange
+          }
+        });
+        
+        // Setup interval to track progress
+        playerTimerRef.current = window.setInterval(() => {
+          if (youtubePlayerRef.current && youtubePlayerRef.current.getCurrentTime) {
+            const currentTime = Math.floor(youtubePlayerRef.current.getCurrentTime());
+            setVideoPosition(currentTime);
+            
+            // Save progress every 10 seconds
+            if (currentTime % 10 === 0 && enrollmentId && activeLesson.id) {
+              saveVideoProgress(activeLesson.id, currentTime);
+            }
+          }
+        }, 1000);
+      } catch (error) {
+        console.error("Error initializing YouTube player:", error);
+      }
+    }
+  };
+  
+  // Extract YouTube video ID from URL
+  const extractYouTubeVideoId = (url: string): string | null => {
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+  };
+  
+  // YouTube player event handlers
+  const onPlayerReady = (event: any) => {
+    // Player is ready, can start playback if needed
+    console.log("YouTube player is ready");
+    if (videoPosition > 0) {
+      event.target.seekTo(videoPosition);
+    }
+  };
+  
+  const onPlayerStateChange = (event: any) => {
+    // Track player state changes if needed
+    if (event.data === window.YT.PlayerState.ENDED) {
+      console.log("Video ended");
+      // Maybe auto-mark as complete?
+    }
+  };
 
   // Track video progress with a timer
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (videoElement && videoElement.contentWindow) {
-        // Try to get current time from YouTube iframe
-        // This is a simplified version - actual implementation would need YouTube API
-        const currentTime = videoPosition + 1;
-        setVideoPosition(currentTime);
-        
-        // Save progress every 10 seconds
-        if (currentTime % 10 === 0 && enrollmentId && activeLesson?.id) {
-          saveVideoProgress(activeLesson.id, currentTime);
-        }
+    // This is now handled by the YouTube API timer
+    return () => {
+      // Cleanup timer when dependencies change
+      if (playerTimerRef.current) {
+        clearInterval(playerTimerRef.current);
+        playerTimerRef.current = null;
       }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [videoElement, videoPosition, enrollmentId]);
+    };
+  }, [enrollmentId]);
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -465,14 +574,7 @@ const CoursePlayerPage = () => {
                   </Button>
                 </div>
               ) : activeLesson?.video_url ? (
-                <iframe
-                  ref={(el) => setVideoElement(el)}
-                  src={`${activeLesson.video_url.replace('watch?v=', 'embed/')}?start=${videoPosition}`}
-                  title={activeLesson.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full h-full"
-                ></iframe>
+                <div ref={videoPlayerRef} className="w-full h-full" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <BookOpen className="h-16 w-16 text-gray-500" />
