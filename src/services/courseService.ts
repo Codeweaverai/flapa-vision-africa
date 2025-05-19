@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
@@ -226,10 +225,19 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
     if (lessonsError) throw lessonsError;
     
     // Organize lessons by module
-    const modulesWithLessons = modules.map(module => ({
-      ...module,
-      lessons: lessons.filter(lesson => lesson.module_id === module.id)
-    }));
+    const modulesWithLessons = modules.map(module => {
+      const moduleLessons = lessons
+        .filter(lesson => lesson.module_id === module.id)
+        .map(lesson => ({
+          ...lesson,
+          content_type: lesson.video_url ? 'video' : 'text'
+        } as Lesson));
+      
+      return {
+        ...module,
+        lessons: moduleLessons
+      } as Module;
+    });
     
     // Return the complete course data
     return {
@@ -244,7 +252,7 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
 };
 
 // Implement module-related functions
-export const createModule = async (moduleData: Partial<Module>): Promise<Module | null> => {
+export const createModule = async (moduleData: Partial<Module> & { course_id: string, title: string, order_index: number }): Promise<Module | null> => {
   try {
     const { data, error } = await supabase
       .from('course_modules')
@@ -296,7 +304,7 @@ export const deleteModule = async (moduleId: string): Promise<boolean> => {
 };
 
 // Implement lesson-related functions
-export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson | null> => {
+export const createLesson = async (lessonData: Partial<Lesson> & { module_id: string, title: string, order_index: number }): Promise<Lesson | null> => {
   try {
     const { data, error } = await supabase
       .from('lessons')
@@ -431,7 +439,22 @@ export const fetchAllCourses = async (): Promise<Course[]> => {
   }
 };
 
-export const createCourseWithCreator = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
+export const createCourseWithCreator = async (
+  courseData: {
+    title: string;
+    summary: string;
+    description: string;
+    duration_minutes: number;
+    category: string;
+    difficulty_level: string;
+    is_free?: boolean;
+    price?: number;
+    certificate_enabled?: boolean;
+    is_published?: boolean;
+    thumbnail_url?: string;
+  },
+  creatorId: string
+): Promise<Course | null> => {
   try {
     const { data, error } = await supabase
       .from('courses')

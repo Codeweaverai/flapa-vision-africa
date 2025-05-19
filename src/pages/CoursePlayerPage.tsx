@@ -91,7 +91,7 @@ const CoursePlayerPage: React.FC = () => {
     setCurrentLesson(lesson);
   };
 
-  const handleVideoLoaded = () => {
+  const handleLoaded = () => {
     setVideoLoading(false);
   };
 
@@ -295,7 +295,7 @@ const CoursePlayerPage: React.FC = () => {
         <video
           ref={videoRef}
           controls
-          onLoadedData={handleVideoLoaded}
+          onLoadedData={handleLoaded}
           onError={handleVideoError}
           onTimeUpdate={handleTimeUpdate}
           onEnded={handleVideoEnded}

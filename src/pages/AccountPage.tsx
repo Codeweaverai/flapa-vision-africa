@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { Edit, Check, User, Mail, Lock, ArrowLeft, Calendar, Graduation, BookOpen } from 'lucide-react';
+import { Edit, Check, User, Mail, Lock, ArrowLeft, Calendar, GraduationCap, BookOpen } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
