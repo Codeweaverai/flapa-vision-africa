@@ -14,7 +14,11 @@ import { toast } from 'sonner';
 import Layout from '@/components/layout/Layout';
 import { Course, updateCourse, createCourseWithCreator } from '@/services/courseService';
 
-const CourseForm = () => {
+interface CourseFormProps {
+  creatorId?: string;
+}
+
+const CourseForm = ({ creatorId }: CourseFormProps) => {
   const { user } = useAuth();
   const [course, setCourse] = useState<Partial<Course>>({
     title: '',
@@ -94,8 +98,8 @@ const CourseForm = () => {
     setSubmitting(true);
     
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
         toast.error('Not authenticated');
         return;
       }
@@ -135,6 +139,9 @@ const CourseForm = () => {
         }
       } else {
         // Create new course, making sure all required fields are included
+        // Use the provided creatorId if available, otherwise use the current user's id
+        const effectiveCreatorId = creatorId || userData.user.id;
+        
         const result = await createCourseWithCreator({
           title: course.title!,
           summary: course.summary!,
@@ -147,7 +154,7 @@ const CourseForm = () => {
           is_published: course.is_published,
           certificate_enabled: course.certificate_enabled,
           thumbnail_url: thumbnailUrl
-        }, user.user.id);
+        }, effectiveCreatorId);
 
         if (result) {
           toast.success('Course created successfully!');

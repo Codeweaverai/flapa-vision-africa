@@ -42,6 +42,7 @@ interface NewEvent {
 
 interface EventFormProps {
   isCreator?: boolean;
+  creatorId?: string;
 }
 
 const formSchema = z.object({
@@ -58,7 +59,7 @@ const formSchema = z.object({
   currency: z.string().default('USD'),
 });
 
-const EventForm = ({ isCreator = false }: EventFormProps) => {
+const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -181,7 +182,9 @@ const EventForm = ({ isCreator = false }: EventFormProps) => {
         };
         
         if (isCreator) {
-          eventResult = await createEventWithCreator(newEventData, user.id);
+          // Use the provided creatorId for creator or fall back to the current user's id
+          const effectiveCreatorId = creatorId || user.id;
+          eventResult = await createEventWithCreator(newEventData, effectiveCreatorId);
           if (eventResult) {
             toast.success('Event created successfully!');
           }
