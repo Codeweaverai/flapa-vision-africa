@@ -66,9 +66,7 @@ const CourseDetailPage = () => {
 
   const handleEnroll = async () => {
     if (!user) {
-      toast({
-        title: "Please sign in to enroll in this course",
-      });
+      toast("Please sign in to enroll in this course");
       return;
     }
 

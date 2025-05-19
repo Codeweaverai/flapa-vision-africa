@@ -31,7 +31,7 @@ const AdminRegistrations = () => {
         .from('events')
         .select(`
           *,
-          registrations:event_registrations(count)
+          registrations(count)
         `)
         .order('start_time', { ascending: false });
 
@@ -43,7 +43,7 @@ const AdminRegistrations = () => {
       const eventsWithRegistrations = await Promise.all(
         data.map(async (event) => {
           const { data: registrations, error: regError } = await supabase
-            .from('event_registrations')
+            .from('registrations')
             .select(`
               *,
               user:profiles(id, email, full_name)

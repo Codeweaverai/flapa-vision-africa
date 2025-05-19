@@ -27,7 +27,8 @@ export interface CombinedRegistration {
   id: string;
   event_id: string;
   user_id: string;
-  registration_date: string;
+  registration_date?: string;
+  created_at?: string;
   status: string;
   payment_status: string;
   user: {
@@ -59,5 +60,14 @@ export interface CourseWithEnrollment {
     completion_date?: string;
     is_completed: boolean;
   };
+  // Add modules for course detail page
+  modules?: {
+    id: string;
+    title: string;
+    lessons?: {
+      id: string;
+      title: string;
+    }[];
+  }[];
   [key: string]: any; // Allow for additional properties
 }
