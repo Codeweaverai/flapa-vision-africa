@@ -1,4 +1,3 @@
-
 // Import React and routing dependencies
 import { Routes, Route } from 'react-router-dom';
 
@@ -34,6 +33,8 @@ import CreatorCourses from '@/pages/creator/CreatorCourses';
 import CreatorEvents from '@/pages/creator/CreatorEvents';
 import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
 import CreatorEventForm from '@/pages/creator/CreatorEventForm';
+import CreatorEventRegistrations from '@/pages/creator/CreatorEventRegistrations';
+import AdminEventRegistrations from '@/pages/admin/AdminEventRegistrations';
 
 function App() {
   return (
@@ -74,6 +75,8 @@ function App() {
       <Route path="/creator/courses/content/:courseId" element={<CourseContentPage />} />
       <Route path="/creator/events/create" element={<CreatorEventForm />} />
       <Route path="/creator/events/edit/:eventId" element={<CreatorEventForm />} />
+      <Route path="/creator/events/registrations/:eventId" element={<CreatorEventRegistrations />} />
+      <Route path="/admin/events/registrations/:eventId" element={<AdminEventRegistrations />} />
       
       {/* Catch-all route */}
       <Route path="*" element={<NotFoundPage />} />

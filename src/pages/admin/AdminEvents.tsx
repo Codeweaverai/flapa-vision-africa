@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { format, parseISO } from 'date-fns';
 import { 
   Table, 
@@ -16,12 +16,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Event } from '@/services/eventService';
-import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Edit, Trash2, Users } from 'lucide-react';
 
 const AdminEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [registrationCounts, setRegistrationCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchEvents();
@@ -36,12 +37,45 @@ const AdminEvents = () => {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setEvents(data as Event[]);
+      
+      const eventsData = data as Event[];
+      setEvents(eventsData);
+      
+      // Fetch registration counts for each event
+      const eventIds = eventsData.map(event => event.id);
+      if (eventIds.length > 0) {
+        await fetchRegistrationCounts(eventIds);
+      }
     } catch (error) {
       console.error('Error fetching events:', error);
       toast.error('Failed to load events');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRegistrationCounts = async (eventIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('registrations')
+        .select('event_id, id')
+        .in('event_id', eventIds);
+      
+      if (error) throw error;
+      
+      // Count registrations per event
+      const counts: Record<string, number> = {};
+      data.forEach(reg => {
+        if (counts[reg.event_id]) {
+          counts[reg.event_id]++;
+        } else {
+          counts[reg.event_id] = 1;
+        }
+      });
+      
+      setRegistrationCounts(counts);
+    } catch (error) {
+      console.error('Error fetching registration counts:', error);
     }
   };
 
@@ -119,6 +153,7 @@ const AdminEvents = () => {
                 <TableHead>Type</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Price</TableHead>
+                <TableHead>Registrations</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -143,15 +178,30 @@ const AdminEvents = () => {
                       <span>{event.currency} {event.price}</span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {registrationCounts[event.id] || 0} / {event.capacity || '∞'}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button asChild variant="ghost" size="sm">
-                      <Link to={`/admin/events/edit/${event.id}`}>Edit</Link>
+                      <Link to={`/admin/events/registrations/${event.id}`}>
+                        <Users className="h-4 w-4 mr-1" />
+                        Registrations
+                      </Link>
+                    </Button>
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={`/admin/events/edit/${event.id}`}>
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Link>
                     </Button>
                     <Button 
                       variant="destructive" 
                       size="sm"
                       onClick={() => handleDeleteEvent(event.id)}
                     >
+                      <Trash2 className="h-4 w-4 mr-1" />
                       Delete
                     </Button>
                   </TableCell>

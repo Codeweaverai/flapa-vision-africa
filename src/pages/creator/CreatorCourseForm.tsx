@@ -75,7 +75,7 @@ const CreatorCourseForm = () => {
   
   return (
     <CreatorLayout>
-      <CourseForm isCreator={true} />
+      <CourseForm creator={user} isCreator={true} />
     </CreatorLayout>
   );
 };
