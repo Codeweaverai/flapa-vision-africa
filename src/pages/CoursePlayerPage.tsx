@@ -197,33 +197,39 @@ const CoursePlayerPage = () => {
       
       // Get lessons for this course
       const { data: lessonsData, error: lessonsError } = await supabase
-        .from('course_lessons')
+        .from('lessons')
         .select('*')
-        .eq('course_id', courseId)
+        .eq('module_id', modulesData.map(module => module.id))
         .order('order_index', { ascending: true });
       
       if (lessonsError) throw lessonsError;
       
       // Get user progress
       const { data: progressData, error: progressError } = await supabase
-        .from('course_progress')
+        .from('lesson_progress')
         .select('*')
         .eq('user_id', user.id)
-        .eq('course_id', courseId);
+        .eq('lesson_id', lessonsData.map(lesson => lesson.id));
       
       if (progressError) throw progressError;
       
       // Format the data
-      const modules = modulesData.map(module => ({
-        ...module,
-        lessons: lessonsData
+      const modules: Module[] = modulesData.map(module => {
+        const moduleLessons = lessonsData
           .filter(lesson => lesson.module_id === module.id)
           .sort((a, b) => a.order_index - b.order_index)
           .map(lesson => ({
             ...lesson,
-            is_completed: progressData.some(p => p.lesson_id === lesson.id)
-          }))
-      }));
+            content_type: lesson.video_url ? 'video' : 'quiz',
+            content: lesson.video_url ? null : { questions: [], pass_percentage: 70 }, // Default content for now
+            is_completed: progressData?.some(p => p.lesson_id === lesson.id && p.is_completed) || false
+          }));
+        
+        return {
+          ...module,
+          lessons: moduleLessons
+        };
+      });
       
       setCourse({
         ...courseData,
@@ -263,13 +269,29 @@ const CoursePlayerPage = () => {
       const currentLesson = getCurrentLesson();
       if (currentLesson?.is_completed) return;
       
+      // Find enrollment for this course
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .single();
+      
+      if (enrollmentError) throw enrollmentError;
+      
+      if (!enrollmentData) {
+        throw new Error('No enrollment found for this course');
+      }
+      
       const { error } = await supabase
-        .from('course_progress')
+        .from('lesson_progress')
         .insert({
           user_id: user.id,
-          course_id: courseId,
           lesson_id: lessonId,
-          completed_at: new Date().toISOString()
+          enrollment_id: enrollmentData.id,
+          is_completed: true,
+          last_position_seconds: 0,
+          completion_date: new Date().toISOString()
         });
       
       if (error) throw error;
