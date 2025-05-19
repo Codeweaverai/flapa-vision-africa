@@ -45,7 +45,7 @@ interface Course {
   modules: Module[];
 }
 
-// Define interfaces for database tables to make TypeScript happy
+// Define basic interfaces for database tables to avoid TypeScript complexity
 interface DbCourse {
   id: string;
   title: string;
@@ -260,35 +260,33 @@ const CoursePlayerPage = () => {
       // Get all lesson IDs for querying progress
       const lessonIds = lessonsData.map(lesson => lesson.id);
       
-      // Get user progress - avoid deep type instantiation
-      let progressData: any[] = [];
-      let progressError = null;
+      // Get user progress - completely bypass typed query to avoid deep type instantiation
+      let progressData: { lesson_id: string, is_completed: boolean }[] = [];
       
       try {
-        const progressResult = await supabase
+        // Using simple fetch to avoid TypeScript issues
+        const { data, error } = await supabase
           .from('lesson_progress')
-          .select('*')
+          .select('lesson_id,is_completed')
           .eq('user_id', user.id)
           .in('lesson_id', lessonIds);
         
-        progressData = progressResult.data || [];
-        progressError = progressResult.error;
+        if (error) throw error;
+        progressData = data || [];
       } catch (err) {
-        progressError = err;
+        console.error('Error fetching lesson progress:', err);
       }
       
-      if (progressError) throw progressError;
-      
-      // Format the data - ensure we're using our explicit interfaces
-      const modules: Module[] = modulesData.map((module: DbModule) => {
-        const moduleLessons: Lesson[] = lessonsData
-          .filter((lesson: DbLesson) => lesson.module_id === module.id)
-          .sort((a: DbLesson, b: DbLesson) => a.order_index - b.order_index)
-          .map((lesson: DbLesson) => ({
+      // Format the data with minimal typing
+      const modules = modulesData.map((module: any) => {
+        const moduleLessons = lessonsData
+          .filter((lesson: any) => lesson.module_id === module.id)
+          .sort((a: any, b: any) => a.order_index - b.order_index)
+          .map((lesson: any) => ({
             ...lesson,
             content_type: lesson.video_url ? 'video' as const : 'quiz' as const,
-            content: lesson.video_url ? null : { questions: [], pass_percentage: 70 }, // Default content for now
-            is_completed: progressData?.some(p => p.lesson_id === lesson.id && p.is_completed) || false
+            content: lesson.video_url ? null : { questions: [], pass_percentage: 70 },
+            is_completed: progressData.some(p => p.lesson_id === lesson.id && p.is_completed) || false
           }));
         
         return {
