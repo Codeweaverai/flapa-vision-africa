@@ -11,16 +11,16 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <Link to="/" className="text-2xl font-bold">
-              Mbolela Pule
+              SkillPulse
             </Link>
             <p className="mt-4 max-w-md">
-              Empowering Africa Through Travel, Logistics & Innovation. Founder & CEO of FlapaBay, 
-              shaping how people explore and move across Africa.
+              Skills and Event Booking Platform Marketplace. Connecting expertise with opportunity, 
+              facilitating professional growth and development.
             </p>
             <div className="mt-6 flex items-center">
               <Mail size={16} className="mr-2" />
-              <a href="mailto:contact@mbolelapule.com" className="hover:text-primary transition-colors">
-                contact@mbolelapule.com
+              <a href="mailto:contact@skillpulse.com" className="hover:text-primary transition-colors">
+                contact@skillpulse.com
               </a>
             </div>
           </div>
@@ -80,7 +80,7 @@ const Footer = () => {
         
         <div className="mt-12 pt-8 border-t border-gray-700">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p>© {currentYear} Mbolela Pule. All rights reserved.</p>
+            <p>© {currentYear} SkillPulse. All rights reserved.</p>
             <div className="mt-4 md:mt-0 flex space-x-4">
               <Link to="/privacy" className="hover:text-primary transition-colors">
                 Privacy Policy

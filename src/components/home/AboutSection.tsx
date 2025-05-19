@@ -11,35 +11,35 @@ const AboutSection = () => {
             <div className="w-full h-[400px] rounded-xl overflow-hidden animate-fade-in">
               <img 
                 src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80" 
-                alt="Mbolela Pule with team" 
+                alt="SkillPulse Team" 
                 className="w-full h-full object-cover" 
               />
             </div>
             <div className="absolute top-1/2 -right-12 transform -translate-y-1/2 bg-white p-6 rounded-xl shadow-xl max-w-xs animate-slide-in">
               <blockquote className="italic text-flapabay-dark">
-                "Technology should bridge gaps, not create them. We're building solutions that empower Africans in their daily lives."
+                "Our platform bridges the gap between expertise and opportunity, connecting skilled professionals with those eager to learn and grow."
               </blockquote>
-              <p className="mt-4 font-bold">- Mbolela Pule</p>
+              <p className="mt-4 font-bold">- SkillPulse Team</p>
             </div>
           </div>
           
           <div>
             <h2 className="heading-lg mb-6">
-              African Innovation <span className="text-gradient">Leader</span>
+              Skills Marketplace <span className="text-gradient">Platform</span>
             </h2>
             <p className="mb-4 text-lg">
-              Mbolela Pule is the Founder and CEO of FlapaBay, a pioneering travel and logistics 
-              technology company transforming mobility across Africa. With a unique blend of technical, 
-              financial, and entrepreneurial expertise, he founded FlapaBay to harness technology for 
-              social good.
+              SkillPulse is a pioneering skills and event booking platform transforming how people 
+              learn and grow professionally. With a unique blend of technical innovation and 
+              educational expertise, we've built SkillPulse to harness collective knowledge 
+              for professional advancement.
             </p>
             <p className="mb-6 text-lg">
-              His mission is to bridge the gap between technology and social impact, drive 
-              economic growth, and foster community development throughout the continent, creating 
-              sustainable opportunities for millions.
+              Our mission is to bridge the gap between expertise and opportunity, driving 
+              professional growth, and fostering community development throughout the industry, creating 
+              sustainable learning pathways for millions.
             </p>
             <Button asChild size="lg">
-              <Link to="/about">Learn More About Mbolela</Link>
+              <Link to="/about">Learn More About SkillPulse</Link>
             </Button>
           </div>
         </div>

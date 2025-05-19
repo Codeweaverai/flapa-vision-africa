@@ -10,16 +10,16 @@ const HeroSection = () => {
       <div className="section-container relative z-10 grid md:grid-cols-2 gap-8 items-center">
         <div className="text-white animate-fade-in">
           <h1 className="heading-xl mb-6">
-            <span className="text-gradient">Empowering Africa</span> Through Travel, Logistics & Innovation
+            <span className="text-gradient">Skills Marketplace</span> & Event Booking Platform
           </h1>
           <p className="text-xl md:text-2xl mb-8 max-w-xl">
-            Building technology solutions that transform how people explore
-            and move across Africa, connecting opportunities and driving growth.
+            Connecting professionals and learners with opportunities to grow,
+            learn, and advance their careers through expert-led events and courses.
           </p>
           <div className="flex flex-wrap gap-4">
             <Button asChild size="lg" className="text-lg">
               <Link to="/ventures">
-                Discover FlapaBay
+                Discover SkillPulse
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
@@ -33,12 +33,12 @@ const HeroSection = () => {
             <div className="w-full h-[500px] rounded-xl overflow-hidden shadow-2xl animate-zoom-in">
               <img 
                 src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80" 
-                alt="Mbolela Pule" 
+                alt="SkillPulse Platform" 
                 className="w-full h-full object-cover" 
               />
             </div>
             <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-primary rounded-full flex items-center justify-center p-4 shadow-xl">
-              <span className="text-white text-center font-bold">Founder & CEO of FlapaBay</span>
+              <span className="text-white text-center font-bold">Skills & Events Marketplace</span>
             </div>
           </div>
         </div>

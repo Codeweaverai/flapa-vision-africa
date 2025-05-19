@@ -42,7 +42,7 @@ const Navbar = () => {
   };
 
   const getInitials = (name: string) => {
-    if (!name) return 'MP';
+    if (!name) return 'SP';
     return name
       .split(' ')
       .map((n) => n[0])
@@ -57,7 +57,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-20">
           <div className="flex-shrink-0">
             <Link to="/" className="text-2xl font-bold text-gradient">
-              Mbolela Pule
+              SkillPulse
             </Link>
           </div>
           
