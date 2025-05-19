@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLayout from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -26,7 +27,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { Course, createCourseWithCreator, fetchCourseById, updateCourse } from '@/services/courseService';
@@ -46,6 +47,7 @@ const courseFormSchema = z.object({
   price: z.number().optional().nullable(),
   certificate_enabled: z.boolean().default(false),
   is_published: z.boolean().default(false),
+  thumbnail_url: z.string().optional().nullable(),
 });
 
 type CourseFormValues = z.infer<typeof courseFormSchema>;
@@ -56,6 +58,9 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   const form = useForm<CourseFormValues>({
     resolver: zodResolver(courseFormSchema),
@@ -70,6 +75,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
       price: 0,
       certificate_enabled: false,
       is_published: false,
+      thumbnail_url: null,
     },
   });
   
@@ -95,7 +101,12 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
             price: course.price || 0,
             certificate_enabled: course.certificate_enabled,
             is_published: course.is_published,
+            thumbnail_url: course.thumbnail_url || null,
           });
+          
+          if (course.thumbnail_url) {
+            setThumbnailPreview(course.thumbnail_url);
+          }
         }
       } catch (error) {
         console.error("Error loading course:", error);
@@ -108,6 +119,59 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
     loadCourse();
   }, [courseId, form]);
   
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnailFile(file);
+      
+      // Create a preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setThumbnailPreview(previewUrl);
+    }
+  };
+  
+  const uploadThumbnail = async (courseId: string): Promise<string | null> => {
+    if (!thumbnailFile) return form.getValues('thumbnail_url');
+    
+    try {
+      setUploadingImage(true);
+      const fileExt = thumbnailFile.name.split('.').pop();
+      const fileName = `${courseId}-${Date.now()}.${fileExt}`;
+      const filePath = `course-thumbnails/${fileName}`;
+      
+      // Check if storage bucket exists, if not create it
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === 'course-thumbnails');
+      
+      if (!bucketExists) {
+        await supabase.storage.createBucket('course-thumbnails', {
+          public: true,
+          fileSizeLimit: 5242880, // 5MB
+        });
+      }
+      
+      const { error: uploadError } = await supabase.storage
+        .from('course-thumbnails')
+        .upload(filePath, thumbnailFile);
+        
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      const { data } = supabase.storage
+        .from('course-thumbnails')
+        .getPublicUrl(filePath);
+      
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload thumbnail image');
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const onSubmit = async (values: CourseFormValues) => {
     if (!user) {
       toast.error("You must be logged in to create or edit a course");
@@ -116,9 +180,21 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
     
     setLoading(true);
     try {
+      let thumbnailUrl = form.getValues('thumbnail_url');
+      
       if (isEditMode && courseId) {
+        // If there's a new file to upload
+        if (thumbnailFile) {
+          thumbnailUrl = await uploadThumbnail(courseId);
+        }
+        
         // Update existing course
-        const updated = await updateCourse(courseId, values);
+        const courseData = {
+          ...values,
+          thumbnail_url: thumbnailUrl,
+        };
+        
+        const updated = await updateCourse(courseId, courseData);
         
         if (updated) {
           toast.success("Course updated successfully");
@@ -133,24 +209,27 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
           toast.error("Failed to update course");
         }
       } else {
-        // Create new course - Ensure all required fields are present for new courses
+        // Create new course
         const courseData = {
-          title: values.title,
-          description: values.description,
-          summary: values.summary,
-          category: values.category,
-          difficulty_level: values.difficulty_level,
-          duration_minutes: values.duration_minutes,
-          is_free: values.is_free !== undefined ? values.is_free : true,
-          price: values.price,
-          certificate_enabled: values.certificate_enabled !== undefined ? values.certificate_enabled : false,
-          is_published: values.is_published !== undefined ? values.is_published : false,
+          ...values,
+          thumbnail_url: null, // We'll update this after getting the course ID
         };
         
         // Create new course with all required fields
         const course = await createCourseWithCreator(courseData, user.id);
         
         if (course) {
+          // Now upload the thumbnail if there is one
+          if (thumbnailFile) {
+            const uploadedUrl = await uploadThumbnail(course.id);
+            if (uploadedUrl) {
+              // Update the course with the thumbnail URL
+              await updateCourse(course.id, {
+                thumbnail_url: uploadedUrl,
+              });
+            }
+          }
+          
           toast.success("Course created successfully");
           
           // Navigate to the course content page or back to courses list
@@ -270,6 +349,61 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
                     )}
                   />
                 </div>
+                
+                {/* Thumbnail Upload Field */}
+                <FormField
+                  control={form.control}
+                  name="thumbnail_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Course Thumbnail</FormLabel>
+                      <div className="space-y-4">
+                        {thumbnailPreview && (
+                          <div className="mt-2 relative w-full max-w-xs">
+                            <img 
+                              src={thumbnailPreview} 
+                              alt="Thumbnail preview" 
+                              className="object-cover rounded-md h-40 w-full"
+                            />
+                          </div>
+                        )}
+                        <FormControl>
+                          <div className="flex items-center gap-2">
+                            <label 
+                              htmlFor="thumbnail" 
+                              className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
+                            >
+                              <Upload size={16} />
+                              {thumbnailFile ? 'Change Image' : 'Upload Image'}
+                            </label>
+                            <Input
+                              id="thumbnail"
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleFileChange}
+                              disabled={loading || uploadingImage}
+                            />
+                            <input 
+                              type="hidden" 
+                              {...field} 
+                              value={field.value || ''} 
+                            />
+                            {thumbnailFile && (
+                              <span className="text-sm text-muted-foreground">
+                                {thumbnailFile.name}
+                              </span>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Upload an image to represent your course. Recommended size: 1280x720px.
+                        </FormDescription>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
                 
                 <FormField
                   control={form.control}
@@ -437,11 +571,12 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
                     variant="outline"
                     onClick={() => navigate(isCreator ? '/creator/courses' : '/admin/courses')}
                     disabled={loading}
+                    type="button"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? 'Saving...' : isEditMode ? 'Update Course' : 'Create Course'}
+                  <Button type="submit" disabled={loading || uploadingImage}>
+                    {loading || uploadingImage ? 'Saving...' : isEditMode ? 'Update Course' : 'Create Course'}
                   </Button>
                 </div>
               </form>

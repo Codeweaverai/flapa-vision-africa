@@ -1,127 +1,140 @@
 
-import { CombinedRegistration } from '@/types/eventTypes';
-import { Badge } from '@/components/ui/badge';
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
+import { CombinedRegistration } from '@/types/eventTypes';
+import { useMobileOperators } from '@/hooks/useMobileOperators';
 
 interface RegistrationEditDialogProps {
   isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-  registration: CombinedRegistration | null;
-  onUpdate: (registration: CombinedRegistration, status: string, paymentStatus: string) => void;
-  setRegistration: (registration: CombinedRegistration | null) => void;
+  onClose: () => void;
+  registration: CombinedRegistration;
+  onSave: (updatedRegistration: CombinedRegistration) => void;
 }
 
 const RegistrationEditDialog = ({
   isOpen,
-  setIsOpen,
+  onClose,
   registration,
-  onUpdate,
-  setRegistration
+  onSave,
 }: RegistrationEditDialogProps) => {
-  if (!registration) return null;
-  
-  // Safely get the full name
-  const fullName = registration.profiles && 'full_name' in registration.profiles 
-    ? registration.profiles.full_name 
-    : 'Unknown';
-  
+  const [updatedRegistration, setUpdatedRegistration] = useState<CombinedRegistration>(registration);
+  const [loading, setLoading] = useState(false);
+  const { mobileOperators } = useMobileOperators();
+
+  const handleChange = (field: keyof CombinedRegistration, value: string) => {
+    setUpdatedRegistration((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      onSave(updatedRegistration);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Edit Registration</DialogTitle>
-          <DialogDescription>
-            Update the status of this registration.
-          </DialogDescription>
         </DialogHeader>
-        
-        <div className="grid gap-4 py-4">
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={updatedRegistration.status}
+                onValueChange={(value) => handleChange('status', value)}
+                disabled={loading}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="payment_status">Payment Status</Label>
+              <Select
+                value={updatedRegistration.payment_status}
+                onValueChange={(value) => handleChange('payment_status', value)}
+                disabled={loading}
+              >
+                <SelectTrigger id="payment_status">
+                  <SelectValue placeholder="Select payment status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <h4 className="font-medium">{registration.events?.title}</h4>
-            <p className="text-sm">Attendee: {fullName || 'Unknown'}</p>
-            <Badge>Event Booking</Badge>
+            <Label htmlFor="phone_number">Phone Number</Label>
+            <Input
+              id="phone_number"
+              value={updatedRegistration.phone_number || ''}
+              onChange={(e) => handleChange('phone_number', e.target.value)}
+              disabled={loading}
+              placeholder="Enter phone number"
+            />
           </div>
-          
-          <div className="grid gap-2">
-            <Label htmlFor="status">Registration Status</Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="mobile_operator">Mobile Operator</Label>
             <Select
-              defaultValue={registration.status}
-              onValueChange={(value) => {
-                setRegistration({
-                  ...registration,
-                  status: value
-                });
-              }}
+              value={updatedRegistration.mobile_operator || ''}
+              onValueChange={(value) => handleChange('mobile_operator', value)}
+              disabled={loading}
             >
-              <SelectTrigger id="status">
-                <SelectValue placeholder="Select status" />
+              <SelectTrigger id="mobile_operator">
+                <SelectValue placeholder="Select mobile operator" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                {mobileOperators.map((operator) => (
+                  <SelectItem key={operator.id} value={operator.code}>
+                    {operator.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-          
-          <div className="grid gap-2">
-            <Label htmlFor="payment-status">Payment Status</Label>
-            <Select
-              defaultValue={registration.payment_status}
-              onValueChange={(value) => {
-                setRegistration({
-                  ...registration,
-                  payment_status: value
-                });
-              }}
-            >
-              <SelectTrigger id="payment-status">
-                <SelectValue placeholder="Select payment status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button 
-            onClick={() => {
-              if (registration) {
-                onUpdate(
-                  registration,
-                  registration.status, 
-                  registration.payment_status
-                );
-              }
-            }}
-          >
-            Save Changes
-          </Button>
-        </DialogFooter>
+
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

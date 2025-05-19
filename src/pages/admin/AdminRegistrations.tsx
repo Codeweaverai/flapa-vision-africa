@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,12 +13,16 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import { EventWithRegistrations, CombinedRegistration } from '@/types/eventTypes';
 import { format } from 'date-fns';
 import { CSVLink } from 'react-csv';
+import RegistrationsTable from '@/components/admin/RegistrationsTable';
+import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
 
 const AdminRegistrations = () => {
   const [events, setEvents] = useState<EventWithRegistrations[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedRegistration, setSelectedRegistration] = useState<CombinedRegistration | null>(null);
 
   useEffect(() => {
     fetchEvents();
@@ -27,11 +32,11 @@ const AdminRegistrations = () => {
     setLoading(true);
     try {
       // Fetch events with registration counts
-      const { data, error } = await supabase
+      const { data: eventsData, error } = await supabase
         .from('events')
         .select(`
           *,
-          registrations(count)
+          registrations:registrations(count)
         `)
         .order('start_time', { ascending: false });
 
@@ -41,12 +46,12 @@ const AdminRegistrations = () => {
 
       // Fetch detailed registrations for each event
       const eventsWithRegistrations = await Promise.all(
-        data.map(async (event) => {
+        eventsData.map(async (event) => {
           const { data: registrations, error: regError } = await supabase
             .from('registrations')
             .select(`
               *,
-              user:profiles(id, email, full_name)
+              profiles:profiles(id, email, full_name)
             `)
             .eq('event_id', event.id);
 
@@ -59,10 +64,20 @@ const AdminRegistrations = () => {
             };
           }
 
+          // Format registrations properly
+          const formattedRegistrations = registrations.map((reg: any) => ({
+            ...reg,
+            user: {
+              id: reg.profiles?.id,
+              email: reg.profiles?.email,
+              full_name: reg.profiles?.full_name
+            }
+          }));
+
           return {
             ...event,
             date: event.start_time,
-            registrations: registrations as unknown as CombinedRegistration[]
+            registrations: formattedRegistrations as CombinedRegistration[]
           };
         })
       );
@@ -79,8 +94,8 @@ const AdminRegistrations = () => {
   const filteredEvents = events.filter((event) => {
     const matchesSearch = 
       event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.location.toLowerCase().includes(searchTerm.toLowerCase());
+      event.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.location?.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (activeTab === 'all') return matchesSearch;
     if (activeTab === 'upcoming') return matchesSearch && new Date(event.date) > new Date();
@@ -101,9 +116,10 @@ const AdminRegistrations = () => {
         data.push({
           'Event Name': event.title,
           'Event Date': format(new Date(event.date), 'PPP'),
-          'Registration Date': format(new Date(reg.registration_date), 'PPP'),
+          'Registration Date': reg.created_at ? format(new Date(reg.created_at), 'PPP') : 'N/A',
           'Attendee Name': reg.user?.full_name || 'N/A',
           'Attendee Email': reg.user?.email || 'N/A',
+          'Phone Number': reg.phone_number || 'N/A',
           'Status': reg.status,
           'Payment Status': reg.payment_status
         });
@@ -111,6 +127,82 @@ const AdminRegistrations = () => {
     });
     
     return data;
+  };
+
+  const getAllRegistrations = () => {
+    return events.flatMap(event => 
+      event.registrations.map(reg => ({
+        ...reg,
+        events: event
+      }))
+    );
+  };
+
+  const handleEditRegistration = (registration: CombinedRegistration) => {
+    setSelectedRegistration(registration);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteRegistration = async (registration: CombinedRegistration) => {
+    if (!window.confirm('Are you sure you want to delete this registration?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('registrations')
+        .delete()
+        .eq('id', registration.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update state by removing the deleted registration
+      setEvents(prevEvents => 
+        prevEvents.map(event => ({
+          ...event,
+          registrations: event.registrations.filter(reg => reg.id !== registration.id)
+        }))
+      );
+
+      toast.success('Registration deleted successfully');
+    } catch (error) {
+      console.error('Error deleting registration:', error);
+      toast.error('Failed to delete registration');
+    }
+  };
+
+  const handleSaveRegistration = async (updatedRegistration: CombinedRegistration) => {
+    try {
+      const { error } = await supabase
+        .from('registrations')
+        .update({
+          status: updatedRegistration.status,
+          payment_status: updatedRegistration.payment_status,
+          phone_number: updatedRegistration.phone_number,
+          mobile_operator: updatedRegistration.mobile_operator
+        })
+        .eq('id', updatedRegistration.id);
+
+      if (error) throw error;
+
+      // Update state
+      setEvents(prevEvents => 
+        prevEvents.map(event => ({
+          ...event,
+          registrations: event.registrations.map(reg => 
+            reg.id === updatedRegistration.id ? updatedRegistration : reg
+          )
+        }))
+      );
+
+      toast.success('Registration updated successfully');
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating registration:', error);
+      toast.error('Failed to update registration');
+    }
   };
 
   return (
@@ -220,7 +312,7 @@ const AdminRegistrations = () => {
                               {new Date(event.date) > new Date() ? 'Upcoming' : 'Past'}
                             </Badge>
                           </TableCell>
-                          <TableCell>{event.location}</TableCell>
+                          <TableCell>{event.location || 'N/A'}</TableCell>
                           <TableCell>
                             <Badge variant="outline">
                               {getTotalRegistrations(event)} / {event.capacity || '∞'}
@@ -231,9 +323,10 @@ const AdminRegistrations = () => {
                               variant="outline" 
                               size="sm"
                               onClick={() => {
-                                // Implement view details functionality
-                                // This could open a modal or navigate to a details page
-                                toast.info(`Viewing details for ${event.title}`);
+                                const tab = document.getElementById(`tab-${event.id}`);
+                                if (tab) {
+                                  tab.scrollIntoView({ behavior: 'smooth' });
+                                }
                               }}
                             >
                               View Details
@@ -247,7 +340,44 @@ const AdminRegistrations = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Registration Details for All Events */}
+          <div className="space-y-6 mt-6">
+            <h2 className="text-2xl font-bold">All Registrations</h2>
+            <RegistrationsTable
+              registrations={getAllRegistrations()}
+              onEdit={handleEditRegistration}
+              onDelete={handleDeleteRegistration}
+              loading={loading}
+            />
+          </div>
+
+          {/* Individual Event Registrations */}
+          {filteredEvents.map(event => (
+            <Card key={event.id} id={`tab-${event.id}`} className="mt-6">
+              <CardHeader>
+                <CardTitle>{event.title} - Registrations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RegistrationsTable
+                  registrations={event.registrations.map(reg => ({...reg, events: event}))}
+                  onEdit={handleEditRegistration}
+                  onDelete={handleDeleteRegistration}
+                  loading={loading}
+                />
+              </CardContent>
+            </Card>
+          ))}
         </div>
+
+        {selectedRegistration && (
+          <RegistrationEditDialog
+            isOpen={isEditDialogOpen}
+            onClose={() => setIsEditDialogOpen(false)}
+            registration={selectedRegistration}
+            onSave={handleSaveRegistration}
+          />
+        )}
       </div>
     </AdminLayout>
   );
