@@ -1,590 +1,327 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import AdminLayout from '@/components/layout/AdminLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { ArrowLeft, Upload } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Course, createCourseWithCreator, fetchCourseById, updateCourse } from '@/services/courseService';
+import { supabase } from '@/lib/supabaseClient';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
+import Layout from '@/components/layout/Layout';
+import { Course, updateCourse, createCourseWithCreator } from '@/services/courseService';
 
-interface CourseFormProps {
-  isCreator?: boolean;
-}
-
-const courseFormSchema = z.object({
-  title: z.string().min(3, "Title must be at least 3 characters"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
-  summary: z.string().min(10, "Summary must be at least 10 characters"),
-  category: z.string().min(1, "Category is required"),
-  difficulty_level: z.string().min(1, "Difficulty level is required"),
-  duration_minutes: z.number().min(1, "Duration must be at least 1 minute"),
-  is_free: z.boolean().default(true),
-  price: z.number().optional().nullable(),
-  certificate_enabled: z.boolean().default(false),
-  is_published: z.boolean().default(false),
-  thumbnail_url: z.string().optional().nullable(),
-});
-
-type CourseFormValues = z.infer<typeof courseFormSchema>;
-
-const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
+const CourseForm = () => {
+  const { user } = useAuth();
+  const [course, setCourse] = useState<Partial<Course>>({
+    title: '',
+    summary: '',
+    description: '',
+    duration_minutes: 60,
+    category: 'Technology',
+    difficulty_level: 'Beginner',
+    is_free: false,
+    price: 0,
+    certificate_enabled: false,
+    is_published: false,
+  });
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  
-  const form = useForm<CourseFormValues>({
-    resolver: zodResolver(courseFormSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      summary: '',
-      category: '',
-      difficulty_level: 'beginner',
-      duration_minutes: 60,
-      is_free: true,
-      price: 0,
-      certificate_enabled: false,
-      is_published: false,
-      thumbnail_url: null,
-    },
-  });
-  
+
   useEffect(() => {
     const loadCourse = async () => {
-      if (!courseId) return;
-      
-      setIsEditMode(true);
-      setLoading(true);
-      
-      try {
-        const course = await fetchCourseById(courseId);
-        
-        if (course) {
-          form.reset({
-            title: course.title,
-            description: course.description,
-            summary: course.summary,
-            category: course.category,
-            difficulty_level: course.difficulty_level,
-            duration_minutes: course.duration_minutes,
-            is_free: course.is_free,
-            price: course.price || 0,
-            certificate_enabled: course.certificate_enabled,
-            is_published: course.is_published,
-            thumbnail_url: course.thumbnail_url || null,
-          });
-          
-          if (course.thumbnail_url) {
-            setThumbnailPreview(course.thumbnail_url);
+      if (courseId) {
+        setIsEditing(true);
+        try {
+          const { data, error } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('id', courseId)
+            .single();
+
+          if (error) {
+            throw error;
           }
+
+          if (data) {
+            setCourse(data);
+          }
+        } catch (error: any) {
+          console.error("Error fetching course:", error.message);
+          toast.error("Failed to fetch course data.");
         }
-      } catch (error) {
-        console.error("Error loading course:", error);
-        toast.error("Failed to load course data");
-      } finally {
-        setLoading(false);
       }
     };
-    
+
     loadCourse();
-  }, [courseId, form]);
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setThumbnailFile(file);
-      
-      // Create a preview URL
-      const previewUrl = URL.createObjectURL(file);
-      setThumbnailPreview(previewUrl);
-    }
+  }, [courseId]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setCourse(prevCourse => ({
+      ...prevCourse,
+      [name]: value
+    }));
   };
-  
-  const uploadThumbnail = async (courseId: string): Promise<string | null> => {
-    if (!thumbnailFile) return form.getValues('thumbnail_url');
+
+  const handleSelectChange = (name: string, value: string) => {
+    setCourse(prevCourse => ({
+      ...prevCourse,
+      [name]: value
+    }));
+  };
+
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setCourse(prevCourse => ({
+      ...prevCourse,
+      [name]: checked
+    }));
+  };
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setThumbnailFile(file || null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
     
     try {
-      setUploadingImage(true);
-      const fileExt = thumbnailFile.name.split('.').pop();
-      const fileName = `${courseId}-${Date.now()}.${fileExt}`;
-      const filePath = `course-thumbnails/${fileName}`;
-      
-      // Check if storage bucket exists, if not create it
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.name === 'course-thumbnails');
-      
-      if (!bucketExists) {
-        await supabase.storage.createBucket('course-thumbnails', {
-          public: true,
-          fileSizeLimit: 5242880, // 5MB
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        toast.error('Not authenticated');
+        return;
+      }
+
+      // First upload thumbnail if exists
+      let thumbnailUrl = course.thumbnail_url;
+      if (thumbnailFile) {
+        const fileExt = thumbnailFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `courses/${fileName}`;
+
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('course-materials')
+          .upload(filePath, thumbnailFile);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('course-materials')
+          .getPublicUrl(filePath);
+
+        thumbnailUrl = urlData.publicUrl;
+      }
+
+      if (isEditing && courseId) {
+        // Update existing course
+        const result = await updateCourse(courseId, {
+          ...course,
+          thumbnail_url: thumbnailUrl
         });
+
+        if (result) {
+          toast.success('Course updated successfully!');
+          navigate('/admin/courses');
+        }
+      } else {
+        // Create new course, making sure all required fields are included
+        const result = await createCourseWithCreator({
+          title: course.title!,
+          summary: course.summary!,
+          description: course.description!,
+          duration_minutes: course.duration_minutes!,
+          category: course.category!,
+          difficulty_level: course.difficulty_level!,
+          is_free: course.is_free,
+          price: course.price,
+          is_published: course.is_published,
+          certificate_enabled: course.certificate_enabled,
+          thumbnail_url: thumbnailUrl
+        }, user.user.id);
+
+        if (result) {
+          toast.success('Course created successfully!');
+          navigate('/admin/courses');
+        }
       }
-      
-      const { error: uploadError } = await supabase.storage
-        .from('course-thumbnails')
-        .upload(filePath, thumbnailFile);
-        
-      if (uploadError) {
-        throw uploadError;
-      }
-      
-      const { data } = supabase.storage
-        .from('course-thumbnails')
-        .getPublicUrl(filePath);
-      
-      return data.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload thumbnail image');
-      return null;
+    } catch (error: any) {
+      console.error('Error saving course:', error);
+      toast.error(error.message || 'Error saving course');
     } finally {
-      setUploadingImage(false);
+      setSubmitting(false);
     }
   };
 
-  const onSubmit = async (values: CourseFormValues) => {
-    if (!user) {
-      toast.error("You must be logged in to create or edit a course");
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      let thumbnailUrl = form.getValues('thumbnail_url');
-      
-      if (isEditMode && courseId) {
-        // If there's a new file to upload
-        if (thumbnailFile) {
-          thumbnailUrl = await uploadThumbnail(courseId);
-        }
-        
-        // Update existing course
-        const courseData = {
-          ...values,
-          thumbnail_url: thumbnailUrl,
-        };
-        
-        const updated = await updateCourse(courseId, courseData);
-        
-        if (updated) {
-          toast.success("Course updated successfully");
-          
-          // Navigate to the course content page or back to courses list
-          if (isCreator) {
-            navigate(`/creator/courses`);
-          } else {
-            navigate(`/admin/courses/${courseId}/content`);
-          }
-        } else {
-          toast.error("Failed to update course");
-        }
-      } else {
-        // Create new course
-        const courseData = {
-          ...values,
-          thumbnail_url: null, // We'll update this after getting the course ID
-        };
-        
-        // Create new course with all required fields
-        const course = await createCourseWithCreator(courseData, user.id);
-        
-        if (course) {
-          // Now upload the thumbnail if there is one
-          if (thumbnailFile) {
-            const uploadedUrl = await uploadThumbnail(course.id);
-            if (uploadedUrl) {
-              // Update the course with the thumbnail URL
-              await updateCourse(course.id, {
-                thumbnail_url: uploadedUrl,
-              });
-            }
-          }
-          
-          toast.success("Course created successfully");
-          
-          // Navigate to the course content page or back to courses list
-          if (isCreator) {
-            navigate(`/creator/courses`);
-          } else {
-            navigate(`/admin/courses/${course.id}/content`);
-          }
-        } else {
-          toast.error("Failed to create course");
-        }
-      }
-    } catch (error) {
-      console.error("Error saving course:", error);
-      toast.error("An error occurred while saving the course");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   return (
-    <AdminLayout>
-      <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => navigate(isCreator ? '/creator/courses' : '/admin/courses')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="text-2xl font-bold">{isEditMode ? 'Edit Course' : 'Create New Course'}</h1>
-          </div>
-        </div>
-        
+    <Layout>
+      <div className="section-container">
+        <Button asChild variant="ghost" className="mb-4">
+          <Link to="/admin/courses">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Courses
+          </Link>
+        </Button>
+
         <Card>
-          <CardContent className="pt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
+          <CardHeader>
+            <CardTitle>{isEditing ? 'Edit Course' : 'Create New Course'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  type="text"
+                  id="title"
                   name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Course Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter course title" {...field} disabled={loading} />
-                      </FormControl>
-                      <FormDescription>
-                        A clear, descriptive title for your course.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  value={course.title || ''}
+                  onChange={handleChange}
+                  required
                 />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                          disabled={loading}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="leadership">Leadership</SelectItem>
-                            <SelectItem value="entrepreneurship">Entrepreneurship</SelectItem>
-                            <SelectItem value="communication">Communication</SelectItem>
-                            <SelectItem value="career">Career Development</SelectItem>
-                            <SelectItem value="personal-growth">Personal Growth</SelectItem>
-                            <SelectItem value="business">Business</SelectItem>
-                            <SelectItem value="finance">Finance</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          Category for your course.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="difficulty_level"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Difficulty Level</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                          disabled={loading}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select difficulty level" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="beginner">Beginner</SelectItem>
-                            <SelectItem value="intermediate">Intermediate</SelectItem>
-                            <SelectItem value="advanced">Advanced</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          The difficulty level of your course.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                {/* Thumbnail Upload Field */}
-                <FormField
-                  control={form.control}
-                  name="thumbnail_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Course Thumbnail</FormLabel>
-                      <div className="space-y-4">
-                        {thumbnailPreview && (
-                          <div className="mt-2 relative w-full max-w-xs">
-                            <img 
-                              src={thumbnailPreview} 
-                              alt="Thumbnail preview" 
-                              className="object-cover rounded-md h-40 w-full"
-                            />
-                          </div>
-                        )}
-                        <FormControl>
-                          <div className="flex items-center gap-2">
-                            <label 
-                              htmlFor="thumbnail" 
-                              className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
-                            >
-                              <Upload size={16} />
-                              {thumbnailFile ? 'Change Image' : 'Upload Image'}
-                            </label>
-                            <Input
-                              id="thumbnail"
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleFileChange}
-                              disabled={loading || uploadingImage}
-                            />
-                            <input 
-                              type="hidden" 
-                              {...field} 
-                              value={field.value || ''} 
-                            />
-                            {thumbnailFile && (
-                              <span className="text-sm text-muted-foreground">
-                                {thumbnailFile.name}
-                              </span>
-                            )}
-                          </div>
-                        </FormControl>
-                        <FormDescription>
-                          Upload an image to represent your course. Recommended size: 1280x720px.
-                        </FormDescription>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
+              </div>
+
+              <div>
+                <Label htmlFor="summary">Summary</Label>
+                <Input
+                  type="text"
+                  id="summary"
                   name="summary"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Summary</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Brief summary of the course" 
-                          className="resize-none" 
-                          {...field}
-                          disabled={loading}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        A short overview displayed on course cards (max 150 characters recommended).
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  value={course.summary || ''}
+                  onChange={handleChange}
+                  required
                 />
-                
-                <FormField
-                  control={form.control}
+              </div>
+
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
                   name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Detailed course description" 
-                          className="resize-none min-h-[150px]" 
-                          {...field}
-                          disabled={loading}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        A detailed description of what students will learn.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  value={course.description || ''}
+                  onChange={handleChange}
+                  required
                 />
-                
-                <FormField
-                  control={form.control}
+              </div>
+
+              <div>
+                <Label htmlFor="duration_minutes">Duration (minutes)</Label>
+                <Input
+                  type="number"
+                  id="duration_minutes"
                   name="duration_minutes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Duration (minutes)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          {...field}
-                          onChange={e => field.onChange(parseInt(e.target.value) || 0)}
-                          disabled={loading}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Approximate time to complete the course in minutes.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  value={course.duration_minutes || 60}
+                  onChange={handleChange}
+                  required
                 />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="is_free"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Free Course</FormLabel>
-                          <FormDescription>
-                            Make this course freely available to all users.
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={loading}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {!form.watch("is_free") && (
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price (USD)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              {...field}
-                              onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                              disabled={loading || form.watch("is_free")}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Price in USD for the course.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="certificate_enabled"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Enable Certificate</FormLabel>
-                          <FormDescription>
-                            Allow students to earn a certificate upon completion.
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={loading}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="is_published"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Publish Course</FormLabel>
-                          <FormDescription>
-                            Make this course visible to all users.
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={loading}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <div className="flex justify-end space-x-4 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate(isCreator ? '/creator/courses' : '/admin/courses')}
-                    disabled={loading}
-                    type="button"
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={loading || uploadingImage}>
-                    {loading || uploadingImage ? 'Saving...' : isEditMode ? 'Update Course' : 'Create Course'}
-                  </Button>
-                </div>
-              </form>
-            </Form>
+              </div>
+
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Select onValueChange={(value) => handleSelectChange('category', value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a category" defaultValue={course.category || 'Technology'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Technology">Technology</SelectItem>
+                    <SelectItem value="Business">Business</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="difficulty_level">Difficulty Level</Label>
+                <Select onValueChange={(value) => handleSelectChange('difficulty_level', value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select difficulty" defaultValue={course.difficulty_level || 'Beginner'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Beginner">Beginner</SelectItem>
+                    <SelectItem value="Intermediate">Intermediate</SelectItem>
+                    <SelectItem value="Advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="is_free">Is Free</Label>
+                <Switch
+                  id="is_free"
+                  name="is_free"
+                  checked={course.is_free || false}
+                  onCheckedChange={(checked) => handleSwitchChange('is_free', checked)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="price">Price</Label>
+                <Input
+                  type="number"
+                  id="price"
+                  name="price"
+                  value={course.price || 0}
+                  onChange={handleChange}
+                  disabled={course.is_free}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="certificate_enabled">Certificate Enabled</Label>
+                <Switch
+                  id="certificate_enabled"
+                  name="certificate_enabled"
+                  checked={course.certificate_enabled || false}
+                  onCheckedChange={(checked) => handleSwitchChange('certificate_enabled', checked)}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="is_published">Is Published</Label>
+                <Switch
+                  id="is_published"
+                  name="is_published"
+                  checked={course.is_published || false}
+                  onCheckedChange={(checked) => handleSwitchChange('is_published', checked)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="thumbnail_url">Thumbnail</Label>
+                <Input
+                  type="file"
+                  id="thumbnail_url"
+                  name="thumbnail_url"
+                  accept="image/*"
+                  onChange={handleThumbnailChange}
+                />
+                {course.thumbnail_url && typeof course.thumbnail_url === 'string' && (
+                  <img src={course.thumbnail_url} alt="Thumbnail" className="mt-2 max-h-40" />
+                )}
+              </div>
+
+              <Button type="submit" disabled={submitting}>
+                {submitting ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  isEditing ? 'Update Course' : 'Create Course'
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
-    </AdminLayout>
+    </Layout>
   );
 };
 

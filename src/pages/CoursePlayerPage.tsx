@@ -1,37 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { SimplifiedCourse, SimplifiedModule, SimplifiedLesson } from '@/types/eventTypes';
-
-// Use explicit non-recursive interface definitions
-interface SimplifiedLesson {
-  id: string;
-  title: string;
-  description: string | null;
-  video_url: string | null;
-  module_id: string;
-  order_index: number;
-  content_type?: string;
-  content?: any;
-  is_completed?: boolean;
-}
-
-interface SimplifiedModule {
-  id: string;
-  title: string;
-  description: string | null;
-  course_id: string;
-  order_index: number;
-  lessons: SimplifiedLesson[];
-}
-
-interface SimplifiedCourse {
-  id: string;
-  title: string;
-  description: string;
-  modules: SimplifiedModule[];
-}
 
 interface LessonProgress {
   position: number;

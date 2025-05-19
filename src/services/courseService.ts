@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
@@ -239,11 +240,11 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
       } as Module;
     });
     
-    // Return the complete course data
+    // Return the complete course data with proper type casting
     return {
       ...course,
       modules: modulesWithLessons
-    } as Course;
+    } as unknown as Course;
   } catch (error) {
     console.error('Error fetching course with modules and lessons:', error);
     toast.error('Failed to load course content');
@@ -252,7 +253,12 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
 };
 
 // Implement module-related functions
-export const createModule = async (moduleData: Partial<Module> & { course_id: string, title: string, order_index: number }): Promise<Module | null> => {
+export const createModule = async (moduleData: { 
+  course_id: string, 
+  title: string, 
+  order_index: number,
+  description?: string
+}): Promise<Module | null> => {
   try {
     const { data, error } = await supabase
       .from('course_modules')
@@ -304,11 +310,24 @@ export const deleteModule = async (moduleId: string): Promise<boolean> => {
 };
 
 // Implement lesson-related functions
-export const createLesson = async (lessonData: Partial<Lesson> & { module_id: string, title: string, order_index: number }): Promise<Lesson | null> => {
+export const createLesson = async (lessonData: { 
+  module_id: string, 
+  title: string, 
+  order_index: number,
+  description?: string,
+  video_url?: string,
+  materials_urls?: string[]
+}): Promise<Lesson | null> => {
   try {
+    // Make sure content_type is included based on whether a video_url is provided
+    const fullLessonData = {
+      ...lessonData,
+      content_type: lessonData.video_url ? 'video' : 'text'
+    };
+
     const { data, error } = await supabase
       .from('lessons')
-      .insert(lessonData)
+      .insert(fullLessonData)
       .select()
       .single();
       
