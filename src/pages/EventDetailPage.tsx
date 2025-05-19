@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { CalendarDays, Clock, MapPin, User, Users, Share2, ArrowLeft } from 'lucide-react';
@@ -13,7 +14,7 @@ import { Event, fetchEvents, registerForEvent, cancelRegistration, fetchUserRegi
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from '@/lib/supabaseClient';
 
 const EventDetailPage = () => {
@@ -247,7 +248,7 @@ const EventDetailPage = () => {
                 <div className="flex justify-between items-center">
                   <div>
                     {isRegistered ? (
-                      <Badge variant="success">You are registered</Badge>
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">You are registered</Badge>
                     ) : (
                       <Badge variant="secondary">Limited seats available</Badge>
                     )}

@@ -102,21 +102,35 @@ const CourseForm = ({ isCreator = false }: CourseFormProps) => {
     try {
       let courseResult: Course | null = null;
       
+      // Make sure all required fields are present
+      const courseData = {
+        title: data.title,
+        description: data.description, 
+        summary: data.summary,
+        category: data.category,
+        difficulty_level: data.difficulty_level,
+        duration_minutes: data.duration_minutes,
+        is_free: data.is_free,
+        price: data.price,
+        certificate_enabled: data.certificate_enabled,
+        is_published: data.is_published,
+      };
+      
       if (courseId) {
         // Update existing course
-        courseResult = await updateCourse(courseId, data);
+        courseResult = await updateCourse(courseId, courseData);
         if (courseResult) {
           toast.success('Course updated successfully!');
         }
       } else {
         // Create new course
         if (isCreator) {
-          courseResult = await createCourseWithCreator(data, user.id);
+          courseResult = await createCourseWithCreator(courseData, user.id);
           if (courseResult) {
             toast.success('Course created successfully!');
           }
         } else {
-          courseResult = await createCourse(data);
+          courseResult = await createCourse(courseData);
           if (courseResult) {
             toast.success('Course created successfully!');
           }

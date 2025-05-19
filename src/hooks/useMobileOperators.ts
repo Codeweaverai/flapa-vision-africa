@@ -1,44 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-
-export interface MobileOperator {
-  id: string;
-  name: string;
-  code: string;
-  country: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
-  const { data, error } = await supabase
-    .from('mobile_operators')
-    .select('*')
-    .order('name');
-
-  if (error) {
-    console.error('Error fetching mobile operators:', error);
-    throw error;
-  }
-
-  return data || [];
-};
+import { fetchMobileOperators, MobileOperator } from '@/services/eventService';
 
 export const useMobileOperators = () => {
   const [mobileOperators, setMobileOperators] = useState<MobileOperator[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadMobileOperators = async () => {
-      setLoading(true);
       try {
+        setLoading(true);
         const operators = await fetchMobileOperators();
         setMobileOperators(operators);
-      } catch (err) {
-        setError(err as Error);
-        console.error('Error loading mobile operators:', err);
+      } catch (error) {
+        console.error('Error loading mobile operators:', error);
       } finally {
         setLoading(false);
       }
@@ -47,5 +22,5 @@ export const useMobileOperators = () => {
     loadMobileOperators();
   }, []);
 
-  return { mobileOperators, loading, error };
+  return { mobileOperators, loading };
 };

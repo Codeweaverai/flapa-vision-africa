@@ -46,36 +46,30 @@ interface Course {
 }
 
 // Define basic interfaces for database tables to avoid TypeScript complexity
-interface DbCourse {
-  id: string;
-  title: string;
-  description: string;
-  [key: string]: any; // Allow additional properties
-}
-
-interface DbModule {
-  id: string;
-  title: string;
-  description: string | null;
-  course_id: string;
-  order_index: number;
-  [key: string]: any; // Allow additional properties
-}
-
-interface DbLesson {
+type SimplifiedDbLesson = {
   id: string;
   title: string;
   description: string | null;
   video_url: string | null;
   module_id: string;
   order_index: number;
-  [key: string]: any; // Allow additional properties
-}
+  content_type?: 'video' | 'quiz';
+  content?: any;
+  is_completed?: boolean;
+};
 
-interface DbProgress {
+type SimplifiedDbModule = {
+  id: string;
+  title: string;
+  description: string | null;
+  course_id: string;
+  order_index: number;
+  lessons: SimplifiedDbLesson[];
+};
+
+interface SimplifiedDbProgress {
   lesson_id: string;
   is_completed: boolean;
-  [key: string]: any; // Allow additional properties
 }
 
 const CoursePlayerPage = () => {
@@ -277,8 +271,8 @@ const CoursePlayerPage = () => {
         console.error('Error fetching lesson progress:', err);
       }
       
-      // Format the data with minimal typing
-      const modules = modulesData.map((module: any) => {
+      // Format the data with minimal typing to avoid deep instantiation
+      const modules: SimplifiedDbModule[] = modulesData.map((module: any) => {
         const moduleLessons = lessonsData
           .filter((lesson: any) => lesson.module_id === module.id)
           .sort((a: any, b: any) => a.order_index - b.order_index)
