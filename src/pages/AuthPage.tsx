@@ -19,7 +19,12 @@ import {
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
-const AuthPage = () => {
+// Add isSignUp prop to component props
+interface AuthPageProps {
+  isSignUp?: boolean;
+}
+
+const AuthPage = ({ isSignUp = false }: AuthPageProps) => {
   const { user, loading, signIn, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -117,7 +122,7 @@ const AuthPage = () => {
           <p className="text-muted-foreground">Sign in to your account or create a new one</p>
         </div>
         
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs defaultValue={isSignUp ? "register" : "login"} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>

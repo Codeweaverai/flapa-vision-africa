@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -33,6 +32,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
+import '@/types/youtube';
 
 const CoursePlayerPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -56,7 +56,7 @@ const CoursePlayerPage = () => {
   
   // Video player reference
   const videoPlayerRef = useRef<HTMLDivElement>(null);
-  const youtubePlayerRef = useRef<any>(null);
+  const youtubePlayerRef = useRef<YT.Player | null>(null);
   const playerTimerRef = useRef<number | null>(null);
 
   // Load YouTube API

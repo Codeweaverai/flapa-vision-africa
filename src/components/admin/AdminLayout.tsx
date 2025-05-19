@@ -23,9 +23,10 @@ import {
 
 interface AdminLayoutProps {
   children: ReactNode;
+  title?: string; // Added title as an optional prop
 }
 
-const AdminLayout = ({ children }: AdminLayoutProps) => {
+const AdminLayout = ({ children, title }: AdminLayoutProps) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -150,7 +151,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-background border-b p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Admin Panel</h2>
+          <h2 className="text-lg font-semibold">{title || 'Admin Panel'}</h2>
           <Button 
             variant="ghost" 
             size="icon"
@@ -229,6 +230,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         <div className="pt-4 md:pt-0">
           {/* Mobile padding to account for fixed header */}
           <div className="md:hidden h-16"></div>
+          {title && (
+            <div className="px-6 py-4">
+              <h1 className="text-2xl font-bold">{title}</h1>
+            </div>
+          )}
           {children}
         </div>
       </div>
