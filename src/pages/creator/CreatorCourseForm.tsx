@@ -75,7 +75,7 @@ const CreatorCourseForm = () => {
   
   return (
     <CreatorLayout>
-      <CourseForm />
+      <CourseForm creatorId={user?.id} />
     </CreatorLayout>
   );
 };
