@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
@@ -38,6 +37,7 @@ export interface Registration {
   updated_at?: string;
   phone_number?: string;
   mobile_operator?: string;
+  event?: Event; // Add the event relation property
 }
 
 // Define MobileOperator type

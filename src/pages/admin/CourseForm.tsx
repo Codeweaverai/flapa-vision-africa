@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -134,8 +133,22 @@ const CourseForm: React.FC<CourseFormProps> = ({ isCreator = false }) => {
           toast.error("Failed to update course");
         }
       } else {
-        // Create new course
-        const course = await createCourseWithCreator(values, user.id);
+        // Create new course - Ensure all required fields are present for new courses
+        const courseData = {
+          title: values.title,
+          description: values.description,
+          summary: values.summary,
+          category: values.category,
+          difficulty_level: values.difficulty_level,
+          duration_minutes: values.duration_minutes,
+          is_free: values.is_free !== undefined ? values.is_free : true,
+          price: values.price,
+          certificate_enabled: values.certificate_enabled !== undefined ? values.certificate_enabled : false,
+          is_published: values.is_published !== undefined ? values.is_published : false,
+        };
+        
+        // Create new course with all required fields
+        const course = await createCourseWithCreator(courseData, user.id);
         
         if (course) {
           toast.success("Course created successfully");

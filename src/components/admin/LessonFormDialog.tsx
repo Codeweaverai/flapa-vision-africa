@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,16 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { createLesson, updateLesson } from "@/services/courseService";
-
-interface Lesson {
-  id: string;
-  module_id: string;
-  title: string;
-  description?: string;
-  video_url?: string;
-  materials_urls?: string[];
-  order_index: number;
-}
+import { Lesson } from "@/services/courseService";
 
 interface LessonFormDialogProps {
   open: boolean;
@@ -81,6 +71,8 @@ const LessonFormDialog = ({
         description: description || null,
         video_url: videoUrl || null,
         order_index: editingLesson ? editingLesson.order_index : lessons.length,
+        content_type: 'video' as const, // Default content type
+        content: {} // Default empty content
       };
       
       let savedLesson;

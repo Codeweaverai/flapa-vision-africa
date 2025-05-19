@@ -1,22 +1,29 @@
-
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Calendar, Clock, BookOpen, Award, Check, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Clock, BookOpen, Award, PlayCircle, CheckCircle, Lock, FileCheck } from 'lucide-react';
-import { CourseWithModules, fetchCourseWithModulesAndLessons, enrollInCourse, checkEnrollmentStatus } from '@/services/courseService';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import Layout from '@/components/layout/Layout';
+import { 
+  Course, 
+  fetchCourseById, 
+  fetchCourseWithModulesAndLessons, 
+  enrollInCourse, 
+  checkEnrollmentStatus 
+} from '@/services/courseService';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
 
 const CourseDetailPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
-  const [course, setCourse] = useState<CourseWithModules | null>(null);
+  const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isEnrolled, setIsEnrolled] = useState<boolean>(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -26,15 +33,22 @@ const CourseDetailPage = () => {
       const courseData = await fetchCourseWithModulesAndLessons(courseId);
       setCourse(courseData);
       setLoading(false);
-
-      if (user) {
-        const enrolled = await checkEnrollmentStatus(courseId);
-        setIsEnrolled(enrolled);
-      }
     };
 
     loadCourse();
-  }, [courseId, user]);
+  }, [courseId]);
+
+  useEffect(() => {
+    // Check if user is enrolled in this course
+    const checkEnrollment = async () => {
+      if (user && courseId) {
+        const enrolled = await checkEnrollmentStatus(courseId, user);
+        setIsEnrolled(enrolled);
+      }
+    };
+    
+    checkEnrollment();
+  }, [user, courseId]);
 
   const handleEnroll = async () => {
     if (!user) {

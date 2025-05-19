@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
@@ -21,6 +20,7 @@ export interface Course {
   created_at?: string;
   updated_at?: string;
   tags?: string[];
+  modules?: CourseModule[]; // Add modules property
 }
 
 // Define Lesson type
@@ -31,12 +31,48 @@ export interface Lesson {
   video_url?: string;
   module_id: string;
   order_index: number;
-  content_type: 'video' | 'quiz';
-  content: any;
+  content_type?: 'video' | 'quiz'; // Make this optional for backward compatibility
+  content?: any; // Make this optional for backward compatibility
   materials_urls?: string[];
   created_at?: string;
   updated_at?: string;
   is_completed?: boolean;
+  quizzes?: Quiz[]; // Add quizzes property
+}
+
+// Define Quiz type
+export interface Quiz {
+  id: string;
+  title: string;
+  description?: string;
+  lesson_id?: string;
+  module_id?: string;
+  passing_score: number;
+  created_at?: string;
+  updated_at?: string;
+  questions?: QuizQuestion[];
+}
+
+// Define QuizQuestion type
+export interface QuizQuestion {
+  id: string;
+  quiz_id: string;
+  question: string;
+  order_index: number;
+  created_at?: string;
+  updated_at?: string;
+  answers?: QuizAnswer[];
+}
+
+// Define QuizAnswer type
+export interface QuizAnswer {
+  id: string;
+  question_id: string;
+  answer: string;
+  is_correct: boolean;
+  order_index: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Define CourseModule type
@@ -370,11 +406,18 @@ export const deleteModule = async (moduleId: string): Promise<boolean> => {
 };
 
 // Functions for lesson management
-export const createLesson = async (lessonData: Omit<Lesson, 'id' | 'created_at' | 'updated_at'>): Promise<Lesson | null> => {
+export const createLesson = async (lessonData: Omit<Lesson, "id" | "created_at" | "updated_at">): Promise<Lesson | null> => {
   try {
+    // Set default values for content_type if not provided
+    const lessonWithDefaults = {
+      ...lessonData,
+      content_type: lessonData.content_type || 'video',
+      content: lessonData.content || {}
+    };
+    
     const { data, error } = await supabase
       .from('lessons')
-      .insert(lessonData)
+      .insert(lessonWithDefaults)
       .select()
       .single();
     

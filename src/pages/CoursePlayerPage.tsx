@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
@@ -46,8 +46,15 @@ interface SimplifiedCourse {
   modules: SimplifiedModule[];
 }
 
-const CoursePlayerPage = () => {
-  const { courseId } = useParams<{ courseId: string }>();
+// Simplified component props to avoid deep instantiation
+interface CoursePlayerProps {
+  moduleId?: string;
+  lessonId?: string;
+}
+
+// Remove nested recursive types causing deep instantiation
+const CoursePlayerPage: React.FC<CoursePlayerProps> = () => {
+  const { courseId, moduleId, lessonId } = useParams();
   const { user } = useAuth();
   const [course, setCourse] = useState<SimplifiedCourse | null>(null);
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
