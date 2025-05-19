@@ -75,7 +75,7 @@ const CreatorEventForm = () => {
   
   return (
     <CreatorLayout>
-      <EventForm creator={user} isCreator={true} />
+      <EventForm isCreator={true} />
     </CreatorLayout>
   );
 };
