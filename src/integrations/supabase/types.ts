@@ -227,6 +227,7 @@ export type Database = {
           category: string
           certificate_enabled: boolean | null
           created_at: string | null
+          creator_id: string | null
           description: string
           difficulty_level: string
           duration_minutes: number
@@ -244,6 +245,7 @@ export type Database = {
           category: string
           certificate_enabled?: boolean | null
           created_at?: string | null
+          creator_id?: string | null
           description: string
           difficulty_level: string
           duration_minutes: number
@@ -261,6 +263,7 @@ export type Database = {
           category?: string
           certificate_enabled?: boolean | null
           created_at?: string | null
+          creator_id?: string | null
           description?: string
           difficulty_level?: string
           duration_minutes?: number
@@ -336,6 +339,7 @@ export type Database = {
         Row: {
           capacity: number | null
           created_at: string | null
+          creator_id: string | null
           currency: string | null
           description: string | null
           end_time: string
@@ -353,6 +357,7 @@ export type Database = {
         Insert: {
           capacity?: number | null
           created_at?: string | null
+          creator_id?: string | null
           currency?: string | null
           description?: string | null
           end_time: string
@@ -370,6 +375,7 @@ export type Database = {
         Update: {
           capacity?: number | null
           created_at?: string | null
+          creator_id?: string | null
           currency?: string | null
           description?: string | null
           end_time?: string
@@ -572,6 +578,7 @@ export type Database = {
           created_at: string | null
           full_name: string | null
           id: string
+          is_creator: boolean | null
           role: Database["public"]["Enums"]["user_role"] | null
           updated_at: string | null
           username: string | null
@@ -582,6 +589,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id: string
+          is_creator?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string | null
           username?: string | null
@@ -592,6 +600,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          is_creator?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string | null
           username?: string | null

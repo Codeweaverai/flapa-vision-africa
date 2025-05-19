@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -30,6 +29,10 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Event } from '@/services/eventService';
 
+interface EventFormProps {
+  isCreator?: boolean;
+}
+
 type EventFormValues = {
   title: string;
   description: string;
@@ -45,7 +48,7 @@ type EventFormValues = {
   image?: File | null;
 };
 
-const EventForm = () => {
+const EventForm = ({ isCreator = false }: EventFormProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -183,12 +186,21 @@ const EventForm = () => {
         toast.success('Event updated successfully');
       } else {
         // Create new event
-        const { error } = await supabase
-          .from('events')
-          .insert([eventData]);
-        
-        if (error) throw error;
-        toast.success('Event created successfully');
+        if (isCreator && user) {
+          // Creator is creating an event
+          const newEvent = await createEventWithCreator(eventData, user.id);
+          if (newEvent) {
+            toast.success("Event created successfully!");
+            navigate(isCreator ? "/creator/events" : "/admin/events");
+          }
+        } else {
+          // Admin is creating an event
+          const newEvent = await createEvent(eventData);
+          if (newEvent) {
+            toast.success("Event created successfully!");
+            navigate("/admin/events");
+          }
+        }
       }
       
       // Navigate back to events list

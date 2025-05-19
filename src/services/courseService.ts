@@ -4,20 +4,20 @@ import { supabase } from "@/lib/supabaseClient";
 export interface Course {
   id: string;
   title: string;
-  summary: string;
   description: string;
-  difficulty_level: string;
+  summary: string;
   category: string;
+  difficulty_level: string;
   duration_minutes: number;
-  price: number;
   is_free: boolean;
+  price: number;
+  thumbnail_url?: string;
   is_published: boolean;
   certificate_enabled: boolean;
-  thumbnail_url?: string;
-  tags?: string[];
   created_at?: string;
   updated_at?: string;
   modules?: CourseModule[];
+  creator_id?: string;
 }
 
 export interface CourseWithModules extends Course {
@@ -117,7 +117,10 @@ export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' 
 };
 
 // Add a function to create a course with creator_id
-export const createCourseWithCreator = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
+export const createCourseWithCreator = async (
+  courseData: Partial<Course>, 
+  creatorId: string
+): Promise<Course | null> => {
   try {
     const { data, error } = await supabase
       .from('courses')

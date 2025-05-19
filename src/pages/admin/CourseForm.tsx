@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button"
@@ -18,7 +17,11 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 
 type DifficultyLevel = "beginner" | "intermediate" | "advanced";
 
-const CourseForm = () => {
+interface CourseFormProps {
+  isCreator?: boolean;
+}
+
+const CourseForm = ({ isCreator = false }: CourseFormProps) => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
 
@@ -90,7 +93,7 @@ const CourseForm = () => {
     setLessons([...lessons, lesson]);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
 
@@ -109,9 +112,9 @@ const CourseForm = () => {
         tags: tags.length > 0 ? tags.split(',').map(tag => tag.trim()) : []
       };
 
-      if (editingCourse) {
-        // Type assertion to address the error
-        const updatedCourse = await updateCourse(editingCourse.id, courseData);
+      if (courseId) {
+        // Update existing course
+        const updatedCourse = await updateCourse(editingCourse?.id || '', courseData);
         if (updatedCourse) {
           toast({
             title: "Course Updated",
@@ -125,21 +128,21 @@ const CourseForm = () => {
           });
         }
       } else {
-        // Type assertion to address the error
-        const fullCourseData = courseData as Omit<Course, 'id' | 'created_at' | 'updated_at'>;
-        const newCourse = await createCourse(fullCourseData);
-        if (newCourse) {
-          toast({
-            title: "Course Created",
-            description: "The course has been created successfully.",
-          });
-          navigate('/admin/courses');
+        // Create new course
+        if (isCreator && user) {
+          // Creator is creating a course
+          const newCourse = await createCourseWithCreator(courseData, user.id);
+          if (newCourse) {
+            toast.success("Course created successfully!");
+            navigate(isCreator ? "/creator/courses" : "/admin/courses");
+          }
         } else {
-          toast({
-            title: "Error",
-            description: "Failed to create the course.",
-            variant: "destructive",
-          });
+          // Admin is creating a course
+          const newCourse = await createCourse(courseData);
+          if (newCourse) {
+            toast.success("Course created successfully!");
+            navigate("/admin/courses");
+          }
         }
       }
     } catch (error) {
