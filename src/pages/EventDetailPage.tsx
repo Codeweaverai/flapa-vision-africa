@@ -184,20 +184,20 @@ const EventDetailPage = () => {
           <Card className="shadow-lg">
             <CardContent className="p-6">
               <div className="space-y-6">
-                <h1 className="text-3xl font-bold">{event.title}</h1>
+                <h1 className="text-3xl font-bold">{event?.title}</h1>
                 
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{event.event_type}</Badge>
-                  {event.is_free ? (
+                  <Badge variant="secondary">{event?.event_type}</Badge>
+                  {event?.is_free ? (
                     <Badge variant="outline">Free</Badge>
                   ) : (
                     <Badge variant="default">
-                      {event.currency} {event.price}
+                      {event?.currency} {event?.price}
                     </Badge>
                   )}
                 </div>
                 
-                {event.image_url && (
+                {event?.image_url && (
                   <img
                     src={event.image_url}
                     alt={event.title}
@@ -209,26 +209,26 @@ const EventDetailPage = () => {
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <CalendarDays className="h-4 w-4" />
                     <span>
-                      {format(parseISO(event.start_time), 'MMMM dd, yyyy')}
+                      {event?.start_time && format(parseISO(event.start_time), 'MMMM dd, yyyy')}
                     </span>
                   </div>
                   
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>
-                      {format(parseISO(event.start_time), 'h:mm a')} -{' '}
-                      {format(parseISO(event.end_time), 'h:mm a')}
+                      {event?.start_time && format(parseISO(event.start_time), 'h:mm a')} -{' '}
+                      {event?.end_time && format(parseISO(event.end_time), 'h:mm a')}
                     </span>
                   </div>
                   
-                  {event.location && (
+                  {event?.location && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <MapPin className="h-4 w-4" />
                       <span>{event.location}</span>
                     </div>
                   )}
                   
-                  {event.capacity && (
+                  {event?.capacity && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Users className="h-4 w-4" />
                       <span>Capacity: {event.capacity}</span>
@@ -240,7 +240,7 @@ const EventDetailPage = () => {
                 
                 <div className="space-y-4">
                   <h2 className="text-2xl font-bold">About this event</h2>
-                  <p>{event.description || 'No description provided.'}</p>
+                  <p>{event?.description || 'No description provided.'}</p>
                 </div>
                 
                 <Separator />

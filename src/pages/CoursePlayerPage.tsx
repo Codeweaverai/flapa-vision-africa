@@ -17,36 +17,8 @@ declare global {
   }
 }
 
-interface Lesson {
-  id: string;
-  title: string;
-  description: string | null;
-  video_url: string | null;
-  module_id: string;
-  order_index: number;
-  content_type: 'video' | 'quiz';
-  content: any;
-  is_completed?: boolean;
-}
-
-interface Module {
-  id: string;
-  title: string;
-  description: string | null;
-  course_id: string;
-  order_index: number;
-  lessons: Lesson[];
-}
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  modules: Module[];
-}
-
-// Define basic interfaces for database tables to avoid TypeScript complexity
-type SimplifiedDbLesson = {
+// Simplified types to avoid excessive type instantiation
+interface SimplifiedLesson {
   id: string;
   title: string;
   description: string | null;
@@ -56,26 +28,28 @@ type SimplifiedDbLesson = {
   content_type?: 'video' | 'quiz';
   content?: any;
   is_completed?: boolean;
-};
+}
 
-type SimplifiedDbModule = {
+interface SimplifiedModule {
   id: string;
   title: string;
   description: string | null;
   course_id: string;
   order_index: number;
-  lessons: SimplifiedDbLesson[];
-};
+  lessons: SimplifiedLesson[];
+}
 
-interface SimplifiedDbProgress {
-  lesson_id: string;
-  is_completed: boolean;
+interface SimplifiedCourse {
+  id: string;
+  title: string;
+  description: string;
+  modules: SimplifiedModule[];
 }
 
 const CoursePlayerPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
-  const [course, setCourse] = useState<Course | null>(null);
+  const [course, setCourse] = useState<SimplifiedCourse | null>(null);
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -197,6 +171,7 @@ const CoursePlayerPage = () => {
     }
   };
   
+  // Simplified fetch function to avoid deep type instantiation
   const fetchCourseData = async () => {
     if (!courseId || !user) return;
     
@@ -254,7 +229,7 @@ const CoursePlayerPage = () => {
       // Get all lesson IDs for querying progress
       const lessonIds = lessonsData.map(lesson => lesson.id);
       
-      // Get user progress - completely bypass typed query to avoid deep type instantiation
+      // Get user progress
       let progressData: { lesson_id: string, is_completed: boolean }[] = [];
       
       try {
@@ -272,13 +247,13 @@ const CoursePlayerPage = () => {
       }
       
       // Format the data with minimal typing to avoid deep instantiation
-      const modules: SimplifiedDbModule[] = modulesData.map((module: any) => {
+      const modules = modulesData.map((module: any) => {
         const moduleLessons = lessonsData
           .filter((lesson: any) => lesson.module_id === module.id)
           .sort((a: any, b: any) => a.order_index - b.order_index)
           .map((lesson: any) => ({
             ...lesson,
-            content_type: lesson.video_url ? 'video' as const : 'quiz' as const,
+            content_type: lesson.video_url ? 'video' : 'quiz',
             content: lesson.video_url ? null : { questions: [], pass_percentage: 70 },
             is_completed: progressData.some(p => p.lesson_id === lesson.id && p.is_completed) || false
           }));
@@ -446,7 +421,7 @@ const CoursePlayerPage = () => {
     }
   };
   
-  const getCurrentLesson = (): Lesson | null => {
+  const getCurrentLesson = (): SimplifiedLesson | null => {
     if (!course) return null;
     
     const currentModule = course.modules[currentModuleIndex];

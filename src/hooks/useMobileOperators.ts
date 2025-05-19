@@ -1,6 +1,23 @@
 
 import { useState, useEffect } from 'react';
-import { fetchMobileOperators, MobileOperator } from '@/services/eventService';
+
+// Define MobileOperator type
+export interface MobileOperator {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
+}
+
+// Mock fetchMobileOperators function until properly implemented in eventService
+const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
+  // This is a placeholder that will return some mock data
+  return [
+    { id: '1', name: 'MTN', code: 'mtn', country: 'Ghana' },
+    { id: '2', name: 'Vodafone', code: 'vodafone', country: 'Ghana' },
+    { id: '3', name: 'AirtelTigo', code: 'airteltigo', country: 'Ghana' }
+  ];
+};
 
 export const useMobileOperators = () => {
   const [mobileOperators, setMobileOperators] = useState<MobileOperator[]>([]);

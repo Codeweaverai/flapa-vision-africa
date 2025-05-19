@@ -1,4 +1,3 @@
-
 // Add a function to create an event with creator_id
 export const createEventWithCreator = async (
   eventData: Partial<Event>, 
@@ -45,5 +44,114 @@ export const createEventWithCreator = async (
   } catch (error) {
     console.error('Error in createEventWithCreator:', error);
     return null;
+  }
+};
+
+// Function to fetch events
+export const fetchEvents = async (): Promise<Event[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('start_time', { ascending: true });
+      
+    if (error) throw error;
+    return data as Event[];
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    return [];
+  }
+};
+
+// Function to register for an event
+export const registerForEvent = async (
+  event: Event, 
+  user: User,
+  phoneNumber?: string,
+  mobileOperator?: string
+): Promise<boolean> => {
+  try {
+    const registration = {
+      event_id: event.id,
+      user_id: user.id,
+      status: 'confirmed',
+      payment_status: event.is_free ? 'free' : 'pending',
+      payment_amount: event.price,
+      payment_currency: event.currency,
+      phone_number: phoneNumber,
+      mobile_operator: mobileOperator,
+    };
+    
+    const { data, error } = await supabase
+      .from('registrations')
+      .insert(registration)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    if (event.is_free) {
+      toast.success(`Successfully registered for ${event.title}`);
+      return true;
+    } else {
+      // For paid events, redirect to payment or show payment info
+      // This is a placeholder for the payment process
+      console.log('Proceeding to payment for', data.id);
+      return true;
+    }
+  } catch (error) {
+    console.error('Error registering for event:', error);
+    toast.error('Failed to register for event');
+    return false;
+  }
+};
+
+// Function to fetch user registrations
+export const fetchUserRegistrations = async (user: User): Promise<Registration[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data as Registration[];
+  } catch (error) {
+    console.error('Error fetching user registrations:', error);
+    return [];
+  }
+};
+
+// Function to cancel registration
+export const cancelRegistration = async (registrationId: string, user: User): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('registrations')
+      .update({ status: 'cancelled' })
+      .eq('id', registrationId)
+      .eq('user_id', user.id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error cancelling registration:', error);
+    return false;
+  }
+};
+
+// Function to fetch mobile operators
+export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('mobile_operators')
+      .select('*')
+      .order('name', { ascending: true });
+      
+    if (error) throw error;
+    return data as MobileOperator[];
+  } catch (error) {
+    console.error('Error fetching mobile operators:', error);
+    return [];
   }
 };
