@@ -6,6 +6,7 @@ import EventForm from '@/pages/admin/EventForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 
 const CreatorEventForm = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -29,17 +30,22 @@ const CreatorEventForm = () => {
           .eq('id', eventId)
           .single();
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error checking event ownership:', error);
+          throw error;
+        }
         
         if (data.creator_id === user.id) {
           setAuthorized(true);
         } else {
+          toast.error("You don't have permission to edit this event");
           // Not authorized, redirect to creator events page
           navigate('/creator/events');
           return;
         }
       } catch (error) {
         console.error('Error checking event ownership:', error);
+        toast.error("Error checking event permissions");
         navigate('/creator/events');
         return;
       } finally {
@@ -49,6 +55,12 @@ const CreatorEventForm = () => {
     
     checkEventOwnership();
   }, [eventId, user, navigate]);
+  
+  if (!user) {
+    toast.error("You must be logged in to create or edit events");
+    navigate('/auth');
+    return null;
+  }
   
   if (loading) {
     return (
@@ -75,7 +87,7 @@ const CreatorEventForm = () => {
   
   return (
     <CreatorLayout>
-      <EventForm isCreator={true} creatorId={user?.id} />
+      <EventForm isCreator={true} creatorId={user.id} />
     </CreatorLayout>
   );
 };

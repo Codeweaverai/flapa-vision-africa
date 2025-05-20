@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
@@ -79,6 +80,9 @@ export const createEventWithCreator = async (
       creator_id: creatorId,
     };
 
+    // Log the event data for debugging
+    console.log('Sending event data to Supabase:', eventWithCreator);
+
     const { data, error } = await supabase
       .from('events')
       .insert(eventWithCreator)
@@ -87,12 +91,15 @@ export const createEventWithCreator = async (
 
     if (error) {
       console.error('Error creating event:', error);
+      toast.error(`Failed to create event: ${error.message}`);
       throw error;
     }
 
+    toast.success('Event created successfully!');
     return data as Event;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in createEventWithCreator:', error);
+    toast.error(`Failed to create event: ${error.message || 'Unknown error'}`);
     return null;
   }
 };
@@ -109,6 +116,23 @@ export const fetchEvents = async (): Promise<Event[]> => {
     return data as Event[];
   } catch (error) {
     console.error('Error fetching events:', error);
+    return [];
+  }
+};
+
+// Function to fetch events by creator
+export const fetchEventsByCreator = async (creatorId: string): Promise<Event[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('creator_id', creatorId)
+      .order('start_time', { ascending: true });
+      
+    if (error) throw error;
+    return data as Event[];
+  } catch (error) {
+    console.error('Error fetching creator events:', error);
     return [];
   }
 };

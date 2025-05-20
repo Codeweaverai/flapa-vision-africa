@@ -162,7 +162,12 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
           .select()
           .single();
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating event:', error);
+          toast.error(`Failed to update event: ${error.message}`);
+          throw error;
+        }
+        
         eventResult = updatedEvent as Event;
         toast.success('Event updated successfully!');
       } else {
@@ -181,24 +186,40 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
           currency: data.currency,
         };
         
+        console.log('Creating new event with data:', newEventData);
+        
         if (isCreator) {
           // Use the provided creatorId for creator or fall back to the current user's id
           const effectiveCreatorId = creatorId || user.id;
+          console.log('Creating event as creator with ID:', effectiveCreatorId);
           eventResult = await createEventWithCreator(newEventData, effectiveCreatorId);
-          if (eventResult) {
-            toast.success('Event created successfully!');
+          if (!eventResult) {
+            setLoading(false);
+            return;
           }
         } else {
           // For admin
-          const { data: createdEvent, error } = await supabase
-            .from('events')
-            .insert([newEventData])
-            .select()
-            .single();
+          try {
+            const { data: createdEvent, error } = await supabase
+              .from('events')
+              .insert([newEventData])
+              .select()
+              .single();
+              
+            if (error) {
+              console.error('Admin event creation error:', error);
+              toast.error(`Failed to create event: ${error.message}`);
+              throw error;
+            }
             
-          if (error) throw error;
-          eventResult = createdEvent as Event;
-          toast.success('Event created successfully!');
+            eventResult = createdEvent as Event;
+            toast.success('Event created successfully!');
+          } catch (error: any) {
+            console.error('Error in admin event creation:', error);
+            toast.error(`Failed to create event: ${error.message || 'Unknown error'}`);
+            setLoading(false);
+            return;
+          }
         }
       }
       
@@ -238,9 +259,9 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
       }
       
       navigate(isCreator ? '/creator/events' : '/admin/events');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving event:', error);
-      toast.error('Failed to save event. Please try again.');
+      toast.error(`Failed to save event: ${error.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
     }
