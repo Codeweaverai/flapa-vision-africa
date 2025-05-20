@@ -22,27 +22,33 @@ type MultiSelectProps = {
 
 export function MultiSelect({
   options,
-  value,
+  value = [], // Default to empty array
   onChange,
   placeholder = 'Select items',
   className,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
+  
+  // Ensure options is always an array
+  const safeOptions = Array.isArray(options) ? options : [];
 
   const handleSelect = (optionValue: string) => {
-    if (value.includes(optionValue)) {
-      onChange(value.filter((v) => v !== optionValue));
+    const safeValue = Array.isArray(value) ? value : []; // Ensure value is an array
+    
+    if (safeValue.includes(optionValue)) {
+      onChange(safeValue.filter((v) => v !== optionValue));
     } else {
-      onChange([...value, optionValue]);
+      onChange([...safeValue, optionValue]);
     }
   };
 
   const handleRemoveValue = (optionValue: string) => {
-    onChange(value.filter((v) => v !== optionValue));
+    const safeValue = Array.isArray(value) ? value : []; // Ensure value is an array
+    onChange(safeValue.filter((v) => v !== optionValue));
   };
 
-  const selectedLabels = value
-    .map((v) => options.find((option) => option.value === v)?.label || '')
+  const selectedLabels = (Array.isArray(value) ? value : [])
+    .map((v) => safeOptions.find((option) => option.value === v)?.label || '')
     .filter(Boolean);
 
   return (
@@ -73,8 +79,8 @@ export function MultiSelect({
           <CommandInput placeholder="Search..." />
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup className="max-h-64 overflow-auto">
-            {options.map((option) => {
-              const isSelected = value.includes(option.value);
+            {safeOptions.map((option) => {
+              const isSelected = Array.isArray(value) && value.includes(option.value);
               return (
                 <CommandItem
                   key={option.value}

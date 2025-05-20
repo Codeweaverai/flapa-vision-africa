@@ -1,7 +1,6 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { User } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Define MediaPost type
@@ -96,7 +95,7 @@ export const createMediaPost = async (
 
     // Get the current user
     const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
+    if (!userData?.user) {
       toast.error('You must be logged in to create posts');
       return null;
     }
@@ -145,7 +144,7 @@ export const createMediaPost = async (
     }
 
     toast.success('Media post created successfully');
-    return data as MediaPost;
+    return data as unknown as MediaPost;
   } catch (error: any) {
     console.error('Error in createMediaPost:', error);
     toast.error(`Failed to create media post: ${error.message || 'Unknown error'}`);
@@ -314,7 +313,7 @@ export const getMediaPosts = async (
       return [];
     }
 
-    return data as MediaPost[];
+    return data as unknown as MediaPost[];
   } catch (error: any) {
     console.error('Error in getMediaPosts:', error);
     toast.error(`Failed to fetch media posts: ${error.message || 'Unknown error'}`);
@@ -387,12 +386,15 @@ export const getMediaCategories = async (): Promise<MediaCategory[]> => {
 
     if (error) {
       console.error('Error fetching media categories:', error);
+      toast.error(`Failed to fetch categories: ${error.message}`);
       return [];
     }
 
-    return data as MediaCategory[] || [];
+    // Make sure we always return an array, even if data is null
+    return (data as MediaCategory[]) || [];
   } catch (error: any) {
     console.error('Error in getMediaCategories:', error);
+    toast.error(`Failed to fetch categories: ${error.message || 'Unknown error'}`);
     return [];
   }
 };
@@ -420,3 +422,4 @@ export const createMediaCategory = async (name: string, description?: string): P
     return null;
   }
 };
+

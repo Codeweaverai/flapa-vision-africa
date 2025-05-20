@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -48,6 +47,7 @@ const MediaForm = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [categories, setCategories] = useState<MediaCategory[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(false);
   
   // Initialize form with default values
   const defaultPostType = location.state?.type || 'news';
@@ -61,6 +61,25 @@ const MediaForm = () => {
   
   const postType = watch('post_type');
   const isEditing = !!id;
+
+  // Load categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const data = await getMediaCategories();
+        console.log('Loaded categories:', data);
+        setCategories(data || []);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        toast.error('Failed to load categories');
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Load post data if editing
   useEffect(() => {
@@ -83,8 +102,10 @@ const MediaForm = () => {
               setImagePreview(post.image_url);
             }
             
-            if (post.categories) {
+            if (post.categories && post.categories.length > 0) {
               setSelectedCategories(post.categories.map(cat => cat.id));
+            } else {
+              setSelectedCategories([]);
             }
           } else {
             toast.error('Failed to load post data');
@@ -99,17 +120,6 @@ const MediaForm = () => {
       }
     };
 
-    const loadCategories = async () => {
-      try {
-        const data = await getMediaCategories();
-        setCategories(data);
-      } catch (error) {
-        console.error('Error loading categories:', error);
-        toast.error('Failed to load categories');
-      }
-    };
-
-    loadCategories();
     if (isEditing) {
       loadPostData();
     }
@@ -169,6 +179,9 @@ const MediaForm = () => {
   };
 
   const getCategoryOptions = () => {
+    if (!categories || categories.length === 0) {
+      return [];
+    }
     return categories.map(category => ({
       value: category.id,
       label: category.name
@@ -256,12 +269,19 @@ const MediaForm = () => {
 
                 <div className="space-y-2">
                   <Label>Categories</Label>
-                  <MultiSelect
-                    options={getCategoryOptions()}
-                    value={selectedCategories}
-                    onChange={setSelectedCategories}
-                    placeholder="Select categories"
-                  />
+                  {loadingCategories ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Loading categories...</span>
+                    </div>
+                  ) : (
+                    <MultiSelect
+                      options={getCategoryOptions()}
+                      value={selectedCategories}
+                      onChange={setSelectedCategories}
+                      placeholder="Select categories"
+                    />
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-2 pt-2">
