@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -13,7 +14,7 @@ import { Search, Download, Mail, BookOpen, Calendar } from 'lucide-react';
 
 interface Student {
   id: string;
-  email: string;
+  email?: string; // Making email optional since it might not exist in the profiles table
   full_name: string | null;
   avatar_url: string | null;
   created_at: string;
@@ -23,7 +24,7 @@ interface EnrolledStudent extends Student {
   course_id: string;
   course_title: string;
   enrollment_date: string;
-  progress: number;
+  progress?: number; // Making progress optional since it might not exist in the course_enrollments table
   is_completed: boolean;
 }
 
@@ -59,7 +60,6 @@ const CreatorStudents = () => {
           course_id,
           user_id,
           enrollment_date,
-          progress,
           is_completed,
           course:courses(title, creator_id)
         `)
@@ -68,13 +68,21 @@ const CreatorStudents = () => {
       if (enrollmentError) throw enrollmentError;
       
       // Get student profile data for course enrollments
-      const enrollmentUserIds = (enrollmentData || []).map(item => item.user_id);
-      const { data: enrollmentProfiles, error: enrollmentProfilesError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, avatar_url, created_at')
-        .in('id', enrollmentUserIds.length > 0 ? enrollmentUserIds : ['no-ids']);
-        
-      if (enrollmentProfilesError) throw enrollmentProfilesError;
+      const enrollmentUserIds = enrollmentData?.map(item => item.user_id) || [];
+      
+      let enrollmentProfiles = [];
+      if (enrollmentUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, created_at')
+          .in('id', enrollmentUserIds);
+          
+        if (profilesError) {
+          console.error('Enrollment profiles error:', profilesError);
+        } else {
+          enrollmentProfiles = profiles || [];
+        }
+      }
       
       // Get event registration data
       const { data: registrationsData, error: registrationsError } = await supabase
@@ -92,24 +100,32 @@ const CreatorStudents = () => {
       if (registrationsError) throw registrationsError;
       
       // Get student profile data for event registrations
-      const registrationUserIds = (registrationsData || []).map(item => item.user_id);
-      const { data: registrationProfiles, error: registrationProfilesError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, avatar_url, created_at')
-        .in('id', registrationUserIds.length > 0 ? registrationUserIds : ['no-ids']);
-        
-      if (registrationProfilesError) throw registrationProfilesError;
+      const registrationUserIds = registrationsData?.map(item => item.user_id) || [];
+      
+      let registrationProfiles = [];
+      if (registrationUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, created_at')
+          .in('id', registrationUserIds);
+          
+        if (profilesError) {
+          console.error('Registration profiles error:', profilesError);
+        } else {
+          registrationProfiles = profiles || [];
+        }
+      }
       
       // Create a profile map for faster lookups
       const profilesMap = new Map();
       
       // Add enrollment profiles to map
-      (enrollmentProfiles || []).forEach(profile => {
+      enrollmentProfiles.forEach((profile: any) => {
         profilesMap.set(profile.id, profile);
       });
       
       // Add registration profiles to map
-      (registrationProfiles || []).forEach(profile => {
+      registrationProfiles.forEach((profile: any) => {
         profilesMap.set(profile.id, profile);
       });
       
@@ -118,14 +134,14 @@ const CreatorStudents = () => {
         const profile = profilesMap.get(enrollment.user_id) || {};
         return {
           id: enrollment.user_id,
-          email: profile.email || 'Unknown Email',
+          email: 'User', // Email field is not in profiles table according to error
           full_name: profile.full_name,
           avatar_url: profile.avatar_url,
           created_at: profile.created_at || enrollment.enrollment_date,
           course_id: enrollment.course_id,
           course_title: enrollment.course?.title || 'Unnamed Course',
           enrollment_date: enrollment.enrollment_date,
-          progress: enrollment.progress || 0,
+          progress: 0, // Progress field is not in course_enrollments table according to error
           is_completed: enrollment.is_completed || false
         };
       });
@@ -135,7 +151,7 @@ const CreatorStudents = () => {
         const profile = profilesMap.get(registration.user_id) || {};
         return {
           id: registration.user_id,
-          email: profile.email || 'Unknown Email',
+          email: 'User', // Email field is not in profiles table according to error
           full_name: profile.full_name,
           avatar_url: profile.avatar_url,
           created_at: profile.created_at || registration.created_at,

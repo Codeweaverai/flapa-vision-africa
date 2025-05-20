@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -93,7 +94,7 @@ const CreatorDashboard = () => {
       const { data: registrationData, error: registrationError } = await supabase
         .from('registrations')
         .select('user_id, event:events!inner(creator_id)')
-        .eq('events.creator_id', user?.id);
+        .eq('event.creator_id', user?.id);
         
       if (registrationError) throw registrationError;
       
@@ -107,25 +108,25 @@ const CreatorDashboard = () => {
       const { data: courseRevenue, error: courseRevenueError } = await supabase
         .from('course_enrollments')
         .select('course:courses!inner(price, is_free, creator_id)')
-        .eq('courses.creator_id', user?.id)
-        .eq('courses.is_free', false);
+        .eq('course.creator_id', user?.id)
+        .eq('course.is_free', false);
         
       if (courseRevenueError) throw courseRevenueError;
       
       const { data: eventRevenue, error: eventRevenueError } = await supabase
         .from('registrations')
         .select('event:events!inner(price, is_free, creator_id)')
-        .eq('events.creator_id', user?.id)
+        .eq('event.creator_id', user?.id)
         .eq('events.is_free', false);
         
       if (eventRevenueError) throw eventRevenueError;
       
       // Calculate total revenue safely
       const courseRevenueTotal = (courseRevenue || []).reduce((sum, item) => 
-        sum + Number(item.course.price || 0), 0);
+        sum + Number(item.course?.price || 0), 0);
       
       const eventRevenueTotal = (eventRevenue || []).reduce((sum, item) => 
-        sum + Number(item.event.price || 0), 0);
+        sum + Number(item.event?.price || 0), 0);
       
       const totalRevenue = courseRevenueTotal + eventRevenueTotal;
       
@@ -161,15 +162,21 @@ const CreatorDashboard = () => {
         throw enrollmentsError;
       }
 
-      // Get student profiles for enrollments
+      // Get profiles for all user IDs from enrollments
       const enrollmentUserIds = (enrollments || []).map(enrollment => enrollment.user_id);
-      const { data: enrollmentProfiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', enrollmentUserIds.length > 0 ? enrollmentUserIds : ['no-ids']);
-
-      if (profilesError) {
-        console.error('Profiles error:', profilesError);
+      
+      let enrollmentProfiles = [];
+      if (enrollmentUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', enrollmentUserIds);
+          
+        if (profilesError) {
+          console.error('Profiles error:', profilesError);
+        } else {
+          enrollmentProfiles = profiles || [];
+        }
       }
       
       // Get recent registrations
@@ -193,53 +200,59 @@ const CreatorDashboard = () => {
       
       // Get profiles for registrations
       const registrationUserIds = (registrations || []).map(reg => reg.user_id);
-      const { data: registrationProfiles, error: regProfilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', registrationUserIds.length > 0 ? registrationUserIds : ['no-ids']);
-
-      if (regProfilesError) {
-        console.error('Registration profiles error:', regProfilesError);
+      
+      let registrationProfiles = [];
+      if (registrationUserIds.length > 0) {
+        const { data: profiles, error: regProfilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', registrationUserIds);
+          
+        if (regProfilesError) {
+          console.error('Registration profiles error:', regProfilesError);
+        } else {
+          registrationProfiles = profiles || [];
+        }
       }
 
       // Map profiles to enrollments and registrations
       const profilesMap = new Map();
       
       // Add enrollment profiles to map
-      (enrollmentProfiles || []).forEach(profile => {
+      enrollmentProfiles.forEach(profile => {
         profilesMap.set(profile.id, profile);
       });
       
       // Add registration profiles to map
-      (registrationProfiles || []).forEach(profile => {
+      registrationProfiles.forEach(profile => {
         profilesMap.set(profile.id, profile);
       });
 
       // Combine and sort by creation date
       const combinedActivity = [
         ...(enrollments?.map(item => {
-          const profile = profilesMap.get(item.user_id);
+          const profile = profilesMap.get(item.user_id) || {};
           return {
             id: item.id,
             type: 'enrollment',
             created_at: item.enrollment_date,
             user_id: item.user_id,
             user_name: profile?.full_name || 'Anonymous User',
-            user_email: profile?.email || '',
+            user_email: 'User', // Email is not in the profiles table according to error
             content_id: item.course_id,
             content_title: item.course?.title || 'Unnamed Course'
           };
         }) || []),
         
         ...(registrations?.map(item => {
-          const profile = profilesMap.get(item.user_id);
+          const profile = profilesMap.get(item.user_id) || {};
           return {
             id: item.id,
             type: 'registration',
             created_at: item.created_at,
             user_id: item.user_id,
             user_name: profile?.full_name || 'Anonymous User',
-            user_email: profile?.email || '',
+            user_email: 'User', // Email is not in the profiles table according to error
             content_id: item.event_id,
             content_title: item.event?.title || 'Unnamed Event'
           };
@@ -394,6 +407,8 @@ const CreatorDashboard = () => {
     
     // Summarize revenue by month (only for current year)
     registrations.forEach(item => {
+      if (!item.event || !item.created_at) return;
+      
       const date = new Date(item.created_at);
       if (date.getFullYear() === currentYear && !item.event.is_free) {
         const monthIndex = date.getMonth();
