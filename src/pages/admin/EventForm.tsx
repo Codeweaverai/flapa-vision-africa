@@ -36,8 +36,8 @@ interface NewEvent {
   online_meeting_link: string | null;
   capacity: number | null;
   is_free: boolean;
-  price: number;
-  currency: string;
+  price: number | null;
+  currency: string | null;
 }
 
 interface EventFormProps {
@@ -155,8 +155,8 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
             online_meeting_link: data.online_meeting_link || null,
             capacity: data.capacity || null,
             is_free: data.is_free,
-            price: data.is_free ? 0 : data.price,
-            currency: data.currency,
+            price: data.is_free ? null : data.price,
+            currency: data.is_free ? null : data.currency,
           })
           .eq('id', eventId)
           .select()
@@ -182,8 +182,8 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
           online_meeting_link: data.online_meeting_link || null,
           capacity: data.capacity || null,
           is_free: data.is_free,
-          price: data.is_free ? 0 : (data.price || 0),
-          currency: data.currency,
+          price: data.is_free ? null : (data.price || 0),
+          currency: data.is_free ? null : (data.currency || 'USD'),
         };
         
         console.log('Creating new event with data:', newEventData);
@@ -202,7 +202,10 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
           try {
             const { data: createdEvent, error } = await supabase
               .from('events')
-              .insert([newEventData])
+              .insert([{
+                ...newEventData,
+                creator_id: user.id
+              }])
               .select()
               .single();
               
@@ -282,6 +285,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
     }
   };
 
+  // Ensure we have valid event types that match the database constraints
   const eventTypes = [
     { value: 'workshop', label: 'Workshop' },
     { value: 'webinar', label: 'Webinar' },

@@ -63,6 +63,14 @@ export const createEventWithCreator = async (
       return null;
     }
     
+    // Validate event_type against allowed values in the database
+    const validEventTypes = ['workshop', 'webinar', 'conference', 'meetup', 'seminar', 'training', 'other'];
+    if (!validEventTypes.includes(eventData.event_type)) {
+      console.error(`Error creating event: Invalid event type: ${eventData.event_type}`);
+      toast.error(`Invalid event type: ${eventData.event_type}. Must be one of: ${validEventTypes.join(', ')}`);
+      return null;
+    }
+    
     // Create the complete event object with required fields
     const eventWithCreator = {
       title: eventData.title,
@@ -74,9 +82,8 @@ export const createEventWithCreator = async (
       online_meeting_link: eventData.online_meeting_link,
       capacity: eventData.capacity,
       is_free: eventData.is_free !== undefined ? eventData.is_free : false,
-      price: eventData.price,
-      currency: eventData.currency || 'USD',
-      image_url: eventData.image_url,
+      price: eventData.is_free ? null : eventData.price, // Set price to null if is_free is true
+      currency: eventData.is_free ? null : (eventData.currency || 'USD'), // Set currency to null if is_free is true
       creator_id: creatorId,
     };
 
