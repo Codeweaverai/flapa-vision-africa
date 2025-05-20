@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -48,6 +49,22 @@ const calculateMonthlyRevenue = (enrollments: any[]) => {
   return monthlyRevenue;
 };
 
+// Define interfaces for our state types
+interface RevenueMetrics {
+  totalRevenue: number;
+  courseRevenue: number;
+  eventRevenue: number;
+  monthlyRevenue: Array<{name: string, revenue: number}>;
+  revenueBySource: Array<{name: string, value: number}>;
+}
+
+interface EngagementMetrics {
+  totalStudents: number;
+  activeCourses: number;
+  completionRate: number;
+  studentEngagement: Array<{month: string, engagement: number}>;
+}
+
 const CreatorDashboard: React.FC = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
@@ -58,18 +75,18 @@ const CreatorDashboard: React.FC = () => {
   const [selectedTimeRange, setSelectedTimeRange] = useState('month');
   const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false);
   const [showRevenueBySource, setShowRevenueBySource] = useState(false);
-  const [revenueMetrics, setRevenueMetrics] = useState({
+  const [revenueMetrics, setRevenueMetrics] = useState<RevenueMetrics>({
     totalRevenue: 0,
     courseRevenue: 0,
     eventRevenue: 0,
-    monthlyRevenue: [] as any[],
-    revenueBySource: [] as any[]
+    monthlyRevenue: [],
+    revenueBySource: []
   });
-  const [engagementMetrics, setEngagementMetrics] = useState({
+  const [engagementMetrics, setEngagementMetrics] = useState<EngagementMetrics>({
     totalStudents: 0,
     activeCourses: 0,
     completionRate: 0,
-    studentEngagement: [] as any[]
+    studentEngagement: []
   });
 
   useEffect(() => {
@@ -91,7 +108,7 @@ const CreatorDashboard: React.FC = () => {
         
         if (coursesError) throw coursesError;
         
-        // Fetch enrollments for the creator's courses - Fix the table name from 'enrollments' to 'course_enrollments'
+        // Fetch enrollments for the creator's courses
         const { data: enrollmentsData, error: enrollmentsError } = await supabase
           .from('course_enrollments')
           .select(`
