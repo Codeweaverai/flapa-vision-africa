@@ -18,9 +18,8 @@ import { CalendarIcon, ArrowLeft, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
-import { Event } from '@/services/eventService';
+import { Event, createEventWithCreator, VALID_EVENT_TYPES } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
-import { createEventWithCreator } from '@/services/eventService';
 
 // Define a type for the form values
 type FormValues = z.infer<typeof formSchema>;
@@ -285,16 +284,11 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
     }
   };
 
-  // Ensure we have valid event types that match the database constraints
-  const eventTypes = [
-    { value: 'workshop', label: 'Workshop' },
-    { value: 'webinar', label: 'Webinar' },
-    { value: 'conference', label: 'Conference' },
-    { value: 'meetup', label: 'Meetup' },
-    { value: 'seminar', label: 'Seminar' },
-    { value: 'training', label: 'Training' },
-    { value: 'other', label: 'Other' },
-  ];
+  // Use the validated event types constant from our service
+  const eventTypes = VALID_EVENT_TYPES.map(type => ({
+    value: type,
+    label: type.charAt(0).toUpperCase() + type.slice(1)
+  }));
 
   const currencies = [
     { value: 'USD', label: 'US Dollar (USD)' },

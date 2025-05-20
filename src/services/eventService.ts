@@ -15,8 +15,8 @@ export interface Event {
   online_meeting_link?: string;
   capacity?: number;
   is_free: boolean;
-  price?: number;
-  currency?: string;
+  price?: number | null;
+  currency?: string | null;
   image_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -49,6 +49,9 @@ export interface MobileOperator {
   country: string;
 }
 
+// Define valid event types
+export const VALID_EVENT_TYPES = ['workshop', 'webinar', 'conference', 'meetup', 'seminar', 'training', 'other'];
+
 // Add a function to create an event with creator_id
 export const createEventWithCreator = async (
   eventData: Partial<Event>, 
@@ -64,10 +67,9 @@ export const createEventWithCreator = async (
     }
     
     // Validate event_type against allowed values in the database
-    const validEventTypes = ['workshop', 'webinar', 'conference', 'meetup', 'seminar', 'training', 'other'];
-    if (!validEventTypes.includes(eventData.event_type)) {
+    if (!VALID_EVENT_TYPES.includes(eventData.event_type)) {
       console.error(`Error creating event: Invalid event type: ${eventData.event_type}`);
-      toast.error(`Invalid event type: ${eventData.event_type}. Must be one of: ${validEventTypes.join(', ')}`);
+      toast.error(`Invalid event type: ${eventData.event_type}. Must be one of: ${VALID_EVENT_TYPES.join(', ')}`);
       return null;
     }
     
@@ -78,9 +80,9 @@ export const createEventWithCreator = async (
       start_time: eventData.start_time,
       end_time: eventData.end_time,
       description: eventData.description || '',
-      location: eventData.location,
-      online_meeting_link: eventData.online_meeting_link,
-      capacity: eventData.capacity,
+      location: eventData.location || null,
+      online_meeting_link: eventData.online_meeting_link || null,
+      capacity: eventData.capacity || null,
       is_free: eventData.is_free !== undefined ? eventData.is_free : false,
       price: eventData.is_free ? null : eventData.price, // Set price to null if is_free is true
       currency: eventData.is_free ? null : (eventData.currency || 'USD'), // Set currency to null if is_free is true
