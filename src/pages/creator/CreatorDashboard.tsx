@@ -387,13 +387,15 @@ const CreatorDashboard = () => {
       const date = new Date(item.created_at);
       if (date.getFullYear() === currentYear && !item.event.is_free) {
         const monthIndex = date.getMonth();
-        // Convert price to number to ensure we're dealing with numeric values
+        
+        // Fix: Ensure we're dealing with numeric values
         const price = typeof item.event.price === 'number' ? Number(item.event.price) : 0;
         
-        // Fix: Ensure we're performing arithmetic on number types
-        // Use explicit type conversion for both operands
-        const currentRevenue = Number(monthlyRevenue[monthIndex].revenue);
-        monthlyRevenue[monthIndex].revenue = currentRevenue + price;
+        // Fix the type error by ensuring both operands are numbers
+        monthlyRevenue[monthIndex] = {
+          ...monthlyRevenue[monthIndex],
+          revenue: Number(monthlyRevenue[monthIndex].revenue) + Number(price)
+        };
       }
     });
     
