@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,38 @@ import {
   LineChart, Line, AreaChart, Area, BarChart as RechartsBarChart, 
   Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
+
+interface EnrollmentData {
+  id: string;
+  enrollment_date: string;
+  user_id: string;
+  course_id: string;
+  student?: {
+    full_name: string | null;
+    email: string;
+  } | null;
+  course?: {
+    title: string;
+    creator_id: string;
+  } | null;
+}
+
+interface RegistrationData {
+  id: string;
+  created_at: string;
+  user_id: string;
+  event_id: string;
+  attendee?: {
+    full_name: string | null;
+    email: string;
+  } | null;
+  event?: {
+    title: string;
+    creator_id: string;
+    price: number;
+    is_free: boolean;
+  } | null;
+}
 
 const CreatorDashboard = () => {
   const { user } = useAuth();
@@ -55,7 +86,7 @@ const CreatorDashboard = () => {
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select('user_id, course:courses!inner(creator_id)')
-        .eq('courses.creator_id', user?.id);
+        .eq('course.creator_id', user?.id);
         
       if (enrollmentError) throw enrollmentError;
       
@@ -115,18 +146,31 @@ const CreatorDashboard = () => {
       const { data: enrollments, error: enrollmentsError } = await supabase
         .from('course_enrollments')
         .select(`
-          id, 
+          id,
           enrollment_date,
           user_id,
           course_id,
-          course:courses!inner(title, creator_id),
-          student:profiles(full_name, email)
+          course:courses(title, creator_id)
         `)
         .eq('course.creator_id', user?.id)
         .order('enrollment_date', { ascending: false })
         .limit(5);
         
-      if (enrollmentsError) throw enrollmentsError;
+      if (enrollmentsError) {
+        console.error('Enrollment error:', enrollmentsError);
+        throw enrollmentsError;
+      }
+
+      // Get student profiles for enrollments
+      const enrollmentUserIds = (enrollments || []).map(enrollment => enrollment.user_id);
+      const { data: enrollmentProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', enrollmentUserIds.length > 0 ? enrollmentUserIds : ['no-ids']);
+
+      if (profilesError) {
+        console.error('Profiles error:', profilesError);
+      }
       
       // Get recent registrations
       const { data: registrations, error: registrationsError } = await supabase
@@ -136,38 +180,70 @@ const CreatorDashboard = () => {
           created_at,
           user_id,
           event_id,
-          event:events!inner(title, creator_id),
-          attendee:profiles(full_name, email)
+          event:events(title, creator_id)
         `)
         .eq('event.creator_id', user?.id)
         .order('created_at', { ascending: false })
         .limit(5);
         
-      if (registrationsError) throw registrationsError;
+      if (registrationsError) {
+        console.error('Registration error:', registrationsError);
+        throw registrationsError;
+      }
       
+      // Get profiles for registrations
+      const registrationUserIds = (registrations || []).map(reg => reg.user_id);
+      const { data: registrationProfiles, error: regProfilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', registrationUserIds.length > 0 ? registrationUserIds : ['no-ids']);
+
+      if (regProfilesError) {
+        console.error('Registration profiles error:', regProfilesError);
+      }
+
+      // Map profiles to enrollments and registrations
+      const profilesMap = new Map();
+      
+      // Add enrollment profiles to map
+      (enrollmentProfiles || []).forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+      
+      // Add registration profiles to map
+      (registrationProfiles || []).forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+
       // Combine and sort by creation date
       const combinedActivity = [
-        ...(enrollments?.map(item => ({
-          id: item.id,
-          type: 'enrollment',
-          created_at: item.enrollment_date,
-          user_id: item.user_id,
-          user_name: item.student?.full_name || 'Anonymous User',
-          user_email: item.student?.email,
-          content_id: item.course_id,
-          content_title: item.course.title
-        })) || []),
+        ...(enrollments?.map(item => {
+          const profile = profilesMap.get(item.user_id);
+          return {
+            id: item.id,
+            type: 'enrollment',
+            created_at: item.enrollment_date,
+            user_id: item.user_id,
+            user_name: profile?.full_name || 'Anonymous User',
+            user_email: profile?.email || '',
+            content_id: item.course_id,
+            content_title: item.course?.title || 'Unnamed Course'
+          };
+        }) || []),
         
-        ...(registrations?.map(item => ({
-          id: item.id,
-          type: 'registration',
-          created_at: item.created_at,
-          user_id: item.user_id,
-          user_name: item.attendee?.full_name || 'Anonymous User',
-          user_email: item.attendee?.email,
-          content_id: item.event_id,
-          content_title: item.event.title
-        })) || [])
+        ...(registrations?.map(item => {
+          const profile = profilesMap.get(item.user_id);
+          return {
+            id: item.id,
+            type: 'registration',
+            created_at: item.created_at,
+            user_id: item.user_id,
+            user_name: profile?.full_name || 'Anonymous User',
+            user_email: profile?.email || '',
+            content_id: item.event_id,
+            content_title: item.event?.title || 'Unnamed Event'
+          };
+        }) || [])
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5);
       
@@ -321,7 +397,9 @@ const CreatorDashboard = () => {
       const date = new Date(item.created_at);
       if (date.getFullYear() === currentYear && !item.event.is_free) {
         const monthIndex = date.getMonth();
-        monthlyRevenue[monthIndex].revenue += Number(item.event.price) || 0;
+        // Convert to number to ensure we're dealing with numeric values
+        const price = Number(item.event.price) || 0;
+        monthlyRevenue[monthIndex].revenue += price;
       }
     });
     

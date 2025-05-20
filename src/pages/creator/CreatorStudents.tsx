@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -62,12 +61,20 @@ const CreatorStudents = () => {
           enrollment_date,
           progress,
           is_completed,
-          course:courses(title, creator_id),
-          student:profiles(id, email, full_name, avatar_url, created_at)
+          course:courses(title, creator_id)
         `)
         .eq('course.creator_id', user?.id);
         
       if (enrollmentError) throw enrollmentError;
+      
+      // Get student profile data for course enrollments
+      const enrollmentUserIds = (enrollmentData || []).map(item => item.user_id);
+      const { data: enrollmentProfiles, error: enrollmentProfilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, avatar_url, created_at')
+        .in('id', enrollmentUserIds.length > 0 ? enrollmentUserIds : ['no-ids']);
+        
+      if (enrollmentProfilesError) throw enrollmentProfilesError;
       
       // Get event registration data
       const { data: registrationsData, error: registrationsError } = await supabase
@@ -78,39 +85,66 @@ const CreatorStudents = () => {
           user_id,
           created_at,
           status,
-          event:events(title, creator_id),
-          attendee:profiles(id, email, full_name, avatar_url, created_at)
+          event:events(title, creator_id)
         `)
         .eq('event.creator_id', user?.id);
         
       if (registrationsError) throw registrationsError;
       
+      // Get student profile data for event registrations
+      const registrationUserIds = (registrationsData || []).map(item => item.user_id);
+      const { data: registrationProfiles, error: registrationProfilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, avatar_url, created_at')
+        .in('id', registrationUserIds.length > 0 ? registrationUserIds : ['no-ids']);
+        
+      if (registrationProfilesError) throw registrationProfilesError;
+      
+      // Create a profile map for faster lookups
+      const profilesMap = new Map();
+      
+      // Add enrollment profiles to map
+      (enrollmentProfiles || []).forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+      
+      // Add registration profiles to map
+      (registrationProfiles || []).forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+      
       // Format course students data
-      const formattedCourseStudents: EnrolledStudent[] = enrollmentData?.map((enrollment: any) => ({
-        id: enrollment.student.id,
-        email: enrollment.student.email,
-        full_name: enrollment.student.full_name,
-        avatar_url: enrollment.student.avatar_url,
-        created_at: enrollment.student.created_at,
-        course_id: enrollment.course_id,
-        course_title: enrollment.course.title,
-        enrollment_date: enrollment.enrollment_date,
-        progress: enrollment.progress || 0,
-        is_completed: enrollment.is_completed || false
-      })) || [];
+      const formattedCourseStudents: EnrolledStudent[] = (enrollmentData || []).map((enrollment: any) => {
+        const profile = profilesMap.get(enrollment.user_id) || {};
+        return {
+          id: enrollment.user_id,
+          email: profile.email || 'Unknown Email',
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          created_at: profile.created_at || enrollment.enrollment_date,
+          course_id: enrollment.course_id,
+          course_title: enrollment.course?.title || 'Unnamed Course',
+          enrollment_date: enrollment.enrollment_date,
+          progress: enrollment.progress || 0,
+          is_completed: enrollment.is_completed || false
+        };
+      });
       
       // Format event attendees data
-      const formattedEventAttendees: EventAttendee[] = registrationsData?.map((registration: any) => ({
-        id: registration.attendee.id,
-        email: registration.attendee.email,
-        full_name: registration.attendee.full_name,
-        avatar_url: registration.attendee.avatar_url,
-        created_at: registration.attendee.created_at,
-        event_id: registration.event_id,
-        event_title: registration.event.title,
-        registration_date: registration.created_at,
-        status: registration.status
-      })) || [];
+      const formattedEventAttendees: EventAttendee[] = (registrationsData || []).map((registration: any) => {
+        const profile = profilesMap.get(registration.user_id) || {};
+        return {
+          id: registration.user_id,
+          email: profile.email || 'Unknown Email',
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          created_at: profile.created_at || registration.created_at,
+          event_id: registration.event_id,
+          event_title: registration.event?.title || 'Unnamed Event',
+          registration_date: registration.created_at,
+          status: registration.status
+        };
+      });
       
       setCourseStudents(formattedCourseStudents);
       setEventAttendees(formattedEventAttendees);
@@ -129,7 +163,7 @@ const CreatorStudents = () => {
     const enrollmentChannel = supabase
       .channel('creator-enrollments')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'course_enrollments', filter: `course.creator_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'course_enrollments' },
         () => {
           fetchStudentsData();
         }
@@ -140,7 +174,7 @@ const CreatorStudents = () => {
     const registrationChannel = supabase
       .channel('creator-registrations')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'registrations', filter: `event.creator_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'registrations' },
         () => {
           fetchStudentsData();
         }
