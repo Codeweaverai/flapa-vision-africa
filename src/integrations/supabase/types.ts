@@ -522,6 +522,8 @@ export type Database = {
       }
       lessons: {
         Row: {
+          content: Json | null
+          content_type: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -533,6 +535,8 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          content?: Json | null
+          content_type?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -544,6 +548,8 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          content?: Json | null
+          content_type?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -1109,6 +1115,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      video_metadata: {
+        Row: {
+          content_type: string
+          created_at: string
+          duration_seconds: number | null
+          file_size: number
+          filename: string
+          id: string
+          lesson_id: string
+          original_filename: string
+          storage_path: string
+          updated_at: string
+          wasabi_url: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          duration_seconds?: number | null
+          file_size: number
+          filename: string
+          id?: string
+          lesson_id: string
+          original_filename: string
+          storage_path: string
+          updated_at?: string
+          wasabi_url: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          duration_seconds?: number | null
+          file_size?: number
+          filename?: string
+          id?: string
+          lesson_id?: string
+          original_filename?: string
+          storage_path?: string
+          updated_at?: string
+          wasabi_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_metadata_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
