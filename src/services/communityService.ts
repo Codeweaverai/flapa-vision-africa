@@ -57,16 +57,37 @@ export interface Notification {
 // Community Posts Functions
 export const fetchCommunityPosts = async (): Promise<CommunityPost[]> => {
   try {
-    const { data, error } = await supabase
+    // First fetch the posts
+    const { data: posts, error: postsError } = await supabase
       .from('community_posts')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url, full_name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    if (postsError) throw postsError;
+    
+    if (!posts || posts.length === 0) {
+      return [];
+    }
+
+    // Then fetch the profiles for these posts
+    const userIds = [...new Set(posts.map(post => post.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, full_name')
+      .in('id', userIds);
+
+    if (profilesError) throw profilesError;
+
+    // Merge the data
+    const postsWithProfiles = posts.map(post => {
+      const userProfile = profiles?.find(profile => profile.id === post.user_id);
+      return {
+        ...post,
+        profiles: userProfile || null
+      };
+    });
+
+    return postsWithProfiles as CommunityPost[];
   } catch (error) {
     console.error('Error fetching community posts:', error);
     toast.error('Failed to load community posts');
@@ -99,17 +120,38 @@ export const createCommunityPost = async (userId: string, title: string, content
 // Course Comments Functions
 export const fetchCourseComments = async (courseId: string): Promise<CourseComment[]> => {
   try {
-    const { data, error } = await supabase
+    // First fetch the comments
+    const { data: comments, error: commentsError } = await supabase
       .from('course_comments')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url, full_name)
-      `)
+      .select('*')
       .eq('course_id', courseId)
       .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    return data || [];
+    if (commentsError) throw commentsError;
+    
+    if (!comments || comments.length === 0) {
+      return [];
+    }
+
+    // Then fetch the profiles for these comments
+    const userIds = [...new Set(comments.map(comment => comment.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, full_name')
+      .in('id', userIds);
+
+    if (profilesError) throw profilesError;
+
+    // Merge the data
+    const commentsWithProfiles = comments.map(comment => {
+      const userProfile = profiles?.find(profile => profile.id === comment.user_id);
+      return {
+        ...comment,
+        profiles: userProfile || null
+      };
+    });
+
+    return commentsWithProfiles as CourseComment[];
   } catch (error) {
     console.error('Error fetching course comments:', error);
     toast.error('Failed to load comments');
@@ -142,18 +184,39 @@ export const createCourseComment = async (userId: string, courseId: string, cont
 // Chat Messages Functions
 export const fetchChatMessages = async (channel = 'general'): Promise<CommunityMessage[]> => {
   try {
-    const { data, error } = await supabase
+    // First fetch the messages
+    const { data: messages, error: messagesError } = await supabase
       .from('community_messages')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url, full_name)
-      `)
+      .select('*')
       .eq('channel', channel)
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (error) throw error;
-    return data || [];
+    if (messagesError) throw messagesError;
+    
+    if (!messages || messages.length === 0) {
+      return [];
+    }
+
+    // Then fetch the profiles for these messages
+    const userIds = [...new Set(messages.map(message => message.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, full_name')
+      .in('id', userIds);
+
+    if (profilesError) throw profilesError;
+
+    // Merge the data
+    const messagesWithProfiles = messages.map(message => {
+      const userProfile = profiles?.find(profile => profile.id === message.user_id);
+      return {
+        ...message,
+        profiles: userProfile || null
+      };
+    });
+
+    return messagesWithProfiles as CommunityMessage[];
   } catch (error) {
     console.error('Error fetching chat messages:', error);
     toast.error('Failed to load messages');
