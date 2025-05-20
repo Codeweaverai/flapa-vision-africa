@@ -1,12 +1,191 @@
-import React from 'react';
+
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Image, Video, Mic } from 'lucide-react';
+import { Image, Mic, FileDown, Calendar, Clock, ArrowRight } from 'lucide-react';
+import { getMediaPosts, MediaPost } from '@/services/mediaService';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const MediaPage = () => {
+  const navigate = useNavigate();
+  const [newsPosts, setNewsPosts] = useState<MediaPost[]>([]);
+  const [podcastPosts, setPodcastPosts] = useState<MediaPost[]>([]);
+  const [resourcePosts, setResourcePosts] = useState<MediaPost[]>([]);
+  const [loading, setLoading] = useState({
+    news: true,
+    podcasts: true,
+    resources: true
+  });
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    const loadMediaContent = async () => {
+      try {
+        // Load all media content in parallel
+        const [newsData, podcastData, resourceData] = await Promise.all([
+          getMediaPosts('news'),
+          getMediaPosts('podcast'),
+          getMediaPosts('resource')
+        ]);
+        
+        setNewsPosts(newsData);
+        setPodcastPosts(podcastData);
+        setResourcePosts(resourceData);
+      } catch (error) {
+        console.error('Error loading media content:', error);
+        toast.error('Failed to load some media content');
+      } finally {
+        setLoading({
+          news: false,
+          podcasts: false,
+          resources: false
+        });
+      }
+    };
+
+    loadMediaContent();
+  }, []);
+
+  const handleViewPost = (post: MediaPost) => {
+    navigate(`/media/${post.id}`);
+  };
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    // Here you would typically call an API to subscribe the user
+    toast.success('Thank you for subscribing to our newsletter!');
+    setEmail('');
+  };
+
+  const renderNewsCard = (post: MediaPost, index: number) => {
+    const publishedDate = format(new Date(post.published_at), 'MMMM d, yyyy');
+    
+    return (
+      <Card key={post.id} className="overflow-hidden h-full">
+        <div className="relative h-48 bg-muted">
+          {post.image_url ? (
+            <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="flex items-center justify-center w-full h-full bg-gray-100">
+              <Image className="h-12 w-12 text-gray-300" />
+            </div>
+          )}
+        </div>
+        <CardHeader>
+          <CardDescription>{publishedDate}</CardDescription>
+          <CardTitle className="line-clamp-2">{post.title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="line-clamp-3">
+            {post.summary || post.content.substring(0, 150) + '...'}
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Button 
+            variant="link" 
+            className="px-0 flex items-center"
+            onClick={() => handleViewPost(post)}
+          >
+            Read More <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  const renderPodcastCard = (post: MediaPost, index: number) => {
+    const publishedDate = format(new Date(post.published_at), 'MMMM d, yyyy');
+    
+    return (
+      <Card key={post.id} className="overflow-hidden">
+        <div className="flex flex-col md:flex-row">
+          <div className="relative w-full md:w-48 h-48 bg-muted">
+            {post.image_url ? (
+              <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full bg-gray-100">
+                <Mic className="h-16 w-16 text-gray-300" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardDescription className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> {publishedDate}
+                </CardDescription>
+                {post.duration_minutes && (
+                  <span className="text-sm text-muted-foreground flex items-center">
+                    <Clock className="h-4 w-4 mr-1" /> {post.duration_minutes} min
+                  </span>
+                )}
+              </div>
+              <CardTitle>{post.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="line-clamp-2">
+                {post.summary || post.content.substring(0, 150) + '...'}
+              </p>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="flex items-center"
+                onClick={() => handleViewPost(post)}
+              >
+                <Mic className="w-4 h-4 mr-2" /> Listen Now
+              </Button>
+            </CardFooter>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderResourceCard = (post: MediaPost) => {
+    return (
+      <Card key={post.id} className="h-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileDown className="h-5 w-5 text-primary" />
+            {post.title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 line-clamp-3">
+            {post.summary || post.content.substring(0, 150) + '...'}
+          </p>
+          <Button onClick={() => handleViewPost(post)}>View Resource</Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderLoadingState = (type: string) => (
+    <div className="flex flex-col items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <p className="mt-4 text-muted-foreground">Loading {type}...</p>
+    </div>
+  );
+
+  const renderEmptyState = (type: string) => (
+    <div className="text-center py-12">
+      <p className="text-xl text-muted-foreground">No {type} available at the moment.</p>
+      <p className="mt-2">Please check back soon for updates!</p>
+    </div>
+  );
+
   return (
     <Layout>
       <div className="section-container bg-light-purple">
@@ -25,133 +204,53 @@ const MediaPage = () => {
           </TabsList>
           
           <TabsContent value="news" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="overflow-hidden">
-                  <div className="relative h-48 bg-muted">
-                    <Image className="w-full h-full object-cover" />
+            {loading.news ? (
+              renderLoadingState('news articles')
+            ) : newsPosts.length === 0 ? (
+              renderEmptyState('news articles')
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {newsPosts.map((post, index) => renderNewsCard(post, index))}
+                </div>
+                {newsPosts.length >= 6 && (
+                  <div className="flex justify-center mt-8">
+                    <Button>Load More News</Button>
                   </div>
-                  <CardHeader>
-                    <CardDescription>May {i + 10}, 2023</CardDescription>
-                    <CardTitle className="line-clamp-2">SkillPulse Launches New Learning Platform Features</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="line-clamp-3">
-                      SkillPulse introduces advanced AI-powered learning recommendations and interactive course content,
-                      designed to enhance user engagement and improve learning outcomes.
-                    </p>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="link" className="px-0">Read More</Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-            <div className="flex justify-center mt-8">
-              <Button>Load More News</Button>
-            </div>
+                )}
+              </>
+            )}
           </TabsContent>
           
           <TabsContent value="podcast" className="mt-6">
-            <div className="space-y-6 max-w-4xl mx-auto">
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i} className="overflow-hidden">
-                  <div className="flex flex-col md:flex-row">
-                    <div className="relative w-full md:w-48 h-48 bg-muted">
-                      <Mic className="w-full h-full p-16 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardDescription>Episode {i} • May {i + 10}, 2023</CardDescription>
-                          <span className="text-sm text-muted-foreground">45 min</span>
-                        </div>
-                        <CardTitle>The Future of Professional Development</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="line-clamp-2">
-                          In this episode, we discuss the evolving landscape of professional development
-                          and how technology is shaping the future of learning and career advancement.
-                        </p>
-                      </CardContent>
-                      <CardFooter className="flex justify-between">
-                        <Button variant="outline" size="sm">
-                          <Mic className="w-4 h-4 mr-2" /> Listen Now
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          Download
-                        </Button>
-                      </CardFooter>
-                    </div>
+            {loading.podcasts ? (
+              renderLoadingState('podcasts')
+            ) : podcastPosts.length === 0 ? (
+              renderEmptyState('podcasts')
+            ) : (
+              <>
+                <div className="space-y-6 max-w-4xl mx-auto">
+                  {podcastPosts.map((post, index) => renderPodcastCard(post, index))}
+                </div>
+                {podcastPosts.length >= 4 && (
+                  <div className="flex justify-center mt-8">
+                    <Button>View All Episodes</Button>
                   </div>
-                </Card>
-              ))}
-            </div>
-            <div className="flex justify-center mt-8">
-              <Button>View All Episodes</Button>
-            </div>
+                )}
+              </>
+            )}
           </TabsContent>
           
           <TabsContent value="resources" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Image className="h-5 w-5 text-primary" />
-                    Press Kit
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-4">
-                    Access our official logos, images, executive bios, and company information 
-                    for media and press usage.
-                  </p>
-                  <Button>Download Press Kit</Button>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Video className="h-5 w-5 text-primary" />
-                    Brand Assets
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-4">
-                    Access our brand guidelines, color palettes, typography information, and 
-                    approved visual assets.
-                  </p>
-                  <Button>View Brand Assets</Button>
-                </CardContent>
-              </Card>
-              
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle>Media Contact</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-4">
-                    For press inquiries, interview requests, or additional information, 
-                    please contact our media relations team.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="font-medium">Media Relations</p>
-                      <a href="mailto:media@skillpulse.com" className="text-primary">
-                        media@skillpulse.com
-                      </a>
-                    </div>
-                    <div>
-                      <p className="font-medium">Phone</p>
-                      <a href="tel:+18005551234" className="text-primary">
-                        +1 (800) 555-1234
-                      </a>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {loading.resources ? (
+              renderLoadingState('resources')
+            ) : resourcePosts.length === 0 ? (
+              renderEmptyState('resources')
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {resourcePosts.map((post) => renderResourceCard(post))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
         
@@ -160,14 +259,16 @@ const MediaPage = () => {
           <p className="text-lg mb-6 max-w-2xl mx-auto">
             Stay updated with the latest news, upcoming events, and special offers from SkillPulse.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+          <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
             <Input 
               type="email" 
               placeholder="Your email address" 
               className="flex-1"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
-            <Button>Subscribe</Button>
-          </div>
+            <Button type="submit">Subscribe</Button>
+          </form>
         </div>
       </div>
     </Layout>

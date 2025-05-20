@@ -18,6 +18,7 @@ import PaymentCancelPage from '@/pages/PaymentCancelPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import HelpCenterPage from '@/pages/HelpCenterPage';
 import MediaPage from '@/pages/MediaPage';
+import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
 
 // Import admin pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -29,6 +30,8 @@ import AdminSettings from '@/pages/admin/AdminSettings';
 import EventForm from '@/pages/admin/EventForm';
 import CourseForm from '@/pages/admin/CourseForm';
 import CourseContentPage from '@/pages/admin/CourseContentPage';
+import AdminMedia from '@/pages/admin/AdminMedia';
+import MediaForm from '@/pages/admin/MediaForm';
 
 // Import creator pages
 import CreatorDashboard from '@/pages/creator/CreatorDashboard';
@@ -49,6 +52,7 @@ function App() {
       <Route path="/about" element={<AboutPage />} />
       <Route path="/help-center" element={<HelpCenterPage />} />
       <Route path="/media" element={<MediaPage />} />
+      <Route path="/media/:id" element={<MediaPostDetailPage />} />
       <Route path="/consult" element={<ConsultPage />} />
       <Route path="/events" element={<EventsPage />} />
       <Route path="/events/:eventId" element={<EventDetailPage />} />
@@ -72,6 +76,9 @@ function App() {
       <Route path="/admin/courses/content/:courseId" element={<CourseContentPage />} />
       <Route path="/admin/users" element={<AdminUsers />} />
       <Route path="/admin/settings" element={<AdminSettings />} />
+      <Route path="/admin/media" element={<AdminMedia />} />
+      <Route path="/admin/media/create" element={<MediaForm />} />
+      <Route path="/admin/media/edit/:id" element={<MediaForm />} />
       
       {/* Creator Routes */}
       <Route path="/creator/dashboard" element={<CreatorDashboard />} />

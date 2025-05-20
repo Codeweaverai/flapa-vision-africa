@@ -8,7 +8,8 @@ import {
   MessageSquare, 
   Settings,
   Layers,
-  FileCheck
+  FileCheck,
+  FileText
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -26,6 +27,7 @@ const AdminSidebar = () => {
     { icon: Mic, text: 'Speaking', path: '/admin/speaking' },
     { icon: MessageSquare, text: 'Consultations', path: '/admin/consultations' },
     { icon: Layers, text: 'Courses', path: '/admin/courses' },
+    { icon: FileText, text: 'Media', path: '/admin/media' },
     { icon: Settings, text: 'Settings', path: '/admin/settings' },
   ];
   

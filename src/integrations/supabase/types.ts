@@ -478,6 +478,105 @@ export type Database = {
           },
         ]
       }
+      media_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      media_posts: {
+        Row: {
+          author_id: string | null
+          content: string
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          image_url: string | null
+          is_published: boolean | null
+          media_url: string | null
+          post_type: string
+          published_at: string | null
+          summary: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          content: string
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          media_url?: string | null
+          post_type: string
+          published_at?: string | null
+          summary?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          content?: string
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          media_url?: string | null
+          post_type?: string
+          published_at?: string | null
+          summary?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      media_posts_categories: {
+        Row: {
+          category_id: string
+          post_id: string
+        }
+        Insert: {
+          category_id: string
+          post_id: string
+        }
+        Update: {
+          category_id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_posts_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "media_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_posts_categories_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "media_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mobile_operators: {
         Row: {
           code: string
