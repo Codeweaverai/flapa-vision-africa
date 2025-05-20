@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -21,10 +20,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 
 // Fix the specific function causing the error
-// The error occurs around line 361 in the calculateMonthlyRevenue function
-
-// Let's revise the full implementation of the function:
-
 const calculateMonthlyRevenue = (enrollments: any[]) => {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
@@ -92,18 +87,18 @@ const CreatorDashboard: React.FC = () => {
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
           .select('*')
-          .eq('instructor_id', creatorId);
+          .eq('creator_id', creatorId);
         
         if (coursesError) throw coursesError;
         
-        // Fetch enrollments for the creator's courses
+        // Fetch enrollments for the creator's courses - Fix the table name from 'enrollments' to 'course_enrollments'
         const { data: enrollmentsData, error: enrollmentsError } = await supabase
-          .from('enrollments')
+          .from('course_enrollments')
           .select(`
             *,
             course:courses(*)
           `)
-          .in('course_id', coursesData.map(course => course.id) || []);
+          .in('course_id', coursesData?.map(course => course.id) || []);
         
         if (enrollmentsError) throw enrollmentsError;
         
@@ -122,7 +117,7 @@ const CreatorDashboard: React.FC = () => {
             *,
             event:events(*)
           `)
-          .in('event_id', eventsData.map(event => event.id) || []);
+          .in('event_id', eventsData?.map(event => event.id) || []);
         
         if (registrationsError) throw registrationsError;
         
