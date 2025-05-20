@@ -67,7 +67,7 @@ export const createEventWithCreator = async (
     }
     
     // Validate event_type against allowed values in the database
-    if (!VALID_EVENT_TYPES.includes(eventData.event_type)) {
+    if (!VALID_EVENT_TYPES.includes(eventData.event_type.toLowerCase())) {
       console.error(`Error creating event: Invalid event type: ${eventData.event_type}`);
       toast.error(`Invalid event type: ${eventData.event_type}. Must be one of: ${VALID_EVENT_TYPES.join(', ')}`);
       return null;
@@ -76,7 +76,7 @@ export const createEventWithCreator = async (
     // Create the complete event object with required fields
     const eventWithCreator = {
       title: eventData.title,
-      event_type: eventData.event_type,
+      event_type: eventData.event_type.toLowerCase(), // Convert to lowercase to ensure consistency
       start_time: eventData.start_time,
       end_time: eventData.end_time,
       description: eventData.description || '',
@@ -87,6 +87,7 @@ export const createEventWithCreator = async (
       price: eventData.is_free ? null : eventData.price, // Set price to null if is_free is true
       currency: eventData.is_free ? null : (eventData.currency || 'USD'), // Set currency to null if is_free is true
       creator_id: creatorId,
+      image_url: eventData.image_url || null,
     };
 
     // Log the event data for debugging

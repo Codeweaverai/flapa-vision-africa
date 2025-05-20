@@ -153,8 +153,10 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
         imageUrl = urlData.publicUrl;
       }
       
-      const eventData = {
+      // Ensure event_type is lowercase to match database constraints
+      const processedEventData = {
         ...event,
+        event_type: event.event_type?.toLowerCase(),
         image_url: imageUrl
       };
       
@@ -163,7 +165,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
         const { error } = await supabase
           .from('events')
           .update({
-            ...eventData,
+            ...processedEventData,
             updated_at: new Date().toISOString()
           })
           .eq('id', eventId);
@@ -177,7 +179,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
         // Use the passed creatorId or current user's ID
         const effectiveCreatorId = creatorId || userData.user.id;
 
-        const newEvent = await createEventWithCreator(eventData, effectiveCreatorId);
+        const newEvent = await createEventWithCreator(processedEventData, effectiveCreatorId);
         
         if (newEvent) {
           toast.success('Event created successfully');
@@ -229,7 +231,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
               <Label htmlFor="event_type">Event Type</Label>
               <Select 
                 value={event.event_type} 
-                onValueChange={(value) => handleChange('event_type', value)}
+                onValueChange={(value) => handleChange('event_type', value.toLowerCase())}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select event type" />

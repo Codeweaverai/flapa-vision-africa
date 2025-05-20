@@ -55,6 +55,12 @@ const CreatorCourseForm = () => {
     
     checkCourseOwnership();
   }, [courseId, user, navigate]);
+
+  if (!user) {
+    toast.error("You must be logged in to create or edit courses");
+    navigate('/auth');
+    return null;
+  }
   
   if (loading) {
     return (
