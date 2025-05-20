@@ -39,13 +39,13 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/ventures" className="hover:text-primary transition-colors">
-                  Ventures
+                <Link to="/help-center" className="hover:text-primary transition-colors">
+                  Help Center
                 </Link>
               </li>
               <li>
-                <Link to="/speaking" className="hover:text-primary transition-colors">
-                  Speaking & Media
+                <Link to="/media" className="hover:text-primary transition-colors">
+                  Media
                 </Link>
               </li>
             </ul>
@@ -54,11 +54,6 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Resources</h3>
             <ul className="space-y-2">
-              <li>
-                <Link to="/ai-animations" className="hover:text-primary transition-colors">
-                  AI Animations
-                </Link>
-              </li>
               <li>
                 <Link to="/learning" className="hover:text-primary transition-colors">
                   Learning

@@ -68,14 +68,11 @@ const Navbar = () => {
             <Link to="/about" className="text-foreground hover:text-primary transition-colors">
               About
             </Link>
-            <Link to="/ventures" className="text-foreground hover:text-primary transition-colors">
-              Ventures
+            <Link to="/help-center" className="text-foreground hover:text-primary transition-colors">
+              Help Center
             </Link>
-            <Link to="/speaking" className="text-foreground hover:text-primary transition-colors">
-              Speaking & Media
-            </Link>
-            <Link to="/ai-animations" className="text-foreground hover:text-primary transition-colors">
-              AI Animations
+            <Link to="/media" className="text-foreground hover:text-primary transition-colors">
+              Media
             </Link>
             <Link to="/learning" className="text-foreground hover:text-primary transition-colors">
               Learning
@@ -165,25 +162,18 @@ const Navbar = () => {
               About
             </Link>
             <Link 
-              to="/ventures" 
+              to="/help-center" 
               className="block text-foreground hover:text-primary transition-colors py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              Ventures
+              Help Center
             </Link>
             <Link 
-              to="/speaking" 
+              to="/media" 
               className="block text-foreground hover:text-primary transition-colors py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              Speaking & Media
-            </Link>
-            <Link 
-              to="/ai-animations" 
-              className="block text-foreground hover:text-primary transition-colors py-2"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              AI Animations
+              Media
             </Link>
             <Link 
               to="/learning" 

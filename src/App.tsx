@@ -1,3 +1,4 @@
+
 // Import React and routing dependencies
 import { Routes, Route } from 'react-router-dom';
 
@@ -15,6 +16,8 @@ import AuthPage from '@/pages/AuthPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCancelPage from '@/pages/PaymentCancelPage';
 import NotFoundPage from '@/pages/NotFoundPage';
+import HelpCenterPage from '@/pages/HelpCenterPage';
+import MediaPage from '@/pages/MediaPage';
 
 // Import admin pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -42,6 +45,8 @@ function App() {
       {/* Public routes */}
       <Route path="/" element={<HomePage />} />
       <Route path="/about" element={<AboutPage />} />
+      <Route path="/help-center" element={<HelpCenterPage />} />
+      <Route path="/media" element={<MediaPage />} />
       <Route path="/consult" element={<ConsultPage />} />
       <Route path="/events" element={<EventsPage />} />
       <Route path="/events/:eventId" element={<EventDetailPage />} />
