@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -21,7 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 
 // Fix the specific function causing the error
-const calculateMonthlyRevenue = (enrollments: any[]) => {
+const calculateMonthlyRevenue = (enrollments: EnrollmentType[]) => {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
   // Initialize the monthly revenue with zeros for all months
@@ -80,6 +79,7 @@ interface EnrollmentType {
   payment_status: string;
   enrollment_date: string;
   course?: CourseType;
+  status?: string;
   [key: string]: any;
 }
 
@@ -98,6 +98,12 @@ interface RegistrationType {
   event?: EventType;
   [key: string]: any;
 }
+
+// Define simple types for Supabase responses to avoid nested type recursion
+type SupabaseResponse<T> = {
+  data: T | null;
+  error: Error | null;
+};
 
 const CreatorDashboard: React.FC = () => {
   const [courses, setCourses] = useState<CourseType[]>([]);
@@ -128,60 +134,78 @@ const CreatorDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: creatorData, error: creatorError } = await supabase.auth.getUser();
+        // Explicitly type the auth response to avoid deep recursion
+        const authResponse: SupabaseResponse<{user?: {id: string}|null}> = await supabase.auth.getUser();
         
-        if (creatorError) throw creatorError;
+        if (authResponse.error) throw authResponse.error;
         
-        const creatorId = creatorData.user?.id;
+        const creatorId = authResponse.data?.user?.id;
+        if (!creatorId) {
+          throw new Error('User not authenticated');
+        }
         
-        // Fetch courses created by this creator
-        const { data: coursesData, error: coursesError } = await supabase
+        // Fetch courses created by this creator with explicit typing
+        const coursesResponse: SupabaseResponse<CourseType[]> = await supabase
           .from('courses')
           .select('*')
           .eq('creator_id', creatorId);
         
-        if (coursesError) throw coursesError;
+        if (coursesResponse.error) throw coursesResponse.error;
         
-        // Fetch enrollments for the creator's courses
-        const { data: enrollmentsData, error: enrollmentsError } = await supabase
-          .from('course_enrollments')
-          .select(`
-            *,
-            course:courses(*)
-          `)
-          .in('course_id', coursesData?.map(course => course.id) || []);
+        // Fetch enrollments for the creator's courses with explicit typing
+        const courseIds = coursesResponse.data?.map(course => course.id) || [];
         
-        if (enrollmentsError) throw enrollmentsError;
+        // Only fetch if we have course IDs
+        let enrollmentsData: EnrollmentType[] = [];
+        if (courseIds.length > 0) {
+          const enrollmentsResponse: SupabaseResponse<EnrollmentType[]> = await supabase
+            .from('course_enrollments')
+            .select(`
+              *,
+              course:courses(*)
+            `)
+            .in('course_id', courseIds);
+          
+          if (enrollmentsResponse.error) throw enrollmentsResponse.error;
+          enrollmentsData = enrollmentsResponse.data || [];
+        }
         
-        // Fetch events created by this creator
-        const { data: eventsData, error: eventsError } = await supabase
+        // Fetch events created by this creator with explicit typing
+        const eventsResponse: SupabaseResponse<EventType[]> = await supabase
           .from('events')
           .select('*')
           .eq('organizer_id', creatorId);
         
-        if (eventsError) throw eventsError;
+        if (eventsResponse.error) throw eventsResponse.error;
         
-        // Fetch registrations for the creator's events
-        const { data: registrationsData, error: registrationsError } = await supabase
-          .from('registrations')
-          .select(`
-            *,
-            event:events(*)
-          `)
-          .in('event_id', eventsData?.map(event => event.id) || []);
+        // Fetch registrations for the creator's events with explicit typing
+        const eventIds = eventsResponse.data?.map(event => event.id) || [];
         
-        if (registrationsError) throw registrationsError;
+        // Only fetch if we have event IDs
+        let registrationsData: RegistrationType[] = [];
+        if (eventIds.length > 0) {
+          const registrationsResponse: SupabaseResponse<RegistrationType[]> = await supabase
+            .from('registrations')
+            .select(`
+              *,
+              event:events(*)
+            `)
+            .in('event_id', eventIds);
+          
+          if (registrationsResponse.error) throw registrationsResponse.error;
+          registrationsData = registrationsResponse.data || [];
+        }
         
-        setCourses(coursesData || []);
-        setEnrollments(enrollmentsData || []);
-        setEvents(eventsData || []);
-        setRegistrations(registrationsData || []);
+        setCourses(coursesResponse.data || []);
+        setEnrollments(enrollmentsData);
+        setEvents(eventsResponse.data || []);
+        setRegistrations(registrationsData);
         
         // Calculate revenue metrics
-        calculateRevenueMetrics(enrollmentsData || [], registrationsData || []);
+        calculateRevenueMetrics(enrollmentsData, registrationsData);
         
         // Calculate engagement metrics
-        calculateEngagementMetrics(enrollmentsData || [], coursesData || []);
+        calculateEngagementMetrics(enrollmentsData, coursesResponse.data || []);
         
       } catch (err: any) {
         console.error('Error fetching creator data:', err.message);
