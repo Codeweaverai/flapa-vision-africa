@@ -19,8 +19,6 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import HelpCenterPage from '@/pages/HelpCenterPage';
 import MediaPage from '@/pages/MediaPage';
 import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
-
-// Import admin pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminConsultations from '@/pages/admin/AdminConsultations';
 import AdminEvents from '@/pages/admin/AdminEvents';
@@ -32,8 +30,6 @@ import CourseForm from '@/pages/admin/CourseForm';
 import CourseContentPage from '@/pages/admin/CourseContentPage';
 import AdminMedia from '@/pages/admin/AdminMedia';
 import MediaForm from '@/pages/admin/MediaForm';
-
-// Import creator pages
 import CreatorDashboard from '@/pages/creator/CreatorDashboard';
 import CreatorCourses from '@/pages/creator/CreatorCourses';
 import CreatorEvents from '@/pages/creator/CreatorEvents';
@@ -43,6 +39,7 @@ import CreatorEventRegistrations from '@/pages/creator/CreatorEventRegistrations
 import AdminEventRegistrations from '@/pages/admin/AdminEventRegistrations';
 import CreatorStudents from '@/pages/creator/CreatorStudents';
 import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
+import AdminLogin from '@/pages/admin/AdminLogin';
 
 function App() {
   return (
@@ -63,6 +60,7 @@ function App() {
       <Route path="/auth" element={<AuthPage />} />
       <Route path="/payment/success" element={<PaymentSuccessPage />} />
       <Route path="/payment/cancel" element={<PaymentCancelPage />} />
+      <Route path="/admin-login" element={<AdminLogin />} />
       
       {/* Admin routes */}
       <Route path="/admin" element={<AdminDashboard />} />
