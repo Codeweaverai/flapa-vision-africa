@@ -1,11 +1,10 @@
-
 import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { image as Image, video as Video, mic as Mic } from 'lucide-react';
+import { Image, Video, Mic } from 'lucide-react';
 
 const MediaPage = () => {
   return (
