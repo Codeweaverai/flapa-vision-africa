@@ -65,11 +65,45 @@ interface EngagementMetrics {
   studentEngagement: Array<{month: string, engagement: number}>;
 }
 
+// Define simpler interfaces for API response types to avoid deep type recursion
+interface CourseType {
+  id: string;
+  title: string;
+  price: number;
+  [key: string]: any;
+}
+
+interface EnrollmentType {
+  id: string;
+  user_id: string;
+  course_id: string;
+  payment_status: string;
+  enrollment_date: string;
+  course?: CourseType;
+  [key: string]: any;
+}
+
+interface EventType {
+  id: string;
+  title: string;
+  price: number;
+  [key: string]: any;
+}
+
+interface RegistrationType {
+  id: string;
+  user_id: string;
+  event_id: string;
+  payment_status: string;
+  event?: EventType;
+  [key: string]: any;
+}
+
 const CreatorDashboard: React.FC = () => {
-  const [courses, setCourses] = useState<any[]>([]);
-  const [enrollments, setEnrollments] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [registrations, setRegistrations] = useState<any[]>([]);
+  const [courses, setCourses] = useState<CourseType[]>([]);
+  const [enrollments, setEnrollments] = useState<EnrollmentType[]>([]);
+  const [events, setEvents] = useState<EventType[]>([]);
+  const [registrations, setRegistrations] = useState<RegistrationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState('month');
@@ -160,7 +194,7 @@ const CreatorDashboard: React.FC = () => {
     fetchCreatorData();
   }, []);
 
-  const calculateRevenueMetrics = (enrollments: any[], registrations: any[]) => {
+  const calculateRevenueMetrics = (enrollments: EnrollmentType[], registrations: RegistrationType[]) => {
     // Calculate total course revenue
     const courseRevenue = enrollments.reduce((total, enrollment) => {
       if (enrollment.payment_status === 'completed' && enrollment.course) {
@@ -198,7 +232,7 @@ const CreatorDashboard: React.FC = () => {
     });
   };
 
-  const calculateEngagementMetrics = (enrollments: any[], courses: any[]) => {
+  const calculateEngagementMetrics = (enrollments: EnrollmentType[], courses: CourseType[]) => {
     // Calculate total students (unique users enrolled)
     const uniqueStudentIds = new Set(enrollments.map(enrollment => enrollment.user_id));
     const totalStudents = uniqueStudentIds.size;
