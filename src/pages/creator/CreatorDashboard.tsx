@@ -201,13 +201,15 @@ const CreatorDashboard = () => {
       // Map profiles to a lookup object
       const profilesMap: Record<string, ProfileData> = {};
       profilesData.forEach(profile => {
-        profilesMap[profile.id] = profile;
+        if (profile && profile.id) {
+          profilesMap[profile.id] = profile;
+        }
       });
 
       // Combine and sort by creation date
       const combinedActivity = [
         ...(enrollments?.map(item => {
-          const profile = profilesMap[item.user_id] || {};
+          const profile = profilesMap[item.user_id] || { full_name: 'Anonymous User' };
           return {
             id: item.id,
             type: 'enrollment',
@@ -220,7 +222,7 @@ const CreatorDashboard = () => {
         }) || []),
         
         ...(registrations?.map(item => {
-          const profile = profilesMap[item.user_id] || {};
+          const profile = profilesMap[item.user_id] || { full_name: 'Anonymous User' };
           return {
             id: item.id,
             type: 'registration',
@@ -388,7 +390,7 @@ const CreatorDashboard = () => {
         const monthIndex = date.getMonth();
         // Convert price to number to ensure we're dealing with numeric values
         const price = typeof item.event.price === 'number' ? Number(item.event.price) : 0;
-        monthlyRevenue[monthIndex].revenue = Number(monthlyRevenue[monthIndex].revenue) + price;
+        monthlyRevenue[monthIndex].revenue = Number(monthlyRevenue[monthIndex].revenue) + Number(price);
       }
     });
     
@@ -404,6 +406,83 @@ const CreatorDashboard = () => {
       hour: 'numeric',
       minute: 'numeric'
     }).format(date);
+  };
+  
+  const fetchCreatorStats = async () => {
+    setLoading(true);
+    try {
+      // Get course count
+      const { count: courseCountData, error: courseError } = await supabase
+        .from('courses')
+        .select('*', { count: 'exact', head: true })
+        .eq('creator_id', user?.id);
+        
+      if (courseError) throw courseError;
+      
+      // Get event count
+      const { count: eventCountData, error: eventError } = await supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .eq('creator_id', user?.id);
+        
+      if (eventError) throw eventError;
+
+      // Get unique student count (combining course enrollments and event registrations)
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('user_id, course:courses!inner(creator_id)')
+        .eq('course.creator_id', user?.id);
+        
+      if (enrollmentError) throw enrollmentError;
+      
+      const { data: registrationData, error: registrationError } = await supabase
+        .from('registrations')
+        .select('user_id, event:events!inner(creator_id)')
+        .eq('event.creator_id', user?.id);
+        
+      if (registrationError) throw registrationError;
+      
+      // Combine unique student IDs from both sources
+      const enrollmentUserIds = enrollmentData?.map(item => item.user_id) || [];
+      const registrationUserIds = registrationData?.map(item => item.user_id) || [];
+      const uniqueStudentIds = new Set([...enrollmentUserIds, ...registrationUserIds]);
+      
+      // Calculate total revenue (simplified for demo)
+      const { data: courseRevenue, error: courseRevenueError } = await supabase
+        .from('course_enrollments')
+        .select('course:courses!inner(price, is_free, creator_id)')
+        .eq('course.creator_id', user?.id)
+        .eq('course.is_free', false);
+        
+      if (courseRevenueError) throw courseRevenueError;
+      
+      const { data: eventRevenue, error: eventRevenueError } = await supabase
+        .from('registrations')
+        .select('event:events!inner(price, is_free, creator_id)')
+        .eq('event.creator_id', user?.id)
+        .eq('event.is_free', false);
+        
+      if (eventRevenueError) throw eventRevenueError;
+      
+      // Calculate total revenue safely
+      const courseRevenueTotal = (courseRevenue || []).reduce((sum, item) => 
+        Number(sum) + (typeof item.course?.price === 'number' ? Number(item.course?.price) : 0), 0);
+      
+      const eventRevenueTotal = (eventRevenue || []).reduce((sum, item) => 
+        Number(sum) + (typeof item.event?.price === 'number' ? Number(item.event?.price) : 0), 0);
+      
+      // Make sure we're adding two numbers
+      const totalRevenue = Number(courseRevenueTotal) + Number(eventRevenueTotal);
+      
+      setCourseCount(courseCountData || 0);
+      setEventCount(eventCountData || 0);
+      setStudentCount(uniqueStudentIds.size);
+      setRevenue(totalRevenue);
+    } catch (error) {
+      console.error('Error fetching creator stats:', error);
+    } finally {
+      setLoading(false);
+    }
   };
   
   return (
