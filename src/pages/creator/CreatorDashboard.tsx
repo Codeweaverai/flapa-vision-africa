@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -53,7 +52,7 @@ const CreatorDashboard = () => {
 
       // Get unique student count (combining course enrollments and event registrations)
       const { data: enrollmentData, error: enrollmentError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select('user_id, course:courses!inner(creator_id)')
         .eq('courses.creator_id', user?.id);
         
@@ -74,7 +73,7 @@ const CreatorDashboard = () => {
       
       // Calculate total revenue (simplified for demo)
       const { data: courseRevenue, error: courseRevenueError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select('course:courses!inner(price, is_free, creator_id)')
         .eq('courses.creator_id', user?.id)
         .eq('courses.is_free', false);
@@ -90,8 +89,8 @@ const CreatorDashboard = () => {
       if (eventRevenueError) throw eventRevenueError;
       
       const totalRevenue = [
-        ...(courseRevenue?.map(item => Number(item.course.price) || 0) || []),
-        ...(eventRevenue?.map(item => Number(item.event.price) || 0) || [])
+        ...(courseRevenue?.map(item => Number(item.course.price || 0)) || []),
+        ...(eventRevenue?.map(item => Number(item.event.price || 0) || []))
       ].reduce((sum, price) => sum + price, 0);
       
       setCourseCount(courseCountData || 0);
@@ -109,10 +108,10 @@ const CreatorDashboard = () => {
     try {
       // Get recent enrollments
       const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select(`
           id, 
-          created_at,
+          enrollment_date as created_at,
           user_id,
           course_id,
           course:courses!inner(title, creator_id),
@@ -177,9 +176,9 @@ const CreatorDashboard = () => {
     try {
       // Get enrollment data for chart
       const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select(`
-          created_at,
+          enrollment_date as created_at,
           course:courses!inner(creator_id)
         `)
         .eq('courses.creator_id', user?.id);

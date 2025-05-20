@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { Edit, Check, User, Mail, Lock, ArrowLeft, Calendar, GraduationCap, BookOpen, Switch } from 'lucide-react';
+import { Edit, Check, User, Mail, Lock, ArrowLeft, Calendar, GraduationCap, BookOpen, SwitchCamera } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -311,7 +310,7 @@ const AccountPage = () => {
                 {profile.is_creator && (
                   <Button asChild className="w-full mb-3 flex items-center" variant="outline">
                     <Link to="/creator/dashboard">
-                      <Switch className="mr-2 h-4 w-4" />
+                      <SwitchCamera className="mr-2 h-4 w-4" />
                       Switch to Creator Mode
                     </Link>
                   </Button>

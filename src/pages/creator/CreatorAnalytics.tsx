@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -54,7 +53,7 @@ const CreatorAnalytics = () => {
     const enrollmentsChannel = supabase
       .channel('creator-analytics-enrollments')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'enrollments' },
+        { event: '*', schema: 'public', table: 'course_enrollments' },
         () => {
           fetchAnalyticsData();
         }
@@ -86,15 +85,16 @@ const CreatorAnalytics = () => {
 
       // Fetch course enrollments
       const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select(`
           id,
-          created_at,
+          enrollment_date,
+          course_id,
           course:courses!inner(id, title, price, is_free, creator_id)
         `)
         .eq('courses.creator_id', user?.id)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .gte('enrollment_date', startDate.toISOString())
+        .lte('enrollment_date', endDate.toISOString());
 
       if (enrollmentsError) throw enrollmentsError;
 
@@ -125,7 +125,7 @@ const CreatorAnalytics = () => {
       
       const last30DaysStart = subDays(new Date(), 30).toISOString();
       const last30DaysRevenue = [
-        ...(enrollments || []).filter(item => new Date(item.created_at) >= new Date(last30DaysStart) && !item.course.is_free),
+        ...(enrollments || []).filter(item => new Date(item.enrollment_date) >= new Date(last30DaysStart) && !item.course.is_free),
         ...(registrations || []).filter(item => new Date(item.created_at) >= new Date(last30DaysStart) && !item.event.is_free)
       ].reduce((sum, item) => {
         const price = item.hasOwnProperty('course') 
@@ -135,7 +135,7 @@ const CreatorAnalytics = () => {
       }, 0);
       
       const last30DaysEnrollments = [
-        ...(enrollments || []).filter(item => new Date(item.created_at) >= new Date(last30DaysStart)),
+        ...(enrollments || []).filter(item => new Date(item.enrollment_date) >= new Date(last30DaysStart)),
         ...(registrations || []).filter(item => new Date(item.created_at) >= new Date(last30DaysStart))
       ].length;
       
@@ -157,7 +157,7 @@ const CreatorAnalytics = () => {
       const revenueByDay = processDataByDay(
         [
           ...(enrollments?.filter(item => !item.course.is_free).map(item => ({
-            date: item.created_at,
+            date: item.enrollment_date,
             amount: Number(item.course.price || 0),
             type: 'course'
           })) || []),
@@ -178,7 +178,7 @@ const CreatorAnalytics = () => {
       const enrollmentByDay = processDataByDay(
         [
           ...(enrollments?.map(item => ({
-            date: item.created_at,
+            date: item.enrollment_date,
             count: 1,
             type: 'course'
           })) || []),
@@ -233,7 +233,7 @@ const CreatorAnalytics = () => {
       const completionData = await Promise.all(courses?.map(async (course) => {
         // Get total enrollments for this course
         const { count: totalCount, error: totalError } = await supabase
-          .from('enrollments')
+          .from('course_enrollments')
           .select('id', { count: 'exact', head: true })
           .eq('course_id', course.id);
           
@@ -241,7 +241,7 @@ const CreatorAnalytics = () => {
         
         // Get completed enrollments for this course
         const { count: completedCount, error: completedError } = await supabase
-          .from('enrollments')
+          .from('course_enrollments')
           .select('id', { count: 'exact', head: true })
           .eq('course_id', course.id)
           .eq('is_completed', true);
