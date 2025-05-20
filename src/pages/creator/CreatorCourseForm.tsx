@@ -6,6 +6,7 @@ import CourseForm from '@/pages/admin/CourseForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 
 const CreatorCourseForm = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -29,12 +30,17 @@ const CreatorCourseForm = () => {
           .eq('id', courseId)
           .single();
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error checking course ownership:', error);
+          toast.error("Failed to verify course ownership. Please try again.");
+          throw error;
+        }
         
         if (data.creator_id === user.id) {
           setAuthorized(true);
         } else {
           // Not authorized, redirect to creator courses page
+          toast.error("You don't have permission to edit this course");
           navigate('/creator/courses');
           return;
         }
@@ -75,7 +81,7 @@ const CreatorCourseForm = () => {
   
   return (
     <CreatorLayout>
-      <CourseForm creatorId={user?.id} />
+      <CourseForm creatorId={user?.id} isCreator={true} />
     </CreatorLayout>
   );
 };

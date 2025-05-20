@@ -32,6 +32,7 @@ const CreatorEventForm = () => {
           
         if (error) {
           console.error('Error checking event ownership:', error);
+          toast.error("Failed to verify event ownership. Please try again.");
           throw error;
         }
         

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,9 +17,10 @@ import { Course, updateCourse, createCourseWithCreator } from '@/services/course
 
 interface CourseFormProps {
   creatorId?: string;
+  isCreator?: boolean;
 }
 
-const CourseForm = ({ creatorId }: CourseFormProps) => {
+const CourseForm = ({ creatorId, isCreator = false }: CourseFormProps) => {
   const { user } = useAuth();
   const [course, setCourse] = useState<Partial<Course>>({
     title: '',
@@ -108,8 +110,10 @@ const CourseForm = ({ creatorId }: CourseFormProps) => {
       let thumbnailUrl = course.thumbnail_url;
       if (thumbnailFile) {
         const fileExt = thumbnailFile.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        const filePath = `courses/${fileName}`;
+        // Generate a unique filename using UUID and current timestamp
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        // Use the correct path: course-materials/courses/posts/[filename]
+        const filePath = `courses/posts/${fileName}`;
 
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from('course-materials')
@@ -135,7 +139,7 @@ const CourseForm = ({ creatorId }: CourseFormProps) => {
 
         if (result) {
           toast.success('Course updated successfully!');
-          navigate('/admin/courses');
+          navigate(isCreator ? '/creator/courses' : '/admin/courses');
         }
       } else {
         // Create new course, making sure all required fields are included
@@ -158,7 +162,7 @@ const CourseForm = ({ creatorId }: CourseFormProps) => {
 
         if (result) {
           toast.success('Course created successfully!');
-          navigate('/admin/courses');
+          navigate(isCreator ? '/creator/courses' : '/admin/courses');
         }
       }
     } catch (error: any) {
@@ -173,7 +177,7 @@ const CourseForm = ({ creatorId }: CourseFormProps) => {
     <Layout>
       <div className="section-container">
         <Button asChild variant="ghost" className="mb-4">
-          <Link to="/admin/courses">
+          <Link to={isCreator ? "/creator/courses" : "/admin/courses"}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Courses
           </Link>
@@ -234,9 +238,12 @@ const CourseForm = ({ creatorId }: CourseFormProps) => {
 
               <div>
                 <Label htmlFor="category">Category</Label>
-                <Select onValueChange={(value) => handleSelectChange('category', value)}>
+                <Select 
+                  value={course.category || 'Technology'} 
+                  onValueChange={(value) => handleSelectChange('category', value)}
+                >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a category" defaultValue={course.category || 'Technology'} />
+                    <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Technology">Technology</SelectItem>
@@ -249,9 +256,12 @@ const CourseForm = ({ creatorId }: CourseFormProps) => {
 
               <div>
                 <Label htmlFor="difficulty_level">Difficulty Level</Label>
-                <Select onValueChange={(value) => handleSelectChange('difficulty_level', value)}>
+                <Select 
+                  value={course.difficulty_level || 'Beginner'} 
+                  onValueChange={(value) => handleSelectChange('difficulty_level', value)}
+                >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select difficulty" defaultValue={course.difficulty_level || 'Beginner'} />
+                    <SelectValue placeholder="Select difficulty" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Beginner">Beginner</SelectItem>
@@ -304,7 +314,7 @@ const CourseForm = ({ creatorId }: CourseFormProps) => {
               </div>
 
               <div>
-                <Label htmlFor="thumbnail_url">Thumbnail</Label>
+                <Label htmlFor="thumbnail_url">Course Thumbnail</Label>
                 <Input
                   type="file"
                   id="thumbnail_url"
