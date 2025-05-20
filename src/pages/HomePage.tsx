@@ -5,6 +5,7 @@ import HeroSection from '@/components/home/HeroSection';
 import AboutSection from '@/components/home/AboutSection';
 import EventsSection from '@/components/home/EventsSection';
 import CoursesSection from '@/components/home/CoursesSection';
+import MediaSection from '@/components/home/MediaSection';
 import SpeakingSection from '@/components/home/SpeakingSection';
 import CallToAction from '@/components/home/CallToAction';
 
@@ -14,6 +15,7 @@ const HomePage = () => {
       <HeroSection />
       <AboutSection />
       <CoursesSection />
+      <MediaSection />
       <EventsSection />
       <SpeakingSection />
       <CallToAction />
