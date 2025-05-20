@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -170,11 +171,11 @@ const CreatorDashboard: React.FC = () => {
           enrollmentsData = enrollmentsResponse.data || [];
         }
         
-        // Fetch events created by this creator with explicit typing
+        // Fixed: Using creator_id instead of organizer_id for events
         const eventsResponse: SupabaseResponse<EventType[]> = await supabase
           .from('events')
           .select('*')
-          .eq('organizer_id', creatorId);
+          .eq('creator_id', creatorId);
         
         if (eventsResponse.error) throw eventsResponse.error;
         

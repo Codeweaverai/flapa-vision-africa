@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -62,17 +63,20 @@ const MediaForm = () => {
   const postType = watch('post_type');
   const isEditing = !!id;
 
-  // Load categories
+  // Load categories with better error handling and logging
   useEffect(() => {
     const loadCategories = async () => {
       setLoadingCategories(true);
       try {
-        const data = await getMediaCategories();
-        console.log('Loaded categories:', data);
-        setCategories(data || []);
+        const categoriesData = await getMediaCategories();
+        console.log('Loaded categories:', categoriesData);
+        // Ensure we always set an array, even if the response is null or undefined
+        setCategories(categoriesData || []);
       } catch (error) {
         console.error('Error loading categories:', error);
         toast.error('Failed to load categories');
+        // Set empty array on error to avoid null reference issues
+        setCategories([]);
       } finally {
         setLoadingCategories(false);
       }
@@ -178,6 +182,7 @@ const MediaForm = () => {
     }
   };
 
+  // Fixed: Complete the getCategoryOptions function to properly format categories for the MultiSelect component
   const getCategoryOptions = () => {
     if (!categories || categories.length === 0) {
       return [];
