@@ -392,13 +392,12 @@ const CreatorDashboard = () => {
         const price = typeof item.event.price === 'number' ? item.event.price : 0;
         
         // Add the price to the current revenue - ensure both are numbers
-        const currentRevenue = typeof monthlyRevenue[monthIndex].revenue === 'number' ? 
-          monthlyRevenue[monthIndex].revenue : 0;
+        const currentRevenue = monthlyRevenue[monthIndex].revenue;
         
         // Create a new object with proper numeric types
         monthlyRevenue[monthIndex] = {
           name: monthlyRevenue[monthIndex].name,
-          revenue: currentRevenue + price // Both variables are now guaranteed to be numbers
+          revenue: Number(currentRevenue) + Number(price) // Ensure both are numbers
         };
       }
     });

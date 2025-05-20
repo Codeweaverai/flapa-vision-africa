@@ -145,7 +145,7 @@ export const createMediaPost = async (
     }
 
     toast.success('Media post created successfully');
-    return data;
+    return data as MediaPost;
   } catch (error: any) {
     console.error('Error in createMediaPost:', error);
     toast.error(`Failed to create media post: ${error.message || 'Unknown error'}`);
@@ -256,7 +256,7 @@ export const updateMediaPost = async (
     }
 
     toast.success('Media post updated successfully');
-    return data;
+    return data as MediaPost;
   } catch (error: any) {
     console.error('Error in updateMediaPost:', error);
     toast.error(`Failed to update media post: ${error.message || 'Unknown error'}`);
@@ -314,7 +314,7 @@ export const getMediaPosts = async (
       return [];
     }
 
-    return data || [];
+    return data as MediaPost[];
   } catch (error: any) {
     console.error('Error in getMediaPosts:', error);
     toast.error(`Failed to fetch media posts: ${error.message || 'Unknown error'}`);
@@ -341,6 +341,8 @@ export const getMediaPostById = async (id: string): Promise<MediaPostWithCategor
       return null;
     }
 
+    const typedPost = post as unknown as MediaPost;
+
     // Get the post's categories
     const { data: categoryLinks, error: categoryLinksError } = await supabase
       .from('media_posts_categories')
@@ -349,11 +351,11 @@ export const getMediaPostById = async (id: string): Promise<MediaPostWithCategor
 
     if (categoryLinksError) {
       console.error('Error fetching post categories:', categoryLinksError);
-      return { ...post, categories: [] };
+      return { ...typedPost, categories: [] };
     }
 
     if (!categoryLinks || categoryLinks.length === 0) {
-      return { ...post, categories: [] };
+      return { ...typedPost, categories: [] };
     }
 
     const categoryIds = categoryLinks.map(link => link.category_id);
@@ -365,10 +367,10 @@ export const getMediaPostById = async (id: string): Promise<MediaPostWithCategor
 
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
-      return { ...post, categories: [] };
+      return { ...typedPost, categories: [] };
     }
 
-    return { ...post, categories: categories || [] };
+    return { ...typedPost, categories: categories as MediaCategory[] || [] };
   } catch (error: any) {
     console.error('Error in getMediaPostById:', error);
     return null;
@@ -388,7 +390,7 @@ export const getMediaCategories = async (): Promise<MediaCategory[]> => {
       return [];
     }
 
-    return data || [];
+    return data as MediaCategory[] || [];
   } catch (error: any) {
     console.error('Error in getMediaCategories:', error);
     return [];
@@ -411,7 +413,7 @@ export const createMediaCategory = async (name: string, description?: string): P
     }
 
     toast.success('Category created successfully');
-    return data;
+    return data as MediaCategory;
   } catch (error: any) {
     console.error('Error in createMediaCategory:', error);
     toast.error(`Failed to create category: ${error.message || 'Unknown error'}`);
