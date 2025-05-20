@@ -4,13 +4,13 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, BookOpen, Users, DollarSign, BarChart, Plus } from 'lucide-react';
+import { Calendar, BookOpen, Users, DollarSign, Plus } from 'lucide-react';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   LineChart, Line, AreaChart, Area, BarChart as RechartsBarChart, 
-  Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
+  Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 
 interface EnrollmentData {
@@ -18,10 +18,6 @@ interface EnrollmentData {
   enrollment_date: string;
   user_id: string;
   course_id: string;
-  student?: {
-    full_name: string | null;
-    email: string;
-  } | null;
   course?: {
     title: string;
     creator_id: string;
@@ -33,16 +29,18 @@ interface RegistrationData {
   created_at: string;
   user_id: string;
   event_id: string;
-  attendee?: {
-    full_name: string | null;
-    email: string;
-  } | null;
   event?: {
     title: string;
     creator_id: string;
     price: number;
     is_free: boolean;
   } | null;
+}
+
+interface ProfileData {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
 const CreatorDashboard = () => {
@@ -99,10 +97,9 @@ const CreatorDashboard = () => {
       if (registrationError) throw registrationError;
       
       // Combine unique student IDs from both sources
-      const uniqueStudentIds = new Set([
-        ...(enrollmentData?.map(item => item.user_id) || []),
-        ...(registrationData?.map(item => item.user_id) || [])
-      ]);
+      const enrollmentUserIds = enrollmentData?.map(item => item.user_id) || [];
+      const registrationUserIds = registrationData?.map(item => item.user_id) || [];
+      const uniqueStudentIds = new Set([...enrollmentUserIds, ...registrationUserIds]);
       
       // Calculate total revenue (simplified for demo)
       const { data: courseRevenue, error: courseRevenueError } = await supabase
@@ -117,18 +114,19 @@ const CreatorDashboard = () => {
         .from('registrations')
         .select('event:events!inner(price, is_free, creator_id)')
         .eq('event.creator_id', user?.id)
-        .eq('events.is_free', false);
+        .eq('event.is_free', false);
         
       if (eventRevenueError) throw eventRevenueError;
       
       // Calculate total revenue safely
       const courseRevenueTotal = (courseRevenue || []).reduce((sum, item) => 
-        sum + Number(item.course?.price || 0), 0);
+        sum + (typeof item.course?.price === 'number' ? Number(item.course?.price) : 0), 0);
       
       const eventRevenueTotal = (eventRevenue || []).reduce((sum, item) => 
-        sum + Number(item.event?.price || 0), 0);
+        sum + (typeof item.event?.price === 'number' ? Number(item.event?.price) : 0), 0);
       
-      const totalRevenue = courseRevenueTotal + eventRevenueTotal;
+      // Make sure we're adding two numbers
+      const totalRevenue = Number(courseRevenueTotal) + Number(eventRevenueTotal);
       
       setCourseCount(courseCountData || 0);
       setEventCount(eventCountData || 0);
@@ -162,23 +160,6 @@ const CreatorDashboard = () => {
         throw enrollmentsError;
       }
 
-      // Get profiles for all user IDs from enrollments
-      const enrollmentUserIds = (enrollments || []).map(enrollment => enrollment.user_id);
-      
-      let enrollmentProfiles = [];
-      if (enrollmentUserIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', enrollmentUserIds);
-          
-        if (profilesError) {
-          console.error('Profiles error:', profilesError);
-        } else {
-          enrollmentProfiles = profiles || [];
-        }
-      }
-      
       // Get recent registrations
       const { data: registrations, error: registrationsError } = await supabase
         .from('registrations')
@@ -198,61 +179,54 @@ const CreatorDashboard = () => {
         throw registrationsError;
       }
       
-      // Get profiles for registrations
+      // Get profiles for all user IDs
+      const enrollmentUserIds = (enrollments || []).map(enrollment => enrollment.user_id);
       const registrationUserIds = (registrations || []).map(reg => reg.user_id);
+      const allUserIds = [...new Set([...enrollmentUserIds, ...registrationUserIds])];
       
-      let registrationProfiles = [];
-      if (registrationUserIds.length > 0) {
-        const { data: profiles, error: regProfilesError } = await supabase
+      let profilesData: ProfileData[] = [];
+      if (allUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name, avatar_url')
-          .in('id', registrationUserIds);
+          .in('id', allUserIds);
           
-        if (regProfilesError) {
-          console.error('Registration profiles error:', regProfilesError);
+        if (profilesError) {
+          console.error('Profiles error:', profilesError);
         } else {
-          registrationProfiles = profiles || [];
+          profilesData = profiles || [];
         }
       }
-
-      // Map profiles to enrollments and registrations
-      const profilesMap = new Map();
       
-      // Add enrollment profiles to map
-      enrollmentProfiles.forEach(profile => {
-        profilesMap.set(profile.id, profile);
-      });
-      
-      // Add registration profiles to map
-      registrationProfiles.forEach(profile => {
-        profilesMap.set(profile.id, profile);
+      // Map profiles to a lookup object
+      const profilesMap: Record<string, ProfileData> = {};
+      profilesData.forEach(profile => {
+        profilesMap[profile.id] = profile;
       });
 
       // Combine and sort by creation date
       const combinedActivity = [
         ...(enrollments?.map(item => {
-          const profile = profilesMap.get(item.user_id) || {};
+          const profile = profilesMap[item.user_id] || {};
           return {
             id: item.id,
             type: 'enrollment',
             created_at: item.enrollment_date,
             user_id: item.user_id,
             user_name: profile?.full_name || 'Anonymous User',
-            user_email: 'User', // Email is not in the profiles table according to error
             content_id: item.course_id,
             content_title: item.course?.title || 'Unnamed Course'
           };
         }) || []),
         
         ...(registrations?.map(item => {
-          const profile = profilesMap.get(item.user_id) || {};
+          const profile = profilesMap[item.user_id] || {};
           return {
             id: item.id,
             type: 'registration',
             created_at: item.created_at,
             user_id: item.user_id,
             user_name: profile?.full_name || 'Anonymous User',
-            user_email: 'User', // Email is not in the profiles table according to error
             content_id: item.event_id,
             content_title: item.event?.title || 'Unnamed Event'
           };
@@ -412,9 +386,9 @@ const CreatorDashboard = () => {
       const date = new Date(item.created_at);
       if (date.getFullYear() === currentYear && !item.event.is_free) {
         const monthIndex = date.getMonth();
-        // Convert to number to ensure we're dealing with numeric values
-        const price = Number(item.event.price) || 0;
-        monthlyRevenue[monthIndex].revenue += price;
+        // Convert price to number to ensure we're dealing with numeric values
+        const price = typeof item.event.price === 'number' ? Number(item.event.price) : 0;
+        monthlyRevenue[monthIndex].revenue = Number(monthlyRevenue[monthIndex].revenue) + price;
       }
     });
     
