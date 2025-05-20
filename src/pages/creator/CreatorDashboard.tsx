@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -390,8 +389,11 @@ const CreatorDashboard = () => {
         const monthIndex = date.getMonth();
         // Convert price to number to ensure we're dealing with numeric values
         const price = typeof item.event.price === 'number' ? Number(item.event.price) : 0;
+        
         // Fix: Ensure we're performing arithmetic on number types
-        monthlyRevenue[monthIndex].revenue = Number(monthlyRevenue[monthIndex].revenue) + Number(price);
+        // Use explicit type conversion for both operands
+        const currentRevenue = Number(monthlyRevenue[monthIndex].revenue);
+        monthlyRevenue[monthIndex].revenue = currentRevenue + price;
       }
     });
     
