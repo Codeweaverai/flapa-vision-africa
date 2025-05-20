@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,8 @@ import { toast } from "sonner";
 import { createLesson, updateLesson } from "@/services/courseService";
 import { uploadFileToWasabi, getVideoMetadata } from "@/services/wasabiService";
 import { Lesson } from "@/services/courseService";
-import { FileUpload, Upload } from "lucide-react";
+// Replace FileUpload with the correct icon from lucide-react
+import { Upload, FileUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface LessonFormDialogProps {
@@ -314,7 +314,8 @@ const LessonFormDialog = ({
                           className="flex flex-col items-center justify-center cursor-pointer py-4"
                           onClick={() => fileInputRef.current?.click()}
                         >
-                          <FileUpload className="h-10 w-10 text-muted-foreground mb-2" />
+                          {/* Replace FileUpload with FileUp component */}
+                          <FileUp className="h-10 w-10 text-muted-foreground mb-2" />
                           <p className="font-medium">Click to select a video</p>
                           <p className="text-sm text-muted-foreground">MP4, WebM or MOV up to 1GB</p>
                         </div>
