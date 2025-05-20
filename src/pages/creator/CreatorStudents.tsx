@@ -54,18 +54,18 @@ const CreatorStudents = () => {
     try {
       // Get course enrollment data
       const { data: enrollmentData, error: enrollmentError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select(`
           id,
           course_id,
           user_id,
-          created_at,
+          enrollment_date,
           progress,
           is_completed,
           course:courses(title, creator_id),
           student:profiles(id, email, full_name, avatar_url, created_at)
         `)
-        .eq('course:courses.creator_id', user?.id);
+        .eq('course.creator_id', user?.id);
         
       if (enrollmentError) throw enrollmentError;
       
@@ -81,7 +81,7 @@ const CreatorStudents = () => {
           event:events(title, creator_id),
           attendee:profiles(id, email, full_name, avatar_url, created_at)
         `)
-        .eq('event:events.creator_id', user?.id);
+        .eq('event.creator_id', user?.id);
         
       if (registrationsError) throw registrationsError;
       
@@ -94,7 +94,7 @@ const CreatorStudents = () => {
         created_at: enrollment.student.created_at,
         course_id: enrollment.course_id,
         course_title: enrollment.course.title,
-        enrollment_date: enrollment.created_at,
+        enrollment_date: enrollment.enrollment_date,
         progress: enrollment.progress || 0,
         is_completed: enrollment.is_completed || false
       })) || [];
@@ -129,7 +129,7 @@ const CreatorStudents = () => {
     const enrollmentChannel = supabase
       .channel('creator-enrollments')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'enrollments', filter: `course.creator_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'course_enrollments', filter: `course.creator_id=eq.${user.id}` },
         () => {
           fetchStudentsData();
         }

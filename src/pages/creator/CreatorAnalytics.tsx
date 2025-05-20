@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -92,7 +93,7 @@ const CreatorAnalytics = () => {
           course_id,
           course:courses!inner(id, title, price, is_free, creator_id)
         `)
-        .eq('courses.creator_id', user?.id)
+        .eq('course.creator_id', user?.id)
         .gte('enrollment_date', startDate.toISOString())
         .lte('enrollment_date', endDate.toISOString());
 
@@ -104,9 +105,10 @@ const CreatorAnalytics = () => {
         .select(`
           id,
           created_at,
+          event_id,
           event:events!inner(id, title, price, is_free, creator_id)
         `)
-        .eq('events.creator_id', user?.id)
+        .eq('event.creator_id', user?.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
 
@@ -124,20 +126,36 @@ const CreatorAnalytics = () => {
       const totalRevenue = courseRevenue + eventRevenue;
       
       const last30DaysStart = subDays(new Date(), 30).toISOString();
-      const last30DaysRevenue = [
-        ...(enrollments || []).filter(item => new Date(item.enrollment_date) >= new Date(last30DaysStart) && !item.course.is_free),
-        ...(registrations || []).filter(item => new Date(item.created_at) >= new Date(last30DaysStart) && !item.event.is_free)
-      ].reduce((sum, item) => {
-        const price = item.hasOwnProperty('course') 
-          ? Number(item.course.price || 0) 
-          : Number(item.event.price || 0);
-        return sum + price;
-      }, 0);
       
-      const last30DaysEnrollments = [
-        ...(enrollments || []).filter(item => new Date(item.enrollment_date) >= new Date(last30DaysStart)),
-        ...(registrations || []).filter(item => new Date(item.created_at) >= new Date(last30DaysStart))
-      ].length;
+      // Process enrollments for last 30 days revenue
+      const last30DaysEnrollmentRevenue = (enrollments || [])
+        .filter(item => 
+          new Date(item.enrollment_date) >= new Date(last30DaysStart) && 
+          !item.course.is_free
+        )
+        .reduce((sum, item) => sum + Number(item.course.price || 0), 0);
+      
+      // Process registrations for last 30 days revenue
+      const last30DaysRegistrationRevenue = (registrations || [])
+        .filter(item => 
+          new Date(item.created_at) >= new Date(last30DaysStart) && 
+          !item.event.is_free
+        )
+        .reduce((sum, item) => sum + Number(item.event.price || 0), 0);
+      
+      const last30DaysRevenue = last30DaysEnrollmentRevenue + last30DaysRegistrationRevenue;
+      
+      // Count enrollments in last 30 days
+      const last30DaysEnrollmentsCount = (enrollments || [])
+        .filter(item => new Date(item.enrollment_date) >= new Date(last30DaysStart))
+        .length;
+      
+      // Count registrations in last 30 days
+      const last30DaysRegistrationsCount = (registrations || [])
+        .filter(item => new Date(item.created_at) >= new Date(last30DaysStart))
+        .length;
+      
+      const last30DaysEnrollments = last30DaysEnrollmentsCount + last30DaysRegistrationsCount;
       
       setRevenueSummary({
         total: totalRevenue,
@@ -154,45 +172,55 @@ const CreatorAnalytics = () => {
       });
 
       // Process revenue data by day
-      const revenueByDay = processDataByDay(
-        [
-          ...(enrollments?.filter(item => !item.course.is_free).map(item => ({
+      const revenueData = [];
+      
+      // Add course revenue data
+      for (const item of (enrollments || [])) {
+        if (!item.course.is_free) {
+          revenueData.push({
             date: item.enrollment_date,
             amount: Number(item.course.price || 0),
             type: 'course'
-          })) || []),
-          
-          ...(registrations?.filter(item => !item.event.is_free).map(item => ({
+          });
+        }
+      }
+      
+      // Add event revenue data
+      for (const item of (registrations || [])) {
+        if (!item.event.is_free) {
+          revenueData.push({
             date: item.created_at,
             amount: Number(item.event.price || 0),
             type: 'event'
-          })) || [])
-        ],
-        startDate,
-        endDate
-      );
+          });
+        }
+      }
       
+      const revenueByDay = processDataByDay(revenueData, startDate, endDate);
       setRevenueData(revenueByDay);
 
       // Process enrollment data by day
-      const enrollmentByDay = processDataByDay(
-        [
-          ...(enrollments?.map(item => ({
-            date: item.enrollment_date,
-            count: 1,
-            type: 'course'
-          })) || []),
-          
-          ...(registrations?.map(item => ({
-            date: item.created_at,
-            count: 1,
-            type: 'event'
-          })) || [])
-        ],
-        startDate,
-        endDate
-      );
+      const enrollmentData = [];
       
+      // Add course enrollment data
+      for (const item of (enrollments || [])) {
+        enrollmentData.push({
+          date: item.enrollment_date,
+          count: 1,
+          type: 'course'
+        });
+      }
+      
+      // Add event registration data
+      for (const item of (registrations || [])) {
+        enrollmentData.push({
+          date: item.created_at,
+          count: 1,
+          type: 'event'
+        });
+      }
+      
+      const enrollmentByDay = processDataByDay(enrollmentData, startDate, endDate);
       setEnrollmentData(enrollmentByDay);
 
       // Process course performance
@@ -230,7 +258,7 @@ const CreatorAnalytics = () => {
         
       if (coursesError) throw coursesError;
       
-      const completionData = await Promise.all(courses?.map(async (course) => {
+      const completionData = await Promise.all((courses || []).map(async (course) => {
         // Get total enrollments for this course
         const { count: totalCount, error: totalError } = await supabase
           .from('course_enrollments')
@@ -255,7 +283,7 @@ const CreatorAnalytics = () => {
           completionRate: completionRate,
           enrollments: totalCount || 0
         };
-      }) || []);
+      }));
       
       setCompletionRates(completionData);
     } catch (error) {

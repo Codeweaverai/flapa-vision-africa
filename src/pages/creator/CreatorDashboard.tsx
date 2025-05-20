@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -88,10 +89,14 @@ const CreatorDashboard = () => {
         
       if (eventRevenueError) throw eventRevenueError;
       
-      const totalRevenue = [
-        ...(courseRevenue?.map(item => Number(item.course.price || 0)) || []),
-        ...(eventRevenue?.map(item => Number(item.event.price || 0) || []))
-      ].reduce((sum, price) => sum + price, 0);
+      // Calculate total revenue safely
+      const courseRevenueTotal = (courseRevenue || []).reduce((sum, item) => 
+        sum + Number(item.course.price || 0), 0);
+      
+      const eventRevenueTotal = (eventRevenue || []).reduce((sum, item) => 
+        sum + Number(item.event.price || 0), 0);
+      
+      const totalRevenue = courseRevenueTotal + eventRevenueTotal;
       
       setCourseCount(courseCountData || 0);
       setEventCount(eventCountData || 0);
@@ -111,14 +116,14 @@ const CreatorDashboard = () => {
         .from('course_enrollments')
         .select(`
           id, 
-          enrollment_date as created_at,
+          enrollment_date,
           user_id,
           course_id,
           course:courses!inner(title, creator_id),
           student:profiles(full_name, email)
         `)
-        .eq('courses.creator_id', user?.id)
-        .order('created_at', { ascending: false })
+        .eq('course.creator_id', user?.id)
+        .order('enrollment_date', { ascending: false })
         .limit(5);
         
       if (enrollmentsError) throw enrollmentsError;
@@ -132,9 +137,9 @@ const CreatorDashboard = () => {
           user_id,
           event_id,
           event:events!inner(title, creator_id),
-          student:profiles(full_name, email)
+          attendee:profiles(full_name, email)
         `)
-        .eq('events.creator_id', user?.id)
+        .eq('event.creator_id', user?.id)
         .order('created_at', { ascending: false })
         .limit(5);
         
@@ -145,7 +150,7 @@ const CreatorDashboard = () => {
         ...(enrollments?.map(item => ({
           id: item.id,
           type: 'enrollment',
-          created_at: item.created_at,
+          created_at: item.enrollment_date,
           user_id: item.user_id,
           user_name: item.student?.full_name || 'Anonymous User',
           user_email: item.student?.email,
@@ -158,8 +163,8 @@ const CreatorDashboard = () => {
           type: 'registration',
           created_at: item.created_at,
           user_id: item.user_id,
-          user_name: item.student?.full_name || 'Anonymous User',
-          user_email: item.student?.email,
+          user_name: item.attendee?.full_name || 'Anonymous User',
+          user_email: item.attendee?.email,
           content_id: item.event_id,
           content_title: item.event.title
         })) || [])
@@ -178,10 +183,10 @@ const CreatorDashboard = () => {
       const { data: enrollments, error: enrollmentsError } = await supabase
         .from('course_enrollments')
         .select(`
-          enrollment_date as created_at,
+          enrollment_date,
           course:courses!inner(creator_id)
         `)
-        .eq('courses.creator_id', user?.id);
+        .eq('course.creator_id', user?.id);
         
       if (enrollmentsError) throw enrollmentsError;
       
@@ -192,7 +197,7 @@ const CreatorDashboard = () => {
           created_at,
           event:events!inner(creator_id, price, is_free)
         `)
-        .eq('events.creator_id', user?.id);
+        .eq('event.creator_id', user?.id);
         
       if (registrationsError) throw registrationsError;
       
@@ -239,7 +244,7 @@ const CreatorDashboard = () => {
     const enrollmentsChannel = supabase
       .channel('creator-enrollments')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'enrollments' },
+        { event: '*', schema: 'public', table: 'course_enrollments' },
         () => {
           fetchCreatorStats();
           fetchRecentActivity();
@@ -286,7 +291,7 @@ const CreatorDashboard = () => {
     
     // Count items by month (only for current year)
     data.forEach(item => {
-      const date = new Date(item.created_at);
+      const date = new Date(item.enrollment_date || item.created_at);
       if (date.getFullYear() === currentYear) {
         const monthIndex = date.getMonth();
         monthlyCounts[monthIndex][type]++;
@@ -521,7 +526,7 @@ const CreatorDashboard = () => {
               </CardHeader>
               <CardContent className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueData}>
+                  <RechartsBarChart data={revenueData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
                       dataKey="name" 
@@ -537,7 +542,7 @@ const CreatorDashboard = () => {
                       fill="#4c1d95" 
                       name="Revenue" 
                     />
-                  </BarChart>
+                  </RechartsBarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
