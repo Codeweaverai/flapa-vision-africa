@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Image, Mic, FileDown, Calendar, Clock, ArrowRight } from 'lucide-react';
+import { FileText, Mic, FileDown, Calendar, Clock, ArrowRight } from 'lucide-react';
 import { getMediaPosts, MediaPost } from '@/services/mediaService';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -77,7 +77,7 @@ const MediaPage = () => {
             <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
           ) : (
             <div className="flex items-center justify-center w-full h-full bg-gray-100">
-              <Image className="h-12 w-12 text-gray-300" />
+              <FileText className="h-12 w-12 text-gray-300" />
             </div>
           )}
         </div>

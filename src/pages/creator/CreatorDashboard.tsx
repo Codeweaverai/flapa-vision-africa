@@ -397,7 +397,7 @@ const CreatorDashboard = () => {
         // Create a new object with proper numeric types
         monthlyRevenue[monthIndex] = {
           name: monthlyRevenue[monthIndex].name,
-          revenue: Number(currentRevenue) + Number(price) // Ensure both are numbers
+          revenue: Number(currentRevenue) + Number(price) // Ensure both are converted to numbers
         };
       }
     });
