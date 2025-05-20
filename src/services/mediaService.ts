@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,6 +9,7 @@ export interface MediaPost {
   content: string;
   summary?: string;
   post_type: 'news' | 'podcast' | 'resource';
+  category?: string; // Add category field
   image_url?: string;
   media_url?: string;
   published_at: string;
@@ -20,7 +20,7 @@ export interface MediaPost {
   is_published: boolean;
 }
 
-// Define MediaCategory type
+// Define MediaCategory type - keeping for backwards compatibility but not actively used anymore
 export interface MediaCategory {
   id: string;
   name: string;
@@ -28,17 +28,11 @@ export interface MediaCategory {
   created_at: string;
 }
 
-// Define MediaPostWithCategories type
-export interface MediaPostWithCategories extends MediaPost {
-  categories: MediaCategory[];
-}
-
 // Create a new media post
 export const createMediaPost = async (
   postData: Partial<MediaPost>, 
   imageFile?: File,
-  mediaFile?: File,
-  categories?: string[]
+  mediaFile?: File
 ): Promise<MediaPost | null> => {
   try {
     // Check for required fields
@@ -106,6 +100,7 @@ export const createMediaPost = async (
       content: postData.content,
       summary: postData.summary || postData.content.substring(0, 150) + '...',
       post_type: postData.post_type,
+      category: postData.category, // Include category field
       image_url: imageUrl,
       media_url: mediaUrl,
       author_id: userData.user.id,
@@ -126,23 +121,6 @@ export const createMediaPost = async (
       return null;
     }
 
-    // If categories are provided, associate them with the post
-    if (categories && categories.length > 0 && data) {
-      const categoryAssociations = categories.map(categoryId => ({
-        post_id: data.id,
-        category_id: categoryId
-      }));
-
-      const { error: categoryError } = await supabase
-        .from('media_posts_categories')
-        .insert(categoryAssociations);
-
-      if (categoryError) {
-        console.error('Error associating categories:', categoryError);
-        toast.warning('Post created but failed to associate categories');
-      }
-    }
-
     toast.success('Media post created successfully');
     return data as unknown as MediaPost;
   } catch (error: any) {
@@ -157,8 +135,7 @@ export const updateMediaPost = async (
   id: string,
   postData: Partial<MediaPost>,
   imageFile?: File,
-  mediaFile?: File,
-  categories?: string[]
+  mediaFile?: File
 ): Promise<MediaPost | null> => {
   try {
     let imageUrl: string | undefined = postData.image_url;
@@ -228,32 +205,6 @@ export const updateMediaPost = async (
       return null;
     }
 
-    // If categories are provided, update the associations
-    if (categories && data) {
-      // First delete existing associations
-      await supabase
-        .from('media_posts_categories')
-        .delete()
-        .eq('post_id', id);
-
-      // Then create new associations
-      if (categories.length > 0) {
-        const categoryAssociations = categories.map(categoryId => ({
-          post_id: id,
-          category_id: categoryId
-        }));
-
-        const { error: categoryError } = await supabase
-          .from('media_posts_categories')
-          .insert(categoryAssociations);
-
-        if (categoryError) {
-          console.error('Error associating categories:', categoryError);
-          toast.warning('Post updated but failed to update categories');
-        }
-      }
-    }
-
     toast.success('Media post updated successfully');
     return data as MediaPost;
   } catch (error: any) {
@@ -321,8 +272,8 @@ export const getMediaPosts = async (
   }
 };
 
-// Get a single media post by ID with its categories
-export const getMediaPostById = async (id: string): Promise<MediaPostWithCategories | null> => {
+// Get a single media post by ID
+export const getMediaPostById = async (id: string): Promise<MediaPost | null> => {
   try {
     // Get the post
     const { data: post, error } = await supabase
@@ -336,47 +287,14 @@ export const getMediaPostById = async (id: string): Promise<MediaPostWithCategor
       return null;
     }
 
-    if (!post) {
-      return null;
-    }
-
-    const typedPost = post as unknown as MediaPost;
-
-    // Get the post's categories
-    const { data: categoryLinks, error: categoryLinksError } = await supabase
-      .from('media_posts_categories')
-      .select('category_id')
-      .eq('post_id', id);
-
-    if (categoryLinksError) {
-      console.error('Error fetching post categories:', categoryLinksError);
-      return { ...typedPost, categories: [] };
-    }
-
-    if (!categoryLinks || categoryLinks.length === 0) {
-      return { ...typedPost, categories: [] };
-    }
-
-    const categoryIds = categoryLinks.map(link => link.category_id);
-
-    const { data: categories, error: categoriesError } = await supabase
-      .from('media_categories')
-      .select('*')
-      .in('id', categoryIds);
-
-    if (categoriesError) {
-      console.error('Error fetching categories:', categoriesError);
-      return { ...typedPost, categories: [] };
-    }
-
-    return { ...typedPost, categories: categories as MediaCategory[] || [] };
+    return post as MediaPost;
   } catch (error: any) {
     console.error('Error in getMediaPostById:', error);
     return null;
   }
 };
 
-// Get all categories
+// Get all categories (keeping for backwards compatibility)
 export const getMediaCategories = async (): Promise<MediaCategory[]> => {
   try {
     const { data, error } = await supabase
@@ -399,7 +317,7 @@ export const getMediaCategories = async (): Promise<MediaCategory[]> => {
   }
 };
 
-// Create a new category
+// Create a new category (keeping for backwards compatibility)
 export const createMediaCategory = async (name: string, description?: string): Promise<MediaCategory | null> => {
   try {
     const { data, error } = await supabase
@@ -422,4 +340,3 @@ export const createMediaCategory = async (name: string, description?: string): P
     return null;
   }
 };
-

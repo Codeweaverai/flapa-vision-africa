@@ -21,18 +21,16 @@ import {
   createMediaPost,
   updateMediaPost,
   getMediaPostById,
-  getMediaCategories,
-  MediaPost, 
-  MediaCategory
+  MediaPost
 } from '@/services/mediaService';
 import { Loader2, ArrowLeft, Save, FileUp } from 'lucide-react';
-import { MultiSelect } from '@/components/ui/multi-select';
 
 type FormData = {
   title: string;
   content: string;
   summary?: string;
   post_type: 'news' | 'podcast' | 'resource';
+  category?: string;
   duration_minutes?: number;
   is_published: boolean;
 };
@@ -46,9 +44,6 @@ const MediaForm = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [categories, setCategories] = useState<MediaCategory[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState<boolean>(false);
   
   // Initialize form with default values
   const defaultPostType = location.state?.type || 'news';
@@ -61,29 +56,8 @@ const MediaForm = () => {
   });
   
   const postType = watch('post_type');
+  const category = watch('category');
   const isEditing = !!id;
-
-  // Load categories with better error handling and logging
-  useEffect(() => {
-    const loadCategories = async () => {
-      setLoadingCategories(true);
-      try {
-        const categoriesData = await getMediaCategories();
-        console.log('Loaded categories:', categoriesData);
-        // Ensure we always set an array, even if the response is null or undefined
-        setCategories(categoriesData || []);
-      } catch (error) {
-        console.error('Error loading categories:', error);
-        toast.error('Failed to load categories');
-        // Set empty array on error to avoid null reference issues
-        setCategories([]);
-      } finally {
-        setLoadingCategories(false);
-      }
-    };
-
-    loadCategories();
-  }, []);
 
   // Load post data if editing
   useEffect(() => {
@@ -98,18 +72,13 @@ const MediaForm = () => {
               content: post.content,
               summary: post.summary,
               post_type: post.post_type as 'news' | 'podcast' | 'resource',
+              category: post.category,
               duration_minutes: post.duration_minutes,
               is_published: post.is_published
             });
             
             if (post.image_url) {
               setImagePreview(post.image_url);
-            }
-            
-            if (post.categories && post.categories.length > 0) {
-              setSelectedCategories(post.categories.map(cat => cat.id));
-            } else {
-              setSelectedCategories([]);
             }
           } else {
             toast.error('Failed to load post data');
@@ -159,15 +128,13 @@ const MediaForm = () => {
           id, 
           data, 
           imageFile || undefined, 
-          mediaFile || undefined,
-          selectedCategories
+          mediaFile || undefined
         );
       } else {
         result = await createMediaPost(
           data, 
           imageFile || undefined, 
-          mediaFile || undefined,
-          selectedCategories
+          mediaFile || undefined
         );
       }
       
@@ -180,17 +147,6 @@ const MediaForm = () => {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // Fixed: Complete the getCategoryOptions function to properly format categories for the MultiSelect component
-  const getCategoryOptions = () => {
-    if (!categories || categories.length === 0) {
-      return [];
-    }
-    return categories.map(category => ({
-      value: category.id,
-      label: category.name
-    }));
   };
 
   if (loading) {
@@ -256,6 +212,29 @@ const MediaForm = () => {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={category}
+                    onValueChange={(value) => setValue('category', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="education">Education</SelectItem>
+                      <SelectItem value="technology">Technology</SelectItem>
+                      <SelectItem value="artificial-intelligence">Artificial Intelligence</SelectItem>
+                      <SelectItem value="entrepreneurship">Entrepreneurship</SelectItem>
+                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value="professional-development">Professional Development</SelectItem>
+                      <SelectItem value="health">Health</SelectItem>
+                      <SelectItem value="finance">Finance</SelectItem>
+                      <SelectItem value="creative">Creative</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {postType === 'podcast' && (
                   <div className="space-y-2">
                     <Label htmlFor="duration_minutes">Duration (minutes)</Label>
@@ -271,23 +250,6 @@ const MediaForm = () => {
                     {errors.duration_minutes && <p className="text-sm text-red-500">{errors.duration_minutes.message}</p>}
                   </div>
                 )}
-
-                <div className="space-y-2">
-                  <Label>Categories</Label>
-                  {loadingCategories ? (
-                    <div className="flex items-center space-x-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Loading categories...</span>
-                    </div>
-                  ) : (
-                    <MultiSelect
-                      options={getCategoryOptions()}
-                      value={selectedCategories}
-                      onChange={setSelectedCategories}
-                      placeholder="Select categories"
-                    />
-                  )}
-                </div>
 
                 <div className="flex items-center space-x-2 pt-2">
                   <Checkbox

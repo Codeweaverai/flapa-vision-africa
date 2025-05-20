@@ -66,6 +66,13 @@ const AdminMedia = () => {
     navigate(`/admin/media/create`, { state: { type } });
   };
 
+  const formatCategoryName = (category: string | undefined): string => {
+    if (!category) return '';
+    return category.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
   const renderPostCard = (post: MediaPost) => {
     const isPublished = post.is_published;
     const timeAgo = formatDistanceToNow(new Date(post.published_at), { addSuffix: true });
@@ -85,9 +92,16 @@ const AdminMedia = () => {
           <div className="flex-1">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-col space-y-2">
                   <CardTitle className="text-lg">{post.title}</CardTitle>
-                  {!isPublished && <Badge variant="outline" className="bg-amber-100 text-amber-800">Draft</Badge>}
+                  <div className="flex items-center space-x-2">
+                    {!isPublished && <Badge variant="outline" className="bg-amber-100 text-amber-800">Draft</Badge>}
+                    {post.category && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-800">
+                        {formatCategoryName(post.category)}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <CardDescription>{timeAgo}</CardDescription>
               </div>
