@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -389,13 +388,17 @@ const CreatorDashboard = () => {
       if (date.getFullYear() === currentYear && !item.event.is_free) {
         const monthIndex = date.getMonth();
         
-        // Ensure price is a number
-        const price = typeof item.event.price === 'number' ? Number(item.event.price) : 0;
+        // Ensure price is a number - convert explicitly
+        const price = typeof item.event.price === 'number' ? item.event.price : 0;
         
-        // Create a new object with revenue as a number to avoid type issues
+        // Add the price to the current revenue - ensure both are numbers
+        const currentRevenue = typeof monthlyRevenue[monthIndex].revenue === 'number' ? 
+          monthlyRevenue[monthIndex].revenue : 0;
+        
+        // Create a new object with proper numeric types
         monthlyRevenue[monthIndex] = {
           name: monthlyRevenue[monthIndex].name,
-          revenue: Number(monthlyRevenue[monthIndex].revenue) + price
+          revenue: currentRevenue + price // Both variables are now guaranteed to be numbers
         };
       }
     });
