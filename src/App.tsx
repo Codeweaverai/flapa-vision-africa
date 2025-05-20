@@ -38,6 +38,8 @@ import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
 import CreatorEventForm from '@/pages/creator/CreatorEventForm';
 import CreatorEventRegistrations from '@/pages/creator/CreatorEventRegistrations';
 import AdminEventRegistrations from '@/pages/admin/AdminEventRegistrations';
+import CreatorStudents from '@/pages/creator/CreatorStudents';
+import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
 
 function App() {
   return (
@@ -52,7 +54,7 @@ function App() {
       <Route path="/events/:eventId" element={<EventDetailPage />} />
       <Route path="/learning" element={<LearningPage />} />
       <Route path="/learning/course/:courseId" element={<CourseDetailPage />} />
-      <Route path="/learning/course/:courseId/learn" element={<CourseLearningPage />} />
+      <Route path="/learning/player/:courseId" element={<CourseLearningPage />} />
       <Route path="/account" element={<AccountPage />} />
       <Route path="/auth" element={<AuthPage />} />
       <Route path="/payment/success" element={<PaymentSuccessPage />} />
@@ -82,6 +84,8 @@ function App() {
       <Route path="/creator/events/edit/:eventId" element={<CreatorEventForm />} />
       <Route path="/creator/events/registrations/:eventId" element={<CreatorEventRegistrations />} />
       <Route path="/admin/events/registrations/:eventId" element={<AdminEventRegistrations />} />
+      <Route path="/creator/students" element={<CreatorStudents />} />
+      <Route path="/creator/analytics" element={<CreatorAnalytics />} />
       
       {/* Catch-all route */}
       <Route path="*" element={<NotFoundPage />} />

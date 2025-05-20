@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { Edit, Check, User, Mail, Lock, ArrowLeft, Calendar, GraduationCap, BookOpen } from 'lucide-react';
+import { Edit, Check, User, Mail, Lock, ArrowLeft, Calendar, GraduationCap, BookOpen, Switch } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -249,7 +249,7 @@ const AccountPage = () => {
 
   return (
     <Layout>
-      <div className="section-container">
+      <div className="section-container bg-light-purple">
         <Button asChild variant="ghost" className="mb-4">
           <Link to="/">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -257,27 +257,90 @@ const AccountPage = () => {
           </Link>
         </Button>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-1 md:grid-cols-4 mb-6">
-            <TabsTrigger value="profile">My Profile</TabsTrigger>
-            <TabsTrigger value="courses">My Courses</TabsTrigger>
-            <TabsTrigger value="events">My Events</TabsTrigger>
-            <TabsTrigger value="consultations">My Consultations</TabsTrigger>
-          </TabsList>
-          
-          {/* Profile Tab */}
-          <TabsContent value="profile">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Profile Information Card */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* Sidebar */}
+          <div className="md:col-span-1">
+            <Card className="p-4">
+              <div className="mb-4 flex items-center space-x-2">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={profile.avatar_url || ""} alt={profile.full_name || "Avatar"} />
+                  <AvatarFallback>{profile.full_name?.charAt(0) || "U"}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="text-lg font-semibold">{profile.full_name || "User"}</h2>
+                  <p className="text-sm text-muted-foreground">{profile.email}</p>
+                </div>
+              </div>
+              
+              <nav className="space-y-1">
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start ${activeTab === 'profile' ? 'bg-primary/10 text-primary font-medium' : ''}`}
+                  onClick={() => setActiveTab('profile')}
+                >
+                  <User className="h-5 w-5 mr-2" />
+                  My Profile
+                </Button>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start ${activeTab === 'courses' ? 'bg-primary/10 text-primary font-medium' : ''}`}
+                  onClick={() => setActiveTab('courses')}
+                >
+                  <BookOpen className="h-5 w-5 mr-2" />
+                  My Courses
+                </Button>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start ${activeTab === 'events' ? 'bg-primary/10 text-primary font-medium' : ''}`}
+                  onClick={() => setActiveTab('events')}
+                >
+                  <Calendar className="h-5 w-5 mr-2" />
+                  My Events
+                </Button>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start ${activeTab === 'consultations' ? 'bg-primary/10 text-primary font-medium' : ''}`}
+                  onClick={() => setActiveTab('consultations')}
+                >
+                  <User className="h-5 w-5 mr-2" />
+                  My Consultations
+                </Button>
+              </nav>
+              
+              <div className="mt-8 pt-4 border-t">
+                {profile.is_creator && (
+                  <Button asChild className="w-full mb-3 flex items-center" variant="outline">
+                    <Link to="/creator/dashboard">
+                      <Switch className="mr-2 h-4 w-4" />
+                      Switch to Creator Mode
+                    </Link>
+                  </Button>
+                )}
+                
+                <Button variant="destructive" className="w-full" onClick={handleSignOut}>
+                  Sign Out
+                </Button>
+              </div>
+            </Card>
+          </div>
+
+          {/* Main Content */}
+          <div className="md:col-span-3">
+            {/* Profile Tab */}
+            {activeTab === 'profile' && (
               <Card>
-                <CardContent className="space-y-4 pt-6">
+                <CardHeader>
+                  <CardTitle>My Profile</CardTitle>
+                  <CardDescription>Manage your personal information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="flex items-center space-x-4">
-                    <Avatar className="h-12 w-12">
+                    <Avatar className="h-24 w-24">
                       <AvatarImage src={profile.avatar_url || ""} alt={profile.full_name || "Avatar"} />
                       <AvatarFallback>{profile.full_name?.charAt(0) || "U"}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <h2 className="text-lg font-semibold">{profile.full_name || "No Name"}</h2>
+                      <h2 className="text-xl font-semibold">{profile.full_name || "No Name"}</h2>
                       <p className="text-sm text-muted-foreground">{profile.email}</p>
                     </div>
                   </div>
@@ -335,270 +398,260 @@ const AccountPage = () => {
                       </Button>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Actions Card */}
-              <Card>
-                <CardContent className="space-y-4 pt-6">
-                  <h2 className="text-lg font-semibold">Actions</h2>
-                  <Button variant="destructive" className="w-full" onClick={handleSignOut} disabled={loading}>
-                    Sign Out
-                  </Button>
                   
                   {!profile.is_creator && (
-                    <Button className="w-full" onClick={handleCreatorRequest} disabled={loading}>
-                      Request Creator Access
-                    </Button>
-                  )}
-                  
-                  {profile.is_creator && (
-                    <Button asChild className="w-full">
-                      <Link to="/creator/dashboard">
-                        Go to Creator Dashboard
-                      </Link>
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          {/* Courses Tab */}
-          <TabsContent value="courses">
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <BookOpen className="mr-2" />
-              My Courses
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {courses.length === 0 ? (
-                <Card className="col-span-full">
-                  <CardContent className="flex flex-col items-center justify-center p-6">
-                    <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                    <p className="text-lg font-medium mb-2">You haven't enrolled in any courses yet</p>
-                    <p className="text-muted-foreground mb-4 text-center">Explore our courses and start learning today</p>
-                    <Button asChild>
-                      <Link to="/learning">Browse Courses</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                courses.map((course) => (
-                  <Card key={course.id} className="overflow-hidden flex flex-col">
-                    <div className="aspect-video relative">
-                      {course.image_url ? (
-                        <img 
-                          src={course.image_url} 
-                          alt={course.title} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <BookOpen className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2">
-                        <Badge variant="secondary">
-                          {course.difficulty_level}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <CardHeader className="pb-2">
-                      <CardTitle className="line-clamp-1">{course.title}</CardTitle>
-                      <CardDescription className="line-clamp-2">{course.description}</CardDescription>
-                    </CardHeader>
-                    
-                    <CardContent className="pb-2 flex-grow">
-                      <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                        <span>{Math.ceil((course.duration_minutes || 0) / 60)} hours</span>
-                        <span>{course.is_free ? "Free" : `$${course.price}`}</span>
-                      </div>
-                      
-                      <div className="mt-2">
-                        <Badge variant={course.enrollment?.is_completed ? "default" : "outline"}>
-                          {course.enrollment?.is_completed ? "Completed" : "In Progress"}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                    
-                    <CardFooter className="pt-0">
-                      <Button asChild variant="default" className="w-full">
-                        <Link to={`/learning/player/${course.id}`}>
-                          Continue Learning
-                        </Link>
+                    <div className="pt-4 border-t mt-4">
+                      <Button className="w-full" onClick={handleCreatorRequest} disabled={loading}>
+                        Request Creator Access
                       </Button>
-                    </CardFooter>
-                  </Card>
-                ))
-              )}
-            </div>
-          </TabsContent>
-          
-          {/* Events Tab */}
-          <TabsContent value="events">
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <Calendar className="mr-2" />
-              My Events
-            </h2>
-            
-            {registrations.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center p-6">
-                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">You haven't registered for any events yet</p>
-                  <p className="text-muted-foreground mb-4 text-center">Explore our upcoming events and join us</p>
-                  <Button asChild>
-                    <Link to="/events">Browse Events</Link>
-                  </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            ) : (
-              <div className="space-y-6">
-                {registrations.map((registration) => (
-                  <Card key={registration.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle>{registration.event?.title}</CardTitle>
-                        {getStatusBadge(registration.status)}
-                      </div>
-                      <CardDescription>
-                        {registration.event?.start_time && (
-                          <>
-                            <Calendar className="inline-block mr-1 h-3 w-3" />
-                            {format(new Date(registration.event.start_time), 'PPP p')}
-                          </>
-                        )}
-                        {registration.event?.location && (
-                          <span className="ml-3">{registration.event.location}</span>
-                        )}
-                      </CardDescription>
-                    </CardHeader>
-                    
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium">Registration Date:</p>
-                          <p className="text-muted-foreground">
-                            {registration.created_at ? format(new Date(registration.created_at), 'PPP') : 'N/A'}
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm font-medium">Payment Status:</p>
-                          <div>{getPaymentStatusBadge(registration.payment_status, registration.event?.is_free)}</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                    
-                    <CardFooter>
-                      <div className="flex gap-3">
-                        <Button asChild variant="outline">
-                          <Link to={`/events/${registration.event_id}`}>
-                            View Event
-                          </Link>
+            )}
+            
+            {/* Courses Tab */}
+            {activeTab === 'courses' && (
+              <>
+                <h2 className="text-2xl font-bold mb-6 flex items-center">
+                  <BookOpen className="mr-2" />
+                  My Courses
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {courses.length === 0 ? (
+                    <Card className="col-span-full">
+                      <CardContent className="flex flex-col items-center justify-center p-6">
+                        <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
+                        <p className="text-lg font-medium mb-2">You haven't enrolled in any courses yet</p>
+                        <p className="text-muted-foreground mb-4 text-center">Explore our courses and start learning today</p>
+                        <Button asChild>
+                          <Link to="/learning">Browse Courses</Link>
                         </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    courses.map((course) => (
+                      <Card key={course.id} className="overflow-hidden flex flex-col">
+                        <div className="aspect-video relative">
+                          {course.image_url ? (
+                            <img 
+                              src={course.image_url} 
+                              alt={course.title} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-muted flex items-center justify-center">
+                              <BookOpen className="h-12 w-12 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2">
+                            <Badge variant="secondary">
+                              {course.difficulty_level}
+                            </Badge>
+                          </div>
+                        </div>
                         
-                        {registration.status !== 'cancelled' && (
-                          <Button variant="ghost" className="text-destructive">
-                            Cancel Registration
+                        <CardHeader className="pb-2">
+                          <CardTitle className="line-clamp-1">{course.title}</CardTitle>
+                          <CardDescription className="line-clamp-2">{course.description}</CardDescription>
+                        </CardHeader>
+                        
+                        <CardContent className="pb-2 flex-grow">
+                          <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                            <span>{Math.ceil((course.duration_minutes || 0) / 60)} hours</span>
+                            <span>{course.is_free ? "Free" : `$${course.price}`}</span>
+                          </div>
+                          
+                          <div className="mt-2">
+                            <Badge variant={course.enrollment?.is_completed ? "default" : "outline"}>
+                              {course.enrollment?.is_completed ? "Completed" : "In Progress"}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                        
+                        <CardFooter className="pt-0">
+                          <Button asChild variant="default" className="w-full">
+                            <Link to={`/learning/player/${course.id}`}>
+                              Continue Learning
+                            </Link>
                           </Button>
-                        )}
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
+                        </CardFooter>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </>
             )}
-          </TabsContent>
-          
-          {/* Consultations Tab */}
-          <TabsContent value="consultations">
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <User className="mr-2" />
-              My Consultations
-            </h2>
             
-            {consultations.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center p-6">
-                  <User className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">You haven't booked any consultations yet</p>
-                  <p className="text-muted-foreground mb-4 text-center">Book a consultation for personalized guidance</p>
-                  <Button asChild>
-                    <Link to="/consult">Book Consultation</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {consultations.map((consultation) => (
-                  <Card key={consultation.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle>{consultation.booking_type} Consultation</CardTitle>
-                        {getStatusBadge(consultation.status)}
-                      </div>
-                      <CardDescription>
-                        <Calendar className="inline-block mr-1 h-3 w-3" />
-                        {consultation.scheduled_time && format(new Date(consultation.scheduled_time), 'PPP p')}
-                        {consultation.duration && <span className="ml-2">({consultation.duration} minutes)</span>}
-                      </CardDescription>
-                    </CardHeader>
-                    
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {consultation.topic && (
-                          <div>
-                            <p className="text-sm font-medium">Topic:</p>
-                            <p className="text-muted-foreground">{consultation.topic}</p>
-                          </div>
-                        )}
-                        
-                        {consultation.location && (
-                          <div>
-                            <p className="text-sm font-medium">Location:</p>
-                            <p className="text-muted-foreground">{consultation.location}</p>
-                          </div>
-                        )}
-                        
-                        {consultation.online_meeting_link && (
-                          <div className="col-span-2">
-                            <p className="text-sm font-medium">Meeting Link:</p>
-                            <a href={consultation.online_meeting_link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                              {consultation.online_meeting_link}
-                            </a>
-                          </div>
-                        )}
-                        
-                        <div>
-                          <p className="text-sm font-medium">Payment Status:</p>
-                          <div>{getPaymentStatusBadge(consultation.payment_status, false)}</div>
-                        </div>
-                      </div>
-                      
-                      {consultation.notes && (
-                        <div className="mt-4">
-                          <p className="text-sm font-medium">Notes:</p>
-                          <p className="text-muted-foreground whitespace-pre-line">{consultation.notes}</p>
-                        </div>
-                      )}
+            {/* Events Tab */}
+            {activeTab === 'events' && (
+              <>
+                <h2 className="text-2xl font-bold mb-6 flex items-center">
+                  <Calendar className="mr-2" />
+                  My Events
+                </h2>
+                
+                {registrations.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center p-6">
+                      <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-lg font-medium mb-2">You haven't registered for any events yet</p>
+                      <p className="text-muted-foreground mb-4 text-center">Explore our upcoming events and join us</p>
+                      <Button asChild>
+                        <Link to="/events">Browse Events</Link>
+                      </Button>
                     </CardContent>
-                    
-                    <CardFooter>
-                      {consultation.status !== 'cancelled' && new Date(consultation.scheduled_time) > new Date() && (
-                        <Button variant="outline" className="text-destructive">
-                          Cancel Booking
-                        </Button>
-                      )}
-                    </CardFooter>
                   </Card>
-                ))}
-              </div>
+                ) : (
+                  <div className="space-y-6">
+                    {registrations.map((registration) => (
+                      <Card key={registration.id}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle>{registration.event?.title}</CardTitle>
+                            {getStatusBadge(registration.status)}
+                          </div>
+                          <CardDescription>
+                            {registration.event?.start_time && (
+                              <>
+                                <Calendar className="inline-block mr-1 h-3 w-3" />
+                                {format(new Date(registration.event.start_time), 'PPP p')}
+                              </>
+                            )}
+                            {registration.event?.location && (
+                              <span className="ml-3">{registration.event.location}</span>
+                            )}
+                          </CardDescription>
+                        </CardHeader>
+                        
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm font-medium">Registration Date:</p>
+                              <p className="text-muted-foreground">
+                                {registration.created_at ? format(new Date(registration.created_at), 'PPP') : 'N/A'}
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <p className="text-sm font-medium">Payment Status:</p>
+                              <div>{getPaymentStatusBadge(registration.payment_status, registration.event?.is_free)}</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                        
+                        <CardFooter>
+                          <div className="flex gap-3">
+                            <Button asChild variant="outline">
+                              <Link to={`/events/${registration.event_id}`}>
+                                View Event
+                              </Link>
+                            </Button>
+                            
+                            {registration.status !== 'cancelled' && (
+                              <Button variant="ghost" className="text-destructive">
+                                Cancel Registration
+                              </Button>
+                            )}
+                          </div>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
-          </TabsContent>
-        </Tabs>
+            
+            {/* Consultations Tab */}
+            {activeTab === 'consultations' && (
+              <>
+                <h2 className="text-2xl font-bold mb-6 flex items-center">
+                  <User className="mr-2" />
+                  My Consultations
+                </h2>
+                
+                {consultations.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center p-6">
+                      <User className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-lg font-medium mb-2">You haven't booked any consultations yet</p>
+                      <p className="text-muted-foreground mb-4 text-center">Book a consultation for personalized guidance</p>
+                      <Button asChild>
+                        <Link to="/consult">Book Consultation</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-6">
+                    {consultations.map((consultation) => (
+                      <Card key={consultation.id}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle>{consultation.booking_type} Consultation</CardTitle>
+                            {getStatusBadge(consultation.status)}
+                          </div>
+                          <CardDescription>
+                            <Calendar className="inline-block mr-1 h-3 w-3" />
+                            {consultation.scheduled_time && format(new Date(consultation.scheduled_time), 'PPP p')}
+                            {consultation.duration && <span className="ml-2">({consultation.duration} minutes)</span>}
+                          </CardDescription>
+                        </CardHeader>
+                        
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {consultation.topic && (
+                              <div>
+                                <p className="text-sm font-medium">Topic:</p>
+                                <p className="text-muted-foreground">{consultation.topic}</p>
+                              </div>
+                            )}
+                            
+                            {consultation.location && (
+                              <div>
+                                <p className="text-sm font-medium">Location:</p>
+                                <p className="text-muted-foreground">{consultation.location}</p>
+                              </div>
+                            )}
+                            
+                            {consultation.online_meeting_link && (
+                              <div className="col-span-2">
+                                <p className="text-sm font-medium">Meeting Link:</p>
+                                <a href={consultation.online_meeting_link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                                  {consultation.online_meeting_link}
+                                </a>
+                              </div>
+                            )}
+                            
+                            <div>
+                              <p className="text-sm font-medium">Payment Status:</p>
+                              <div>{getPaymentStatusBadge(consultation.payment_status, false)}</div>
+                            </div>
+                          </div>
+                          
+                          {consultation.notes && (
+                            <div className="mt-4">
+                              <p className="text-sm font-medium">Notes:</p>
+                              <p className="text-muted-foreground whitespace-pre-line">{consultation.notes}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                        
+                        <CardFooter>
+                          {consultation.status !== 'cancelled' && new Date(consultation.scheduled_time) > new Date() && (
+                            <Button variant="outline" className="text-destructive">
+                              Cancel Booking
+                            </Button>
+                          )}
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </Layout>
   );
