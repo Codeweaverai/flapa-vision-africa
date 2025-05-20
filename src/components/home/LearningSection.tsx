@@ -1,7 +1,7 @@
 
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Clock, VideoIcon, Users, MapPin } from 'lucide-react';
+import { Clock, VideoIcon, Users, MapPin, MessageCircle } from 'lucide-react';
 
 const LearningSection = () => {
   return (
@@ -41,17 +41,22 @@ const LearningSection = () => {
                 </p>
               </div>
               <div className="bg-white/80 p-4 rounded-lg shadow-sm">
-                <Users className="h-8 w-8 text-primary mb-3" />
-                <h3 className="font-bold mb-1">Team Sessions</h3>
+                <MessageCircle className="h-8 w-8 text-primary mb-3" />
+                <h3 className="font-bold mb-1">Community Access</h3>
                 <p className="text-sm text-muted-foreground">
-                  Group consultations for your leadership team
+                  Join our learning community for ongoing support
                 </p>
               </div>
             </div>
             
-            <Button asChild size="lg">
-              <Link to="/consult">Book a Consultation</Link>
-            </Button>
+            <div className="flex flex-wrap gap-4">
+              <Button asChild size="lg">
+                <Link to="/consult">Book a Consultation</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link to="/community">Join Community</Link>
+              </Button>
+            </div>
           </div>
           
           <div className="order-1 md:order-2 relative">

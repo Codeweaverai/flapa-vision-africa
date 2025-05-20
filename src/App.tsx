@@ -40,6 +40,11 @@ import AdminEventRegistrations from '@/pages/admin/AdminEventRegistrations';
 import CreatorStudents from '@/pages/creator/CreatorStudents';
 import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
 import AdminLogin from '@/pages/admin/AdminLogin';
+// Import new community pages
+import CommunityPage from '@/pages/CommunityPage';
+import CommunityChatPage from '@/pages/CommunityChatPage';
+import CommunityCoursesPage from '@/pages/CommunityCoursesPage';
+import CommunityNotificationsPage from '@/pages/CommunityNotificationsPage';
 
 function App() {
   return (
@@ -61,6 +66,12 @@ function App() {
       <Route path="/payment/success" element={<PaymentSuccessPage />} />
       <Route path="/payment/cancel" element={<PaymentCancelPage />} />
       <Route path="/admin-login" element={<AdminLogin />} />
+      
+      {/* Community routes */}
+      <Route path="/community" element={<CommunityPage />} />
+      <Route path="/community/chat" element={<CommunityChatPage />} />
+      <Route path="/community/courses" element={<CommunityCoursesPage />} />
+      <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
       
       {/* Admin routes */}
       <Route path="/admin" element={<AdminDashboard />} />

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Video, FileText, Lock, Award, Users, BookUser, Headphones, Play } from 'lucide-react';
+import { BookOpen, Video, FileText, Lock, Award, Users, BookUser, Headphones, Play, MessageCircle } from 'lucide-react';
 import { Course, fetchPublishedCourses } from '@/services/courseService';
 
 const LearningPage = () => {
@@ -60,8 +60,10 @@ const LearningPage = () => {
             <Button size="lg">
               <BookUser className="h-5 w-5 mr-2" /> Browse Courses
             </Button>
-            <Button size="lg" variant="outline">
-              <Users className="h-5 w-5 mr-2" /> Join Community
+            <Button size="lg" variant="outline" asChild>
+              <Link to="/community">
+                <Users className="h-5 w-5 mr-2" /> Join Community
+              </Link>
             </Button>
           </div>
         </div>
@@ -125,10 +127,15 @@ const LearningPage = () => {
                         <span>New</span>
                       </div>
                     </CardContent>
-                    <CardFooter>
-                      <Button className="w-full" asChild>
+                    <CardFooter className="flex gap-2">
+                      <Button className="flex-1" asChild>
                         <Link to={`/learning/course/${course.id}`}>
                           <Play className="h-4 w-4 mr-2" /> View Course
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="icon" asChild>
+                        <Link to={`/community/courses?course=${course.id}`}>
+                          <MessageCircle className="h-4 w-4" />
                         </Link>
                       </Button>
                     </CardFooter>
@@ -174,10 +181,10 @@ const LearningPage = () => {
                   <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold mb-1">Live Workshops</h3>
+                  <h3 className="text-xl font-semibold mb-1">Community</h3>
                   <p>
-                    Interactive online sessions with Mbolela and other experts where 
-                    you can ask questions and get personalized feedback.
+                    Connect with fellow learners in our community forum, join discussions,
+                    and get support as you implement what you've learned.
                   </p>
                 </div>
               </div>
@@ -220,8 +227,8 @@ const LearningPage = () => {
                 <span>Downloadable resources, templates, and implementation guides</span>
               </li>
               <li className="flex items-start gap-2">
-                <Award className="h-5 w-5 text-primary mt-1" />
-                <span>Completion certificates for all courses</span>
+                <MessageCircle className="h-5 w-5 text-primary mt-1" />
+                <span>Full access to the community and premium discussion groups</span>
               </li>
             </ul>
             <Button size="lg" className="w-full">Join Premium Membership</Button>
@@ -237,9 +244,14 @@ const LearningPage = () => {
             Join our community of over 10,000 entrepreneurs and business leaders 
             learning practical skills to thrive in Africa's evolving business landscape.
           </p>
-          <Button size="lg" asChild>
-            <Link to="/auth">Create Free Account</Link>
-          </Button>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Button size="lg" asChild>
+              <Link to="/auth">Create Free Account</Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <Link to="/community">Join Our Community</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </Layout>
