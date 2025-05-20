@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { getMediaPostById, MediaPostWithCategories } from '@/services/mediaService';
+import { getMediaPostById, MediaPost } from '@/services/mediaService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 const MediaPostDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [post, setPost] = useState<MediaPostWithCategories | null>(null);
+  const [post, setPost] = useState<MediaPost | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -82,6 +82,13 @@ const MediaPostDetailPage = () => {
   const formattedDate = post.published_at 
     ? format(new Date(post.published_at), 'MMMM dd, yyyy')
     : '';
+    
+  const formatCategoryName = (category: string | undefined): string => {
+    if (!category) return '';
+    return category.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
 
   return (
     <Layout>
@@ -160,14 +167,12 @@ const MediaPostDetailPage = () => {
           </Card>
         )}
 
-        {post.categories && post.categories.length > 0 && (
+        {post.category && (
           <div className="flex flex-wrap gap-2 mt-8">
-            <span className="text-muted-foreground mr-2">Categories:</span>
-            {post.categories.map(category => (
-              <Badge key={category.id} variant="secondary">
-                {category.name}
-              </Badge>
-            ))}
+            <span className="text-muted-foreground mr-2">Category:</span>
+            <Badge variant="secondary">
+              {formatCategoryName(post.category)}
+            </Badge>
           </div>
         )}
       </div>

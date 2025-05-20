@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,7 +10,7 @@ export interface MediaPost {
   content: string;
   summary?: string;
   post_type: 'news' | 'podcast' | 'resource';
-  category?: string; // Add category field
+  category?: string; 
   image_url?: string;
   media_url?: string;
   published_at: string;
@@ -94,13 +95,13 @@ export const createMediaPost = async (
       return null;
     }
 
-    // Create the post object
+    // Create the post object, now including category directly in the post
     const post = {
       title: postData.title,
       content: postData.content,
       summary: postData.summary || postData.content.substring(0, 150) + '...',
       post_type: postData.post_type,
-      category: postData.category, // Include category field
+      category: postData.category,
       image_url: imageUrl,
       media_url: mediaUrl,
       author_id: userData.user.id,
@@ -184,7 +185,7 @@ export const updateMediaPost = async (
       mediaUrl = urlData.publicUrl;
     }
 
-    // Update the post
+    // Update the post, including category directly in the post
     const updateData = {
       ...postData,
       image_url: imageUrl,
