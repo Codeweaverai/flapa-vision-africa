@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
@@ -49,8 +48,16 @@ export interface MobileOperator {
   country: string;
 }
 
-// Define valid event types
-export const VALID_EVENT_TYPES = ['workshop', 'webinar', 'conference', 'meetup', 'seminar', 'training', 'other'];
+// Update the VALID_EVENT_TYPES constant to include all valid event types
+export const VALID_EVENT_TYPES = [
+  'webinar', 
+  'workshop', 
+  'meetup', 
+  'conference', 
+  'seminar', 
+  'training', 
+  'other'
+];
 
 // Add a function to create an event with creator_id
 export const createEventWithCreator = async (

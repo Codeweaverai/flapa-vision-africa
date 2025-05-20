@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +13,7 @@ import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import Layout from '@/components/layout/Layout';
 import { Course, updateCourse, createCourseWithCreator } from '@/services/courseService';
+import { VALID_DIFFICULTY_LEVELS } from '@/services/courseService';
 
 interface CourseFormProps {
   creatorId?: string;
@@ -264,9 +264,9 @@ const CourseForm = ({ creatorId, isCreator = false }: CourseFormProps) => {
                     <SelectValue placeholder="Select difficulty" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Beginner">Beginner</SelectItem>
-                    <SelectItem value="Intermediate">Intermediate</SelectItem>
-                    <SelectItem value="Advanced">Advanced</SelectItem>
+                    {VALID_DIFFICULTY_LEVELS.map((level) => (
+                      <SelectItem key={level} value={level}>{level}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

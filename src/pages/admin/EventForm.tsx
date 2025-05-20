@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -226,7 +225,6 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
               />
             </div>
             
-            {/* Event Type */}
             <div className="space-y-2">
               <Label htmlFor="event_type">Event Type</Label>
               <Select 

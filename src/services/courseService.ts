@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
@@ -601,3 +600,11 @@ export const saveLessonProgress = async (lessonId: string, enrollmentId: string,
     return false;
   }
 };
+
+// Add a constant for valid difficulty levels
+export const VALID_DIFFICULTY_LEVELS = [
+  'Beginner',
+  'Intermediate',
+  'Advanced',
+  'Expert'
+];
