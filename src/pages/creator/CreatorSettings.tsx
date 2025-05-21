@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -15,6 +14,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getStripeAccountStatus, connectStripeAccount } from '@/services/paymentService';
 import { useAuth } from '@/contexts/AuthContext';
 import StripeAccountManagement from '@/components/creator/StripeAccountManagement';
+import { ConnectComponentsProvider } from '@stripe/react-connect-js';
 
 const CreatorSettings = () => {
   const { user } = useAuth();
@@ -282,7 +282,9 @@ const CreatorSettings = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Update your account details, bank account information, and manage your Stripe Connect account settings.
                   </p>
-                  <StripeAccountManagement stripeAccountId={stripeAccountId} />
+                  <ConnectComponentsProvider publishableKey="pk_test_TYooMQauvdEDq54NiTphI7jx">
+                    <StripeAccountManagement stripeAccountId={stripeAccountId} />
+                  </ConnectComponentsProvider>
                 </div>
               )}
               

@@ -3,8 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ConnectAccountManagement,
   ConnectComponentsProvider,
-  loadConnectComponents,
-  StripeConnect
+  useConnectComponents
 } from '@stripe/react-connect-js';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -18,16 +17,12 @@ interface StripeAccountManagementProps {
 const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ stripeAccountId }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [stripeConnect, setStripeConnect] = useState<StripeConnect | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { connectInstance } = useConnectComponents();
 
   useEffect(() => {
     const initializeStripeConnect = async () => {
       try {
-        // Load the Stripe Connect Components
-        const instance = await loadConnectComponents();
-        setStripeConnect(instance);
-        
         // Get the account session client secret
         if (stripeAccountId) {
           const { data, error } = await supabase.functions.invoke('create-stripe-account-session');
@@ -100,7 +95,7 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     );
   }
 
-  if (!stripeConnect || !clientSecret) {
+  if (!connectInstance || !clientSecret) {
     return (
       <div className="p-4 border rounded-md">
         <p>Unable to load Stripe Account Management</p>
@@ -113,7 +108,7 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
 
   return (
     <div className="stripe-account-management">
-      <ConnectComponentsProvider connectInstance={stripeConnect}>
+      <ConnectComponentsProvider connectInstance={connectInstance}>
         <ConnectAccountManagement 
           clientSecret={clientSecret}
           collectionOptions={{
