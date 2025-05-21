@@ -492,6 +492,7 @@ export const enrollInCourse = async (courseId: string, userId: string): Promise<
         enrollment_date: new Date().toISOString(),
         progress: 0,
         is_completed: false,
+        certificate_id: null,
         payment_status: 'pending' // Will be updated after payment
       });
 
@@ -632,7 +633,8 @@ export const createModule = async (moduleData: Partial<CourseModule>): Promise<C
       return null;
     }
 
-    return data;
+    // Add empty lessons array to the returned data to match CourseModule interface
+    return { ...data, lessons: [] } as CourseModule;
   } catch (error) {
     console.error('Error in createModule:', error);
     toast.error('Failed to create module');
@@ -1098,21 +1100,29 @@ export const fetchModuleLessons = async (courseId: string, userId?: string): Pro
     
     // Organize lessons into modules and add progress data if available
     const result: CourseModule[] = modules.map(module => {
-      const moduleLessons = lessons
-        ?.filter(lesson => lesson.module_id === module.id)
-        .map(lesson => {
-          const progress = lessonProgress[lesson.id];
-          return {
-            ...lesson,
-            is_completed: progress?.is_completed || false,
-            last_position_seconds: progress?.last_position_seconds || 0
-          };
-        }) || [];
-        
-      return {
+      // Initialize with empty lessons array
+      const moduleWithLessons = {
         ...module,
-        lessons: moduleLessons
-      } as CourseModule;
+        lessons: [] as Lesson[]
+      };
+      
+      // Find and attach lessons that belong to this module
+      if (lessons) {
+        const moduleLessons = lessons
+          .filter(lesson => lesson.module_id === module.id)
+          .map(lesson => {
+            const progress = lessonProgress[lesson.id];
+            return {
+              ...lesson,
+              is_completed: progress?.is_completed || false,
+              last_position_seconds: progress?.last_position_seconds || 0
+            };
+          });
+          
+        moduleWithLessons.lessons = moduleLessons;
+      }
+      
+      return moduleWithLessons;
     });
     
     return result;
