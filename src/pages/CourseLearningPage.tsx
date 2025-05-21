@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -226,7 +227,7 @@ const CourseLearningPage = () => {
                       </TabsContent>
                       
                       <TabsContent value="materials">
-                        {currentLesson.materials_urls?.length > 0 ? (
+                        {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
                           <ul className="space-y-2">
                             {currentLesson.materials_urls.map((url: string, idx: number) => (
                               <li key={idx}>

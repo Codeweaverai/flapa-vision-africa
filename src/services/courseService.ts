@@ -41,6 +41,8 @@ export interface CourseModule {
   course_id: string;
   order_index: number;
   lessons: Lesson[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Lesson {
@@ -54,6 +56,8 @@ export interface Lesson {
   content?: any;
   is_completed?: boolean;
   last_position_seconds?: number;
+  quizzes?: Quiz[];
+  materials_urls?: string[];
 }
 
 export interface Quiz {
@@ -1055,7 +1059,7 @@ export const fetchModuleLessons = async (courseId: string, userId?: string): Pro
     const moduleIds = modules.map(module => module.id);
     const { data: lessons, error: lessonsError } = await supabase
       .from('lessons')
-      .select('*')
+      .select('*, quizzes(*)')
       .in('module_id', moduleIds)
       .order('order_index', { ascending: true });
       
@@ -1095,7 +1099,7 @@ export const fetchModuleLessons = async (courseId: string, userId?: string): Pro
     // Organize lessons into modules and add progress data if available
     const result: CourseModule[] = modules.map(module => {
       const moduleLessons = lessons
-        .filter(lesson => lesson.module_id === module.id)
+        ?.filter(lesson => lesson.module_id === module.id)
         .map(lesson => {
           const progress = lessonProgress[lesson.id];
           return {
@@ -1103,12 +1107,12 @@ export const fetchModuleLessons = async (courseId: string, userId?: string): Pro
             is_completed: progress?.is_completed || false,
             last_position_seconds: progress?.last_position_seconds || 0
           };
-        });
+        }) || [];
         
       return {
         ...module,
         lessons: moduleLessons
-      };
+      } as CourseModule;
     });
     
     return result;
