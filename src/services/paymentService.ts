@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { PaymentTransaction, PayoutTransaction, CreatorBalance } from '@/types/paymentTypes';
 import { toast } from '@/components/ui/use-toast';
@@ -30,6 +29,7 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         payment_method: typeof payment === 'object' && 'payment_method' in payment ? 
                         String(payment.payment_method) : 'unknown',
         user_id: payment.user_id,
+        creator_id: payment.creator_id,
         provider: payment.provider,
         provider_transaction_id: payment.provider_transaction_id,
         metadata: payment.metadata,

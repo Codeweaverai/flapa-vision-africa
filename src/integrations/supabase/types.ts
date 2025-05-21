@@ -773,6 +773,7 @@ export type Database = {
           amount: number
           correspondent: string | null
           created_at: string | null
+          creator_id: string | null
           currency: string
           customer_timestamp: string | null
           deposit_id: string | null
@@ -794,6 +795,7 @@ export type Database = {
           amount: number
           correspondent?: string | null
           created_at?: string | null
+          creator_id?: string | null
           currency: string
           customer_timestamp?: string | null
           deposit_id?: string | null
@@ -815,6 +817,7 @@ export type Database = {
           amount?: number
           correspondent?: string | null
           created_at?: string | null
+          creator_id?: string | null
           currency?: string
           customer_timestamp?: string | null
           deposit_id?: string | null
