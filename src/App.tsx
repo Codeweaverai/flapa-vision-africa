@@ -1,109 +1,112 @@
 
-import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
-import { supabase } from './lib/supabaseClient';
-import './App.css';
-import Layout from './components/layout/Layout';
-import EventsPage from './pages/EventsPage';
-import EventDetailPage from './pages/EventDetailPage';
-import AccountPage from './pages/AccountPage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminEvents from './pages/admin/AdminEvents';
-import AdminEventForm from './pages/admin/EventForm';
-import AdminRegistrations from './pages/admin/AdminRegistrations';
-import AdminSettings from './pages/admin/AdminSettings';
-import CourseLearningPage from './pages/CourseLearningPage';
-import CourseDetailPage from './pages/CourseDetailPage';
-import CourseForm from './pages/admin/CourseForm';
-import CourseContentPage from './pages/admin/CourseContentPage';
-import CreatorCourses from './pages/creator/CreatorCourses';
-import CreatorCourseForm from './pages/creator/CreatorCourseForm';
-import AdminCoursesList from './pages/admin/AdminCoursesList';
-import AdminRoute from './components/admin/AdminRoute';
-import CreatorRoute from './components/creator/CreatorRoute';
-import AuthPage from './pages/AuthPage';
+// Import React and routing dependencies
+import { Routes, Route } from 'react-router-dom';
 
-const App = () => {
-  const { user, loading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isCreator, setIsCreator] = useState(false);
+// Import pages
+import HomePage from '@/pages/HomePage';
+import AboutPage from '@/pages/AboutPage';
+import ConsultPage from '@/pages/ConsultPage';
+import EventsPage from '@/pages/EventsPage';
+import EventDetailPage from '@/pages/EventDetailPage';
+import LearningPage from '@/pages/LearningPage';
+import CourseDetailPage from '@/pages/CourseDetailPage';
+import CourseLearningPage from '@/pages/CourseLearningPage';
+import AccountPage from '@/pages/AccountPage';
+import AuthPage from '@/pages/AuthPage';
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
+import PaymentCancelPage from '@/pages/PaymentCancelPage';
+import NotFoundPage from '@/pages/NotFoundPage';
+import HelpCenterPage from '@/pages/HelpCenterPage';
+import MediaPage from '@/pages/MediaPage';
+import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
+import AdminConsultations from '@/pages/admin/AdminConsultations';
+import AdminEvents from '@/pages/admin/AdminEvents';
+import AdminCourses from '@/pages/admin/AdminCourses';
+import AdminUsers from '@/pages/admin/AdminUsers';
+import AdminSettings from '@/pages/admin/AdminSettings';
+import EventForm from '@/pages/admin/EventForm';
+import CourseForm from '@/pages/admin/CourseForm';
+import CourseContentPage from '@/pages/admin/CourseContentPage';
+import AdminMedia from '@/pages/admin/AdminMedia';
+import MediaForm from '@/pages/admin/MediaForm';
+import CreatorDashboard from '@/pages/creator/CreatorDashboard';
+import CreatorCourses from '@/pages/creator/CreatorCourses';
+import CreatorEvents from '@/pages/creator/CreatorEvents';
+import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
+import CreatorEventForm from '@/pages/creator/CreatorEventForm';
+import CreatorEventRegistrations from '@/pages/creator/CreatorEventRegistrations';
+import AdminEventRegistrations from '@/pages/admin/AdminEventRegistrations';
+import CreatorStudents from '@/pages/creator/CreatorStudents';
+import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
+import AdminLogin from '@/pages/admin/AdminLogin';
+// Import new community pages
+import CommunityPage from '@/pages/CommunityPage';
+import CommunityChatPage from '@/pages/CommunityChatPage';
+import CommunityCoursesPage from '@/pages/CommunityCoursesPage';
+import CommunityNotificationsPage from '@/pages/CommunityNotificationsPage';
 
-  useEffect(() => {
-    const checkUserRole = async () => {
-      if (user) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('role, is_creator')
-            .eq('id', user.id)
-            .single();
-
-          if (error) {
-            console.error('Error fetching user role:', error);
-          } else {
-            setIsAdmin(data?.role === 'admin');
-            // Check for the is_creator boolean field
-            setIsCreator(data?.is_creator === true);
-          }
-        } catch (error) {
-          console.error('Error checking user role:', error);
-        }
-      } else {
-        setIsAdmin(false);
-        setIsCreator(false);
-      }
-    };
-
-    checkUserRole();
-  }, [user]);
-
-  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    if (!user) {
-      return <Navigate to="/auth" replace />;
-    }
-
-    return <Layout>{children}</Layout>;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
+function App() {
   return (
     <Routes>
-      <Route path="/" element={<EventsPage />} />
-      <Route path="/auth" element={<AuthPage />} />
+      {/* Public routes */}
+      <Route path="/" element={<HomePage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/help-center" element={<HelpCenterPage />} />
+      <Route path="/media" element={<MediaPage />} />
+      <Route path="/media/:id" element={<MediaPostDetailPage />} />
+      <Route path="/consult" element={<ConsultPage />} />
+      <Route path="/events" element={<EventsPage />} />
       <Route path="/events/:eventId" element={<EventDetailPage />} />
-      <Route path="/courses" element={<CourseLearningPage />} />
-      <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+      <Route path="/learning" element={<LearningPage />} />
+      <Route path="/learning/course/:courseId" element={<CourseDetailPage />} />
+      <Route path="/learning/player/:courseId" element={<CourseLearningPage />} />
+      <Route path="/account" element={<AccountPage />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/payment/success" element={<PaymentSuccessPage />} />
+      <Route path="/payment/cancel" element={<PaymentCancelPage />} />
+      <Route path="/admin-login" element={<AdminLogin />} />
       
-      {/* Protected Routes */}
-      <Route path="/profile" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-      <Route path="/events/create" element={<ProtectedRoute><AdminEventForm /></ProtectedRoute>} />
+      {/* Community routes */}
+      <Route path="/community" element={<CommunityPage />} />
+      <Route path="/community/chat" element={<CommunityChatPage />} />
+      <Route path="/community/courses" element={<CommunityCoursesPage />} />
+      <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
       
-      {/* Admin Routes */}
-      <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-      <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
-      <Route path="/admin/events/create" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
-      <Route path="/admin/events/:eventId" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
-      <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
-      <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
-      <Route path="/admin/courses/create" element={<AdminRoute><CourseForm /></AdminRoute>} />
-      <Route path="/admin/courses/:courseId" element={<AdminRoute><CourseForm /></AdminRoute>} />
-      <Route path="/admin/courses/content/:courseId" element={<AdminRoute><CourseContentPage /></AdminRoute>} />
-      <Route path="/admin/courses-list" element={<AdminRoute><AdminCoursesList /></AdminRoute>} />
+      {/* Admin routes */}
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/consultations" element={<AdminConsultations />} />
+      <Route path="/admin/events" element={<AdminEvents />} />
+      <Route path="/admin/events/create" element={<EventForm />} />
+      <Route path="/admin/events/edit/:eventId" element={<EventForm />} />
+      <Route path="/admin/courses" element={<AdminCourses />} />
+      <Route path="/admin/courses/create" element={<CourseForm />} />
+      <Route path="/admin/courses/edit/:courseId" element={<CourseForm />} />
+      <Route path="/admin/courses/content/:courseId" element={<CourseContentPage />} />
+      <Route path="/admin/users" element={<AdminUsers />} />
+      <Route path="/admin/settings" element={<AdminSettings />} />
+      <Route path="/admin/media" element={<AdminMedia />} />
+      <Route path="/admin/media/create" element={<MediaForm />} />
+      <Route path="/admin/media/edit/:id" element={<MediaForm />} />
       
       {/* Creator Routes */}
-      <Route path="/creator/courses" element={<CreatorRoute><CreatorCourses /></CreatorRoute>} />
-      <Route path="/creator/courses/create" element={<CreatorRoute><CreatorCourseForm /></CreatorRoute>} />
-      <Route path="/creator/courses/:courseId" element={<CreatorRoute><CreatorCourseForm /></CreatorRoute>} />
+      <Route path="/creator/dashboard" element={<CreatorDashboard />} />
+      <Route path="/creator/courses" element={<CreatorCourses />} />
+      <Route path="/creator/events" element={<CreatorEvents />} />
+      <Route path="/creator/courses/create" element={<CreatorCourseForm />} />
+      <Route path="/creator/courses/edit/:courseId" element={<CreatorCourseForm />} />
+      <Route path="/creator/courses/content/:courseId" element={<CourseContentPage />} />
+      <Route path="/creator/events/create" element={<CreatorEventForm />} />
+      <Route path="/creator/events/edit/:eventId" element={<CreatorEventForm />} />
+      <Route path="/creator/events/registrations/:eventId" element={<CreatorEventRegistrations />} />
+      <Route path="/admin/events/registrations/:eventId" element={<AdminEventRegistrations />} />
+      <Route path="/creator/students" element={<CreatorStudents />} />
+      <Route path="/creator/analytics" element={<CreatorAnalytics />} />
+      
+      {/* Catch-all route */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
-};
+}
 
 export default App;

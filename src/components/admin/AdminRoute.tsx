@@ -2,8 +2,8 @@
 import React, { ReactNode, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
-import Layout from '@/components/layout/Layout';
+import { supabase } from '@/integrations/supabase/client';
+import { checkIsAdmin } from '@/services/adminService';
 
 interface AdminRouteProps {
   children: ReactNode;
@@ -17,23 +17,8 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
   useEffect(() => {
     const verifyAdminStatus = async () => {
       if (user) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-
-          if (error) {
-            console.error('Error fetching user role:', error);
-            setIsAdmin(false);
-          } else {
-            setIsAdmin(data?.role === 'admin');
-          }
-        } catch (error) {
-          console.error('Error checking admin status:', error);
-          setIsAdmin(false);
-        }
+        const adminStatus = await checkIsAdmin(user);
+        setIsAdmin(adminStatus);
       } else {
         setIsAdmin(false);
       }
@@ -54,10 +39,10 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
   }
 
   if (!user || !isAdmin) {
-    return <Navigate to="/" />;
+    return <Navigate to="/admin-login" />;
   }
 
-  return <Layout>{children}</Layout>;
+  return <>{children}</>;
 };
 
 export default AdminRoute;

@@ -51,7 +51,6 @@ export const saveVideoMetadata = async (
   try {
     const wasabiUrl = `${WASABI_ENDPOINT}/${WASABI_BUCKET}/${key}`;
     
-    // Use array selection instead of single() to avoid 406 errors
     const { data, error } = await supabase
       .from('video_metadata')
       .insert({
@@ -97,7 +96,7 @@ export const uploadFileToWasabi = async (
     const key = `course-videos/${uuidv4()}-${file.name}`;
     const wasabiUrl = `${WASABI_ENDPOINT}/${WASABI_BUCKET}/${key}`;
     
-    // Save the metadata to Supabase using array selection instead of single()
+    // Save the metadata to Supabase
     const { data, error } = await supabase
       .from('video_metadata')
       .insert({
@@ -125,7 +124,6 @@ export const uploadFileToWasabi = async (
 // Get video metadata for a lesson
 export const getVideoMetadata = async (lessonId: string) => {
   try {
-    // Use array selection instead of single() to avoid 406 errors
     const { data, error } = await supabase
       .from('video_metadata')
       .select('*')
