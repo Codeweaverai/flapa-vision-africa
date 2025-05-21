@@ -19,6 +19,8 @@ import CreatorEvents from '@/pages/creator/CreatorEvents';
 import CreatorStudents from '@/pages/creator/CreatorStudents';
 import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
 import CreatorPayments from '@/pages/creator/CreatorPayments';
+import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
+import CreatorEventForm from '@/pages/creator/CreatorEventForm';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCancelPage from '@/pages/PaymentCancelPage';
 import PaymentResultPage from '@/pages/PaymentResultPage';
@@ -68,7 +70,11 @@ const AppRoutes = () => {
       <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
       <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
       <Route path="/creator/courses" element={<ProtectedRoute><CreatorCourses /></ProtectedRoute>} />
+      <Route path="/creator/courses/create" element={<ProtectedRoute><CreatorCourseForm /></ProtectedRoute>} />
+      <Route path="/creator/courses/edit/:id" element={<ProtectedRoute><CreatorCourseForm /></ProtectedRoute>} />
       <Route path="/creator/events" element={<ProtectedRoute><CreatorEvents /></ProtectedRoute>} />
+      <Route path="/creator/events/create" element={<ProtectedRoute><CreatorEventForm /></ProtectedRoute>} />
+      <Route path="/creator/events/edit/:id" element={<ProtectedRoute><CreatorEventForm /></ProtectedRoute>} />
       <Route path="/creator/students" element={<ProtectedRoute><CreatorStudents /></ProtectedRoute>} />
       <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
       <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />

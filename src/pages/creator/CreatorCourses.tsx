@@ -1,23 +1,21 @@
 
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import CreatorLayout from '@/components/creator/CreatorLayout';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { Course, deleteCourse, updateCourse } from '@/services/courseService';
-import { supabase } from '@/lib/supabaseClient';
+import { Edit, Trash2, Eye, Plus, BookOpen } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import CreatorLayout from '@/components/creator/CreatorLayout';
+import { Course, fetchCreatorCourses, deleteCourse } from '@/services/courseService';
 import { useAuth } from '@/contexts/AuthContext';
 
 const CreatorCourses = () => {
-  const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -30,61 +28,51 @@ const CreatorCourses = () => {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      
-      setCourses(data as Course[]);
+      const coursesData = await fetchCreatorCourses(user.id);
+      setCourses(coursesData);
     } catch (error) {
       console.error('Error loading courses:', error);
-      toast.error('Failed to load your courses');
+      toast({
+        title: "Error",
+        description: "Failed to load courses",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteCourse = async () => {
-    if (!courseToDelete) return;
-
-    const success = await deleteCourse(courseToDelete.id);
-    if (success) {
-      setCourses(courses.filter(course => course.id !== courseToDelete.id));
-      toast.success(`${courseToDelete.title} has been deleted successfully.`);
-    }
+  const handleDeleteCourse = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this course?')) return;
     
-    setDeleteDialogOpen(false);
-    setCourseToDelete(null);
-  };
-
-  const handleTogglePublish = async (course: Course) => {
-    const updatedCourse = await updateCourse(course.id, {
-      is_published: !course.is_published
-    });
-    
-    if (updatedCourse) {
-      setCourses(courses.map(c => c.id === course.id ? updatedCourse : c));
-      toast.success(updatedCourse.is_published ? 
-        `${updatedCourse.title} has been published.` : 
-        `${updatedCourse.title} has been unpublished.`
-      );
+    try {
+      const success = await deleteCourse(id);
+      if (success) {
+        setCourses(courses.filter(course => course.id !== id));
+        toast({
+          title: "Course Deleted",
+          description: "Course has been deleted successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete course",
+        variant: "destructive"
+      });
     }
   };
 
   return (
     <CreatorLayout title="My Courses">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Courses</h1>
-          <p className="text-muted-foreground">Create and manage your online courses.</p>
+          <p className="text-muted-foreground">Manage your online courses</p>
         </div>
-        
         <Button asChild>
           <Link to="/creator/courses/create">
-            <PlusCircle className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 h-4 w-4" />
             Create Course
           </Link>
         </Button>
@@ -109,7 +97,7 @@ const CreatorCourses = () => {
                   </CardDescription>
                   <Button asChild>
                     <Link to="/creator/courses/create">
-                      <PlusCircle className="mr-2 h-4 w-4" />
+                      <Plus className="mr-2 h-4 w-4" />
                       Create Course
                     </Link>
                   </Button>
@@ -128,7 +116,7 @@ const CreatorCourses = () => {
                     />
                   ) : (
                     <div className="w-full h-48 bg-muted flex items-center justify-center rounded-t-lg">
-                      <span className="text-muted-foreground">No thumbnail</span>
+                      <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
                     </div>
                   )}
                   <div className="absolute top-2 right-2">
@@ -149,7 +137,7 @@ const CreatorCourses = () => {
                 
                 <CardContent className="flex-grow">
                   <div className="flex text-sm text-muted-foreground mb-2">
-                    <div className="mr-4">{Math.ceil(course.duration_minutes / 60)} hours</div>
+                    <div className="mr-4">{Math.ceil((course.duration_minutes || 0) / 60)} hours</div>
                     <div>{course.price && course.price > 0 ? `$${course.price}` : "Free"}</div>
                   </div>
                 </CardContent>
@@ -162,35 +150,10 @@ const CreatorCourses = () => {
                     </Link>
                   </Button>
                   
-                  <Button
-                    variant={course.is_published ? "destructive" : "default"}
-                    size="sm"
-                    onClick={() => handleTogglePublish(course)}
-                  >
-                    {course.is_published ? (
-                      <>
-                        <Lock className="h-4 w-4 mr-1" />
-                        Unpublish
-                      </>
-                    ) : (
-                      <>
-                        <Unlock className="h-4 w-4 mr-1" />
-                        Publish
-                      </>
-                    )}
-                  </Button>
-
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/creator/courses/content/${course.id}`}>
-                      <BookOpen className="h-4 w-4 mr-1" />
-                      Course Content
-                    </Link>
-                  </Button>
-                  
                   <Button variant="outline" size="sm" asChild>
                     <Link to={`/learning/course/${course.id}`} target="_blank">
                       <Eye className="h-4 w-4 mr-1" />
-                      View
+                      Preview
                     </Link>
                   </Button>
                   
@@ -198,10 +161,7 @@ const CreatorCourses = () => {
                     variant="outline"
                     size="sm"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => {
-                      setCourseToDelete(course);
-                      setDeleteDialogOpen(true);
-                    }}
+                    onClick={() => handleDeleteCourse(course.id)}
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
                     Delete
@@ -212,26 +172,6 @@ const CreatorCourses = () => {
           )}
         </div>
       )}
-      
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Course</DialogTitle>
-            <DialogDescription>
-              This will permanently delete the course and all related content.
-            </DialogDescription>
-          </DialogHeader>
-          <p className="py-4">
-            Are you sure you want to delete <strong>{courseToDelete?.title}</strong>? 
-            This will also delete all modules, lessons, and student progress data. 
-            This action cannot be undone.
-          </p>
-          <DialogFooter className="flex space-x-2 justify-end">
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDeleteCourse}>Delete Course</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </CreatorLayout>
   );
 };

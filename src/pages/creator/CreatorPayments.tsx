@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { BarChart, Calendar, DollarSign, CreditCard, Download } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -34,11 +35,17 @@ import {
   CreatorBalance 
 } from '@/types/paymentTypes';
 import { 
+  Alert,
+  AlertTitle,
+  AlertDescription,
+} from '@/components/ui/alert';
+import { 
   fetchCreatorPayments, 
   fetchCreatorPayouts, 
   calculateCreatorBalance,
   requestPayout,
-  connectStripeAccount
+  connectStripeAccount,
+  getStripeAccountStatus
 } from '@/services/paymentService';
 
 const CreatorPayments: React.FC = () => {
@@ -54,15 +61,40 @@ const CreatorPayments: React.FC = () => {
   const [loadingBalance, setLoadingBalance] = useState(true);
   const [payoutMethod, setPayoutMethod] = useState('stripe');
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
+  const [isStripeConnected, setIsStripeConnected] = useState(false);
+  const [isConnectingStripe, setIsConnectingStripe] = useState(false);
+  const [stripeAccountId, setStripeAccountId] = useState<string | undefined>();
   
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   useEffect(() => {
     if (user) {
       loadPaymentData();
+      checkStripeStatus();
+      
+      // Check URL parameters for Stripe callback
+      const success = searchParams.get('success');
+      const refresh = searchParams.get('refresh');
+      
+      if (success === 'true') {
+        toast({
+          title: "Stripe Account Connected",
+          description: "Your Stripe Connect account has been set up successfully!",
+        });
+        // Remove the query parameters
+        setSearchParams({});
+      } else if (refresh === 'true') {
+        toast({
+          title: "Account Setup Incomplete",
+          description: "Please complete your Stripe Connect account setup to receive payments.",
+        });
+        // Remove the query parameters
+        setSearchParams({});
+      }
     }
-  }, [user]);
+  }, [user, searchParams]);
   
   const loadPaymentData = async () => {
     if (!user) return;
@@ -92,6 +124,18 @@ const CreatorPayments: React.FC = () => {
       setLoadingPayments(false);
       setLoadingPayouts(false);
       setLoadingBalance(false);
+    }
+  };
+  
+  const checkStripeStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const { isConnected, accountId } = await getStripeAccountStatus(user.id);
+      setIsStripeConnected(isConnected);
+      setStripeAccountId(accountId);
+    } catch (error) {
+      console.error('Error checking Stripe status:', error);
     }
   };
   
@@ -134,9 +178,23 @@ const CreatorPayments: React.FC = () => {
   const handleConnectStripe = async () => {
     if (!user) return;
     
-    const url = await connectStripeAccount(user.id);
-    if (url) {
-      window.open(url, '_blank');
+    try {
+      setIsConnectingStripe(true);
+      const url = await connectStripeAccount(user.id);
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        throw new Error('Failed to get Stripe Connect URL');
+      }
+    } catch (error) {
+      console.error('Failed to connect Stripe:', error);
+      toast({
+        title: 'Connection Error',
+        description: 'Failed to initialize Stripe Connect account. Please try again later.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsConnectingStripe(false);
     }
   };
 
@@ -169,6 +227,30 @@ const CreatorPayments: React.FC = () => {
   return (
     <CreatorLayout title="Payments & Payouts">
       <div className="space-y-6">
+        {/* Stripe Connection Alert */}
+        {!isStripeConnected && (
+          <Alert variant="warning" className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Stripe Connect Account Required</AlertTitle>
+            <AlertDescription>
+              To receive payments and manage your earnings, you need to connect your Stripe account.
+              This allows secure transfers of your earnings directly to your bank account.
+              <div className="mt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-white border-amber-300 text-amber-800 hover:bg-amber-50"
+                  onClick={handleConnectStripe}
+                  disabled={isConnectingStripe}
+                >
+                  {isConnectingStripe ? 'Connecting...' : 'Connect Stripe Account'}
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <Card>
@@ -191,7 +273,7 @@ const CreatorPayments: React.FC = () => {
             <CardFooter>
               <Button 
                 onClick={() => setIsWithdrawDialogOpen(true)}
-                disabled={loadingBalance || balance.available <= 0}
+                disabled={loadingBalance || balance.available <= 0 || !isStripeConnected}
                 className="w-full"
               >
                 Withdraw Funds
@@ -259,8 +341,13 @@ const CreatorPayments: React.FC = () => {
             </CardContent>
             <CardFooter>
               {payoutMethod === 'stripe' && (
-                <Button variant="outline" onClick={handleConnectStripe} className="w-full">
-                  Connect Stripe Account
+                <Button 
+                  variant="outline" 
+                  onClick={handleConnectStripe} 
+                  className="w-full"
+                  disabled={isConnectingStripe}
+                >
+                  {isStripeConnected ? 'Update Stripe Account' : 'Connect Stripe Account'}
                 </Button>
               )}
               {payoutMethod === 'mobile_money' && (
@@ -276,6 +363,41 @@ const CreatorPayments: React.FC = () => {
             </CardFooter>
           </Card>
         </div>
+        
+        {/* Stripe Account Info */}
+        {isStripeConnected && stripeAccountId && (
+          <Card className="bg-slate-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center">
+                <CreditCard className="h-4 w-4 mr-2 text-slate-600" />
+                Connected Stripe Account
+              </CardTitle>
+              <CardDescription>
+                Your Stripe Connect account is active
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pb-2">
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className="bg-white">
+                  ID: {stripeAccountId.substring(0, 8)}...
+                </Badge>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  Active
+                </Badge>
+              </div>
+            </CardContent>
+            <CardFooter className="pt-0">
+              <Button 
+                variant="link" 
+                className="p-0 h-auto text-xs text-slate-600" 
+                onClick={handleConnectStripe}
+              >
+                Manage Stripe Account
+                <ExternalLink className="ml-1 h-3 w-3" />
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
         
         {/* Payments & Payouts Tabs */}
         <Tabs defaultValue="payments" className="w-full">

@@ -72,48 +72,77 @@ serve(async (req) => {
       throw new Error(`Failed to fetch user profile: ${profileError.message}`);
     }
 
+    const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeKey) {
+      throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+    }
+    
     // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+    const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
     });
-    
+
     // Check if the user already has a Stripe Connect account
     let stripeAccountId = profile.stripe_connect_id;
     
-    if (!stripeAccountId) {
-      // Create a new Express account
-      const account = await stripe.accounts.create({
-        type: 'express',
-        email: user.email,
-        business_type: 'individual',
-        metadata: {
-          userId: userId,
-        },
+    try {
+      if (!stripeAccountId) {
+        console.log("Creating new Stripe Connect Express account");
+        // Create a new Express account
+        const account = await stripe.accounts.create({
+          type: 'express',
+          email: user.email,
+          business_type: 'individual',
+          metadata: {
+            userId: userId,
+          },
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+        
+        stripeAccountId = account.id;
+        console.log(`Created new Stripe account with ID: ${stripeAccountId}`);
+        
+        // Save the Stripe Connect account ID to the user's profile
+        await supabaseAdmin
+          .from('profiles')
+          .update({ stripe_connect_id: stripeAccountId })
+          .eq('id', userId);
+      } else {
+        console.log(`Using existing Stripe account with ID: ${stripeAccountId}`);
+      }
+      
+      // Generate an account link for onboarding
+      const origin = req.headers.get('origin') || 'http://localhost:5173';
+      const accountLink = await stripe.accountLinks.create({
+        account: stripeAccountId,
+        refresh_url: `${origin}/creator/payments?refresh=true`,
+        return_url: `${origin}/creator/payments?success=true`,
+        type: 'account_onboarding',
       });
       
-      stripeAccountId = account.id;
+      // Return the account link URL
+      return new Response(JSON.stringify({ url: accountLink.url }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    } catch (error) {
+      console.error('Error in Stripe operation:', error);
       
-      // Save the Stripe Connect account ID to the user's profile
-      await supabaseAdmin
-        .from('profiles')
-        .update({ stripe_connect_id: stripeAccountId })
-        .eq('id', userId);
+      // Check if this is a Stripe Connect API error
+      if (error.type === 'invalid_request_error' && error.message.includes('Connect')) {
+        return new Response(JSON.stringify({ 
+          error: 'Stripe Connect is not enabled for this account. Please contact support or upgrade your Stripe account to enable Connect features.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        });
+      }
+      
+      throw error;
     }
-    
-    // Generate an account link for onboarding
-    const origin = req.headers.get('origin') || 'http://localhost:5173';
-    const accountLink = await stripe.accountLinks.create({
-      account: stripeAccountId,
-      refresh_url: `${origin}/creator/payments?refresh=true`,
-      return_url: `${origin}/creator/payments?success=true`,
-      type: 'account_onboarding',
-    });
-    
-    // Return the account link URL
-    return new Response(JSON.stringify({ url: accountLink.url }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
   } catch (error) {
     console.error('Error creating Stripe Connect account:', error);
     return new Response(JSON.stringify({ error: error.message }), {

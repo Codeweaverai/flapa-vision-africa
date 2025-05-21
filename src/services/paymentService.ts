@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabaseClient';
 import { PaymentTransaction, PayoutTransaction, CreatorBalance } from '@/types/paymentTypes';
 import { toast } from '@/components/ui/use-toast';
@@ -33,12 +34,12 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         provider: payment.provider,
         provider_transaction_id: payment.provider_transaction_id,
         metadata: payment.metadata,
-        // Since we're no longer joining with user profiles, set a default email
+        // Since we're no longer joining with user profiles, set a default display name
         user_email: 'unknown'
       };
     });
     
-    // If we need user emails, fetch them separately to avoid deep typing issues
+    // If we need user display names, fetch them separately to avoid deep typing issues
     if (formattedData.length > 0) {
       // Get unique user IDs
       const userIds = [...new Set(formattedData.map(p => p.user_id))];
@@ -181,16 +182,44 @@ export async function connectStripeAccount(userId: string): Promise<string | nul
       body: { userId }
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Stripe connect error:', error);
+      throw new Error(`Failed to initialize Stripe Connect: ${error.message}`);
+    }
     
-    return data?.url || null;
+    if (!data?.url) {
+      throw new Error('No Stripe Connect URL returned');
+    }
+    
+    return data.url;
   } catch (error) {
     console.error('Error connecting Stripe account:', error);
     toast({
       title: "Connection Error",
-      description: "Failed to initialize Stripe Connect account setup",
+      description: "Failed to initialize Stripe Connect account setup. Please ensure you have Stripe Connect enabled for your account.",
       variant: "destructive"
     });
     return null;
+  }
+}
+
+// New function to check Stripe account status
+export async function getStripeAccountStatus(userId: string): Promise<{ isConnected: boolean, accountId?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('stripe_connect_id')
+      .eq('id', userId)
+      .single();
+      
+    if (error) throw error;
+    
+    return { 
+      isConnected: !!data?.stripe_connect_id, 
+      accountId: data?.stripe_connect_id
+    };
+  } catch (error) {
+    console.error('Error checking Stripe account status:', error);
+    return { isConnected: false };
   }
 }

@@ -1,115 +1,67 @@
 
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
-import { format, parseISO } from 'date-fns';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Event } from '@/services/eventService';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Edit, Trash2, Eye, Users, Calendar, Plus } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import CreatorLayout from '@/components/creator/CreatorLayout';
+import { Event, fetchCreatorEvents, deleteEvent } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
-import { Calendar, Edit, Trash2, Eye, Users } from 'lucide-react';
+import { format, parseISO, isPast } from 'date-fns';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const CreatorEvents = () => {
-  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [registrationCounts, setRegistrationCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState<boolean>(true);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (user) {
-      fetchEvents();
+      loadEvents();
     }
   }, [user]);
 
-  const fetchEvents = async () => {
+  const loadEvents = async () => {
     if (!user) return;
     
+    setLoading(true);
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      const eventsData = data as Event[];
+      const eventsData = await fetchCreatorEvents(user.id);
       setEvents(eventsData);
-      
-      // Fetch registration counts for each event
-      const eventIds = eventsData.map(event => event.id);
-      if (eventIds.length > 0) {
-        await fetchRegistrationCounts(eventIds);
-      }
     } catch (error) {
-      console.error('Error fetching events:', error);
-      toast.error('Failed to load events');
+      console.error('Error loading events:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load events",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchRegistrationCounts = async (eventIds: string[]) => {
-    try {
-      const { data, error } = await supabase
-        .from('registrations')
-        .select('event_id, id')
-        .in('event_id', eventIds);
-      
-      if (error) throw error;
-      
-      // Count registrations per event
-      const counts: Record<string, number> = {};
-      data.forEach(reg => {
-        if (counts[reg.event_id]) {
-          counts[reg.event_id]++;
-        } else {
-          counts[reg.event_id] = 1;
-        }
-      });
-      
-      setRegistrationCounts(counts);
-    } catch (error) {
-      console.error('Error fetching registration counts:', error);
-    }
-  };
-
   const handleDeleteEvent = async (id: string) => {
     if (!confirm('Are you sure you want to delete this event?')) return;
-
+    
     try {
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      toast.success('Event deleted successfully');
-      fetchEvents(); // Refresh the list
+      const success = await deleteEvent(id);
+      if (success) {
+        setEvents(events.filter(event => event.id !== id));
+        toast({
+          title: "Event Deleted",
+          description: "Event has been deleted successfully",
+        });
+      }
     } catch (error) {
       console.error('Error deleting event:', error);
-      toast.error('Failed to delete event');
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return format(parseISO(dateString), 'MMM d, yyyy h:mm a');
-    } catch (error) {
-      return dateString;
+      toast({
+        title: "Error",
+        description: "Failed to delete event",
+        variant: "destructive"
+      });
     }
   };
 
@@ -130,92 +82,121 @@ const CreatorEvents = () => {
     <CreatorLayout title="My Events">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-semibold">My Events</h2>
-          <p className="text-muted-foreground">Create and manage your events.</p>
+          <p className="text-muted-foreground">Manage your events and workshops</p>
         </div>
         <Button asChild>
-          <Link to="/creator/events/create">Create New Event</Link>
+          <Link to="/creator/events/create">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Event
+          </Link>
         </Button>
       </div>
-
+      
       {loading ? (
         <div className="flex justify-center my-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      ) : events.length === 0 ? (
-        <div className="text-center py-12 border rounded bg-white">
-          <h3 className="text-lg font-medium mb-2">No events found</h3>
-          <p className="text-muted-foreground mb-6">Get started by creating your first event</p>
-          <Button asChild>
-            <Link to="/creator/events/create">Create New Event</Link>
-          </Button>
-        </div>
       ) : (
-        <div className="bg-white rounded-md shadow overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Image</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Registrations</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {events.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell>
-                    <Avatar className="h-10 w-10 rounded-md">
-                      <AvatarImage src={event.image_url || ''} alt={event.title} />
-                      <AvatarFallback className="rounded-md bg-muted">EV</AvatarFallback>
-                    </Avatar>
-                  </TableCell>
-                  <TableCell className="font-medium">{event.title}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{getEventTypeLabel(event.event_type)}</Badge>
-                  </TableCell>
-                  <TableCell>{formatDate(event.start_time)}</TableCell>
-                  <TableCell>
-                    {event.is_free ? (
-                      <Badge variant="secondary">Free</Badge>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {events.length === 0 ? (
+            <div className="col-span-full">
+              <Card className="border-dashed">
+                <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
+                  <div className="mb-4 rounded-full bg-primary/10 p-6">
+                    <Calendar className="h-8 w-8 text-primary" />
+                  </div>
+                  <CardTitle className="mb-2">No events yet</CardTitle>
+                  <p className="text-muted-foreground mb-6">
+                    Get started by creating your first event
+                  </p>
+                  <Button asChild>
+                    <Link to="/creator/events/create">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Event
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            events.map((event) => {
+              const isPastEvent = isPast(new Date(event.end_time || event.start_time));
+              
+              return (
+                <Card key={event.id} className={isPastEvent ? 'opacity-70' : ''}>
+                  <div className="relative">
+                    {event.image_url ? (
+                      <img
+                        src={event.image_url}
+                        alt={event.title}
+                        className="w-full h-48 object-cover rounded-t-lg"
+                      />
                     ) : (
-                      <span>{event.currency} {event.price}</span>
+                      <div className="w-full h-48 bg-muted flex items-center justify-center rounded-t-lg">
+                        <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
+                      </div>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {registrationCounts[event.id] || 0} / {event.capacity || '∞'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button asChild variant="ghost" size="sm">
-                      <Link to={`/creator/events/registrations/${event.id}`}>
-                        <Users className="h-4 w-4 mr-1" />
-                        Registrations
-                      </Link>
-                    </Button>
-                    <Button asChild variant="ghost" size="sm">
+                    <div className="absolute top-2 right-2">
+                      <Badge
+                        variant={isPastEvent ? "outline" : "default"}
+                      >
+                        {isPastEvent ? "Past Event" : "Upcoming"}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <CardHeader>
+                    <div className="flex justify-between items-center mb-2">
+                      <Badge variant="outline">
+                        {getEventTypeLabel(event.event_type)}
+                      </Badge>
+                      <Badge variant={event.is_free ? "secondary" : "outline"}>
+                        {event.is_free ? "Free" : `${event.currency?.toUpperCase()} ${event.price}`}
+                      </Badge>
+                    </div>
+                    <CardTitle className="line-clamp-2">{event.title}</CardTitle>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      {format(parseISO(event.start_time), 'MMM d, yyyy h:mm a')}
+                    </div>
+                  </CardHeader>
+                  
+                  <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
                       <Link to={`/creator/events/edit/${event.id}`}>
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
                       </Link>
                     </Button>
-                    <Button 
-                      variant="destructive" 
+                    
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/creator/events/registrations/${event.id}`}>
+                        <Users className="h-4 w-4 mr-1" />
+                        Registrations
+                      </Link>
+                    </Button>
+                    
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/events/${event.id}`} target="_blank">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Link>
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
                       size="sm"
+                      className="text-destructive hover:text-destructive"
                       onClick={() => handleDeleteEvent(event.id)}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </CardFooter>
+                </Card>
+              );
+            })
+          )}
         </div>
       )}
     </CreatorLayout>
