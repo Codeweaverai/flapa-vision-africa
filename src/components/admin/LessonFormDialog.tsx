@@ -10,9 +10,9 @@ import { toast } from "sonner";
 import { createLesson, updateLesson } from "@/services/courseService";
 import { uploadFileToWasabi, getVideoMetadata } from "@/services/wasabiService";
 import { Lesson } from "@/services/courseService";
-// Replace FileUpload with the correct icon from lucide-react
 import { Upload, FileUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { v4 as uuidv4 } from 'uuid';
 
 interface LessonFormDialogProps {
   open: boolean;

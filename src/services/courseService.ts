@@ -345,11 +345,12 @@ export const updateLesson = async (lessonId: string, lessonData: Partial<Lesson>
       .from('lessons')
       .update(lessonData)
       .eq('id', lessonId)
-      .select()
-      .single();
+      .select();
       
     if (error) throw error;
-    return data as Lesson;
+    if (!data || data.length === 0) return null;
+    
+    return data[0] as Lesson;
   } catch (error) {
     console.error('Error updating lesson:', error);
     toast.error('Failed to update lesson');

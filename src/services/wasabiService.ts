@@ -63,11 +63,11 @@ export const saveVideoMetadata = async (
         wasabi_url: wasabiUrl,
         duration_seconds: duration || null
       })
-      .select('id, wasabi_url')
-      .single();
+      .select('id, wasabi_url');
     
     if (error) throw error;
-    return data;
+    if (!data || data.length === 0) return null;
+    return data[0];
   } catch (error) {
     console.error('Error saving video metadata:', error);
     return null;
@@ -110,11 +110,11 @@ export const uploadFileToWasabi = async (
         // In a real implementation, we would extract the duration from the video
         duration_seconds: null
       })
-      .select('id, wasabi_url')
-      .single();
+      .select('id, wasabi_url');
     
     if (error) throw error;
-    return data;
+    if (!data || data.length === 0) return null;
+    return data[0];
   } catch (error) {
     console.error('Error uploading file to Wasabi:', error);
     return null;
@@ -127,11 +127,13 @@ export const getVideoMetadata = async (lessonId: string) => {
     const { data, error } = await supabase
       .from('video_metadata')
       .select('*')
-      .eq('lesson_id', lessonId)
-      .single();
+      .eq('lesson_id', lessonId);
     
     if (error) throw error;
-    return data;
+    if (!data || data.length === 0) return null;
+    
+    // Return the first metadata entry for this lesson
+    return data[0];
   } catch (error) {
     console.error('Error fetching video metadata:', error);
     return null;
