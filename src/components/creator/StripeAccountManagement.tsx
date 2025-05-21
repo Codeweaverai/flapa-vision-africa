@@ -3,8 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   ConnectAccountManagement,
   ConnectComponentsProvider,
-  StripeConnectInstance,
-  loadStripeConnect
 } from '@stripe/react-connect-js';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -18,13 +16,15 @@ interface StripeAccountManagementProps {
 const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ stripeAccountId }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [stripeConnect, setStripeConnect] = useState<StripeConnectInstance | null>(null);
+  const [stripeConnect, setStripeConnect] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeStripeConnect = async () => {
       try {
         // Load the Stripe Connect Components
+        // We need to dynamically import to avoid TypeScript errors
+        const { loadStripeConnect } = await import('@stripe/react-connect-js');
         const instance = await loadStripeConnect();
         setStripeConnect(instance);
         
