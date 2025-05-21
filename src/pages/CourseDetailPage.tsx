@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -31,8 +30,7 @@ const CourseDetailPage = () => {
       setCourse(courseData);
       
       if (user) {
-        const enrolled = await checkEnrollmentStatus(courseId, user);
-        setIsEnrolled(enrolled);
+        checkEnrollment();
       }
       
       setLoading(false);
@@ -40,6 +38,14 @@ const CourseDetailPage = () => {
     
     loadCourse();
   }, [courseId, user]);
+
+  const checkEnrollment = async () => {
+    if (user && course) {
+      // Fix: Pass user.id instead of user object
+      const isEnrolled = await checkEnrollmentStatus(courseId!, user.id);
+      setIsEnrolled(isEnrolled);
+    }
+  };
 
   const handleEnroll = async () => {
     if (!user) {

@@ -1,22 +1,94 @@
+
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
+// Define all necessary types
 export interface Course {
   id: string;
   title: string;
   description?: string;
+  summary?: string;
   price?: number;
   is_free: boolean;
   currency?: string;
   image_url?: string;
+  thumbnail_url?: string;
+  duration_minutes?: number;
   duration?: number;
   duration_unit?: string;
   level?: string;
   category?: string;
+  difficulty_level?: string;
   created_at?: string;
   updated_at?: string;
   creator_id?: string;
   published?: boolean;
+  is_published?: boolean;
+  certificate_enabled?: boolean;
+  modules?: CourseModule[];
+}
+
+export interface CourseWithEnrollment extends Course {
+  description: string;
+  enrollment?: Enrollment;
+}
+
+export interface CourseModule {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  course_id: string;
+  lessons?: Lesson[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Lesson {
+  id: string;
+  title: string;
+  description?: string;
+  module_id: string;
+  video_url?: string;
+  order_index: number;
+  content_type?: string;
+  content?: any;
+  materials_urls?: string[];
+  quizzes?: Quiz[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Quiz {
+  id: string;
+  title: string;
+  description?: string;
+  lesson_id?: string;
+  module_id?: string;
+  passing_score: number;
+  questions?: QuizQuestion[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  quiz_id: string;
+  question: string;
+  order_index: number;
+  answers?: QuizAnswer[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface QuizAnswer {
+  id: string;
+  question_id: string;
+  answer: string;
+  is_correct: boolean;
+  order_index: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Enrollment {
@@ -32,6 +104,22 @@ export interface Enrollment {
   updated_at?: string;
   payment_status?: string;
 }
+
+export interface LessonProgress {
+  id: string;
+  enrollment_id: string;
+  lesson_id: string;
+  is_completed: boolean;
+  last_position_seconds: number;
+  completion_date?: string;
+}
+
+export const VALID_DIFFICULTY_LEVELS = [
+  'Beginner',
+  'Intermediate',
+  'Advanced',
+  'All Levels'
+];
 
 // Function to fetch courses for a specific user/student
 export const fetchUserCourses = async (userId: string): Promise<Course[]> => {
@@ -60,6 +148,51 @@ export const fetchUserCourses = async (userId: string): Promise<Course[]> => {
   } catch (error) {
     console.error('Error in fetchUserCourses:', error);
     toast.error('Failed to load your courses');
+    return [];
+  }
+};
+
+// Function to fetch all published courses
+export const fetchPublishedCourses = async (): Promise<Course[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('is_published', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching published courses:', error);
+      toast.error('Failed to load courses');
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in fetchPublishedCourses:', error);
+    toast.error('Failed to load courses');
+    return [];
+  }
+};
+
+// Function to fetch all courses for admin
+export const fetchAllCourses = async (): Promise<Course[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching all courses:', error);
+      toast.error('Failed to load courses');
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in fetchAllCourses:', error);
+    toast.error('Failed to load courses');
     return [];
   }
 };
@@ -129,7 +262,8 @@ export const createCourse = async (courseData: Partial<Course>, creatorId: strin
     const newCourse = {
       ...courseData,
       creator_id: creatorId,
-      published: courseData.published || false,
+      is_published: courseData.is_published || false,
+      published: courseData.is_published || false,
       is_free: courseData.is_free || false,
       price: courseData.is_free ? null : courseData.price,
       currency: courseData.is_free ? null : (courseData.currency || 'USD'),
@@ -156,6 +290,11 @@ export const createCourse = async (courseData: Partial<Course>, creatorId: strin
   }
 };
 
+// Function to create a course with a creator
+export const createCourseWithCreator = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
+  return createCourse(courseData, creatorId);
+};
+
 // Function to update an existing course
 export const updateCourse = async (courseId: string, courseData: Partial<Course>): Promise<Course | null> => {
   try {
@@ -168,6 +307,15 @@ export const updateCourse = async (courseId: string, courseData: Partial<Course>
     if (courseData.is_free) {
       courseData.price = null;
       courseData.currency = null;
+    }
+
+    // Make sure both naming conventions are updated
+    if (courseData.is_published !== undefined) {
+      courseData.published = courseData.is_published;
+    }
+
+    if (courseData.published !== undefined) {
+      courseData.is_published = courseData.published;
     }
 
     const { data, error } = await supabase
@@ -216,6 +364,72 @@ export const fetchCourseById = async (courseId: string): Promise<Course | null> 
   } catch (error) {
     console.error('Error in fetchCourseById:', error);
     toast.error('Failed to load course');
+    return null;
+  }
+};
+
+// Function to fetch a course with its modules and lessons
+export const fetchCourseWithModulesAndLessons = async (courseId: string): Promise<Course | null> => {
+  try {
+    if (!courseId) {
+      toast.error('Course ID is required');
+      return null;
+    }
+
+    // Fetch course
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', courseId)
+      .single();
+
+    if (courseError) {
+      console.error('Error fetching course:', courseError);
+      toast.error('Failed to load course');
+      return null;
+    }
+
+    if (!course) {
+      toast.error('Course not found');
+      return null;
+    }
+
+    // Fetch modules
+    const { data: modules, error: modulesError } = await supabase
+      .from('course_modules')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true });
+
+    if (modulesError) {
+      console.error('Error fetching modules:', modulesError);
+      toast.error('Failed to load course modules');
+      return course;
+    }
+
+    // Fetch lessons for each module
+    const modulesWithLessons = await Promise.all(
+      modules.map(async (module) => {
+        const { data: lessons, error: lessonsError } = await supabase
+          .from('lessons')
+          .select('*, quizzes(*)')
+          .eq('module_id', module.id)
+          .order('order_index', { ascending: true });
+
+        if (lessonsError) {
+          console.error(`Error fetching lessons for module ${module.id}:`, lessonsError);
+          return { ...module, lessons: [] };
+        }
+
+        return { ...module, lessons: lessons || [] };
+      })
+    );
+
+    // Return course with modules and lessons
+    return { ...course, modules: modulesWithLessons };
+  } catch (error) {
+    console.error('Error in fetchCourseWithModulesAndLessons:', error);
+    toast.error('Failed to load course content');
     return null;
   }
 };
@@ -270,6 +484,32 @@ export const enrollInCourse = async (courseId: string, userId: string): Promise<
   } catch (error) {
     console.error('Error in enrollInCourse:', error);
     toast.error('Failed to enroll in course');
+    return false;
+  }
+};
+
+// Check if a user is enrolled in a course
+export const checkEnrollmentStatus = async (courseId: string, userId: string): Promise<boolean> => {
+  try {
+    if (!courseId || !userId) {
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from('course_enrollments')
+      .select('id')
+      .eq('course_id', courseId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error checking enrollment status:', error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error('Error in checkEnrollmentStatus:', error);
     return false;
   }
 };
@@ -341,3 +581,393 @@ export const fetchCourseEnrollments = async (courseId: string): Promise<Enrollme
     return [];
   }
 };
+
+// Module functions
+export const createModule = async (moduleData: Partial<CourseModule>): Promise<CourseModule | null> => {
+  try {
+    if (!moduleData.course_id || !moduleData.title) {
+      toast.error('Course ID and module title are required');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('course_modules')
+      .insert(moduleData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating module:', error);
+      toast.error('Failed to create module');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createModule:', error);
+    toast.error('Failed to create module');
+    return null;
+  }
+};
+
+export const updateModule = async (moduleId: string, moduleData: Partial<CourseModule>): Promise<CourseModule | null> => {
+  try {
+    if (!moduleId) {
+      toast.error('Module ID is required');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('course_modules')
+      .update(moduleData)
+      .eq('id', moduleId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating module:', error);
+      toast.error('Failed to update module');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in updateModule:', error);
+    toast.error('Failed to update module');
+    return null;
+  }
+};
+
+export const deleteModule = async (moduleId: string): Promise<boolean> => {
+  try {
+    // Delete module lessons first to maintain referential integrity
+    const { error: lessonsError } = await supabase
+      .from('lessons')
+      .delete()
+      .eq('module_id', moduleId);
+
+    if (lessonsError) {
+      console.error('Error deleting module lessons:', lessonsError);
+      toast.error('Failed to delete module lessons');
+      return false;
+    }
+
+    // Delete the module
+    const { error } = await supabase
+      .from('course_modules')
+      .delete()
+      .eq('id', moduleId);
+
+    if (error) {
+      console.error('Error deleting module:', error);
+      toast.error('Failed to delete module');
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in deleteModule:', error);
+    toast.error('Failed to delete module');
+    return false;
+  }
+};
+
+// Lesson functions
+export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson | null> => {
+  try {
+    if (!lessonData.module_id || !lessonData.title) {
+      toast.error('Module ID and lesson title are required');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('lessons')
+      .insert(lessonData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating lesson:', error);
+      toast.error('Failed to create lesson');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createLesson:', error);
+    toast.error('Failed to create lesson');
+    return null;
+  }
+};
+
+export const updateLesson = async (lessonId: string, lessonData: Partial<Lesson>): Promise<Lesson | null> => {
+  try {
+    if (!lessonId) {
+      toast.error('Lesson ID is required');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('lessons')
+      .update(lessonData)
+      .eq('id', lessonId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating lesson:', error);
+      toast.error('Failed to update lesson');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in updateLesson:', error);
+    toast.error('Failed to update lesson');
+    return null;
+  }
+};
+
+export const deleteLesson = async (lessonId: string): Promise<boolean> => {
+  try {
+    // Delete lesson quizzes first to maintain referential integrity
+    const { data: quizzes, error: quizzesQueryError } = await supabase
+      .from('quizzes')
+      .select('id')
+      .eq('lesson_id', lessonId);
+
+    if (!quizzesQueryError && quizzes && quizzes.length > 0) {
+      for (const quiz of quizzes) {
+        // Delete quiz answers and questions
+        await deleteQuiz(quiz.id);
+      }
+    }
+
+    // Delete the lesson
+    const { error } = await supabase
+      .from('lessons')
+      .delete()
+      .eq('id', lessonId);
+
+    if (error) {
+      console.error('Error deleting lesson:', error);
+      toast.error('Failed to delete lesson');
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in deleteLesson:', error);
+    toast.error('Failed to delete lesson');
+    return false;
+  }
+};
+
+export const saveLessonProgress = async (
+  enrollmentId: string,
+  lessonId: string,
+  progress: { 
+    is_completed?: boolean,
+    last_position_seconds?: number
+  }
+): Promise<boolean> => {
+  try {
+    if (!enrollmentId || !lessonId) {
+      toast.error('Enrollment ID and Lesson ID are required');
+      return false;
+    }
+
+    // Check if progress record exists
+    const { data: existingProgress, error: checkError } = await supabase
+      .from('lesson_progress')
+      .select('*')
+      .eq('enrollment_id', enrollmentId)
+      .eq('lesson_id', lessonId)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking lesson progress:', checkError);
+      return false;
+    }
+
+    let result;
+    if (existingProgress) {
+      // Update existing progress
+      const updates = { ...progress };
+      if (progress.is_completed && !existingProgress.is_completed) {
+        updates.completion_date = new Date().toISOString();
+      }
+
+      result = await supabase
+        .from('lesson_progress')
+        .update(updates)
+        .eq('id', existingProgress.id);
+    } else {
+      // Create new progress record
+      const newProgress = {
+        enrollment_id: enrollmentId,
+        lesson_id: lessonId,
+        is_completed: progress.is_completed || false,
+        last_position_seconds: progress.last_position_seconds || 0,
+        completion_date: progress.is_completed ? new Date().toISOString() : null,
+      };
+
+      result = await supabase
+        .from('lesson_progress')
+        .insert(newProgress);
+    }
+
+    if (result.error) {
+      console.error('Error saving lesson progress:', result.error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in saveLessonProgress:', error);
+    return false;
+  }
+};
+
+// Quiz functions
+export const createQuiz = async (quizData: Partial<Quiz>): Promise<Quiz | null> => {
+  try {
+    if ((!quizData.lesson_id && !quizData.module_id) || !quizData.title) {
+      toast.error('Lesson ID/Module ID and quiz title are required');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('quizzes')
+      .insert(quizData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating quiz:', error);
+      toast.error('Failed to create quiz');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createQuiz:', error);
+    toast.error('Failed to create quiz');
+    return null;
+  }
+};
+
+export const createQuizQuestion = async (questionData: Partial<QuizQuestion>): Promise<QuizQuestion | null> => {
+  try {
+    if (!questionData.quiz_id || !questionData.question) {
+      toast.error('Quiz ID and question text are required');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('quiz_questions')
+      .insert(questionData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating quiz question:', error);
+      toast.error('Failed to create quiz question');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createQuizQuestion:', error);
+    toast.error('Failed to create quiz question');
+    return null;
+  }
+};
+
+export const createQuizAnswer = async (answerData: Partial<QuizAnswer>): Promise<QuizAnswer | null> => {
+  try {
+    if (!answerData.question_id || !answerData.answer) {
+      toast.error('Question ID and answer text are required');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('quiz_answers')
+      .insert(answerData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating quiz answer:', error);
+      toast.error('Failed to create quiz answer');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createQuizAnswer:', error);
+    toast.error('Failed to create quiz answer');
+    return null;
+  }
+};
+
+export const deleteQuiz = async (quizId: string): Promise<boolean> => {
+  try {
+    // Get quiz questions
+    const { data: questions, error: questionsError } = await supabase
+      .from('quiz_questions')
+      .select('id')
+      .eq('quiz_id', quizId);
+
+    if (questionsError) {
+      console.error('Error fetching quiz questions:', questionsError);
+      toast.error('Failed to delete quiz');
+      return false;
+    }
+
+    // Delete answers for each question
+    if (questions && questions.length > 0) {
+      for (const question of questions) {
+        const { error: answersError } = await supabase
+          .from('quiz_answers')
+          .delete()
+          .eq('question_id', question.id);
+
+        if (answersError) {
+          console.error(`Error deleting answers for question ${question.id}:`, answersError);
+        }
+      }
+    }
+
+    // Delete questions
+    const { error: deleteQuestionsError } = await supabase
+      .from('quiz_questions')
+      .delete()
+      .eq('quiz_id', quizId);
+
+    if (deleteQuestionsError) {
+      console.error('Error deleting quiz questions:', deleteQuestionsError);
+    }
+
+    // Delete the quiz
+    const { error: deleteQuizError } = await supabase
+      .from('quizzes')
+      .delete()
+      .eq('id', quizId);
+
+    if (deleteQuizError) {
+      console.error('Error deleting quiz:', deleteQuizError);
+      toast.error('Failed to delete quiz');
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in deleteQuiz:', error);
+    toast.error('Failed to delete quiz');
+    return false;
+  }
+};
+
+// Helper alias types for backwards compatibility
+export type Module = CourseModule;

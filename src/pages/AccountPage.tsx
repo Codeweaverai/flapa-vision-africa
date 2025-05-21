@@ -37,7 +37,7 @@ const AccountPage = () => {
   const [newAvatarUrl, setNewAvatarUrl] = useState('');
   const [consultations, setConsultations] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
-  const [courses, setCourses] = useState<CourseWithEnrollment[]>([]);
+  const [enrolledCourses, setEnrolledCourses] = useState<CourseWithEnrollment[]>([]);
   const [activeTab, setActiveTab] = useState('profile');
   const navigate = useNavigate();
 
@@ -121,21 +121,30 @@ const AccountPage = () => {
     };
     
     // Fetch user courses
-    const loadUserCourses = async () => {
-      if (!user) return;
-      
+    const loadEnrollments = async () => {
+      setLoading(true);
       try {
-        const userCourses = await fetchUserCourses();
-        setCourses(userCourses);
+        if (user) {
+          const courses = await fetchUserCourses(user.id);
+          // Transform Course[] to CourseWithEnrollment[]
+          const coursesWithEnrollment = courses.map(course => ({
+            ...course,
+            description: course.description || '',
+            enrollment: undefined
+          }));
+          setEnrolledCourses(coursesWithEnrollment);
+        }
       } catch (error) {
-        console.error('Error fetching courses:', error);
+        console.error('Error loading enrollments:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     if (user) {
       fetchConsultations();
       fetchRegistrations();
-      loadUserCourses();
+      loadEnrollments();
     }
   }, [user]);
 
@@ -418,7 +427,7 @@ const AccountPage = () => {
                 </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {courses.length === 0 ? (
+                  {enrolledCourses.length === 0 ? (
                     <Card className="col-span-full">
                       <CardContent className="flex flex-col items-center justify-center p-6">
                         <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
@@ -430,7 +439,7 @@ const AccountPage = () => {
                       </CardContent>
                     </Card>
                   ) : (
-                    courses.map((course) => (
+                    enrolledCourses.map((course) => (
                       <Card key={course.id} className="overflow-hidden flex flex-col">
                         <div className="aspect-video relative">
                           {course.image_url ? (
