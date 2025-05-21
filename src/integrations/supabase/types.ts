@@ -517,6 +517,39 @@ export type Database = {
         }
         Relationships: []
       }
+      general_settings: {
+        Row: {
+          contact_email: string | null
+          enable_registration: boolean | null
+          id: number
+          platform_fee: number | null
+          require_email_verification: boolean | null
+          site_description: string | null
+          site_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          enable_registration?: boolean | null
+          id: number
+          platform_fee?: number | null
+          require_email_verification?: boolean | null
+          site_description?: string | null
+          site_name?: string
+          updated_at?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          enable_registration?: boolean | null
+          id?: number
+          platform_fee?: number | null
+          require_email_verification?: boolean | null
+          site_description?: string | null
+          site_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lesson_progress: {
         Row: {
           completion_date: string | null

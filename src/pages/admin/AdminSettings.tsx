@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -19,6 +20,7 @@ interface SiteSettings {
   contact_email: string;
   enable_registration: boolean;
   require_email_verification: boolean;
+  platform_fee: number;
   updated_at: string;
 }
 
@@ -30,6 +32,7 @@ const AdminSettings = () => {
   const [contactEmail, setContactEmail] = useState('');
   const [enableRegistration, setEnableRegistration] = useState(true);
   const [requireEmailVerification, setRequireEmailVerification] = useState(true);
+  const [platformFee, setPlatformFee] = useState(10);
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeAccountId, setStripeAccountId] = useState('');
   
@@ -41,34 +44,27 @@ const AdminSettings = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      // First check if the general_settings table exists using a safe approach
-      const { data: tableExists, error: tableCheckError } = await supabase
+      const { data, error } = await supabase
         .from('general_settings')
-        .select('id')
-        .limit(1);
+        .select('*')
+        .single();
       
-      if (!tableCheckError) {
-        // If the table exists, try to fetch data
-        const { data, error } = await supabase
-          .from('general_settings')
-          .select('*')
-          .single();
-        
-        if (error) throw error;
-        
-        if (data) {
-          setSiteName(data.site_name || '');
-          setSiteDescription(data.site_description || '');
-          setContactEmail(data.contact_email || '');
-          setEnableRegistration(data.enable_registration !== false);
-          setRequireEmailVerification(data.require_email_verification !== false);
-        }
-      } else {
-        // If there was an error, the table might not exist - use fallback values
-        console.log('Using default settings - settings table may not exist yet');
-        setSiteName('Site Name');
-        setSiteDescription('Site Description');
-        setContactEmail('');
+      if (error) {
+        console.error('Error fetching settings:', error);
+        // Use default values if there was an error
+        setSiteName('Learning Platform');
+        setSiteDescription('A platform for courses and events');
+        setContactEmail('admin@example.com');
+        setEnableRegistration(true);
+        setRequireEmailVerification(true);
+        setPlatformFee(10);
+      } else if (data) {
+        setSiteName(data.site_name || '');
+        setSiteDescription(data.site_description || '');
+        setContactEmail(data.contact_email || '');
+        setEnableRegistration(data.enable_registration !== false);
+        setRequireEmailVerification(data.require_email_verification !== false);
+        setPlatformFee(data.platform_fee || 10);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -116,7 +112,7 @@ const AdminSettings = () => {
       const { error } = await supabase
         .from('general_settings')
         .upsert({
-          id: 1, // Assuming a single settings record
+          id: 1, // Single settings record
           site_name: siteName,
           site_description: siteDescription,
           contact_email: contactEmail,
@@ -142,7 +138,7 @@ const AdminSettings = () => {
       const { error } = await supabase
         .from('general_settings')
         .upsert({
-          id: 1, // Assuming a single settings record
+          id: 1, // Single settings record
           enable_registration: enableRegistration,
           require_email_verification: requireEmailVerification,
           updated_at: new Date().toISOString()
@@ -156,6 +152,30 @@ const AdminSettings = () => {
     } catch (error) {
       console.error('Error saving auth settings:', error);
       toast.error('Failed to save authentication settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const savePaymentSettings = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('general_settings')
+        .upsert({
+          id: 1, // Single settings record
+          platform_fee: platformFee,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        });
+      
+      if (error) throw error;
+      
+      toast.success('Payment settings saved successfully');
+    } catch (error) {
+      console.error('Error saving payment settings:', error);
+      toast.error('Failed to save payment settings');
     } finally {
       setSaving(false);
     }
@@ -294,7 +314,8 @@ const AdminSettings = () => {
                     min="0"
                     max="100"
                     step="0.1"
-                    defaultValue="10"
+                    value={platformFee}
+                    onChange={(e) => setPlatformFee(parseFloat(e.target.value) || 0)}
                   />
                   <p className="text-sm text-muted-foreground">
                     This is the percentage fee that your platform will take from each transaction.
@@ -303,7 +324,7 @@ const AdminSettings = () => {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button>
+              <Button onClick={savePaymentSettings} disabled={saving}>
                 Save Payment Settings
               </Button>
             </CardFooter>
