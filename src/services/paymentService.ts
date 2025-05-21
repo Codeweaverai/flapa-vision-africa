@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { PaymentTransaction, PayoutTransaction, CreatorBalance } from '@/types/paymentTypes';
 import { toast } from '@/components/ui/use-toast';
@@ -8,20 +7,7 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
     // First, check the actual columns in the payment_transactions table
     const { data, error } = await supabase
       .from('payment_transactions')
-      .select(`
-        id,
-        amount,
-        currency,
-        status,
-        reference_type,
-        reference_id,
-        created_at,
-        user_id,
-        provider,
-        provider_transaction_id,
-        metadata,
-        profiles:user_id(email)
-      `)
+      .select('*, profiles:user_id(email)')
       .eq('creator_id', userId)
       .order('created_at', { ascending: false });
       
@@ -34,12 +20,10 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
       // Safely extract user email from the profiles join
       let userEmail = 'unknown';
       
-      if (payment.profiles) {
-        if (typeof payment.profiles === 'object' && 
-            payment.profiles !== null && 
-            'email' in payment.profiles) {
-          userEmail = String(payment.profiles.email);
-        }
+      // Type check before accessing profiles
+      const profiles = payment.profiles;
+      if (profiles && typeof profiles === 'object' && 'email' in profiles) {
+        userEmail = String(profiles.email);
       }
       
       return {
@@ -51,7 +35,7 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         reference_id: payment.reference_id,
         created_at: payment.created_at,
         // Since payment_method might not exist in the database, provide a default
-        payment_method: 'unknown',
+        payment_method: payment.payment_method || 'unknown',
         user_id: payment.user_id,
         provider: payment.provider,
         provider_transaction_id: payment.provider_transaction_id,
