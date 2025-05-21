@@ -84,18 +84,24 @@ const ExploreCoursesPage: React.FC = () => {
       const from = (currentPage - 1) * coursesPerPage;
       const to = from + coursesPerPage - 1;
       
-      // Get counts for pagination
-      const { count } = await query.count();
+      // Get counts for pagination - fixed to use proper method
+      const countQuery = query.clone();
+      const { count, error: countError } = await countQuery.count();
       
-      // Apply pagination
+      if (countError) {
+        console.error("Error getting count:", countError);
+        return;
+      }
+      
+      // Calculate total pages
+      setTotalPages(Math.ceil((count || 0) / coursesPerPage));
+      
+      // Apply pagination to original query
       const { data, error } = await query
         .order('created_at', { ascending: false })
         .range(from, to);
 
       if (error) throw error;
-      
-      // Calculate total pages
-      setTotalPages(Math.ceil((count || 0) / coursesPerPage));
 
       // Format data
       const formattedCourses = data.map(course => ({

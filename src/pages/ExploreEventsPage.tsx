@@ -91,18 +91,24 @@ const ExploreEventsPage: React.FC = () => {
       const from = (currentPage - 1) * eventsPerPage;
       const to = from + eventsPerPage - 1;
       
-      // Get counts for pagination
-      const { count } = await query.count();
+      // Get counts for pagination - fixed to use proper method
+      const countQuery = query.clone();
+      const { count, error: countError } = await countQuery.count();
       
-      // Apply pagination
+      if (countError) {
+        console.error("Error getting count:", countError);
+        return;
+      }
+      
+      // Calculate total pages
+      setTotalPages(Math.ceil((count || 0) / eventsPerPage));
+      
+      // Apply pagination to original query
       const { data, error } = await query
         .order('start_time', { ascending: true })
         .range(from, to);
 
       if (error) throw error;
-      
-      // Calculate total pages
-      setTotalPages(Math.ceil((count || 0) / eventsPerPage));
 
       // Format data
       const formattedEvents = data.map(event => ({
