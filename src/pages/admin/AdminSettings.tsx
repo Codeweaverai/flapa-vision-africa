@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -11,6 +10,17 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/lib/supabaseClient';
 import { getStripeAccountStatus, connectStripeAccount } from '@/services/paymentService';
+
+// Define the shape of site settings data
+interface SiteSettings {
+  id: number;
+  site_name: string;
+  site_description: string;
+  contact_email: string;
+  enable_registration: boolean;
+  require_email_verification: boolean;
+  updated_at: string;
+}
 
 const AdminSettings = () => {
   const [loading, setLoading] = useState(false);
@@ -31,21 +41,34 @@ const AdminSettings = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('*')
-        .single();
+      // First check if the general_settings table exists using a safe approach
+      const { data: tableExists, error: tableCheckError } = await supabase
+        .from('general_settings')
+        .select('id')
+        .limit(1);
       
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-      
-      if (data) {
-        setSiteName(data.site_name || '');
-        setSiteDescription(data.site_description || '');
-        setContactEmail(data.contact_email || '');
-        setEnableRegistration(data.enable_registration !== false);
-        setRequireEmailVerification(data.require_email_verification !== false);
+      if (!tableCheckError) {
+        // If the table exists, try to fetch data
+        const { data, error } = await supabase
+          .from('general_settings')
+          .select('*')
+          .single();
+        
+        if (error) throw error;
+        
+        if (data) {
+          setSiteName(data.site_name || '');
+          setSiteDescription(data.site_description || '');
+          setContactEmail(data.contact_email || '');
+          setEnableRegistration(data.enable_registration !== false);
+          setRequireEmailVerification(data.require_email_verification !== false);
+        }
+      } else {
+        // If there was an error, the table might not exist - use fallback values
+        console.log('Using default settings - settings table may not exist yet');
+        setSiteName('Site Name');
+        setSiteDescription('Site Description');
+        setContactEmail('');
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -91,7 +114,7 @@ const AdminSettings = () => {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('site_settings')
+        .from('general_settings')
         .upsert({
           id: 1, // Assuming a single settings record
           site_name: siteName,
@@ -117,7 +140,7 @@ const AdminSettings = () => {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('site_settings')
+        .from('general_settings')
         .upsert({
           id: 1, // Assuming a single settings record
           enable_registration: enableRegistration,

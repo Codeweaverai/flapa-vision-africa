@@ -1147,3 +1147,23 @@ export interface CourseDetails {
   tags?: string[];
   modules?: CourseModule[];
 }
+
+// Add this function alongside other functions in the file
+export const updateModuleOrder = async (moduleId: string, orderIndex: number): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('course_modules')
+      .update({ order_index: orderIndex })
+      .eq('id', moduleId);
+    
+    if (error) {
+      console.error('Error updating module order:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in updateModuleOrder:', error);
+    return false;
+  }
+};

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -13,7 +12,8 @@ import {
   Lesson, 
   deleteModule, 
   deleteLesson, 
-  fetchCourseWithModulesAndLessons 
+  fetchCourseWithModulesAndLessons,
+  updateModuleOrder
 } from '@/services/courseService';
 import ModuleAccordion from '@/components/admin/ModuleAccordion';
 import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
@@ -190,8 +190,7 @@ const AdminCourseContent = () => {
     [newModules[index - 1], newModules[index]] = [newModules[index], newModules[index - 1]];
     setModules(newModules);
     
-    // Update order_index in database (simplified version)
-    // In a real implementation, you might want to batch these updates
+    // Update order_index in database
     newModules.forEach((module, idx) => {
       updateModuleOrder(module.id, idx);
     });
@@ -207,17 +206,6 @@ const AdminCourseContent = () => {
     newModules.forEach((module, idx) => {
       updateModuleOrder(module.id, idx);
     });
-  };
-
-  const updateModuleOrder = async (moduleId: string, orderIndex: number) => {
-    try {
-      await supabase
-        .from('course_modules')
-        .update({ order_index: orderIndex })
-        .eq('id', moduleId);
-    } catch (error) {
-      console.error('Error updating module order:', error);
-    }
   };
 
   if (loading) {
@@ -239,6 +227,7 @@ const AdminCourseContent = () => {
         </Button>
       </div>
 
+      {/* Course Header */}
       {course && (
         <Card className="mb-6">
           <CardHeader>
@@ -330,7 +319,6 @@ const AdminCourseContent = () => {
           moduleId={selectedModuleId}
           onLessonSaved={handleLessonSaved}
           editingLesson={editingLesson}
-          moduleTitle={modules.find(m => m.id === selectedModuleId)?.title || ''}
         />
       )}
 

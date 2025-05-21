@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -17,7 +16,8 @@ import {
   FormField, 
   FormItem, 
   FormLabel, 
-  FormMessage 
+  FormMessage,
+  FormDescription
 } from '@/components/ui/form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -124,6 +124,9 @@ const AdminEventForm = () => {
       
       const eventData = {
         ...values,
+        // Convert Date objects to ISO strings for API compatibility
+        start_time: values.start_time.toISOString(),
+        end_time: values.end_time.toISOString(),
         price: values.is_free ? null : values.price,
         currency: values.is_free ? null : values.currency,
       };
@@ -140,7 +143,12 @@ const AdminEventForm = () => {
         toast.success('Event updated successfully');
       } else {
         // Create new event
-        const result = await createEventWithCreator(eventData, user.id);
+        const result = await createEventWithCreator({
+          ...eventData,
+          start_time: eventData.start_time,
+          end_time: eventData.end_time,
+        }, user.id);
+        
         if (!result) {
           throw new Error('Failed to create event');
         }
