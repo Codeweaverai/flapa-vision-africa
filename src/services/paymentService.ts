@@ -5,10 +5,10 @@ import { toast } from '@/components/ui/use-toast';
 
 export async function fetchCreatorPayments(userId: string): Promise<PaymentTransaction[]> {
   try {
-    // Use a simpler query to avoid excessive type instantiation
+    // Use a simpler query approach to avoid excessive type instantiation
     const { data, error } = await supabase
       .from('payment_transactions')
-      .select('*, user_id(email)')
+      .select()
       .eq('creator_id', userId)
       .order('created_at', { ascending: false });
       
@@ -16,17 +16,8 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
     
     if (!data || data.length === 0) return [];
     
-    // Process the data to include user email and ensure all required fields are present
+    // Process the data to ensure all required fields are present
     const formattedData: PaymentTransaction[] = data.map(payment => {
-      // Safely extract user email with default value
-      let userEmail = 'unknown';
-      
-      // Use optional chaining and nullish coalescing for safer access
-      const userProfile = payment.user_id || {};
-      userEmail = typeof userProfile === 'object' && userProfile && 'email' in userProfile 
-                ? String(userProfile.email) 
-                : 'unknown';
-      
       return {
         id: payment.id,
         amount: payment.amount,
@@ -42,9 +33,40 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         provider: payment.provider,
         provider_transaction_id: payment.provider_transaction_id,
         metadata: payment.metadata,
-        user_email: userEmail
+        // Since we're no longer joining with user profiles, set a default email
+        user_email: 'unknown'
       };
     });
+    
+    // If we need user emails, fetch them separately to avoid deep typing issues
+    if (formattedData.length > 0) {
+      // Get unique user IDs
+      const userIds = [...new Set(formattedData.map(p => p.user_id))];
+      
+      // Fetch user profiles separately
+      const { data: userProfiles } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', userIds);
+        
+      // Create a map of userId to email
+      const userEmailMap = new Map();
+      if (userProfiles) {
+        userProfiles.forEach(profile => {
+          if (profile.email) {
+            userEmailMap.set(profile.id, profile.email);
+          }
+        });
+        
+        // Update transactions with user emails
+        formattedData.forEach(transaction => {
+          const email = userEmailMap.get(transaction.user_id);
+          if (email) {
+            transaction.user_email = email;
+          }
+        });
+      }
+    }
     
     return formattedData;
   } catch (error) {
