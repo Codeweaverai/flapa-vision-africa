@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -40,9 +41,9 @@ const CourseDetailPage = () => {
   }, [courseId, user]);
 
   const checkEnrollment = async () => {
-    if (user && course) {
-      // Fix: Pass user.id instead of user object
-      const isEnrolled = await checkEnrollmentStatus(courseId!, user.id);
+    if (user && course && courseId) {
+      // Pass user.id instead of user object
+      const isEnrolled = await checkEnrollmentStatus(courseId, user.id);
       setIsEnrolled(isEnrolled);
     }
   };
@@ -59,7 +60,8 @@ const CourseDetailPage = () => {
     setEnrolling(true);
     
     try {
-      const success = await enrollInCourse(course.id, user);
+      // Pass user.id instead of user object
+      const success = await enrollInCourse(course.id, user.id);
       
       if (success) {
         setIsEnrolled(true);

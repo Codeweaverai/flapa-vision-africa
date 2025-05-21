@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -171,9 +170,9 @@ const CourseLearningPage = () => {
     if (!currentLesson || !enrollmentId) return;
     
     try {
-      await saveLessonProgress(currentLesson.id, enrollmentId, { 
-        position: 0,
-        completed: true 
+      await saveLessonProgress(enrollmentId, currentLesson.id, { 
+        last_position_seconds: 0,
+        is_completed: true 
       });
       
       // Update local state
@@ -218,9 +217,9 @@ const CourseLearningPage = () => {
       lastProgressUpdate.current = now;
       
       // Don't await this to avoid blocking the UI
-      saveLessonProgress(currentLesson.id, enrollmentId, {
-        position: currentTime,
-        completed: percent >= 0.95
+      saveLessonProgress(enrollmentId, currentLesson.id, {
+        last_position_seconds: currentTime,
+        is_completed: percent >= 0.95
       }).then(() => {
         // If the video is 95% watched, mark it as completed
         if (percent >= 0.95 && !lessonProgress[currentLesson.id]?.completed) {
@@ -256,9 +255,9 @@ const CourseLearningPage = () => {
     if (!currentLesson || !enrollmentId) return;
     
     // Mark lesson as completed
-    saveLessonProgress(currentLesson.id, enrollmentId, {
-      position: 0,
-      completed: true
+    saveLessonProgress(enrollmentId, currentLesson.id, {
+      last_position_seconds: 0,
+      is_completed: true
     }).then(() => {
       setLessonProgress({
         ...lessonProgress,

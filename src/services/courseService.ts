@@ -1,6 +1,6 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { Json } from '@/integrations/supabase/types';
 
 // Define all necessary types
 export interface Course {
@@ -112,6 +112,12 @@ export interface LessonProgress {
   is_completed: boolean;
   last_position_seconds: number;
   completion_date?: string;
+}
+
+// Interface for saving progress
+export interface LessonProgressUpdate {
+  is_completed?: boolean;
+  last_position_seconds?: number;
 }
 
 export const VALID_DIFFICULTY_LEVELS = [
@@ -259,6 +265,7 @@ export const createCourse = async (courseData: Partial<Course>, creatorId: strin
       return null;
     }
 
+    // Make sure required fields exist before creating course
     const newCourse = {
       ...courseData,
       creator_id: creatorId,
@@ -267,6 +274,11 @@ export const createCourse = async (courseData: Partial<Course>, creatorId: strin
       is_free: courseData.is_free || false,
       price: courseData.is_free ? null : courseData.price,
       currency: courseData.is_free ? null : (courseData.currency || 'USD'),
+      // Set default values for required fields if not provided
+      category: courseData.category || 'General',
+      description: courseData.description || '',
+      difficulty_level: courseData.difficulty_level || 'All Levels',
+      duration_minutes: courseData.duration_minutes || 0,
     };
 
     const { data, error } = await supabase
@@ -590,9 +602,17 @@ export const createModule = async (moduleData: Partial<CourseModule>): Promise<C
       return null;
     }
 
+    // Ensure required fields exist
+    const module = {
+      course_id: moduleData.course_id,
+      title: moduleData.title,
+      order_index: moduleData.order_index || 0,
+      description: moduleData.description
+    };
+
     const { data, error } = await supabase
       .from('course_modules')
-      .insert(moduleData)
+      .insert(module)
       .select()
       .single();
 
@@ -680,9 +700,21 @@ export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson 
       return null;
     }
 
+    // Ensure required fields exist
+    const lesson = {
+      module_id: lessonData.module_id,
+      title: lessonData.title,
+      order_index: lessonData.order_index || 0,
+      description: lessonData.description,
+      video_url: lessonData.video_url,
+      content_type: lessonData.content_type || 'video',
+      content: lessonData.content || {},
+      materials_urls: lessonData.materials_urls || []
+    };
+
     const { data, error } = await supabase
       .from('lessons')
-      .insert(lessonData)
+      .insert(lesson)
       .select()
       .single();
 
@@ -766,10 +798,7 @@ export const deleteLesson = async (lessonId: string): Promise<boolean> => {
 export const saveLessonProgress = async (
   enrollmentId: string,
   lessonId: string,
-  progress: { 
-    is_completed?: boolean,
-    last_position_seconds?: number
-  }
+  progress: LessonProgressUpdate
 ): Promise<boolean> => {
   try {
     if (!enrollmentId || !lessonId) {
@@ -793,15 +822,24 @@ export const saveLessonProgress = async (
     let result;
     if (existingProgress) {
       // Update existing progress
-      const updates = { ...progress };
+      const updates: LessonProgressUpdate = { ...progress };
+      // Add completion_date if not already completed but now is completed
       if (progress.is_completed && !existingProgress.is_completed) {
-        updates.completion_date = new Date().toISOString();
+        const updatedProgress = {
+          ...updates,
+          completion_date: new Date().toISOString()
+        };
+        
+        result = await supabase
+          .from('lesson_progress')
+          .update(updatedProgress)
+          .eq('id', existingProgress.id);
+      } else {
+        result = await supabase
+          .from('lesson_progress')
+          .update(updates)
+          .eq('id', existingProgress.id);
       }
-
-      result = await supabase
-        .from('lesson_progress')
-        .update(updates)
-        .eq('id', existingProgress.id);
     } else {
       // Create new progress record
       const newProgress = {
@@ -837,9 +875,18 @@ export const createQuiz = async (quizData: Partial<Quiz>): Promise<Quiz | null> 
       return null;
     }
 
+    // Ensure required fields exist
+    const quiz = {
+      title: quizData.title,
+      lesson_id: quizData.lesson_id,
+      module_id: quizData.module_id,
+      description: quizData.description,
+      passing_score: quizData.passing_score || 70
+    };
+
     const { data, error } = await supabase
       .from('quizzes')
-      .insert(quizData)
+      .insert(quiz)
       .select()
       .single();
 
@@ -864,9 +911,16 @@ export const createQuizQuestion = async (questionData: Partial<QuizQuestion>): P
       return null;
     }
 
+    // Ensure required fields exist
+    const question = {
+      quiz_id: questionData.quiz_id,
+      question: questionData.question,
+      order_index: questionData.order_index || 0
+    };
+
     const { data, error } = await supabase
       .from('quiz_questions')
-      .insert(questionData)
+      .insert(question)
       .select()
       .single();
 
@@ -891,9 +945,17 @@ export const createQuizAnswer = async (answerData: Partial<QuizAnswer>): Promise
       return null;
     }
 
+    // Ensure required fields exist
+    const answer = {
+      question_id: answerData.question_id,
+      answer: answerData.answer,
+      is_correct: answerData.is_correct || false,
+      order_index: answerData.order_index || 0
+    };
+
     const { data, error } = await supabase
       .from('quiz_answers')
-      .insert(answerData)
+      .insert(answer)
       .select()
       .single();
 
