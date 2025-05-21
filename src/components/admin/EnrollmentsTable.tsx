@@ -25,7 +25,7 @@ export interface CourseEnrollment {
     full_name?: string;
     email?: string;
     id: string;
-  };
+  } | any; // Allow any type for profiles to handle error cases
   courses?: {
     title: string;
     id: string;
@@ -83,7 +83,8 @@ const EnrollmentsTable = ({
           <TableBody>
             {enrollments.map((enrollment) => {
               // Safely get the profile properties
-              const fullName = enrollment.profiles && 'full_name' in enrollment.profiles 
+              const fullName = enrollment.profiles && 
+                (typeof enrollment.profiles === 'object' && 'full_name' in enrollment.profiles) 
                 ? enrollment.profiles.full_name 
                 : 'Unknown';
                 
@@ -92,7 +93,9 @@ const EnrollmentsTable = ({
                   <TableCell className="font-medium">
                     <div>
                       <p>{fullName || 'Unknown'}</p>
-                      {enrollment.profiles?.email && (
+                      {enrollment.profiles && 
+                       typeof enrollment.profiles === 'object' && 
+                       'email' in enrollment.profiles && (
                         <p className="text-xs text-muted-foreground">{enrollment.profiles.email}</p>
                       )}
                     </div>

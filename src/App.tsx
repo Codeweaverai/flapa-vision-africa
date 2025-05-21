@@ -1,48 +1,48 @@
+
 import React, { useEffect, useState } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from './contexts/AuthContext';
+import { supabase } from './lib/supabaseClient';
 import './App.css';
-import Layout from '@/components/layout/Layout';
-import EventList from '@/pages/EventList';
-import EventDetails from '@/pages/EventDetails';
-import Profile from '@/pages/Profile';
-import EventForm from '@/pages/EventForm';
-import AdminDashboard from '@/pages/admin/AdminDashboard';
-import AdminEvents from '@/pages/admin/AdminEvents';
-import AdminEventForm from '@/pages/admin/AdminEventForm';
-import AdminRegistrations from '@/pages/admin/AdminRegistrations';
-import AdminSettings from '@/pages/admin/AdminSettings';
-import CourseList from '@/pages/CourseList';
-import CourseDetails from '@/pages/CourseDetails';
-import CourseForm from '@/pages/admin/CourseForm';
-import CourseContent from '@/pages/CourseContent';
-import CreatorCourses from '@/pages/creator/CreatorCourses';
-import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
-import AdminRoute from '@/components/routes/AdminRoute';
-import CreatorRoute from '@/components/routes/CreatorRoute';
-import AdminCoursesList from '@/pages/admin/AdminCoursesList';
+import Layout from './components/layout/Layout';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
+import AccountPage from './pages/AccountPage';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminEvents from './pages/admin/AdminEvents';
+import AdminEventForm from './pages/admin/EventForm';
+import AdminRegistrations from './pages/admin/AdminRegistrations';
+import AdminSettings from './pages/admin/AdminSettings';
+import CourseLearningPage from './pages/CourseLearningPage';
+import CourseDetailPage from './pages/CourseDetailPage';
+import CourseForm from './pages/admin/CourseForm';
+import CourseContentPage from './pages/admin/CourseContentPage';
+import CreatorCourses from './pages/creator/CreatorCourses';
+import CreatorCourseForm from './pages/creator/CreatorCourseForm';
+import AdminCoursesList from './pages/admin/AdminCoursesList';
+import AdminRoute from './components/admin/AdminRoute';
+import CreatorRoute from './components/creator/CreatorRoute';
 
 const App = () => {
-  const { authUser } = useAuth();
+  const { user, loading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
 
   useEffect(() => {
     const checkUserRole = async () => {
-      if (authUser) {
+      if (user) {
         try {
           const { data, error } = await supabase
             .from('profiles')
             .select('role')
-            .eq('id', authUser.id)
+            .eq('id', user.id)
             .single();
 
           if (error) {
             console.error('Error fetching user role:', error);
           } else {
             setIsAdmin(data?.role === 'admin');
-            setIsCreator(data?.role === 'creator');
+            setIsCreator(data?.role === 'creator' || data?.is_creator === true);
           }
         } catch (error) {
           console.error('Error checking user role:', error);
@@ -54,10 +54,10 @@ const App = () => {
     };
 
     checkUserRole();
-  }, [authUser]);
+  }, [user]);
 
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    if (!authUser) {
+    if (!user) {
       return <Navigate to="/" replace />;
     }
 
@@ -67,27 +67,27 @@ const App = () => {
   const router = createBrowserRouter([
     {
       path: "/",
-      element: <EventList />,
+      element: <EventsPage />,
     },
     {
       path: "/events/:eventId",
-      element: <EventDetails />,
+      element: <EventDetailPage />,
     },
     {
       path: "/courses",
-      element: <CourseList />,
+      element: <CourseLearningPage />,
     },
     {
       path: "/courses/:courseId",
-      element: <CourseDetails />,
+      element: <CourseDetailPage />,
     },
     {
       path: "/profile",
-      element: <ProtectedRoute><Profile /></ProtectedRoute>,
+      element: <ProtectedRoute><AccountPage /></ProtectedRoute>,
     },
     {
       path: "/events/create",
-      element: <ProtectedRoute><EventForm /></ProtectedRoute>,
+      element: <ProtectedRoute><AdminEventForm /></ProtectedRoute>,
     },
     {
       path: "/admin/dashboard",
@@ -123,7 +123,7 @@ const App = () => {
     },
     {
       path: "/admin/courses/content/:courseId",
-      element: <AdminRoute><CourseContent /></AdminRoute>,
+      element: <AdminRoute><CourseContentPage /></AdminRoute>,
     },
     {
       path: "/creator/courses",
@@ -131,11 +131,11 @@ const App = () => {
     },
     {
       path: "/creator/courses/create",
-      element: <CreatorRoute><CreatorCourseForm creatorId={authUser?.id} isCreator={true} /></CreatorRoute>,
+      element: <CreatorRoute><CreatorCourseForm /></CreatorRoute>,
     },
-     {
+    {
       path: "/creator/courses/:courseId",
-      element: <CreatorRoute><CreatorCourseForm creatorId={authUser?.id} isCreator={true} /></CreatorRoute>,
+      element: <CreatorRoute><CreatorCourseForm /></CreatorRoute>,
     },
     {
       path: "/admin/courses-list",

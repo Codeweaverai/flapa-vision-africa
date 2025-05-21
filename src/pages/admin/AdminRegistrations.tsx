@@ -114,7 +114,13 @@ const AdminRegistrations = () => {
         throw error;
       }
 
-      setEnrollments(data as CourseEnrollment[]);
+      // Cast the data to ensure type compatibility
+      const typedEnrollments = (data || []).map((enrollment: any) => ({
+        ...enrollment,
+        profiles: enrollment.profiles || { id: '', full_name: 'Unknown', email: '' }
+      })) as CourseEnrollment[];
+
+      setEnrollments(typedEnrollments);
     } catch (error: any) {
       console.error('Error fetching enrollments:', error);
       toast.error('Failed to load enrollments');
