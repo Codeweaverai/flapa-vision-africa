@@ -24,18 +24,18 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    
-    // Create a Supabase client
+
+    // Create a Supabase client to verify user authentication
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_ANON_KEY') || '',
       {
         global: { headers: { Authorization: authHeader } },
         auth: { persistSession: false }
       }
     );
-    
-    // Verify the user is authenticated
+
+    // Get user session
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -45,18 +45,20 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const { 
-      amount, 
-      currency, 
-      referenceType, // 'event' or 'consultation'
-      referenceId,
-      userId,
-      eventTitle
+    const {
+      amount,
+      currency = 'usd',
+      itemName,
+      itemId,
+      itemType, // 'course', 'event', 'consultation'
+      creatorId
     } = await req.json();
-    
-    if (!amount || !currency || !referenceType || !referenceId || !userId) {
+
+    if (!amount || amount <= 0 || !itemName || !itemId || !itemType) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }), 
+        JSON.stringify({
+          error: 'Missing required parameters',
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -69,86 +71,115 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     });
 
-    // Get the origin for the redirect URL
-    const origin = req.headers.get('origin') || 'http://localhost:5173';
-    const successUrl = `${origin}/payment-result?status=success&type=${referenceType}&id=${referenceId}`;
-    const cancelUrl = `${origin}/payment-result?status=canceled&type=${referenceType}&id=${referenceId}`;
-    
-    // Create a Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: currency.toLowerCase(),
-            product_data: {
-              name: eventTitle || `${referenceType.charAt(0).toUpperCase() + referenceType.slice(1)} Payment`,
-              description: `Payment for ${referenceType} booking`
-            },
-            unit_amount: Math.round(amount * 100), // Stripe requires amount in cents
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      client_reference_id: referenceId,
-      customer_email: user.email,
-      metadata: {
-        userId: userId,
-        referenceType: referenceType,
-        referenceId: referenceId
-      }
+    // Create a customer if it doesn't exist
+    const existingCustomers = await stripe.customers.list({
+      email: user.email,
+      limit: 1,
     });
 
-    // Create a payment record in the database
-    const { data: payment, error: paymentError } = await supabaseClient
+    let customerId;
+    if (existingCustomers.data.length > 0) {
+      customerId = existingCustomers.data[0].id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          userId: user.id
+        }
+      });
+      customerId = customer.id;
+    }
+
+    // Create a Supabase admin client to create the payment record
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+      { auth: { persistSession: false } }
+    );
+
+    // Create a payment record
+    const { data: payment, error: paymentError } = await supabaseAdmin
       .from('payment_transactions')
       .insert({
-        user_id: userId,
-        reference_type: referenceType,
-        reference_id: referenceId,
+        user_id: user.id,
+        creator_id: creatorId,
+        reference_type: itemType,
+        reference_id: itemId,
         amount: amount,
         currency: currency,
         status: 'pending',
         provider: 'stripe',
-        provider_transaction_id: session.id,
         metadata: {
-          stripe_session_id: session.id,
-          payment_intent_id: session.payment_intent
+          item_name: itemName,
+          customer_id: customerId
         }
       })
       .select()
       .single();
 
     if (paymentError) {
-      console.error('Error creating payment record:', paymentError);
-      return new Response(JSON.stringify({ error: 'Failed to create payment record' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      throw new Error(`Failed to create payment record: ${paymentError.message}`);
     }
-    
-    // Return the Stripe session URL
+
+    // Create a checkout session
+    const origin = req.headers.get('origin') || 'http://localhost:5173';
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: itemName,
+              metadata: {
+                itemId,
+                itemType
+              }
+            },
+            unit_amount: Math.round(amount * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${origin}/payment-success?id=${payment.id}&type=${itemType}&reference_id=${itemId}&amount=${amount}&currency=${currency}&title=${encodeURIComponent(itemName)}`,
+      cancel_url: `${origin}/payment-cancel?type=${itemType}&reference_id=${itemId}&title=${encodeURIComponent(itemName)}`,
+      metadata: {
+        paymentId: payment.id,
+        userId: user.id,
+        itemId,
+        itemType,
+        creatorId
+      }
+    });
+
+    // Update the payment with the session ID
+    await supabaseAdmin
+      .from('payment_transactions')
+      .update({
+        provider_transaction_id: session.id
+      })
+      .eq('id', payment.id);
+
+    // Return the checkout URL
     return new Response(
       JSON.stringify({
         success: true,
-        paymentId: payment.id,
-        sessionId: session.id,
         url: session.url,
-        status: 'pending'
+        sessionId: session.id,
+        paymentId: payment.id
       }),
-      { 
+      {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   } catch (error) {
-    console.error('Error processing payment:', error);
+    console.error('Error creating checkout session:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
+      {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }

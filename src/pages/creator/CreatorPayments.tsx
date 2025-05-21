@@ -13,11 +13,9 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
+  AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { BarChart, Calendar, DollarSign, CreditCard, CheckCircle2, Clock, AlertCircle, Download } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { BarChart, Calendar, DollarSign, CreditCard, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -30,34 +28,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-interface PaymentTransaction {
-  id: string;
-  amount: number;
-  currency: string;
-  status: string;
-  reference_type: string;
-  created_at: string;
-  payment_method: string;
-  user_email?: string;
-  course_title?: string;
-  event_title?: string;
-}
-
-interface PayoutTransaction {
-  id: string;
-  amount: number;
-  currency: string;
-  status: string;
-  created_at: string;
-  method: string;
-  destination: string;
-}
+import { 
+  PaymentTransaction, 
+  PayoutTransaction, 
+  CreatorBalance 
+} from '@/types/paymentTypes';
+import { 
+  fetchCreatorPayments, 
+  fetchCreatorPayouts, 
+  calculateCreatorBalance,
+  requestPayout,
+  connectStripeAccount
+} from '@/services/paymentService';
 
 const CreatorPayments: React.FC = () => {
   const [payments, setPayments] = useState<PaymentTransaction[]>([]);
   const [payouts, setPayouts] = useState<PayoutTransaction[]>([]);
-  const [balance, setBalance] = useState({
+  const [balance, setBalance] = useState<CreatorBalance>({
     available: 0,
     pending: 0,
     currency: 'USD'
@@ -73,42 +60,29 @@ const CreatorPayments: React.FC = () => {
   
   useEffect(() => {
     if (user) {
-      fetchPayments();
-      fetchPayouts();
-      fetchBalance();
+      loadPaymentData();
     }
   }, [user]);
   
-  const fetchPayments = async () => {
+  const loadPaymentData = async () => {
+    if (!user) return;
+    
     try {
       setLoadingPayments(true);
+      setLoadingPayouts(true);
+      setLoadingBalance(true);
       
-      if (!user) return;
+      const [paymentsData, payoutsData, balanceData] = await Promise.all([
+        fetchCreatorPayments(user.id),
+        fetchCreatorPayouts(user.id),
+        calculateCreatorBalance(user.id)
+      ]);
       
-      const { data, error } = await supabase
-        .from('payment_transactions')
-        .select(`
-          *,
-          course:courses!reference_id(title),
-          event:events!reference_id(title),
-          user:profiles!user_id(email)
-        `)
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      
-      // Format the payments data
-      const formattedPayments = data.map(payment => ({
-        ...payment,
-        course_title: payment.course?.title,
-        event_title: payment.event?.title,
-        user_email: payment.user?.email
-      }));
-      
-      setPayments(formattedPayments);
+      setPayments(paymentsData);
+      setPayouts(payoutsData);
+      setBalance(balanceData);
     } catch (error) {
-      console.error('Error fetching payments:', error);
+      console.error('Error loading payment data:', error);
       toast({
         title: "Error",
         description: "Failed to load payment data",
@@ -116,89 +90,7 @@ const CreatorPayments: React.FC = () => {
       });
     } finally {
       setLoadingPayments(false);
-    }
-  };
-  
-  const fetchPayouts = async () => {
-    try {
-      setLoadingPayouts(true);
-      
-      if (!user) return;
-      
-      const { data, error } = await supabase
-        .from('creator_payouts')
-        .select('*')
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      
-      setPayouts(data || []);
-    } catch (error) {
-      console.error('Error fetching payouts:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load payout data",
-        variant: "destructive"
-      });
-    } finally {
       setLoadingPayouts(false);
-    }
-  };
-  
-  const fetchBalance = async () => {
-    try {
-      setLoadingBalance(true);
-      
-      if (!user) return;
-      
-      // This would normally be a separate API call to get the creator's balance
-      // For demo purposes, we'll calculate it from the payments
-      const { data, error } = await supabase
-        .from('payment_transactions')
-        .select('amount, status')
-        .eq('creator_id', user.id)
-        .eq('status', 'completed');
-        
-      if (error) throw error;
-      
-      // Calculate available balance (completed payments minus completed payouts)
-      const totalPaymentsAmount = data?.reduce((sum, item) => sum + item.amount, 0) || 0;
-      
-      const { data: payoutsData, error: payoutsError } = await supabase
-        .from('creator_payouts')
-        .select('amount')
-        .eq('creator_id', user.id)
-        .eq('status', 'completed');
-        
-      if (payoutsError) throw payoutsError;
-      
-      const totalPayoutsAmount = payoutsData?.reduce((sum, item) => sum + item.amount, 0) || 0;
-      
-      // Calculate pending balance
-      const { data: pendingData, error: pendingError } = await supabase
-        .from('payment_transactions')
-        .select('amount')
-        .eq('creator_id', user.id)
-        .eq('status', 'pending');
-        
-      if (pendingError) throw pendingError;
-      
-      const pendingAmount = pendingData?.reduce((sum, item) => sum + item.amount, 0) || 0;
-      
-      setBalance({
-        available: totalPaymentsAmount - totalPayoutsAmount,
-        pending: pendingAmount,
-        currency: 'USD'
-      });
-    } catch (error) {
-      console.error('Error calculating balance:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load balance data",
-        variant: "destructive"
-      });
-    } finally {
       setLoadingBalance(false);
     }
   };
@@ -208,74 +100,43 @@ const CreatorPayments: React.FC = () => {
   };
   
   const handleRequestPayout = async () => {
-    try {
-      if (!user) return;
-      
-      if (balance.available <= 0) {
-        toast({
-          title: "Withdrawal Error",
-          description: "You don't have any available balance to withdraw",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Create a payout record
-      const { data, error } = await supabase
-        .from('creator_payouts')
-        .insert({
-          creator_id: user.id,
-          amount: balance.available,
-          currency: balance.currency,
-          method: payoutMethod,
-          destination: payoutMethod === 'stripe' ? 'Stripe Connect Account' : 'Mobile Money Account',
-          status: 'pending'
-        })
-        .select();
-        
-      if (error) throw error;
-      
-      toast({
-        title: "Withdrawal Requested",
-        description: `Your withdrawal of ${balance.currency} ${balance.available.toFixed(2)} has been requested`,
-      });
-      
-      // Refresh data
-      fetchPayouts();
-      fetchBalance();
-      
-      // Close dialog
-      setIsWithdrawDialogOpen(false);
-    } catch (error) {
-      console.error('Error requesting payout:', error);
+    if (!user) return;
+    
+    if (balance.available <= 0) {
       toast({
         title: "Withdrawal Error",
-        description: "Failed to process your withdrawal request",
+        description: "You don't have any available balance to withdraw",
         variant: "destructive"
       });
+      return;
+    }
+    
+    const destination = payoutMethod === 'stripe' 
+      ? 'Stripe Connect Account' 
+      : payoutMethod === 'mobile_money' 
+        ? 'Mobile Money Account' 
+        : 'Bank Account';
+    
+    const success = await requestPayout(
+      user.id, 
+      balance.available, 
+      balance.currency, 
+      payoutMethod,
+      destination
+    );
+    
+    if (success) {
+      await loadPaymentData();
+      setIsWithdrawDialogOpen(false);
     }
   };
   
-  const connectStripeAccount = async () => {
-    try {
-      // Call a Supabase Edge Function to create a Stripe Connect onboarding link
-      const { data, error } = await supabase.functions.invoke('create-stripe-connect-account', {
-        body: { userId: user?.id }
-      });
-      
-      if (error) throw error;
-      
-      // Open the onboarding link in a new tab
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      }
-    } catch (error) {
-      console.error('Error connecting Stripe account:', error);
-      toast({
-        title: "Connection Error",
-        description: "Failed to initialize Stripe Connect account setup",
-        variant: "destructive"
-      });
+  const handleConnectStripe = async () => {
+    if (!user) return;
+    
+    const url = await connectStripeAccount(user.id);
+    if (url) {
+      window.open(url, '_blank');
     }
   };
 
@@ -341,7 +202,7 @@ const CreatorPayments: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">Pending Balance</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               {loadingBalance ? (
@@ -367,8 +228,10 @@ const CreatorPayments: React.FC = () => {
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  {balance.currency} {payments.reduce((sum, payment) => 
-                    payment.status === 'completed' ? sum + payment.amount : sum, 0).toFixed(2)}
+                  {balance.currency} {payments
+                    .filter(payment => payment.status === 'completed')
+                    .reduce((sum, payment) => sum + payment.amount, 0)
+                    .toFixed(2)}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
@@ -396,7 +259,7 @@ const CreatorPayments: React.FC = () => {
             </CardContent>
             <CardFooter>
               {payoutMethod === 'stripe' && (
-                <Button variant="outline" onClick={connectStripeAccount} className="w-full">
+                <Button variant="outline" onClick={handleConnectStripe} className="w-full">
                   Connect Stripe Account
                 </Button>
               )}
@@ -444,7 +307,6 @@ const CreatorPayments: React.FC = () => {
                           <TableHead>Date</TableHead>
                           <TableHead>User</TableHead>
                           <TableHead>Type</TableHead>
-                          <TableHead>Item</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
@@ -452,7 +314,7 @@ const CreatorPayments: React.FC = () => {
                       <TableBody>
                         {payments.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                               No payment transactions found
                             </TableCell>
                           </TableRow>
@@ -464,11 +326,6 @@ const CreatorPayments: React.FC = () => {
                               </TableCell>
                               <TableCell>{payment.user_email || 'Unknown'}</TableCell>
                               <TableCell>{getPaymentTypeLabel(payment.reference_type)}</TableCell>
-                              <TableCell>
-                                {payment.reference_type === 'course' && payment.course_title}
-                                {payment.reference_type === 'event' && payment.event_title}
-                                {payment.reference_type === 'consultation' && 'Consultation'}
-                              </TableCell>
                               <TableCell>
                                 {payment.currency.toUpperCase()} {payment.amount.toFixed(2)}
                               </TableCell>
@@ -483,7 +340,7 @@ const CreatorPayments: React.FC = () => {
               </CardContent>
               <CardFooter className="flex justify-between">
                 <Button variant="outline">Export CSV</Button>
-                <Button variant="outline" onClick={fetchPayments}>Refresh</Button>
+                <Button variant="outline" onClick={loadPaymentData}>Refresh</Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -553,7 +410,7 @@ const CreatorPayments: React.FC = () => {
               </CardContent>
               <CardFooter className="flex justify-between">
                 <Button variant="outline">Export CSV</Button>
-                <Button variant="outline" onClick={fetchPayouts}>Refresh</Button>
+                <Button variant="outline" onClick={loadPaymentData}>Refresh</Button>
               </CardFooter>
             </Card>
           </TabsContent>

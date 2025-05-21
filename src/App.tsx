@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import HomePage from '@/pages/HomePage';
@@ -18,6 +19,9 @@ import CreatorEvents from '@/pages/creator/CreatorEvents';
 import CreatorStudents from '@/pages/creator/CreatorStudents';
 import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
 import CreatorPayments from '@/pages/creator/CreatorPayments';
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
+import PaymentCancelPage from '@/pages/PaymentCancelPage';
+import PaymentResultPage from '@/pages/PaymentResultPage';
 import AdminRoute from '@/components/admin/AdminRoute';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminUsers from '@/pages/admin/AdminUsers';
@@ -31,7 +35,7 @@ import AdminLogin from '@/pages/admin/AdminLogin';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Protected route component
-const ProtectedRoute = () => {
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
   if (loading) return <div>Loading...</div>;
@@ -40,7 +44,7 @@ const ProtectedRoute = () => {
     return <Navigate to="/auth" replace />;
   }
   
-  return <Outlet />;
+  return <>{children}</>;
 };
 
 const AppRoutes = () => {
@@ -56,17 +60,18 @@ const AppRoutes = () => {
       <Route path="/consult" element={<ConsultPage />} />
       <Route path="/explore/courses" element={<ExploreCoursesPage />} />
       <Route path="/explore/events" element={<ExploreEventsPage />} />
+      <Route path="/payment-success" element={<PaymentSuccessPage />} />
+      <Route path="/payment-cancel" element={<PaymentCancelPage />} />
+      <Route path="/payment-result" element={<PaymentResultPage />} />
       
       {/* Protected routes */}
-      <Route element={<ProtectedRoute />}>
-        <Route path="/account" element={<AccountPage />} />
-        <Route path="/creator/dashboard" element={<CreatorDashboard />} />
-        <Route path="/creator/courses" element={<CreatorCourses />} />
-        <Route path="/creator/events" element={<CreatorEvents />} />
-        <Route path="/creator/students" element={<CreatorStudents />} />
-        <Route path="/creator/analytics" element={<CreatorAnalytics />} />
-        <Route path="/creator/payments" element={<CreatorPayments />} />
-      </Route>
+      <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+      <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
+      <Route path="/creator/courses" element={<ProtectedRoute><CreatorCourses /></ProtectedRoute>} />
+      <Route path="/creator/events" element={<ProtectedRoute><CreatorEvents /></ProtectedRoute>} />
+      <Route path="/creator/students" element={<ProtectedRoute><CreatorStudents /></ProtectedRoute>} />
+      <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
+      <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
       
       {/* Admin routes */}
       <Route path="/admin-login" element={<AdminLogin />} />

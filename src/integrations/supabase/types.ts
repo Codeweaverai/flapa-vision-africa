@@ -365,6 +365,45 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_payouts: {
+        Row: {
+          amount: number
+          created_at: string
+          creator_id: string
+          currency: string
+          destination: string
+          id: string
+          method: string
+          status: string
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          creator_id: string
+          currency?: string
+          destination: string
+          id?: string
+          method: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          creator_id?: string
+          currency?: string
+          destination?: string
+          id?: string
+          method?: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       event_bookings: {
         Row: {
           booking_date: string | null
@@ -798,34 +837,46 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bank_account_details: Json | null
           bio: string | null
           created_at: string | null
           full_name: string | null
           id: string
           is_creator: boolean | null
+          mobile_money_number: string | null
+          payout_method: string | null
           role: Database["public"]["Enums"]["user_role"] | null
+          stripe_connect_id: string | null
           updated_at: string | null
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
+          bank_account_details?: Json | null
           bio?: string | null
           created_at?: string | null
           full_name?: string | null
           id: string
           is_creator?: boolean | null
+          mobile_money_number?: string | null
+          payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_connect_id?: string | null
           updated_at?: string | null
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
+          bank_account_details?: Json | null
           bio?: string | null
           created_at?: string | null
           full_name?: string | null
           id?: string
           is_creator?: boolean | null
+          mobile_money_number?: string | null
+          payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_connect_id?: string | null
           updated_at?: string | null
           username?: string | null
         }
