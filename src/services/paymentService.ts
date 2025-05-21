@@ -1,13 +1,14 @@
+
 import { supabase } from '@/lib/supabaseClient';
 import { PaymentTransaction, PayoutTransaction, CreatorBalance } from '@/types/paymentTypes';
 import { toast } from '@/components/ui/use-toast';
 
 export async function fetchCreatorPayments(userId: string): Promise<PaymentTransaction[]> {
   try {
-    // First, check the actual columns in the payment_transactions table
+    // Use a simpler query to avoid excessive type instantiation
     const { data, error } = await supabase
       .from('payment_transactions')
-      .select('*, profiles:user_id(email)')
+      .select('*, user_id(email)')
       .eq('creator_id', userId)
       .order('created_at', { ascending: false });
       
@@ -17,14 +18,14 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
     
     // Process the data to include user email and ensure all required fields are present
     const formattedData: PaymentTransaction[] = data.map(payment => {
-      // Safely extract user email from the profiles join
+      // Safely extract user email with default value
       let userEmail = 'unknown';
       
-      // Type check before accessing profiles
-      const profiles = payment.profiles;
-      if (profiles && typeof profiles === 'object' && 'email' in profiles) {
-        userEmail = String(profiles.email);
-      }
+      // Use optional chaining and nullish coalescing for safer access
+      const userProfile = payment.user_id || {};
+      userEmail = typeof userProfile === 'object' && userProfile && 'email' in userProfile 
+                ? String(userProfile.email) 
+                : 'unknown';
       
       return {
         id: payment.id,
@@ -34,8 +35,9 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         reference_type: payment.reference_type,
         reference_id: payment.reference_id,
         created_at: payment.created_at,
-        // Since payment_method might not exist in the database, provide a default
-        payment_method: payment.payment_method || 'unknown',
+        // Use optional property access with default value
+        payment_method: typeof payment === 'object' && 'payment_method' in payment ? 
+                        String(payment.payment_method) : 'unknown',
         user_id: payment.user_id,
         provider: payment.provider,
         provider_transaction_id: payment.provider_transaction_id,
