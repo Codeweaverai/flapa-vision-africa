@@ -88,7 +88,7 @@ serve(async (req) => {
     try {
       if (!stripeAccountId) {
         console.log("Creating new Stripe Connect Express account");
-        // Create a new Express account with capabilities for account management
+        // Create a new Express account
         const account = await stripe.accounts.create({
           type: 'express',
           email: user.email,
@@ -100,23 +100,6 @@ serve(async (req) => {
             card_payments: { requested: true },
             transfers: { requested: true },
           },
-          settings: {
-            payouts: {
-              schedule: {
-                interval: 'manual',
-              },
-            },
-          },
-          controller: {
-            // Enable account management via Connect Components
-            account_management: {
-              component_enabled: true,
-            },
-            // Specify who is responsible for collecting account requirements
-            requirement_collection: {
-              method: 'application',
-            },
-          }
         });
         
         stripeAccountId = account.id;
