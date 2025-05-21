@@ -26,6 +26,7 @@ export interface Course {
   is_published?: boolean;
   certificate_enabled?: boolean;
   modules?: CourseModule[];
+  tags?: string[];
 }
 
 export interface CourseWithEnrollment extends Course {
@@ -1004,3 +1005,178 @@ export const deleteQuiz = async (quizId: string): Promise<boolean> => {
 
 // Helper alias types for backwards compatibility
 export type Module = CourseModule;
+
+// Add the missing functions for CourseLearningPage
+export const fetchCourseDetails = async (courseId: string): Promise<CourseDetails | null> => {
+  try {
+    if (!courseId) {
+      throw new Error('Course ID is required');
+    }
+
+    // Fetch the course
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', courseId)
+      .single();
+
+    if (courseError) {
+      console.error('Error fetching course:', courseError);
+      return null;
+    }
+
+    // Fetch the modules for this course
+    const { data: modules, error: modulesError } = await supabase
+      .from('course_modules')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true });
+
+    if (modulesError) {
+      console.error('Error fetching modules:', modulesError);
+      return null;
+    }
+
+    // Fetch the lessons for each module
+    const modulesWithLessons = await Promise.all(modules.map(async (module) => {
+      const { data: lessons, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('module_id', module.id)
+        .order('order_index', { ascending: true });
+
+      if (lessonsError) {
+        console.error(`Error fetching lessons for module ${module.id}:`, lessonsError);
+        return {
+          ...module,
+          lessons: []
+        };
+      }
+
+      return {
+        ...module,
+        lessons: lessons || []
+      };
+    }));
+
+    return {
+      ...course,
+      modules: modulesWithLessons
+    } as CourseDetails;
+  } catch (error) {
+    console.error('Error in fetchCourseDetails:', error);
+    return null;
+  }
+};
+
+export const fetchCourseEnrollment = async (userId: string, courseId: string): Promise<Enrollment | null> => {
+  try {
+    if (!userId || !courseId) {
+      throw new Error('User ID and Course ID are required');
+    }
+
+    const { data, error } = await supabase
+      .from('course_enrollments')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('course_id', courseId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching course enrollment:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in fetchCourseEnrollment:', error);
+    return null;
+  }
+};
+
+export const fetchModuleLessons = async (enrollmentId: string, modules: CourseModule[]): Promise<CourseModule[]> => {
+  try {
+    if (!enrollmentId || !modules.length) {
+      return modules;
+    }
+
+    // Get all module IDs
+    const moduleIds = modules.map(module => module.id);
+    
+    // Get all lesson IDs across all modules
+    const allLessons = modules.flatMap(module => module.lessons || []);
+    const lessonIds = allLessons.map(lesson => lesson.id);
+
+    if (lessonIds.length === 0) {
+      return modules;
+    }
+
+    // Fetch progress data for all lessons
+    const { data: progressData, error: progressError } = await supabase
+      .from('lesson_progress')
+      .select('*')
+      .eq('enrollment_id', enrollmentId)
+      .in('lesson_id', lessonIds);
+
+    if (progressError) {
+      console.error('Error fetching lesson progress:', progressError);
+      return modules;
+    }
+
+    // Create a map of lesson IDs to progress
+    const progressMap = new Map();
+    if (progressData) {
+      progressData.forEach(progress => {
+        progressMap.set(progress.lesson_id, {
+          is_completed: progress.is_completed,
+          last_position_seconds: progress.last_position_seconds
+        });
+      });
+    }
+
+    // Add progress data to lessons
+    return modules.map(module => {
+      if (!module.lessons) return module;
+
+      const updatedLessons = module.lessons.map(lesson => {
+        const progress = progressMap.get(lesson.id);
+        return {
+          ...lesson,
+          is_completed: progress ? progress.is_completed : false,
+          last_position_seconds: progress ? progress.last_position_seconds : 0
+        };
+      });
+
+      return {
+        ...module,
+        lessons: updatedLessons
+      };
+    });
+  } catch (error) {
+    console.error('Error in fetchModuleLessons:', error);
+    return modules;
+  }
+};
+
+// Add interface for courseDetails specifically used in CourseLearningPage
+export interface CourseDetails {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail_url: string;
+  modules: {
+    id: string;
+    title: string;
+    description: string;
+    order_index: number;
+    lessons: {
+      id: string;
+      title: string;
+      description: string;
+      video_url: string;
+      order_index: number;
+      is_completed?: boolean;
+      last_position_seconds?: number;
+    }[];
+  }[];
+}

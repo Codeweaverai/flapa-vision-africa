@@ -313,10 +313,10 @@ export const getStripeUserInfo = async (userId: string) => {
     
     // Combine the data
     return {
-      id: userData.id,
-      email: authUserData.user?.email || 'no-email@example.com',
-      username: userData.username || 'user',
-      full_name: userData.full_name || 'Anonymous User'
+      id: userData?.id || userId,
+      email: authUserData?.user?.email || 'no-email@example.com',
+      username: userData?.username || 'user',
+      full_name: userData?.full_name || 'Anonymous User'
     };
   } catch (error) {
     console.error('Error getting user data for Stripe:', error);
