@@ -3,6 +3,7 @@ import React, { ReactNode, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
 
 interface CreatorRouteProps {
   children: ReactNode;
@@ -57,7 +58,7 @@ const CreatorRoute = ({ children }: CreatorRouteProps) => {
     return <Navigate to="/" />;
   }
 
-  return <>{children}</>;
+  return <Layout>{children}</Layout>;
 };
 
 export default CreatorRoute;

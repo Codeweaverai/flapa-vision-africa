@@ -3,6 +3,7 @@ import React, { ReactNode, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
 
 interface AdminRouteProps {
   children: ReactNode;
@@ -56,7 +57,7 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     return <Navigate to="/" />;
   }
 
-  return <>{children}</>;
+  return <Layout>{children}</Layout>;
 };
 
 export default AdminRoute;
