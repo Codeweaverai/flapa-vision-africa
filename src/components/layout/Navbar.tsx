@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Menu, X } from 'lucide-react';
+import { Bell, Compass, Menu, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
 
@@ -74,6 +74,8 @@ const Navbar = () => {
     { name: 'Community', path: '/community' },
     { name: 'Media', path: '/media' },
     { name: 'Consult', path: '/consult' },
+    { name: 'Explore Courses', path: '/explore/courses' },
+    { name: 'Explore Events', path: '/explore/events' },
   ];
 
   const handleSignOut = async () => {
@@ -145,6 +147,12 @@ const Navbar = () => {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => navigate('/account')}>
                     Account
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/explore/courses')}>
+                    Explore Courses
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/explore/events')}>
+                    Explore Events
                   </DropdownMenuItem>
                   {user.user_metadata?.is_creator || user.user_metadata?.role === 'creator' ? (
                     <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>

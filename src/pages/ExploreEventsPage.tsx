@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Search, Users } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Users, Book } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 
@@ -197,209 +196,223 @@ const ExploreEventsPage: React.FC = () => {
   
   return (
     <Layout>
-      <div className="container mx-auto py-12">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-4">Explore Events</h1>
-          <p className="text-xl text-muted-foreground">
-            Discover upcoming events, workshops, and webinars
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Filters</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Event Type</h3>
-                  <Select 
-                    value={selectedType} 
-                    onValueChange={handleTypeChange}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select event type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      {eventTypes.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Date</h3>
-                  <Select 
-                    value={dateFilter} 
-                    onValueChange={handleDateFilterChange}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Filter by date" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Events</SelectItem>
-                      <SelectItem value="upcoming">Upcoming Events</SelectItem>
-                      <SelectItem value="past">Past Events</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="bg-light-purple min-h-screen">
+        <div className="container mx-auto py-12">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold mb-4">Explore Events</h1>
+            <p className="text-xl text-muted-foreground">
+              Discover upcoming events, workshops, and webinars
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <Button variant="outline" asChild>
+                <Link to="/explore/courses" className="flex items-center gap-2">
+                  <Book className="h-4 w-4" /> Explore Courses
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/explore/events" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> All Events
+                </Link>
+              </Button>
+            </div>
           </div>
           
-          <div className="space-y-6">
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <div className="relative flex-grow">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search events..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Button type="submit">Search</Button>
-            </form>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {loading ? (
-                // Loading skeletons
-                Array.from({ length: 6 }).map((_, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <div className="aspect-video w-full">
-                      <Skeleton className="h-full w-full" />
-                    </div>
-                    <CardHeader>
-                      <Skeleton className="h-6 w-3/4 mb-2" />
-                      <Skeleton className="h-4 w-1/4" />
-                    </CardHeader>
-                    <CardContent>
-                      <Skeleton className="h-4 w-full mb-2" />
-                      <Skeleton className="h-4 w-3/4" />
-                    </CardContent>
-                    <CardFooter>
-                      <Skeleton className="h-9 w-full" />
-                    </CardFooter>
-                  </Card>
-                ))
-              ) : events.length === 0 ? (
-                <div className="col-span-3 text-center py-12">
-                  <h3 className="text-lg font-medium mb-2">No events found</h3>
-                  <p className="text-muted-foreground">
-                    Try adjusting your search or filter criteria
-                  </p>
-                </div>
-              ) : (
-                events.map((event) => (
-                  <Card key={event.id} className="overflow-hidden flex flex-col">
-                    <div className="aspect-video w-full bg-muted relative">
-                      {event.image_url ? (
-                        <img 
-                          src={event.image_url} 
-                          alt={event.title} 
-                          className="object-cover w-full h-full"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
-                        </div>
-                      )}
-                      {isUpcoming(event.start_time) && (
-                        <Badge className="absolute top-2 right-2">Upcoming</Badge>
-                      )}
-                    </div>
-                    <CardHeader>
-                      <div className="flex justify-between items-start gap-2">
-                        <CardTitle className="line-clamp-1">{event.title}</CardTitle>
-                        <Badge variant="outline">{event.event_type}</Badge>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatEventDate(event.start_time, event.end_time)}</span>
-                      </div>
-                      {event.location && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          <span className="truncate">{event.location}</span>
-                        </div>
-                      )}
-                    </CardHeader>
-                    <CardContent className="flex-grow">
-                      <p className="line-clamp-2 text-sm text-muted-foreground mb-4">
-                        {event.description}
-                      </p>
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-1" />
-                          {event.registrationCount} {event.capacity ? `/ ${event.capacity}` : ''}
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <div className="flex items-center justify-between w-full">
-                        <div>
-                          {event.is_free ? (
-                            <Badge variant="secondary">Free</Badge>
-                          ) : (
-                            <span className="font-medium">{event.currency} {event.price}</span>
-                          )}
-                        </div>
-                        <Button asChild>
-                          <Link to={`/events/${event.id}`}>View Event</Link>
-                        </Button>
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))
-              )}
+          <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Filters</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h3 className="mb-2 text-sm font-medium">Event Type</h3>
+                    <Select 
+                      value={selectedType} 
+                      onValueChange={handleTypeChange}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select event type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        {eventTypes.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <h3 className="mb-2 text-sm font-medium">Date</h3>
+                    <Select 
+                      value={dateFilter} 
+                      onValueChange={handleDateFilterChange}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Filter by date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Events</SelectItem>
+                        <SelectItem value="upcoming">Upcoming Events</SelectItem>
+                        <SelectItem value="past">Past Events</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
             
-            {totalPages > 1 && (
-              <Pagination className="mt-8">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      href="#" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage > 1) setCurrentPage(currentPage - 1);
-                      }}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-                  
-                  {[...Array(totalPages)].map((_, i) => (
-                    <PaginationItem key={i}>
-                      <PaginationLink 
+            <div className="space-y-6">
+              <form onSubmit={handleSearch} className="flex gap-2">
+                <div className="relative flex-grow">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search events..."
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Button type="submit">Search</Button>
+              </form>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <Card key={i} className="overflow-hidden">
+                      <div className="aspect-video w-full">
+                        <Skeleton className="h-full w-full" />
+                      </div>
+                      <CardHeader>
+                        <Skeleton className="h-6 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-1/4" />
+                      </CardHeader>
+                      <CardContent>
+                        <Skeleton className="h-4 w-full mb-2" />
+                        <Skeleton className="h-4 w-3/4" />
+                      </CardContent>
+                      <CardFooter>
+                        <Skeleton className="h-9 w-full" />
+                      </CardFooter>
+                    </Card>
+                  ))
+                ) : events.length === 0 ? (
+                  <div className="col-span-3 text-center py-12">
+                    <h3 className="text-lg font-medium mb-2">No events found</h3>
+                    <p className="text-muted-foreground">
+                      Try adjusting your search or filter criteria
+                    </p>
+                  </div>
+                ) : (
+                  events.map((event) => (
+                    <Card key={event.id} className="overflow-hidden flex flex-col">
+                      <div className="aspect-video w-full bg-muted relative">
+                        {event.image_url ? (
+                          <img 
+                            src={event.image_url} 
+                            alt={event.title} 
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
+                          </div>
+                        )}
+                        {isUpcoming(event.start_time) && (
+                          <Badge className="absolute top-2 right-2">Upcoming</Badge>
+                        )}
+                      </div>
+                      <CardHeader>
+                        <div className="flex justify-between items-start gap-2">
+                          <CardTitle className="line-clamp-1">{event.title}</CardTitle>
+                          <Badge variant="outline">{event.event_type}</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>{formatEventDate(event.start_time, event.end_time)}</span>
+                        </div>
+                        {event.location && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MapPin className="h-4 w-4" />
+                            <span className="truncate">{event.location}</span>
+                          </div>
+                        )}
+                      </CardHeader>
+                      <CardContent className="flex-grow">
+                        <p className="line-clamp-2 text-sm text-muted-foreground mb-4">
+                          {event.description}
+                        </p>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-1" />
+                            {event.registrationCount} {event.capacity ? `/ ${event.capacity}` : ''}
+                          </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <div className="flex items-center justify-between w-full">
+                          <div>
+                            {event.is_free ? (
+                              <Badge variant="secondary">Free</Badge>
+                            ) : (
+                              <span className="font-medium">{event.currency} {event.price}</span>
+                            )}
+                          </div>
+                          <Button asChild>
+                            <Link to={`/events/${event.id}`}>View Event</Link>
+                          </Button>
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  ))
+                )}
+              </div>
+              
+              {totalPages > 1 && (
+                <Pagination className="mt-8">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
                         href="#" 
                         onClick={(e) => {
                           e.preventDefault();
-                          setCurrentPage(i + 1);
+                          if (currentPage > 1) setCurrentPage(currentPage - 1);
                         }}
-                        isActive={currentPage === i + 1}
-                      >
-                        {i + 1}
-                      </PaginationLink>
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                      />
                     </PaginationItem>
-                  ))}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      href="#" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                      }}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            )}
+                    
+                    {[...Array(totalPages)].map((_, i) => (
+                      <PaginationItem key={i}>
+                        <PaginationLink 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setCurrentPage(i + 1);
+                          }}
+                          isActive={currentPage === i + 1}
+                        >
+                          {i + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                        }}
+                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </div>
           </div>
         </div>
       </div>
