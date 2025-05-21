@@ -1,5 +1,5 @@
+
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   // Clean up auth state helper
   const cleanupAuthState = () => {
@@ -113,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log('Sign up successful:', data);
       toast.success("Account created! Check your email to verify your account.");
-      navigate('/');
+      window.location.href = '/';
     } catch (error: any) {
       console.error('Sign up error catch:', error);
       toast.error(error.message || "An error occurred during sign up");
@@ -141,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       console.log('Sign in successful:', data);
-      navigate('/account');
+      window.location.href = '/account';
     } catch (error: any) {
       console.error('Sign in error catch:', error);
       toast.error(error.message || "An error occurred during sign in");

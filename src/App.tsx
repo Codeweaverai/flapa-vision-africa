@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { supabase } from './lib/supabaseClient';
 import './App.css';
@@ -22,6 +22,7 @@ import CreatorCourseForm from './pages/creator/CreatorCourseForm';
 import AdminCoursesList from './pages/admin/AdminCoursesList';
 import AdminRoute from './components/admin/AdminRoute';
 import CreatorRoute from './components/creator/CreatorRoute';
+import AuthPage from './pages/AuthPage';
 
 const App = () => {
   const { user, loading } = useAuth();
@@ -59,93 +60,49 @@ const App = () => {
 
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (!user) {
-      return <Navigate to="/" replace />;
+      return <Navigate to="/auth" replace />;
     }
 
     return <Layout>{children}</Layout>;
   };
 
-  const router = createBrowserRouter([
-    {
-      path: "/",
-      element: <EventsPage />,
-    },
-    {
-      path: "/events/:eventId",
-      element: <EventDetailPage />,
-    },
-    {
-      path: "/courses",
-      element: <CourseLearningPage />,
-    },
-    {
-      path: "/courses/:courseId",
-      element: <CourseDetailPage />,
-    },
-    {
-      path: "/profile",
-      element: <ProtectedRoute><AccountPage /></ProtectedRoute>,
-    },
-    {
-      path: "/events/create",
-      element: <ProtectedRoute><AdminEventForm /></ProtectedRoute>,
-    },
-    {
-      path: "/admin/dashboard",
-      element: <AdminRoute><AdminDashboard /></AdminRoute>,
-    },
-    {
-      path: "/admin/events",
-      element: <AdminRoute><AdminEvents /></AdminRoute>,
-    },
-    {
-      path: "/admin/events/create",
-      element: <AdminRoute><AdminEventForm /></AdminRoute>,
-    },
-    {
-      path: "/admin/events/:eventId",
-      element: <AdminRoute><AdminEventForm /></AdminRoute>,
-    },
-    {
-      path: "/admin/registrations",
-      element: <AdminRoute><AdminRegistrations /></AdminRoute>,
-    },
-    {
-      path: "/admin/settings",
-      element: <AdminRoute><AdminSettings /></AdminRoute>,
-    },
-    {
-      path: "/admin/courses/create",
-      element: <AdminRoute><CourseForm /></AdminRoute>,
-    },
-    {
-      path: "/admin/courses/:courseId",
-      element: <AdminRoute><CourseForm /></AdminRoute>,
-    },
-    {
-      path: "/admin/courses/content/:courseId",
-      element: <AdminRoute><CourseContentPage /></AdminRoute>,
-    },
-    {
-      path: "/creator/courses",
-      element: <CreatorRoute><CreatorCourses /></CreatorRoute>,
-    },
-    {
-      path: "/creator/courses/create",
-      element: <CreatorRoute><CreatorCourseForm /></CreatorRoute>,
-    },
-    {
-      path: "/creator/courses/:courseId",
-      element: <CreatorRoute><CreatorCourseForm /></CreatorRoute>,
-    },
-    {
-      path: "/admin/courses-list",
-      element: <AdminRoute><AdminCoursesList /></AdminRoute>,
-    },
-  ]);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <RouterProvider router={router} />
+    <Routes>
+      <Route path="/" element={<EventsPage />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/events/:eventId" element={<EventDetailPage />} />
+      <Route path="/courses" element={<CourseLearningPage />} />
+      <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+      
+      {/* Protected Routes */}
+      <Route path="/profile" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+      <Route path="/events/create" element={<ProtectedRoute><AdminEventForm /></ProtectedRoute>} />
+      
+      {/* Admin Routes */}
+      <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+      <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
+      <Route path="/admin/events/create" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
+      <Route path="/admin/events/:eventId" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
+      <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
+      <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+      <Route path="/admin/courses/create" element={<AdminRoute><CourseForm /></AdminRoute>} />
+      <Route path="/admin/courses/:courseId" element={<AdminRoute><CourseForm /></AdminRoute>} />
+      <Route path="/admin/courses/content/:courseId" element={<AdminRoute><CourseContentPage /></AdminRoute>} />
+      <Route path="/admin/courses-list" element={<AdminRoute><AdminCoursesList /></AdminRoute>} />
+      
+      {/* Creator Routes */}
+      <Route path="/creator/courses" element={<CreatorRoute><CreatorCourses /></CreatorRoute>} />
+      <Route path="/creator/courses/create" element={<CreatorRoute><CreatorCourseForm /></CreatorRoute>} />
+      <Route path="/creator/courses/:courseId" element={<CreatorRoute><CreatorCourseForm /></CreatorRoute>} />
+    </Routes>
   );
 };
 
