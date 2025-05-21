@@ -37,27 +37,23 @@ export interface CourseWithEnrollment extends Course {
 export interface CourseModule {
   id: string;
   title: string;
-  description?: string;
-  order_index: number;
+  description: string | null;
   course_id: string;
-  lessons?: Lesson[];
-  created_at?: string;
-  updated_at?: string;
+  order_index: number;
+  lessons: Lesson[];
 }
 
 export interface Lesson {
   id: string;
   title: string;
-  description?: string;
+  description: string | null;
+  video_url: string | null;
   module_id: string;
-  video_url?: string;
   order_index: number;
   content_type?: string;
   content?: any;
-  materials_urls?: string[];
-  quizzes?: Quiz[];
-  created_at?: string;
-  updated_at?: string;
+  is_completed?: boolean;
+  last_position_seconds?: number;
 }
 
 export interface Quiz {
@@ -1009,152 +1005,116 @@ export type Module = CourseModule;
 // Add the missing functions for CourseLearningPage
 export const fetchCourseDetails = async (courseId: string): Promise<CourseDetails | null> => {
   try {
-    if (!courseId) {
-      throw new Error('Course ID is required');
-    }
-
-    // Fetch the course
-    const { data: course, error: courseError } = await supabase
+    const { data, error } = await supabase
       .from('courses')
       .select('*')
       .eq('id', courseId)
       .single();
+      
+    if (error) throw error;
+    if (!data) return null;
+    
+    return data as CourseDetails;
+  } catch (error) {
+    console.error('Error fetching course details:', error);
+    return null;
+  }
+};
 
-    if (courseError) {
-      console.error('Error fetching course:', courseError);
-      return null;
-    }
+export const fetchCourseEnrollment = async (courseId: string, userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('course_enrollments')
+      .select('*')
+      .eq('course_id', courseId)
+      .eq('user_id', userId)
+      .single();
+      
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error fetching course enrollment:', error);
+    return null;
+  }
+};
 
-    // Fetch the modules for this course
+export const fetchModuleLessons = async (courseId: string, userId?: string): Promise<CourseModule[]> => {
+  try {
+    // Fetch modules
     const { data: modules, error: modulesError } = await supabase
       .from('course_modules')
       .select('*')
       .eq('course_id', courseId)
       .order('order_index', { ascending: true });
-
-    if (modulesError) {
-      console.error('Error fetching modules:', modulesError);
-      return null;
-    }
-
-    // Fetch the lessons for each module
-    const modulesWithLessons = await Promise.all(modules.map(async (module) => {
-      const { data: lessons, error: lessonsError } = await supabase
-        .from('lessons')
-        .select('*')
-        .eq('module_id', module.id)
-        .order('order_index', { ascending: true });
-
-      if (lessonsError) {
-        console.error(`Error fetching lessons for module ${module.id}:`, lessonsError);
-        return {
-          ...module,
-          lessons: []
-        };
-      }
-
-      return {
-        ...module,
-        lessons: lessons || []
-      };
-    }));
-
-    return {
-      ...course,
-      modules: modulesWithLessons
-    } as CourseDetails;
-  } catch (error) {
-    console.error('Error in fetchCourseDetails:', error);
-    return null;
-  }
-};
-
-export const fetchCourseEnrollment = async (userId: string, courseId: string): Promise<Enrollment | null> => {
-  try {
-    if (!userId || !courseId) {
-      throw new Error('User ID and Course ID are required');
-    }
-
-    const { data, error } = await supabase
-      .from('course_enrollments')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('course_id', courseId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching course enrollment:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in fetchCourseEnrollment:', error);
-    return null;
-  }
-};
-
-export const fetchModuleLessons = async (enrollmentId: string, modules: CourseModule[]): Promise<CourseModule[]> => {
-  try {
-    if (!enrollmentId || !modules.length) {
-      return modules;
-    }
-
-    // Get all module IDs
-    const moduleIds = modules.map(module => module.id);
+      
+    if (modulesError) throw modulesError;
     
-    // Get all lesson IDs across all modules
-    const allLessons = modules.flatMap(module => module.lessons || []);
-    const lessonIds = allLessons.map(lesson => lesson.id);
-
-    if (lessonIds.length === 0) {
-      return modules;
-    }
-
-    // Fetch progress data for all lessons
-    const { data: progressData, error: progressError } = await supabase
-      .from('lesson_progress')
+    if (!modules || modules.length === 0) return [];
+    
+    // Fetch all lessons for these modules
+    const moduleIds = modules.map(module => module.id);
+    const { data: lessons, error: lessonsError } = await supabase
+      .from('lessons')
       .select('*')
-      .eq('enrollment_id', enrollmentId)
-      .in('lesson_id', lessonIds);
-
-    if (progressError) {
-      console.error('Error fetching lesson progress:', progressError);
-      return modules;
+      .in('module_id', moduleIds)
+      .order('order_index', { ascending: true });
+      
+    if (lessonsError) throw lessonsError;
+    
+    // If user is provided, fetch lesson progress
+    let lessonProgress: Record<string, { is_completed: boolean, last_position_seconds: number }> = {};
+    
+    if (userId) {
+      // First get user's enrollment for this course
+      const { data: enrollment } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('user_id', userId)
+        .single();
+        
+      if (enrollment) {
+        // Then get lesson progress for this enrollment
+        const { data: progress } = await supabase
+          .from('lesson_progress')
+          .select('*')
+          .eq('enrollment_id', enrollment.id);
+          
+        if (progress) {
+          // Create a map of lesson_id to progress data
+          progress.forEach(item => {
+            lessonProgress[item.lesson_id] = {
+              is_completed: item.is_completed || false,
+              last_position_seconds: item.last_position_seconds || 0
+            };
+          });
+        }
+      }
     }
-
-    // Create a map of lesson IDs to progress
-    const progressMap = new Map();
-    if (progressData) {
-      progressData.forEach(progress => {
-        progressMap.set(progress.lesson_id, {
-          is_completed: progress.is_completed,
-          last_position_seconds: progress.last_position_seconds
+    
+    // Organize lessons into modules and add progress data if available
+    const result: CourseModule[] = modules.map(module => {
+      const moduleLessons = lessons
+        .filter(lesson => lesson.module_id === module.id)
+        .map(lesson => {
+          const progress = lessonProgress[lesson.id];
+          return {
+            ...lesson,
+            is_completed: progress?.is_completed || false,
+            last_position_seconds: progress?.last_position_seconds || 0
+          };
         });
-      });
-    }
-
-    // Add progress data to lessons
-    return modules.map(module => {
-      if (!module.lessons) return module;
-
-      const updatedLessons = module.lessons.map(lesson => {
-        const progress = progressMap.get(lesson.id);
-        return {
-          ...lesson,
-          is_completed: progress ? progress.is_completed : false,
-          last_position_seconds: progress ? progress.last_position_seconds : 0
-        };
-      });
-
+        
       return {
         ...module,
-        lessons: updatedLessons
+        lessons: moduleLessons
       };
     });
+    
+    return result;
   } catch (error) {
-    console.error('Error in fetchModuleLessons:', error);
-    return modules;
+    console.error('Error fetching module lessons:', error);
+    return [];
   }
 };
 
@@ -1163,20 +1123,13 @@ export interface CourseDetails {
   id: string;
   title: string;
   description: string;
-  thumbnail_url: string;
-  modules: {
-    id: string;
-    title: string;
-    description: string;
-    order_index: number;
-    lessons: {
-      id: string;
-      title: string;
-      description: string;
-      video_url: string;
-      order_index: number;
-      is_completed?: boolean;
-      last_position_seconds?: number;
-    }[];
-  }[];
+  thumbnail_url?: string;
+  duration_minutes: number;
+  price: number;
+  is_free: boolean;
+  category: string;
+  difficulty_level: string;
+  creator_id?: string;
+  tags?: string[];
+  modules?: CourseModule[];
 }

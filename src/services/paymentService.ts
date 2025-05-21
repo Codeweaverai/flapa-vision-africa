@@ -43,18 +43,18 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
       // Get unique user IDs
       const userIds = [...new Set(formattedData.map(p => p.user_id))];
       
-      // Fetch user profiles separately - make sure we only select fields that actually exist
+      // Fetch user profiles separately - we need to handle the case where the profile might not have all fields
       const { data: userProfiles } = await supabase
         .from('profiles')
-        .select('id, username, full_name, email')
+        .select('id, username, full_name')
         .in('id', userIds);
         
       // Create a map of userId to display name (using username or full_name)
       const userDisplayMap = new Map();
       if (userProfiles) {
         userProfiles.forEach(profile => {
-          // Use email, username or full_name or 'unknown' as the display identifier
-          const displayName = profile.email || profile.username || profile.full_name || 'unknown';
+          // Use username or full_name or 'unknown' as the display identifier
+          const displayName = profile.username || profile.full_name || 'unknown';
           userDisplayMap.set(profile.id, displayName);
         });
         
