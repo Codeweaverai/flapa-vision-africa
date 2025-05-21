@@ -6,7 +6,7 @@ import AboutSection from '@/components/home/AboutSection';
 import EventsSection from '@/components/home/EventsSection';
 import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
-import SpeakingSection from '@/components/home/SpeakingSection';
+import AnimationsSection from '@/components/home/AnimationsSection';
 import CallToAction from '@/components/home/CallToAction';
 
 const HomePage = () => {
@@ -15,9 +15,9 @@ const HomePage = () => {
       <HeroSection />
       <AboutSection />
       <CoursesSection />
-      <MediaSection />
+      <AnimationsSection />
       <EventsSection />
-      <SpeakingSection />
+      <MediaSection />
       <CallToAction />
     </Layout>
   );

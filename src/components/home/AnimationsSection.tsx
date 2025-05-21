@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -7,8 +8,8 @@ const AnimationsSection = () => {
       <div className="section-container">
         <h2 className="heading-lg text-center mb-4">AI Workflow Automations</h2>
         <p className="text-xl text-center mb-12 max-w-3xl mx-auto">
-          Transforming business operations through intelligent automation solutions 
-          that streamline processes, reduce costs, and increase productivity.
+          Elevate your skills and career with SkillPulse AI automation solutions that 
+          streamline processes, reduce operational overhead, and boost your entrepreneurial potential.
         </p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -21,10 +22,10 @@ const AnimationsSection = () => {
                 <line x1="6" y1="18" x2="6.01" y2="18"></line>
               </svg>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Intelligent Processing</h3>
+            <h3 className="text-xl font-semibold mb-2">Document Intelligence</h3>
             <p className="text-gray-600">
-              Our AI-powered document processing systems automatically extract, categorize, 
-              and route information with 98% accuracy.
+              Our AI-powered document processing systems automatically extract, categorize, and 
+              analyze business documents, giving entrepreneurs more time for strategic decision-making.
             </p>
           </div>
           
@@ -37,10 +38,10 @@ const AnimationsSection = () => {
                 <path d="M13 11v2"></path>
               </svg>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Workflow Optimization</h3>
+            <h3 className="text-xl font-semibold mb-2">Smart Content Creation</h3>
             <p className="text-gray-600">
-              Streamline complex business processes by identifying bottlenecks and 
-              automating repetitive tasks, reducing processing time by up to 75%.
+              Accelerate your content marketing efforts with AI-generated proposals, social media content, 
+              and marketing copy that resonates with your target audience and saves valuable time.
             </p>
           </div>
           
@@ -53,10 +54,10 @@ const AnimationsSection = () => {
                 <path d="M8 17v-3"></path>
               </svg>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Predictive Analytics</h3>
+            <h3 className="text-xl font-semibold mb-2">Business Analytics</h3>
             <p className="text-gray-600">
-              Forecast trends, anticipate issues, and make data-driven decisions 
-              with our advanced predictive models built on your business data.
+              Leverage AI-powered analytics to gain insights from your business data, identify growth opportunities, 
+              and make data-driven decisions that give your entrepreneurial ventures a competitive edge.
             </p>
           </div>
         </div>
@@ -64,7 +65,7 @@ const AnimationsSection = () => {
         <div className="text-center">
           <Button asChild size="lg">
             <Link to="/animations">
-              Explore AI Automation Solutions
+              Enhance Your Business with AI
             </Link>
           </Button>
         </div>

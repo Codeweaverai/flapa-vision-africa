@@ -9,15 +9,20 @@ import { Course, fetchPublishedCourses } from '@/services/courseService';
 
 const CoursesSection = () => {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [visibleCourses, setVisibleCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [showMore, setShowMore] = useState<boolean>(false);
+  const initialCoursesCount = 8; // Show 8 courses initially (2 rows of 4)
 
   useEffect(() => {
     const loadCourses = async () => {
       setLoading(true);
       try {
-        // Fetch courses and limit to 3 for display on homepage
+        // Fetch courses and limit to 20 for display on homepage
         const allCourses = await fetchPublishedCourses();
-        setCourses(allCourses.slice(0, 3));
+        const limitedCourses = allCourses.slice(0, 20);
+        setCourses(limitedCourses);
+        setVisibleCourses(limitedCourses.slice(0, initialCoursesCount));
       } catch (error) {
         console.error('Error loading courses:', error);
       } finally {
@@ -27,6 +32,18 @@ const CoursesSection = () => {
 
     loadCourses();
   }, []);
+
+  const handleShowMore = () => {
+    if (showMore) {
+      // If already showing more, collapse back to initial view
+      setVisibleCourses(courses.slice(0, initialCoursesCount));
+      setShowMore(false);
+    } else {
+      // If showing initial view, expand to show all courses
+      setVisibleCourses(courses);
+      setShowMore(true);
+    }
+  };
 
   return (
     <section className="py-16 bg-gray-50">
@@ -46,8 +63,8 @@ const CoursesSection = () => {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
               <Card key={i} className="animate-pulse">
                 <div className="h-48 bg-gray-200 rounded-t-lg"></div>
                 <CardHeader>
@@ -71,50 +88,65 @@ const CoursesSection = () => {
             <p className="mt-2 text-gray-500">Check back soon for new learning materials.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {courses.map((course) => (
-              <Card key={course.id} className="flex flex-col h-full transition-all hover:shadow-md">
-                <div className="relative h-48">
-                  {course.thumbnail_url ? (
-                    <img
-                      src={course.thumbnail_url}
-                      alt={course.title}
-                      className="w-full h-full object-cover rounded-t-lg"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-primary/10 flex items-center justify-center rounded-t-lg">
-                      <BookOpen className="h-12 w-12 text-primary/40" />
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {visibleCourses.map((course) => (
+                <Card key={course.id} className="flex flex-col h-full transition-all hover:shadow-md">
+                  <div className="relative h-48">
+                    {course.thumbnail_url ? (
+                      <img
+                        src={course.thumbnail_url}
+                        alt={course.title}
+                        className="w-full h-full object-cover rounded-t-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-primary/10 flex items-center justify-center rounded-t-lg">
+                        <BookOpen className="h-12 w-12 text-primary/40" />
+                      </div>
+                    )}
+                    <Badge className="absolute top-3 right-3">
+                      {course.is_free ? "Free" : `$${course.price}`}
+                    </Badge>
+                  </div>
+                  <CardHeader>
+                    <div className="flex gap-2 mb-2">
+                      <Badge variant="outline">{course.category}</Badge>
+                      <Badge variant="outline">{course.difficulty_level}</Badge>
                     </div>
-                  )}
-                  <Badge className="absolute top-3 right-3">
-                    {course.is_free ? "Free" : `$${course.price}`}
-                  </Badge>
-                </div>
-                <CardHeader>
-                  <div className="flex gap-2 mb-2">
-                    <Badge variant="outline">{course.category}</Badge>
-                    <Badge variant="outline">{course.difficulty_level}</Badge>
-                  </div>
-                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="text-sm text-gray-500 line-clamp-2">{course.summary}</p>
-                  <div className="flex items-center mt-3 text-sm text-muted-foreground">
-                    <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                    <span className="mr-4">New</span>
-                    <span>{Math.round(course.duration_minutes / 60)} hours</span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full" asChild>
-                    <Link to={`/learning/course/${course.id}`}>
-                      View Course
-                    </Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+                    <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-sm text-gray-500 line-clamp-2">{course.summary}</p>
+                    <div className="flex items-center mt-3 text-sm text-muted-foreground">
+                      <Star className="h-4 w-4 text-yellow-500 mr-1" />
+                      <span className="mr-4">New</span>
+                      <span>{Math.round(course.duration_minutes / 60)} hours</span>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button className="w-full" asChild>
+                      <Link to={`/learning/course/${course.id}`}>
+                        View Course
+                      </Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+            
+            {courses.length > initialCoursesCount && (
+              <div className="flex justify-center mt-10">
+                <Button 
+                  onClick={handleShowMore} 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                >
+                  {showMore ? "Show Less" : "View More Courses"} 
+                  <ArrowRight className={`h-4 w-4 transition-transform ${showMore ? 'rotate-90' : ''}`} />
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
