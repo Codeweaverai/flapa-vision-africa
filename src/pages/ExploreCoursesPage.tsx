@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,9 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Link } from 'react-router-dom';
-import { Book, Clock, Search, Users, Compass } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Book, Clock, Search, Users, Compass, DollarSign } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Course {
   id: string;
@@ -35,6 +38,7 @@ interface Course {
   category: string;
   difficulty_level: string;
   enrollmentCount: number;
+  creator_id: string;
 }
 
 const ExploreCoursesPage: React.FC = () => {
@@ -47,7 +51,11 @@ const ExploreCoursesPage: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [processingPayment, setProcessingPayment] = useState<string | null>(null);
   const coursesPerPage = 9;
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchCourses();
@@ -83,7 +91,7 @@ const ExploreCoursesPage: React.FC = () => {
       const from = (currentPage - 1) * coursesPerPage;
       const to = from + coursesPerPage - 1;
       
-      // Get counts for pagination - fixed to create a new query instead of clone
+      // Get counts for pagination - create a new query instead of clone
       const countQuery = supabase
         .from('courses')
         .select('*', { count: 'exact', head: true })
@@ -173,6 +181,72 @@ const ExploreCoursesPage: React.FC = () => {
   const handleDifficultyChange = (value: string) => {
     setSelectedDifficulty(value);
     setCurrentPage(1); // Reset to first page on filter change
+  };
+  
+  const handlePurchaseCourse = async (course: Course) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to purchase this course",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+    
+    try {
+      setProcessingPayment(course.id);
+      
+      // Create a Stripe checkout session
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: {
+          amount: course.price,
+          currency: 'usd',
+          referenceType: 'course',
+          referenceId: course.id,
+          userId: user.id,
+          eventTitle: course.title
+        }
+      });
+      
+      if (error) {
+        console.error('Error creating checkout session:', error);
+        toast({
+          title: "Payment Error",
+          description: "Failed to initialize payment process",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (data?.url) {
+        // Open Stripe checkout in a new tab
+        window.open(data.url, '_blank');
+        
+        // Check payment status after a delay
+        setTimeout(async () => {
+          const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-stripe-payment', {
+            body: { sessionId: data.sessionId }
+          });
+          
+          if (!verificationError && verificationData?.status === 'completed') {
+            toast({
+              title: "Payment Successful",
+              description: "Your course purchase was successful"
+            });
+          }
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error purchasing course:', error);
+      toast({
+        title: "Payment Error",
+        description: "An error occurred during the payment process",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingPayment(null);
+    }
   };
   
   return (
@@ -333,12 +407,26 @@ const ExploreCoursesPage: React.FC = () => {
                             {course.is_free ? (
                               <Badge variant="secondary">Free</Badge>
                             ) : (
-                              <span className="font-medium">${course.price}</span>
+                              <span className="font-medium flex items-center">
+                                <DollarSign className="h-4 w-4 mr-1" />{course.price}
+                              </span>
                             )}
                           </div>
-                          <Button asChild>
-                            <Link to={`/learning/course/${course.id}`}>View Course</Link>
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button variant="outline" asChild>
+                              <Link to={`/learning/course/${course.id}`}>Details</Link>
+                            </Button>
+                            {course.is_free ? (
+                              <Button>Enroll Now</Button>
+                            ) : (
+                              <Button 
+                                onClick={() => handlePurchaseCourse(course)}
+                                disabled={processingPayment === course.id}
+                              >
+                                {processingPayment === course.id ? 'Processing...' : 'Buy Now'}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CardFooter>
                     </Card>

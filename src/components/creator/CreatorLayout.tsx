@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Rocket, BookOpen, Calendar, Users, BarChart, Settings } from 'lucide-react';
+import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
@@ -62,6 +62,11 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
       label: 'Students',
       href: '/creator/students',
       icon: <Users className="h-5 w-5 mr-2" />
+    },
+    {
+      label: 'Payments',
+      href: '/creator/payments',
+      icon: <DollarSign className="h-5 w-5 mr-2" />
     },
     {
       label: 'Analytics',

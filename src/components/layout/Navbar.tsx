@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Compass, Menu, X } from 'lucide-react';
+import { Bell, Compass, Menu, DollarSign } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
 
@@ -155,9 +155,14 @@ const Navbar = () => {
                     Explore Events
                   </DropdownMenuItem>
                   {user.user_metadata?.is_creator || user.user_metadata?.role === 'creator' ? (
-                    <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>
-                      Creator Dashboard
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>
+                        Creator Dashboard
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/creator/payments')}>
+                        Payments & Payouts
+                      </DropdownMenuItem>
+                    </>
                   ) : null}
                   {user.user_metadata?.role === 'admin' ? (
                     <DropdownMenuItem onClick={() => navigate('/admin')}>
