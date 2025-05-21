@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabaseClient';
 import { getStripeAccountStatus, connectStripeAccount } from '@/services/paymentService';
 import { useAuth } from '@/contexts/AuthContext';
+import StripeAccountManagement from '@/components/creator/StripeAccountManagement';
 
 const CreatorSettings = () => {
   const { user } = useAuth();
@@ -273,6 +274,17 @@ const CreatorSettings = () => {
                   {stripeConnected ? 'Reconnect Stripe Account' : 'Connect Stripe Account'}
                 </Button>
               </div>
+              
+              {/* Add Stripe Account Management */}
+              {stripeConnected && stripeAccountId && (
+                <div className="p-4 border rounded-md">
+                  <h3 className="text-lg font-semibold mb-2">Account Management</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Update your account details, bank account information, and manage your Stripe Connect account settings.
+                  </p>
+                  <StripeAccountManagement stripeAccountId={stripeAccountId} />
+                </div>
+              )}
               
               <div className="space-y-2">
                 <Label htmlFor="payout_method">Preferred Payout Method</Label>
