@@ -32,9 +32,12 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
     // Process the data to include user email and ensure all required fields are present
     const formattedData: PaymentTransaction[] = data.map(payment => {
       // Safely extract user email from the profiles join
-      const userEmail = payment.profiles && typeof payment.profiles === 'object' && 'email' in payment.profiles 
-        ? String(payment.profiles.email) 
-        : 'unknown';
+      const userEmail = payment.profiles && 
+        typeof payment.profiles === 'object' && 
+        payment.profiles !== null && 
+        'email' in payment.profiles 
+          ? String(payment.profiles.email) 
+          : 'unknown';
       
       return {
         id: payment.id,
