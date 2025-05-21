@@ -5,6 +5,7 @@ import { toast } from '@/components/ui/use-toast';
 
 export async function fetchCreatorPayments(userId: string): Promise<PaymentTransaction[]> {
   try {
+    // First, check the actual columns in the payment_transactions table
     const { data, error } = await supabase
       .from('payment_transactions')
       .select(`
@@ -15,23 +16,26 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         reference_type,
         reference_id,
         created_at,
-        payment_method,
         user_id,
         provider,
         provider_transaction_id,
         metadata,
-        user:profiles(email)
+        profiles:user_id(email)
       `)
       .eq('creator_id', userId)
       .order('created_at', { ascending: false });
       
     if (error) throw error;
     
-    if (!data) return [];
+    if (!data || data.length === 0) return [];
     
     // Process the data to include user email and ensure all required fields are present
-    const formattedData = data.map(payment => {
-      const userEmail = payment.user && 'email' in payment.user ? payment.user.email : 'unknown';
+    const formattedData: PaymentTransaction[] = data.map(payment => {
+      // Safely extract user email from the profiles join
+      const userEmail = payment.profiles && typeof payment.profiles === 'object' && 'email' in payment.profiles 
+        ? String(payment.profiles.email) 
+        : 'unknown';
+      
       return {
         id: payment.id,
         amount: payment.amount,
@@ -40,13 +44,14 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         reference_type: payment.reference_type,
         reference_id: payment.reference_id,
         created_at: payment.created_at,
-        payment_method: payment.payment_method || 'unknown',
+        // Since payment_method might not exist in the database, provide a default
+        payment_method: 'unknown',
         user_id: payment.user_id,
         provider: payment.provider,
         provider_transaction_id: payment.provider_transaction_id,
         metadata: payment.metadata,
         user_email: userEmail
-      } as PaymentTransaction;
+      };
     });
     
     return formattedData;
