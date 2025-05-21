@@ -34,7 +34,7 @@ const App = () => {
         try {
           const { data, error } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, is_creator')
             .eq('id', user.id)
             .single();
 
@@ -42,7 +42,8 @@ const App = () => {
             console.error('Error fetching user role:', error);
           } else {
             setIsAdmin(data?.role === 'admin');
-            setIsCreator(data?.role === 'creator' || data?.is_creator === true);
+            // Check for the is_creator boolean field
+            setIsCreator(data?.is_creator === true);
           }
         } catch (error) {
           console.error('Error checking user role:', error);

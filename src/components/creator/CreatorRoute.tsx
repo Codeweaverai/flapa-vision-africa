@@ -27,7 +27,8 @@ const CreatorRoute = ({ children }: CreatorRouteProps) => {
             console.error('Error fetching user role:', error);
             setIsCreator(false);
           } else {
-            setIsCreator(data.role === 'creator' || data.is_creator === true);
+            // Check either role or is_creator flag
+            setIsCreator(data?.is_creator === true);
           }
         } catch (error) {
           console.error('Error checking creator status:', error);
