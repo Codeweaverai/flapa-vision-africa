@@ -294,3 +294,37 @@ async function updatePaymentFromPaymentIntent(paymentIntent: any, status: string
     return false;
   }
 }
+
+export const getStripeUserInfo = async (userId: string) => {
+  try {
+    // Get the user profile data
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('id, full_name, username')
+      .eq('id', userId)
+      .single();
+      
+    if (userError) throw userError;
+    
+    // Get the user email from auth.users table separately
+    const { data: authUserData, error: authError } = await supabase.auth.admin.getUserById(userId);
+    
+    if (authError) throw authError;
+    
+    // Combine the data
+    return {
+      id: userData.id,
+      email: authUserData.user?.email || 'no-email@example.com',
+      username: userData.username || 'user',
+      full_name: userData.full_name || 'Anonymous User'
+    };
+  } catch (error) {
+    console.error('Error getting user data for Stripe:', error);
+    return {
+      id: userId,
+      email: 'no-email@example.com',
+      username: 'user',
+      full_name: 'Anonymous User'
+    };
+  }
+};

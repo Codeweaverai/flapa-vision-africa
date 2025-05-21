@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [checkingEnrollment, setCheckingEnrollment] = useState(true);
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -31,7 +31,10 @@ const CourseDetailPage = () => {
       setCourse(courseData);
       
       if (user) {
-        checkEnrollment();
+        checkEnrollmentStatus(user.id, courseId).then(status => {
+          setIsEnrolled(status);
+          setCheckingEnrollment(false);
+        });
       }
       
       setLoading(false);

@@ -258,53 +258,62 @@ export const deleteCourse = async (courseId: string): Promise<boolean> => {
 };
 
 // Function to create a new course
-export const createCourse = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
+export const createNewCourse = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
   try {
-    if (!courseData.title) {
-      toast.error('Course title is required');
+    // Ensure all required fields are present
+    if (!courseData.title || !courseData.description || !courseData.category || 
+        !courseData.difficulty_level || courseData.duration_minutes === undefined) {
+      console.error('Error creating course: Missing required fields');
+      toast.error('Please fill in all required fields');
       return null;
     }
-
-    // Make sure required fields exist before creating course
-    const newCourse = {
-      ...courseData,
+    
+    // Create the complete course object with required fields
+    const courseWithCreator = {
+      title: courseData.title,
+      description: courseData.description,
+      summary: courseData.summary || courseData.title, // Provide a default summary if not provided
+      category: courseData.category,
+      difficulty_level: courseData.difficulty_level,
+      duration_minutes: courseData.duration_minutes,
       creator_id: creatorId,
       is_published: courseData.is_published || false,
-      published: courseData.is_published || false,
-      is_free: courseData.is_free || false,
-      price: courseData.is_free ? null : courseData.price,
+      published: courseData.is_published || false, // To handle both property names
+      is_free: courseData.is_free !== undefined ? courseData.is_free : true,
+      price: courseData.is_free ? 0 : (courseData.price || 0),
       currency: courseData.is_free ? null : (courseData.currency || 'USD'),
-      // Set default values for required fields if not provided
-      category: courseData.category || 'General',
-      description: courseData.description || '',
-      difficulty_level: courseData.difficulty_level || 'All Levels',
-      duration_minutes: courseData.duration_minutes || 0,
+      thumbnail_url: courseData.thumbnail_url || null,
+      tags: courseData.tags || [],
+      certificate_enabled: courseData.certificate_enabled || false
     };
+
+    // Log the course data for debugging
+    console.log('Sending course data to Supabase:', courseWithCreator);
 
     const { data, error } = await supabase
       .from('courses')
-      .insert(newCourse)
+      .insert(courseWithCreator)
       .select()
       .single();
 
     if (error) {
       console.error('Error creating course:', error);
-      toast.error('Failed to create course');
-      return null;
+      toast.error(`Failed to create course: ${error.message}`);
+      throw error;
     }
 
-    toast.success('Course created successfully');
-    return data;
-  } catch (error) {
-    console.error('Error in createCourse:', error);
-    toast.error('Failed to create course');
+    toast.success('Course created successfully!');
+    return data as Course;
+  } catch (error: any) {
+    console.error('Error in createNewCourse:', error);
+    toast.error(`Failed to create course: ${error.message || 'Unknown error'}`);
     return null;
   }
 };
 
 // Function to create a course with a creator
 export const createCourseWithCreator = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
-  return createCourse(courseData, creatorId);
+  return createNewCourse(courseData, creatorId);
 };
 
 // Function to update an existing course
@@ -632,28 +641,28 @@ export const createModule = async (moduleData: Partial<CourseModule>): Promise<C
 
 export const updateModule = async (moduleId: string, moduleData: Partial<CourseModule>): Promise<CourseModule | null> => {
   try {
-    if (!moduleId) {
-      toast.error('Module ID is required');
-      return null;
+    // Ensure we're not passing partial data that's missing required fields
+    if (!moduleData.title || moduleData.order_index === undefined || !moduleData.course_id) {
+      throw new Error('Missing required fields for module update');
     }
 
     const { data, error } = await supabase
       .from('course_modules')
-      .update(moduleData)
+      .update({
+        title: moduleData.title,
+        description: moduleData.description,
+        order_index: moduleData.order_index,
+        course_id: moduleData.course_id,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', moduleId)
       .select()
       .single();
 
-    if (error) {
-      console.error('Error updating module:', error);
-      toast.error('Failed to update module');
-      return null;
-    }
-
-    return data;
+    if (error) throw error;
+    return data as CourseModule;
   } catch (error) {
-    console.error('Error in updateModule:', error);
-    toast.error('Failed to update module');
+    console.error('Error updating module:', error);
     return null;
   }
 };
@@ -695,39 +704,30 @@ export const deleteModule = async (moduleId: string): Promise<boolean> => {
 // Lesson functions
 export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson | null> => {
   try {
-    if (!lessonData.module_id || !lessonData.title) {
-      toast.error('Module ID and lesson title are required');
-      return null;
+    // Validate required fields
+    if (!lessonData.title || !lessonData.module_id || lessonData.order_index === undefined) {
+      throw new Error('Missing required fields for lesson creation');
     }
-
-    // Ensure required fields exist
-    const lesson = {
-      module_id: lessonData.module_id,
-      title: lessonData.title,
-      order_index: lessonData.order_index || 0,
-      description: lessonData.description,
-      video_url: lessonData.video_url,
-      content_type: lessonData.content_type || 'video',
-      content: lessonData.content || {},
-      materials_urls: lessonData.materials_urls || []
-    };
 
     const { data, error } = await supabase
       .from('lessons')
-      .insert(lesson)
+      .insert({
+        title: lessonData.title,
+        description: lessonData.description || '',
+        module_id: lessonData.module_id,
+        order_index: lessonData.order_index,
+        video_url: lessonData.video_url || null,
+        content_type: lessonData.content_type || 'video',
+        materials_urls: lessonData.materials_urls || [],
+        content: lessonData.content || {}
+      })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error creating lesson:', error);
-      toast.error('Failed to create lesson');
-      return null;
-    }
-
-    return data;
+    if (error) throw error;
+    return data as Lesson;
   } catch (error) {
-    console.error('Error in createLesson:', error);
-    toast.error('Failed to create lesson');
+    console.error('Error creating lesson:', error);
     return null;
   }
 };
@@ -798,71 +798,51 @@ export const deleteLesson = async (lessonId: string): Promise<boolean> => {
 export const saveLessonProgress = async (
   enrollmentId: string,
   lessonId: string,
-  progress: LessonProgressUpdate
+  progressData: { is_completed?: boolean; last_position_seconds?: number }
 ): Promise<boolean> => {
   try {
-    if (!enrollmentId || !lessonId) {
-      toast.error('Enrollment ID and Lesson ID are required');
-      return false;
-    }
-
-    // Check if progress record exists
-    const { data: existingProgress, error: checkError } = await supabase
+    const { data: existingProgress, error: fetchError } = await supabase
       .from('lesson_progress')
       .select('*')
       .eq('enrollment_id', enrollmentId)
       .eq('lesson_id', lessonId)
-      .single();
+      .maybeSingle();
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Error checking lesson progress:', checkError);
-      return false;
-    }
+    if (fetchError) throw fetchError;
 
-    let result;
     if (existingProgress) {
       // Update existing progress
-      const updates: LessonProgressUpdate = { ...progress };
-      // Add completion_date if not already completed but now is completed
-      if (progress.is_completed && !existingProgress.is_completed) {
-        const updatedProgress = {
-          ...updates,
-          completion_date: new Date().toISOString()
-        };
-        
-        result = await supabase
-          .from('lesson_progress')
-          .update(updatedProgress)
-          .eq('id', existingProgress.id);
-      } else {
-        result = await supabase
-          .from('lesson_progress')
-          .update(updates)
-          .eq('id', existingProgress.id);
+      const updateData: any = {};
+      if (progressData.is_completed !== undefined) {
+        updateData.is_completed = progressData.is_completed;
       }
+      if (progressData.last_position_seconds !== undefined) {
+        updateData.last_position_seconds = progressData.last_position_seconds;
+      }
+      
+      const { error: updateError } = await supabase
+        .from('lesson_progress')
+        .update(updateData)
+        .eq('id', existingProgress.id);
+
+      if (updateError) throw updateError;
     } else {
       // Create new progress record
-      const newProgress = {
-        enrollment_id: enrollmentId,
-        lesson_id: lessonId,
-        is_completed: progress.is_completed || false,
-        last_position_seconds: progress.last_position_seconds || 0,
-        completion_date: progress.is_completed ? new Date().toISOString() : null,
-      };
-
-      result = await supabase
+      const { error: insertError } = await supabase
         .from('lesson_progress')
-        .insert(newProgress);
-    }
+        .insert({
+          enrollment_id: enrollmentId,
+          lesson_id: lessonId,
+          is_completed: progressData.is_completed || false,
+          last_position_seconds: progressData.last_position_seconds || 0
+        });
 
-    if (result.error) {
-      console.error('Error saving lesson progress:', result.error);
-      return false;
+      if (insertError) throw insertError;
     }
 
     return true;
   } catch (error) {
-    console.error('Error in saveLessonProgress:', error);
+    console.error('Error saving lesson progress:', error);
     return false;
   }
 };
@@ -870,36 +850,27 @@ export const saveLessonProgress = async (
 // Quiz functions
 export const createQuiz = async (quizData: Partial<Quiz>): Promise<Quiz | null> => {
   try {
-    if ((!quizData.lesson_id && !quizData.module_id) || !quizData.title) {
-      toast.error('Lesson ID/Module ID and quiz title are required');
-      return null;
+    // Validate required fields
+    if (!quizData.title) {
+      throw new Error('Quiz title is required');
     }
-
-    // Ensure required fields exist
-    const quiz = {
-      title: quizData.title,
-      lesson_id: quizData.lesson_id,
-      module_id: quizData.module_id,
-      description: quizData.description,
-      passing_score: quizData.passing_score || 70
-    };
-
+    
     const { data, error } = await supabase
       .from('quizzes')
-      .insert(quiz)
+      .insert({
+        title: quizData.title,
+        description: quizData.description || '',
+        module_id: quizData.module_id || null,
+        lesson_id: quizData.lesson_id || null,
+        passing_score: quizData.passing_score || 70
+      })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error creating quiz:', error);
-      toast.error('Failed to create quiz');
-      return null;
-    }
-
-    return data;
+    if (error) throw error;
+    return data as Quiz;
   } catch (error) {
-    console.error('Error in createQuiz:', error);
-    toast.error('Failed to create quiz');
+    console.error('Error creating quiz:', error);
     return null;
   }
 };

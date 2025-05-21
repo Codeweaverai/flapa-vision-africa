@@ -1,499 +1,394 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import ReactPlayer from 'react-player';
 import { toast } from 'sonner';
-import Layout from '@/components/layout/Layout';
+import { CheckCircle2, Loader2, ChevronLeft, ChevronRight, AlertCircle, Check } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from '@/contexts/AuthContext';
-import VideoPlayer from '@/components/video/VideoPlayer';
-import { 
-  Course, 
-  Module, 
-  Lesson, 
-  fetchCourseById, 
-  fetchCourseWithModulesAndLessons,
+import Layout from '@/components/layout/Layout';
+import {
+  fetchCourseDetails,
+  fetchCourseEnrollment,
+  fetchModuleLessons,
   saveLessonProgress
 } from '@/services/courseService';
-import { getVideoMetadata } from '@/services/wasabiService';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabaseClient';
-import { BookOpen, CheckCircle, Circle, PlayCircle, List } from 'lucide-react';
+
+interface CourseDetails {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail_url: string;
+  modules: {
+    id: string;
+    title: string;
+    description: string;
+    order_index: number;
+    lessons: {
+      id: string;
+      title: string;
+      description: string;
+      video_url: string;
+      order_index: number;
+    }[];
+  }[];
+}
 
 const CourseLearningPage = () => {
-  const params = useParams<{courseId: string; lessonId?: string}>();
-  const courseId = params.courseId;
-  const initialLessonId = params.lessonId;
-  
-  const [course, setCourse] = useState<Course | null>(null);
-  const [currentModule, setCurrentModule] = useState<Module | null>(null);
-  const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>('');
-  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [lessonProgress, setLessonProgress] = useState<Record<string, { position: number; completed: boolean }>>({});
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
-  const [courseProgress, setCourseProgress] = useState<number>(0);
+  const { courseId } = useParams<{ courseId: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
-
+  const [course, setCourse] = useState<CourseDetails | null>(null);
+  const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
+  const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [lastSavedTime, setLastSavedTime] = useState(0);
+  const [lessonsCompleted, setLessonsCompleted] = useState<{ [key: string]: boolean }>({});
+  const [isCourseComplete, setIsCourseComplete] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const playerRef = useRef<ReactPlayer>(null);
+  
+  const currentModule = course?.modules[currentModuleIndex];
+  const currentLesson = currentModule?.lessons[currentLessonIndex];
+  const currentLessonId = currentLesson?.id;
+  
   useEffect(() => {
-    const loadCourse = async () => {
-      if (!courseId || !user) return;
-
-      setLoading(true);
-      try {
-        const courseData = await fetchCourseWithModulesAndLessons(courseId);
-        setCourse(courseData);
-        
-        // Get enrollment ID
-        const { data: enrollmentData } = await supabase
-          .from('course_enrollments')
-          .select('id')
-          .eq('course_id', courseId)
-          .eq('user_id', user.id)
-          .single();
-        
-        if (enrollmentData) {
-          setEnrollmentId(enrollmentData.id);
-          
-          // Load lesson progress for this enrollment
-          const { data: progressData } = await supabase
-            .from('lesson_progress')
-            .select('*')
-            .eq('enrollment_id', enrollmentData.id);
-            
-          if (progressData) {
-            const progressMap: Record<string, { position: number; completed: boolean }> = {};
-            let completedCount = 0;
-            
-            progressData.forEach((progress) => {
-              progressMap[progress.lesson_id] = {
-                position: progress.last_position_seconds || 0,
-                completed: progress.is_completed || false
-              };
-              
-              if (progress.is_completed) {
-                completedCount++;
-              }
-            });
-            
-            setLessonProgress(progressMap);
-            
-            // Calculate overall course progress
-            let totalLessons = 0;
-            courseData?.modules?.forEach(module => {
-              totalLessons += module.lessons?.length || 0;
-            });
-            
-            if (totalLessons > 0) {
-              setCourseProgress((completedCount / totalLessons) * 100);
-            }
-          }
-        }
-        
-        // Set initial module and lesson
-        if (courseData?.modules && courseData.modules.length > 0) {
-          let foundLesson = false;
-          
-          // If a specific lesson ID was provided in the URL, try to find it
-          if (initialLessonId) {
-            for (const module of courseData.modules) {
-              if (module.lessons) {
-                const lesson = module.lessons.find(l => l.id === initialLessonId);
-                if (lesson) {
-                  setCurrentModule(module);
-                  setCurrentLesson(lesson);
-                  foundLesson = true;
-                  break;
-                }
-              }
-            }
-          }
-          
-          // If no specific lesson was found, use the first lesson
-          if (!foundLesson) {
-            setCurrentModule(courseData.modules[0]);
-            if (courseData.modules[0].lessons && courseData.modules[0].lessons.length > 0) {
-              setCurrentLesson(courseData.modules[0].lessons[0]);
-            }
-          }
-        }
-      } catch (error: any) {
-        console.error("Error loading course:", error);
-        toast.error(error.message || "Failed to load course data");
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!courseId || !user) {
+      navigate('/courses');
+      return;
+    }
     
-    loadCourse();
-  }, [courseId, initialLessonId, user]);
-
-  useEffect(() => {
-    const loadVideoSource = async () => {
-      if (!currentLesson) return;
-      
-      // Check if it's a YouTube video URL
-      if (currentLesson.video_url) {
-        setVideoUrl(currentLesson.video_url);
-        return;
-      }
-      
-      // Check if it's a Wasabi video
-      if (currentLesson.content && currentLesson.content.wasabi_url) {
-        setVideoUrl(currentLesson.content.wasabi_url);
-        return;
-      }
-      
-      // If not in content directly, try to fetch the video metadata
+    const loadCourseDetails = async () => {
+      setIsLoading(true);
       try {
-        const metadata = await getVideoMetadata(currentLesson.id);
-        if (metadata && metadata.wasabi_url) {
-          setVideoUrl(metadata.wasabi_url);
+        const courseDetails = await fetchCourseDetails(courseId);
+        if (courseDetails) {
+          setCourse(courseDetails);
+          
+          // Fetch enrollment status
+          const enrollment = await fetchCourseEnrollment(user.id, courseId);
+          if (enrollment) {
+            setEnrollmentId(enrollment.id);
+            
+            // Load lessons with progress
+            const lessonsWithProgress = await fetchModuleLessons(enrollment.id, courseDetails.modules);
+            
+            // Initialize lessonsCompleted state
+            const initialLessonsCompleted: { [key: string]: boolean } = {};
+            lessonsWithProgress.forEach(module => {
+              module.lessons.forEach(lesson => {
+                initialLessonsCompleted[lesson.id] = lesson.is_completed || false;
+              });
+            });
+            setLessonsCompleted(initialLessonsCompleted);
+          } else {
+            toast.error('You are not enrolled in this course.');
+            navigate('/courses');
+          }
         } else {
-          setVideoUrl('');
+          toast.error('Course not found.');
+          navigate('/courses');
         }
       } catch (error) {
-        console.error("Error loading video metadata:", error);
-        setVideoUrl('');
+        console.error('Error loading course details:', error);
+        toast.error('Failed to load course details.');
+        navigate('/courses');
+      } finally {
+        setIsLoading(false);
       }
     };
     
-    loadVideoSource();
-  }, [currentLesson]);
+    loadCourseDetails();
+  }, [courseId, user, navigate]);
+  
+  useEffect(() => {
+    checkIfCourseIsComplete();
+  }, [lessonsCompleted]);
+  
+  const checkIfCourseIsComplete = () => {
+    if (!course) return;
+    
+    let allLessonsCompleted = true;
+    for (const module of course.modules) {
+      for (const lesson of module.lessons) {
+        if (!lessonsCompleted[lesson.id]) {
+          allLessonsCompleted = false;
+          break;
+        }
+      }
+      if (!allLessonsCompleted) break;
+    }
+    
+    setIsCourseComplete(allLessonsCompleted);
+  };
+  
+  const handleModuleChange = (moduleIndex: number) => {
+    setCurrentModuleIndex(moduleIndex);
+    setCurrentLessonIndex(0); // Reset to the first lesson of the new module
+    setCurrentTime(0); // Reset video time
+    setLastSavedTime(0); // Reset last saved time
+    if (playerRef.current) {
+      playerRef.current.seekTo(0); // Seek video to start
+    }
+  };
+  
+  const handleLessonChange = (lessonIndex: number) => {
+    setCurrentLessonIndex(lessonIndex);
+    setCurrentTime(0); // Reset video time
+    setLastSavedTime(0); // Reset last saved time
+    if (playerRef.current) {
+      playerRef.current.seekTo(0); // Seek video to start
+    }
+  };
+  
+  const handlePrevLesson = () => {
+    if (!currentModule) return;
+    
+    if (currentLessonIndex > 0) {
+      handleLessonChange(currentLessonIndex - 1);
+    } else if (currentModuleIndex > 0) {
+      // Go to the last lesson of the previous module
+      const prevModuleIndex = currentModuleIndex - 1;
+      const prevModule = course?.modules[prevModuleIndex];
+      if (prevModule) {
+        setCurrentModuleIndex(prevModuleIndex);
+        handleLessonChange(prevModule.lessons.length - 1);
+      }
+    }
+  };
+  
+  const handleNextLesson = () => {
+    if (!currentModule) return;
+    
+    if (currentLessonIndex < currentModule.lessons.length - 1) {
+      handleLessonChange(currentLessonIndex + 1);
+    } else if (currentModuleIndex < course.modules.length - 1) {
+      // Go to the first lesson of the next module
+      setCurrentModuleIndex(currentModuleIndex + 1);
+      handleLessonChange(0);
+    }
+  };
 
-  const handleLessonChange = (lesson: Lesson, module: Module) => {
-    setCurrentModule(module);
-    setCurrentLesson(lesson);
+  const handleTimeUpdate = (time: number) => {
+    if (!currentLessonId || !enrollmentId) return;
+    
+    setCurrentTime(time);
+    
+    // Update progress if time has changed significantly (every 10 seconds)
+    if (Math.abs(time - lastSavedTime) > 10) {
+      saveLessonProgress(enrollmentId, currentLessonId, {
+        last_position_seconds: Math.floor(time)
+      });
+      setLastSavedTime(time);
+    }
   };
   
   const handleLessonComplete = async () => {
-    if (!currentLesson || !enrollmentId) return;
+    if (!currentLessonId || !enrollmentId) return;
     
     try {
-      await saveLessonProgress(enrollmentId, currentLesson.id, { 
-        last_position_seconds: 0,
-        is_completed: true 
+      await saveLessonProgress(enrollmentId, currentLessonId, {
+        is_completed: true,
+        last_position_seconds: Math.floor(currentTime)
       });
+      
+      toast.success('Lesson completed!');
       
       // Update local state
-      setLessonProgress({
-        ...lessonProgress,
-        [currentLesson.id]: { position: 0, completed: true }
-      });
+      setLessonsCompleted(prev => ({
+        ...prev,
+        [currentLessonId]: true
+      }));
       
-      // Update course progress
-      let totalLessons = 0;
-      let completedLessons = 0;
-      
-      course?.modules?.forEach(module => {
-        module.lessons?.forEach(lesson => {
-          totalLessons++;
-          if (
-            lessonProgress[lesson.id]?.completed || 
-            lesson.id === currentLesson.id
-          ) {
-            completedLessons++;
-          }
-        });
-      });
-      
-      if (totalLessons > 0) {
-        setCourseProgress((completedLessons / totalLessons) * 100);
-      }
-      
-      toast.success("Lesson completed!");
+      // Check if course is complete
+      checkIfCourseIsComplete();
     } catch (error) {
-      console.error("Error marking lesson as complete:", error);
-      toast.error("Failed to update progress");
-    }
-  };
-
-  const handleVideoProgress = (currentTime: number, duration: number, percent: number) => {
-    if (!currentLesson || !enrollmentId) return;
-    
-    // Save progress periodically (every 5 seconds)
-    const now = Date.now();
-    if (!lastProgressUpdate.current || (now - lastProgressUpdate.current > 5000)) {
-      lastProgressUpdate.current = now;
-      
-      // Don't await this to avoid blocking the UI
-      saveLessonProgress(enrollmentId, currentLesson.id, {
-        last_position_seconds: currentTime,
-        is_completed: percent >= 0.95
-      }).then(() => {
-        // If the video is 95% watched, mark it as completed
-        if (percent >= 0.95 && !lessonProgress[currentLesson.id]?.completed) {
-          setLessonProgress({
-            ...lessonProgress,
-            [currentLesson.id]: { position: currentTime, completed: true }
-          });
-        } else if (lessonProgress[currentLesson.id]) {
-          // Just update the position
-          setLessonProgress({
-            ...lessonProgress,
-            [currentLesson.id]: { 
-              ...lessonProgress[currentLesson.id],
-              position: currentTime
-            }
-          });
-        } else {
-          // Create a new entry
-          setLessonProgress({
-            ...lessonProgress,
-            [currentLesson.id]: { position: currentTime, completed: false }
-          });
-        }
-      }).catch(error => {
-        console.error("Error saving progress:", error);
-      });
+      console.error('Error completing lesson:', error);
+      toast.error('Failed to mark lesson as complete');
     }
   };
   
-  const lastProgressUpdate = React.useRef<number | null>(null);
-
-  const handleVideoEnded = () => {
-    if (!currentLesson || !enrollmentId) return;
+  const handleManualMarkComplete = async () => {
+    if (!currentLessonId || !enrollmentId) return;
     
-    // Mark lesson as completed
-    saveLessonProgress(enrollmentId, currentLesson.id, {
-      last_position_seconds: 0,
-      is_completed: true
-    }).then(() => {
-      setLessonProgress({
-        ...lessonProgress,
-        [currentLesson.id]: { position: 0, completed: true }
+    try {
+      setIsUpdatingProgress(true);
+      
+      await saveLessonProgress(enrollmentId, currentLessonId, {
+        is_completed: true,
+        last_position_seconds: Math.floor(currentTime)
       });
       
-      // Find the next lesson
-      const nextLesson = findNextLesson();
-      if (nextLesson) {
-        const nextModule = course?.modules?.find(m => 
-          m.lessons?.some(l => l.id === nextLesson.id)
-        );
-        
-        if (nextModule) {
-          toast.success("Lesson completed! Moving to the next lesson...");
-          setTimeout(() => {
-            handleLessonChange(nextLesson, nextModule);
-          }, 1500);
-        }
-      } else {
-        toast.success("Congratulations! You've finished all the lessons in this course!");
-      }
-    }).catch(error => {
-      console.error("Error marking lesson as complete:", error);
-    });
-  };
-
-  const findNextLesson = (): Lesson | null => {
-    if (!currentLesson || !course?.modules) return null;
-    
-    let foundCurrentLesson = false;
-    let nextLesson: Lesson | null = null;
-    
-    // Search within the current module first
-    if (currentModule && currentModule.lessons) {
-      for (let i = 0; i < currentModule.lessons.length; i++) {
-        if (foundCurrentLesson) {
-          nextLesson = currentModule.lessons[i];
-          break;
-        }
-        if (currentModule.lessons[i].id === currentLesson.id) {
-          foundCurrentLesson = true;
-        }
-      }
-    }
-    
-    // If no next lesson in current module, look in the next modules
-    if (!nextLesson) {
-      let foundCurrentModule = false;
+      toast.success('Lesson marked as complete!');
       
-      for (const module of course.modules) {
-        if (foundCurrentModule && module.lessons && module.lessons.length > 0) {
-          nextLesson = module.lessons[0];
-          break;
-        }
-        
-        if (module.id === currentModule?.id) {
-          foundCurrentModule = true;
-        }
-      }
+      // Update local state
+      setLessonsCompleted(prev => ({
+        ...prev,
+        [currentLessonId]: true
+      }));
+      
+      // Check if course is complete
+      checkIfCourseIsComplete();
+    } catch (error) {
+      console.error('Error marking lesson as complete:', error);
+      toast.error('Failed to mark lesson as complete');
+    } finally {
+      setIsUpdatingProgress(false);
     }
-    
-    return nextLesson;
   };
-
-  const isLessonCompleted = (lessonId: string): boolean => {
-    return !!lessonProgress[lessonId]?.completed;
-  };
-
-  const calculateModuleProgress = (module: Module): number => {
-    if (!module.lessons || module.lessons.length === 0) return 0;
-    
-    let completedCount = 0;
-    module.lessons.forEach(lesson => {
-      if (isLessonCompleted(lesson.id)) {
-        completedCount++;
-      }
-    });
-    
-    return (completedCount / module.lessons.length) * 100;
-  };
-
-  if (loading) {
+  
+  if (isLoading) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="flex justify-center items-center min-h-[40vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="section-container py-12">
+          <div className="w-full max-w-4xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Loading Course...</CardTitle>
+                <CardDescription>Please wait while we load the course details.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </Layout>
     );
   }
-
-  if (!course) {
+  
+  if (!course || !currentModule || !currentLesson) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
-            <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
-            <p className="mb-6">The course you are looking for does not exist or has been removed.</p>
+        <div className="section-container py-12">
+          <div className="w-full max-w-4xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Course Not Found</CardTitle>
+                <CardDescription>The course you are looking for does not exist.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-red-500" />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </Layout>
     );
   }
-
+  
   return (
     <Layout>
-      <div className="bg-light-purple min-h-screen py-6">
-        <div className="container mx-auto px-4">
-          <div className="mb-4">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">{course.title}</h1>
-            
-            <div className="flex flex-wrap items-center gap-4 mt-2">
-              <div className="flex items-center">
-                <Progress value={courseProgress} className="w-24 h-2 mr-2" />
-                <span className="text-sm font-medium">{Math.round(courseProgress)}% complete</span>
-              </div>
-              
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="md:hidden"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-              >
-                <List className="h-4 w-4 mr-2" />
-                Course Content
-              </Button>
-            </div>
+      <div className="section-container py-12">
+        <div className="w-full max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Course Content */}
+          <div className="lg:col-span-2">
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold">{course.title}</CardTitle>
+                <CardDescription>{course.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Video Player */}
+                <div className="relative aspect-video">
+                  <ReactPlayer
+                    ref={playerRef}
+                    url={currentLesson.video_url}
+                    width="100%"
+                    height="100%"
+                    controls
+                    onProgress={data => handleTimeUpdate(data.playedSeconds)}
+                    onEnded={handleLessonComplete}
+                  />
+                </div>
+                
+                {/* Lesson Title and Description */}
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold">{currentLesson.title}</h3>
+                  <p className="text-muted-foreground">{currentLesson.description}</p>
+                </div>
+                
+                {/* Completion Button */}
+                <Button
+                  variant="secondary"
+                  onClick={handleManualMarkComplete}
+                  disabled={lessonsCompleted[currentLessonId] || isUpdatingProgress}
+                >
+                  {lessonsCompleted[currentLessonId] ? (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Completed
+                    </>
+                  ) : isUpdatingProgress ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Mark as Complete
+                    </>
+                  ) : (
+                    'Mark as Complete'
+                  )}
+                </Button>
+                
+                {/* Navigation Buttons */}
+                <div className="flex justify-between">
+                  <Button variant="outline" onClick={handlePrevLesson} disabled={currentModuleIndex === 0 && currentLessonIndex === 0}>
+                    <ChevronLeft className="mr-2 h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button variant="outline" onClick={handleNextLesson} disabled={isCourseComplete}>
+                    Next
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Course Content */}
-            <div className="lg:col-span-3">
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                {videoUrl ? (
-                  <div className="aspect-video">
-                    <VideoPlayer 
-                      src={videoUrl}
-                      poster={course.thumbnail_url}
-                      onTimeUpdate={handleVideoProgress}
-                      onEnded={handleVideoEnded}
-                      className="w-full h-full"
-                    />
-                  </div>
-                ) : (
-                  <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                    <div className="text-center p-6">
-                      <BookOpen className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                      <p className="text-gray-500">No video available for this lesson</p>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="p-6">
-                  <div className="flex flex-wrap justify-between items-center mb-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">{currentLesson?.title}</h2>
-                      <p className="text-sm text-gray-500">
-                        {currentModule?.title} • Lesson {currentModule?.lessons?.findIndex(l => l.id === currentLesson?.id) ? currentModule?.lessons?.findIndex(l => l.id === currentLesson?.id)! + 1 : 1} 
-                        of {currentModule?.lessons?.length}
-                      </p>
-                    </div>
-                    
-                    <div className="mt-2 lg:mt-0">
-                      {isLessonCompleted(currentLesson?.id || '') ? (
-                        <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Completed
-                        </Badge>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={handleLessonComplete}
+          
+          {/* Course Sidebar */}
+          <div className="lg:col-span-1">
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle>Course Content</CardTitle>
+                <CardDescription>Modules and Lessons</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[500px]">
+                  <div className="space-y-2 p-2">
+                    {course.modules.map((module, moduleIndex) => (
+                      <div key={module.id} className="space-y-1">
+                        <div
+                          className={`px-3 py-2 rounded-md cursor-pointer ${currentModuleIndex === moduleIndex ? 'bg-secondary text-secondary-foreground' : 'hover:bg-accent hover:text-accent-foreground'}`}
+                          onClick={() => handleModuleChange(moduleIndex)}
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Mark as Complete
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="prose max-w-none">
-                    <p>{currentLesson?.description || 'No description available for this lesson.'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar */}
-            <div className={`${sidebarOpen ? 'block' : 'hidden'} lg:block lg:col-span-1`}>
-              <div className="sticky top-8 bg-white rounded-lg shadow-sm p-4">
-                <h3 className="font-semibold mb-4 text-lg">Course Content</h3>
-                
-                <div className="space-y-4">
-                  {course.modules?.map((module) => (
-                    <div key={module.id} className="border rounded-md">
-                      <div className="p-3 border-b bg-gray-50">
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-medium text-sm">{module.title}</h4>
-                          <span className="text-xs text-gray-500">
-                            {module.lessons?.filter(l => isLessonCompleted(l.id)).length || 0}/{module.lessons?.length || 0}
-                          </span>
+                          {module.title}
                         </div>
-                        <Progress value={calculateModuleProgress(module)} className="h-1 mt-2" />
+                        {currentModuleIndex === moduleIndex && (
+                          <div className="ml-4 space-y-1">
+                            {module.lessons.map((lesson, lessonIndex) => (
+                              <div
+                                key={lesson.id}
+                                className={`px-3 py-2 rounded-md text-sm cursor-pointer flex items-center justify-between ${currentLessonIndex === lessonIndex ? 'bg-muted text-muted-foreground' : 'hover:bg-accent hover:text-accent-foreground'}`}
+                                onClick={() => handleLessonChange(lessonIndex)}
+                              >
+                                <span>{lesson.title}</span>
+                                {lessonsCompleted[lesson.id] && (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      
-                      <div className="divide-y">
-                        {module.lessons?.map((lesson) => (
-                          <button
-                            key={lesson.id}
-                            className={`w-full text-left p-2 hover:bg-gray-50 flex items-center ${
-                              currentLesson?.id === lesson.id ? 'bg-primary/5 font-medium' : ''
-                            }`}
-                            onClick={() => handleLessonChange(lesson, module)}
-                          >
-                            <span className="mr-2">
-                              {isLessonCompleted(lesson.id) ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              ) : currentLesson?.id === lesson.id ? (
-                                <PlayCircle className="h-4 w-4 text-primary" />
-                              ) : (
-                                <Circle className="h-4 w-4 text-gray-300" />
-                              )}
-                            </span>
-                            <span className="text-sm truncate">{lesson.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
