@@ -20,19 +20,36 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
         provider,
         provider_transaction_id,
         metadata,
-        user:profiles!user_id(email)
+        user:profiles(email)
       `)
       .eq('creator_id', userId)
       .order('created_at', { ascending: false });
       
     if (error) throw error;
     
+    if (!data) return [];
+    
     // Process the data to include user email and ensure all required fields are present
-    return data.map(payment => ({
-      ...payment,
-      payment_method: payment.payment_method || 'unknown',
-      user_email: payment.user?.email || 'unknown'
-    })) as PaymentTransaction[];
+    const formattedData = data.map(payment => {
+      const userEmail = payment.user && 'email' in payment.user ? payment.user.email : 'unknown';
+      return {
+        id: payment.id,
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+        reference_type: payment.reference_type,
+        reference_id: payment.reference_id,
+        created_at: payment.created_at,
+        payment_method: payment.payment_method || 'unknown',
+        user_id: payment.user_id,
+        provider: payment.provider,
+        provider_transaction_id: payment.provider_transaction_id,
+        metadata: payment.metadata,
+        user_email: userEmail
+      } as PaymentTransaction;
+    });
+    
+    return formattedData;
   } catch (error) {
     console.error('Error fetching creator payments:', error);
     throw error;
@@ -49,7 +66,7 @@ export async function fetchCreatorPayouts(userId: string): Promise<PayoutTransac
       
     if (error) throw error;
     
-    return data;
+    return data || [];
   } catch (error) {
     console.error('Error fetching creator payouts:', error);
     throw error;
