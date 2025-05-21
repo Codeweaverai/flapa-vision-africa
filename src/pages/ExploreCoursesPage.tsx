@@ -84,9 +84,26 @@ const ExploreCoursesPage: React.FC = () => {
       const from = (currentPage - 1) * coursesPerPage;
       const to = from + coursesPerPage - 1;
       
-      // Get counts for pagination - fixed to use proper method
-      const countQuery = query.clone();
-      const { count, error: countError } = await countQuery.count();
+      // Get counts for pagination - fixed to create a new query instead of clone
+      const countQuery = supabase
+        .from('courses')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_published', true);
+
+      // Apply the same filters to the count query
+      if (selectedCategory !== 'all') {
+        countQuery.eq('category', selectedCategory);
+      }
+      
+      if (selectedDifficulty !== 'all') {
+        countQuery.eq('difficulty_level', selectedDifficulty);
+      }
+      
+      if (searchTerm) {
+        countQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+      
+      const { count, error: countError } = await countQuery;
       
       if (countError) {
         console.error("Error getting count:", countError);

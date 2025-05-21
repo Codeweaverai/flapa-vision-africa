@@ -91,9 +91,28 @@ const ExploreEventsPage: React.FC = () => {
       const from = (currentPage - 1) * eventsPerPage;
       const to = from + eventsPerPage - 1;
       
-      // Get counts for pagination - fixed to use proper method
-      const countQuery = query.clone();
-      const { count, error: countError } = await countQuery.count();
+      // Get counts for pagination - fixed to create a new query instead of clone
+      const countQuery = supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true });
+
+      // Apply the same filters to the count query
+      if (selectedType !== 'all') {
+        countQuery.eq('event_type', selectedType);
+      }
+      
+      // Date filter for count query
+      if (dateFilter === 'upcoming') {
+        countQuery.gt('start_time', now.toISOString());
+      } else if (dateFilter === 'past') {
+        countQuery.lt('start_time', now.toISOString());
+      }
+      
+      if (searchTerm) {
+        countQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%`);
+      }
+      
+      const { count, error: countError } = await countQuery;
       
       if (countError) {
         console.error("Error getting count:", countError);
