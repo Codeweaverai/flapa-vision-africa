@@ -37,14 +37,21 @@ import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
 import CreatorEventForm from '@/pages/creator/CreatorEventForm';
 import CreatorEventRegistrations from '@/pages/creator/CreatorEventRegistrations';
 import AdminEventRegistrations from '@/pages/admin/AdminEventRegistrations';
+import AdminRegistrations from '@/pages/admin/AdminRegistrations';
 import CreatorStudents from '@/pages/creator/CreatorStudents';
 import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
 import AdminLogin from '@/pages/admin/AdminLogin';
-// Import new community pages
+// Import new explore pages
+import ExploreCoursesPage from '@/pages/ExploreCoursesPage';
+import ExploreEventsPage from '@/pages/ExploreEventsPage';
+// Import community pages
 import CommunityPage from '@/pages/CommunityPage';
 import CommunityChatPage from '@/pages/CommunityChatPage';
 import CommunityCoursesPage from '@/pages/CommunityCoursesPage';
 import CommunityNotificationsPage from '@/pages/CommunityNotificationsPage';
+
+// Import route guard components
+import AdminRoute from '@/components/admin/AdminRoute';
 
 function App() {
   return (
@@ -67,6 +74,10 @@ function App() {
       <Route path="/payment/cancel" element={<PaymentCancelPage />} />
       <Route path="/admin-login" element={<AdminLogin />} />
       
+      {/* New explore routes */}
+      <Route path="/explore/courses" element={<ExploreCoursesPage />} />
+      <Route path="/explore/events" element={<ExploreEventsPage />} />
+      
       {/* Community routes */}
       <Route path="/community" element={<CommunityPage />} />
       <Route path="/community/chat" element={<CommunityChatPage />} />
@@ -74,20 +85,86 @@ function App() {
       <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
       
       {/* Admin routes */}
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/admin/consultations" element={<AdminConsultations />} />
-      <Route path="/admin/events" element={<AdminEvents />} />
-      <Route path="/admin/events/create" element={<EventForm />} />
-      <Route path="/admin/events/edit/:eventId" element={<EventForm />} />
-      <Route path="/admin/courses" element={<AdminCourses />} />
-      <Route path="/admin/courses/create" element={<CourseForm />} />
-      <Route path="/admin/courses/edit/:courseId" element={<CourseForm />} />
-      <Route path="/admin/courses/content/:courseId" element={<CourseContentPage />} />
-      <Route path="/admin/users" element={<AdminUsers />} />
-      <Route path="/admin/settings" element={<AdminSettings />} />
-      <Route path="/admin/media" element={<AdminMedia />} />
-      <Route path="/admin/media/create" element={<MediaForm />} />
-      <Route path="/admin/media/edit/:id" element={<MediaForm />} />
+      <Route path="/admin" element={
+        <AdminRoute>
+          <AdminDashboard />
+        </AdminRoute>
+      } />
+      <Route path="/admin/consultations" element={
+        <AdminRoute>
+          <AdminConsultations />
+        </AdminRoute>
+      } />
+      <Route path="/admin/events" element={
+        <AdminRoute>
+          <AdminEvents />
+        </AdminRoute>
+      } />
+      <Route path="/admin/events/create" element={
+        <AdminRoute>
+          <EventForm />
+        </AdminRoute>
+      } />
+      <Route path="/admin/events/edit/:eventId" element={
+        <AdminRoute>
+          <EventForm />
+        </AdminRoute>
+      } />
+      <Route path="/admin/courses" element={
+        <AdminRoute>
+          <AdminCourses />
+        </AdminRoute>
+      } />
+      <Route path="/admin/courses/create" element={
+        <AdminRoute>
+          <CourseForm />
+        </AdminRoute>
+      } />
+      <Route path="/admin/courses/edit/:courseId" element={
+        <AdminRoute>
+          <CourseForm />
+        </AdminRoute>
+      } />
+      <Route path="/admin/courses/content/:courseId" element={
+        <AdminRoute>
+          <CourseContentPage />
+        </AdminRoute>
+      } />
+      <Route path="/admin/users" element={
+        <AdminRoute>
+          <AdminUsers />
+        </AdminRoute>
+      } />
+      <Route path="/admin/settings" element={
+        <AdminRoute>
+          <AdminSettings />
+        </AdminRoute>
+      } />
+      <Route path="/admin/media" element={
+        <AdminRoute>
+          <AdminMedia />
+        </AdminRoute>
+      } />
+      <Route path="/admin/media/create" element={
+        <AdminRoute>
+          <MediaForm />
+        </AdminRoute>
+      } />
+      <Route path="/admin/media/edit/:id" element={
+        <AdminRoute>
+          <MediaForm />
+        </AdminRoute>
+      } />
+      <Route path="/admin/registrations" element={
+        <AdminRoute>
+          <AdminRegistrations />
+        </AdminRoute>
+      } />
+      <Route path="/admin/events/registrations/:eventId" element={
+        <AdminRoute>
+          <AdminEventRegistrations />
+        </AdminRoute>
+      } />
       
       {/* Creator Routes */}
       <Route path="/creator/dashboard" element={<CreatorDashboard />} />
@@ -99,7 +176,6 @@ function App() {
       <Route path="/creator/events/create" element={<CreatorEventForm />} />
       <Route path="/creator/events/edit/:eventId" element={<CreatorEventForm />} />
       <Route path="/creator/events/registrations/:eventId" element={<CreatorEventRegistrations />} />
-      <Route path="/admin/events/registrations/:eventId" element={<AdminEventRegistrations />} />
       <Route path="/creator/students" element={<CreatorStudents />} />
       <Route path="/creator/analytics" element={<CreatorAnalytics />} />
       
