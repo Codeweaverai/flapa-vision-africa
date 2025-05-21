@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { PaymentTransaction, PayoutTransaction, CreatorBalance } from '@/types/paymentTypes';
 import { toast } from '@/components/ui/use-toast';
@@ -47,15 +46,15 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
       // Fetch user profiles separately - make sure we only select fields that actually exist
       const { data: userProfiles } = await supabase
         .from('profiles')
-        .select('id, username, full_name')
+        .select('id, username, full_name, email')
         .in('id', userIds);
         
       // Create a map of userId to display name (using username or full_name)
       const userDisplayMap = new Map();
       if (userProfiles) {
         userProfiles.forEach(profile => {
-          // Use username or full_name or 'unknown' as the display identifier
-          const displayName = profile.username || profile.full_name || 'unknown';
+          // Use email, username or full_name or 'unknown' as the display identifier
+          const displayName = profile.email || profile.username || profile.full_name || 'unknown';
           userDisplayMap.set(profile.id, displayName);
         });
         
@@ -221,5 +220,77 @@ export async function getStripeAccountStatus(userId: string): Promise<{ isConnec
   } catch (error) {
     console.error('Error checking Stripe account status:', error);
     return { isConnected: false };
+  }
+}
+
+// New function to handle Stripe webhooks for payment updates
+export async function processStripeWebhook(event: any): Promise<boolean> {
+  try {
+    const eventType = event.type;
+    const eventData = event.data.object;
+    
+    console.log(`Processing Stripe webhook: ${eventType}`);
+    
+    switch (eventType) {
+      case 'checkout.session.completed':
+        return await updatePaymentFromCheckoutSession(eventData);
+      
+      case 'payment_intent.succeeded':
+        return await updatePaymentFromPaymentIntent(eventData, 'completed');
+      
+      case 'payment_intent.payment_failed':
+        return await updatePaymentFromPaymentIntent(eventData, 'failed');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error processing Stripe webhook:', error);
+    return false;
+  }
+}
+
+// Helper function to update payment based on checkout session
+async function updatePaymentFromCheckoutSession(session: any): Promise<boolean> {
+  try {
+    if (!session.id) return false;
+    
+    const { data, error } = await supabase
+      .from('payment_transactions')
+      .update({ 
+        status: session.payment_status === 'paid' ? 'completed' : 'pending',
+        updated_at: new Date().toISOString()
+      })
+      .eq('provider_transaction_id', session.id)
+      .select();
+      
+    if (error) throw error;
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error('Error updating payment from checkout session:', error);
+    return false;
+  }
+}
+
+// Helper function to update payment based on payment intent
+async function updatePaymentFromPaymentIntent(paymentIntent: any, status: string): Promise<boolean> {
+  try {
+    if (!paymentIntent.id) return false;
+    
+    const { data, error } = await supabase
+      .from('payment_transactions')
+      .update({ 
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('provider_transaction_id', paymentIntent.id)
+      .select();
+      
+    if (error) throw error;
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error(`Error updating payment to ${status}:`, error);
+    return false;
   }
 }

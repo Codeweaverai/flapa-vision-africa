@@ -105,13 +105,36 @@ serve(async (req) => {
         stripeAccountId = account.id;
         console.log(`Created new Stripe account with ID: ${stripeAccountId}`);
         
-        // Save the Stripe Connect account ID to the user's profile
+        // Save the Stripe Connect account ID and status to the user's profile
         await supabaseAdmin
           .from('profiles')
-          .update({ stripe_connect_id: stripeAccountId })
+          .update({ 
+            stripe_connect_id: stripeAccountId,
+            stripe_account_status: 'pending',
+            stripe_payouts_enabled: false,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', userId);
       } else {
         console.log(`Using existing Stripe account with ID: ${stripeAccountId}`);
+        
+        // Refresh account details from Stripe
+        try {
+          const account = await stripe.accounts.retrieve(stripeAccountId);
+          
+          // Update status information
+          await supabaseAdmin
+            .from('profiles')
+            .update({ 
+              stripe_account_status: account.charges_enabled ? 'active' : 'pending',
+              stripe_payouts_enabled: account.payouts_enabled,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+        } catch (accountError) {
+          console.error('Error retrieving Stripe account:', accountError);
+          // Continue with account link creation even if account retrieval fails
+        }
       }
       
       // Generate an account link for onboarding

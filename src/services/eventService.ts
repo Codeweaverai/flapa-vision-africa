@@ -154,6 +154,60 @@ export const fetchEventsByCreator = async (creatorId: string): Promise<Event[]> 
   }
 };
 
+// Function to fetch events for a specific creator
+export const fetchCreatorEvents = async (creatorId: string): Promise<Event[]> => {
+  try {
+    if (!creatorId) {
+      throw new Error('Creator ID is required');
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('creator_id', creatorId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching creator events:', error);
+      toast.error('Failed to load events');
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in fetchCreatorEvents:', error);
+    toast.error('Failed to load events');
+    return [];
+  }
+};
+
+// Function to delete an event
+export const deleteEvent = async (eventId: string): Promise<boolean> => {
+  try {
+    if (!eventId) {
+      throw new Error('Event ID is required');
+    }
+
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      toast.error('Failed to delete event');
+      return false;
+    }
+
+    toast.success('Event deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error in deleteEvent:', error);
+    toast.error('Failed to delete event');
+    return false;
+  }
+};
+
 // Function to register for an event
 export const registerForEvent = async (
   event: Event, 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -229,7 +228,7 @@ const CreatorPayments: React.FC = () => {
       <div className="space-y-6">
         {/* Stripe Connection Alert */}
         {!isStripeConnected && (
-          <Alert variant="warning" className="bg-amber-50 border-amber-200">
+          <Alert variant="destructive" className="bg-amber-50 border-amber-200">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Stripe Connect Account Required</AlertTitle>
             <AlertDescription>
