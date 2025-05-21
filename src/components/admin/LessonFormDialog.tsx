@@ -15,6 +15,7 @@ export interface LessonFormDialogProps {
   moduleId: string;
   onLessonSaved: (lesson: Lesson) => void;
   editingLesson?: Lesson | null;
+  courseId?: string; // Add courseId prop
 }
 
 const LessonFormDialog = ({
@@ -22,7 +23,8 @@ const LessonFormDialog = ({
   onOpenChange,
   moduleId,
   onLessonSaved,
-  editingLesson
+  editingLesson,
+  courseId // Add courseId to the props destructuring
 }: LessonFormDialogProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
