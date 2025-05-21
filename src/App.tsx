@@ -75,16 +75,14 @@ const AppRoutes = () => {
       
       {/* Admin routes */}
       <Route path="/admin-login" element={<AdminLogin />} />
-      <Route element={<AdminRoute />}>
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/admin/users" element={<AdminUsers />} />
-        <Route path="/admin/courses" element={<AdminCourses />} />
-        <Route path="/admin/events" element={<AdminEvents />} />
-        <Route path="/admin/media" element={<AdminMedia />} />
-        <Route path="/admin/registrations" element={<AdminRegistrations />} />
-        <Route path="/admin/consultations" element={<AdminConsultations />} />
-        <Route path="/admin/settings" element={<AdminSettings />} />
-      </Route>
+      <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+      <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+      <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
+      <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
+      <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
+      <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
+      <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
+      <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
       
       {/* Not found route */}
       <Route path="*" element={<NotFoundPage />} />

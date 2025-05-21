@@ -8,7 +8,18 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
     const { data, error } = await supabase
       .from('payment_transactions')
       .select(`
-        *,
+        id,
+        amount,
+        currency,
+        status,
+        reference_type,
+        reference_id,
+        created_at,
+        payment_method,
+        user_id,
+        provider,
+        provider_transaction_id,
+        metadata,
         user:profiles!user_id(email)
       `)
       .eq('creator_id', userId)
@@ -16,11 +27,12 @@ export async function fetchCreatorPayments(userId: string): Promise<PaymentTrans
       
     if (error) throw error;
     
-    // Process the data to include user email
+    // Process the data to include user email and ensure all required fields are present
     return data.map(payment => ({
       ...payment,
-      user_email: payment.user?.email
-    }));
+      payment_method: payment.payment_method || 'unknown',
+      user_email: payment.user?.email || 'unknown'
+    })) as PaymentTransaction[];
   } catch (error) {
     console.error('Error fetching creator payments:', error);
     throw error;
