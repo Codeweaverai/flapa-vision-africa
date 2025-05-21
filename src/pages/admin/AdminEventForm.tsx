@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import CreatorLayout from '@/components/creator/CreatorLayout';
+import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/lib/supabaseClient';
 import { VALID_EVENT_TYPES, createEventWithCreator, Event } from '@/services/eventService';
-import { useAuth } from '@/contexts/AuthContext';
 
 // Define the form schema
 const eventSchema = z.object({
@@ -44,13 +43,12 @@ const eventSchema = z.object({
 
 type EventFormValues = z.infer<typeof eventSchema>;
 
-const CreatorEventForm = () => {
+const AdminEventForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
   const [loading, setLoading] = useState(false);
   const [initialEvent, setInitialEvent] = useState<Event | null>(null);
-  const { user } = useAuth();
 
   // Initialize form
   const form = useForm<EventFormValues>({
@@ -114,14 +112,16 @@ const CreatorEventForm = () => {
   }, [id, isEditing, setValue]);
 
   const onSubmit = async (values: EventFormValues) => {
-    if (!user) {
-      toast.error('You must be logged in to create or edit an event');
-      return;
-    }
-    
     setLoading(true);
     try {
-      // Prepare event data
+      // Get the authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error('You must be logged in to create an event');
+        return;
+      }
+      
       const eventData = {
         ...values,
         price: values.is_free ? null : values.price,
@@ -149,7 +149,7 @@ const CreatorEventForm = () => {
       }
       
       // Navigate back to events list
-      navigate('/creator/events');
+      navigate('/admin/events');
     } catch (error) {
       console.error('Error saving event:', error);
       toast.error(`Failed to ${isEditing ? 'update' : 'create'} event`);
@@ -159,7 +159,7 @@ const CreatorEventForm = () => {
   };
 
   return (
-    <CreatorLayout title={isEditing ? "Edit Event" : "Create New Event"}>
+    <AdminLayout title={isEditing ? "Edit Event" : "Create New Event"}>
       <Card>
         <CardHeader>
           <CardTitle>{isEditing ? 'Edit Event' : 'Create New Event'}</CardTitle>
@@ -420,7 +420,7 @@ const CreatorEventForm = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate('/creator/events')}
+                  onClick={() => navigate('/admin/events')}
                   disabled={loading}
                 >
                   Cancel
@@ -433,8 +433,8 @@ const CreatorEventForm = () => {
           </Form>
         </CardContent>
       </Card>
-    </CreatorLayout>
+    </AdminLayout>
   );
 };
 
-export default CreatorEventForm;
+export default AdminEventForm;

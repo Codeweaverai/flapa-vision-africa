@@ -21,6 +21,7 @@ import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
 import CreatorPayments from '@/pages/creator/CreatorPayments';
 import CreatorCourseForm from '@/pages/creator/CreatorCourseForm';
 import CreatorEventForm from '@/pages/creator/CreatorEventForm';
+import CreatorSettings from '@/pages/creator/CreatorSettings';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCancelPage from '@/pages/PaymentCancelPage';
 import PaymentResultPage from '@/pages/PaymentResultPage';
@@ -34,6 +35,10 @@ import AdminRegistrations from '@/pages/admin/AdminRegistrations';
 import AdminConsultations from '@/pages/admin/AdminConsultations';
 import AdminSettings from '@/pages/admin/AdminSettings';
 import AdminLogin from '@/pages/admin/AdminLogin';
+import AdminEventForm from '@/pages/admin/AdminEventForm';
+import AdminCourseForm from '@/pages/admin/AdminCourseForm';
+import AdminMediaForm from '@/pages/admin/AdminMediaForm';
+import AdminCourseContent from '@/pages/admin/AdminCourseContent';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Protected route component
@@ -72,20 +77,30 @@ const AppRoutes = () => {
       <Route path="/creator/courses" element={<ProtectedRoute><CreatorCourses /></ProtectedRoute>} />
       <Route path="/creator/courses/create" element={<ProtectedRoute><CreatorCourseForm /></ProtectedRoute>} />
       <Route path="/creator/courses/edit/:id" element={<ProtectedRoute><CreatorCourseForm /></ProtectedRoute>} />
+      <Route path="/creator/courses/content/:id" element={<ProtectedRoute><CreatorCourseForm /></ProtectedRoute>} />
       <Route path="/creator/events" element={<ProtectedRoute><CreatorEvents /></ProtectedRoute>} />
       <Route path="/creator/events/create" element={<ProtectedRoute><CreatorEventForm /></ProtectedRoute>} />
       <Route path="/creator/events/edit/:id" element={<ProtectedRoute><CreatorEventForm /></ProtectedRoute>} />
       <Route path="/creator/students" element={<ProtectedRoute><CreatorStudents /></ProtectedRoute>} />
       <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
       <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
+      <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
       
       {/* Admin routes */}
       <Route path="/admin-login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
       <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
+      <Route path="/admin/courses/create" element={<AdminRoute><AdminCourseForm /></AdminRoute>} />
+      <Route path="/admin/courses/edit/:id" element={<AdminRoute><AdminCourseForm /></AdminRoute>} />
+      <Route path="/admin/courses/content/:id" element={<AdminRoute><AdminCourseContent /></AdminRoute>} />
       <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
+      <Route path="/admin/events/create" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
+      <Route path="/admin/events/edit/:id" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
+      <Route path="/admin/events/registrations/:id" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
       <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
+      <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+      <Route path="/admin/media/edit/:id" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
       <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
       <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
       <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
