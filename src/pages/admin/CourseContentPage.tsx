@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -338,7 +337,6 @@ const CourseContentPage = () => {
           moduleId={currentModuleId}
           onLessonSaved={handleLessonSaved}
           editingLesson={editingLesson}
-          lessons={modules.find(m => m.id === currentModuleId)?.lessons || []}
           courseId={courseId || ''}
         />
       )}
