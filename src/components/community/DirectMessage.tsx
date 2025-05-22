@@ -52,19 +52,27 @@ const DirectMessage: React.FC<DirectMessageProps> = ({
       try {
         setLoading(true);
         
-        // Fetch direct messages between the two users
-        // Note: We're assuming a table called 'direct_messages' exists in your database
+        // Fetch messages from community_messages with channel = 'dm:userId:recipientId' or 'dm:recipientId:userId'
         const { data, error } = await supabase
           .from('community_messages')
           .select('*')
-          .or(`user_id.eq.${user.id},user_id.eq.${recipientId}`)
+          .or(`and(channel.eq.dm:${user.id}:${recipientId},user_id.eq.${user.id}),and(channel.eq.dm:${user.id}:${recipientId},user_id.eq.${recipientId}),and(channel.eq.dm:${recipientId}:${user.id},user_id.eq.${user.id}),and(channel.eq.dm:${recipientId}:${user.id},user_id.eq.${recipientId})`)
           .order('created_at');
 
         if (error) {
           console.error('Error fetching messages:', error);
           toast.error('Failed to load messages');
         } else {
-          setMessages(data || []);
+          // Map the database results to our Message interface
+          const mappedMessages: Message[] = data?.map(msg => ({
+            id: msg.id,
+            sender_id: msg.user_id,
+            receiver_id: msg.user_id === user.id ? recipientId : user.id,
+            content: msg.content,
+            created_at: msg.created_at
+          })) || [];
+          
+          setMessages(mappedMessages);
         }
       } catch (err) {
         console.error('Error in message fetch:', err);
@@ -77,17 +85,47 @@ const DirectMessage: React.FC<DirectMessageProps> = ({
     fetchMessages();
     
     // Set up realtime subscription for new messages
+    const dmChannelId1 = `dm:${user.id}:${recipientId}`;
+    const dmChannelId2 = `dm:${recipientId}:${user.id}`;
+    
     const channel = supabase
-      .channel(`direct_messages:${user.id}:${recipientId}`)
+      .channel('direct_messages')
       .on('postgres_changes', 
         { 
           event: 'INSERT', 
           schema: 'public',
           table: 'community_messages',
-          filter: `user_id=eq.${recipientId}`
+          filter: `channel=eq.${dmChannelId1}`
         }, 
         (payload) => {
-          setMessages(prev => [...prev, payload.new as Message]);
+          const newMsg = payload.new as any;
+          const mappedMsg: Message = {
+            id: newMsg.id,
+            sender_id: newMsg.user_id,
+            receiver_id: newMsg.user_id === user.id ? recipientId : user.id,
+            content: newMsg.content,
+            created_at: newMsg.created_at
+          };
+          setMessages(prev => [...prev, mappedMsg]);
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public',
+          table: 'community_messages',
+          filter: `channel=eq.${dmChannelId2}`
+        }, 
+        (payload) => {
+          const newMsg = payload.new as any;
+          const mappedMsg: Message = {
+            id: newMsg.id,
+            sender_id: newMsg.user_id,
+            receiver_id: newMsg.user_id === user.id ? recipientId : user.id,
+            content: newMsg.content,
+            created_at: newMsg.created_at
+          };
+          setMessages(prev => [...prev, mappedMsg]);
         }
       )
       .subscribe();
@@ -111,12 +149,15 @@ const DirectMessage: React.FC<DirectMessageProps> = ({
     try {
       setSending(true);
       
+      // Create a direct message channel id in format dm:senderId:recipientId
+      const channelId = `dm:${user.id}:${recipientId}`;
+      
       const { error } = await supabase
         .from('community_messages')
         .insert({
           user_id: user.id,
           content: newMessage.trim(),
-          channel: `dm:${recipientId}`
+          channel: channelId
         });
         
       if (error) {

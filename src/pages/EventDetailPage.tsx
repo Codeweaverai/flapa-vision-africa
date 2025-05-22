@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -41,7 +42,7 @@ const EventDetailPage = () => {
         // Check if user is registered
         if (user) {
           const { data: registrationData, error: registrationError } = await supabase
-            .from('event_registrations')
+            .from('registrations')
             .select('id, payment_status')
             .eq('user_id', user.id)
             .eq('event_id', id)
@@ -54,7 +55,7 @@ const EventDetailPage = () => {
         
         // Get attendee count
         const { count, error: countError } = await supabase
-          .from('event_registrations')
+          .from('registrations')
           .select('id', { count: 'exact', head: true })
           .eq('event_id', id);
           
@@ -97,9 +98,9 @@ const EventDetailPage = () => {
         <div className="container py-12">
           <h1 className="text-2xl font-bold">Event not found</h1>
           <p className="mt-4">The event you're looking for doesn't exist or has been removed.</p>
-          <Button asChild>
-            <Link to="/events">Browse all events</Link>
-          </Button>
+          <Link to="/events" className="mt-4 inline-block">
+            <Button>Browse all events</Button>
+          </Link>
         </div>
       </Layout>
     );
@@ -173,7 +174,7 @@ const EventDetailPage = () => {
                     
                     {isRegistered && event.meeting_link && (
                       <div className="mt-4">
-                        <Button asChild variant="outline">
+                        <Button variant="outline" asChild>
                           <a href={event.meeting_link} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="h-4 w-4 mr-2" />
                             Join Event
@@ -197,7 +198,7 @@ const EventDetailPage = () => {
                     
                     {event.google_maps_url && (
                       <div>
-                        <Button asChild variant="outline" size="sm">
+                        <Button variant="outline" size="sm" asChild>
                           <a href={event.google_maps_url} target="_blank" rel="noopener noreferrer">
                             <MapPin className="h-4 w-4 mr-2" />
                             View on Google Maps
