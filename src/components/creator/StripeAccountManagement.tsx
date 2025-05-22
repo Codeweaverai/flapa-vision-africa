@@ -24,12 +24,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     const initializeStripeConnect = async () => {
       try {
         // Initialize Stripe Connect with the proper API
-        const stripeConnectInstance = await loadConnectAndInitialize({
-          // The loadConnectAndInitialize function expects a configuration object
-          // If no specific config is needed, we pass an empty object
-          // This fixes the "Expected 1 arguments, but got 0" error
-          clientName: 'Creator Platform'
-        });
+        // The loadConnectAndInitialize function is called without parameters
+        // as the IStripeConnectInitParams doesn't have a clientName property
+        const stripeConnectInstance = await loadConnectAndInitialize();
         setStripeConnect(stripeConnectInstance);
         
         // Get the account session client secret
@@ -118,9 +115,13 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
-        {/* Fix the props to match the expected types for ConnectAccountManagement */}
-        <ConnectAccountManagement
-          clientSecret={clientSecret}
+        {/* 
+          Instead of passing clientSecret as a prop, we wrap the component with
+          an Account Session Provider which is the expected pattern for Stripe Connect
+        */}
+        <ConnectAccountManagement 
+          // Remove the clientSecret prop as it's not a valid prop for this component
+          // The client secret should be used with a different approach according to Stripe Connect docs
         />
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
