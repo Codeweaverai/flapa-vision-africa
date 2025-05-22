@@ -1,142 +1,124 @@
-
-import React, { useState, useEffect } from 'react';
-import { 
-  ConnectAccountManagement,
-  ConnectComponentsProvider,
-  // Use ConnectEmbed which is the correct component name in the latest API
-  ConnectEmbed
-} from '@stripe/react-connect-js';
-import { loadConnectAndInitialize } from '@stripe/connect-js';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
+// Import correct component or remove incorrect import
+// Commented out incorrect import that was causing errors
+// import { ConnectEmbed } from '@stripe/react-connect-js';
 
-interface StripeAccountManagementProps {
-  stripeAccountId: string;
-}
-
-const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ stripeAccountId }) => {
-  const [loading, setLoading] = useState<boolean>(true);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [stripeConnect, setStripeConnect] = useState<any | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const StripeAccountManagement = () => {
+  const { user } = useAuth();
+  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initializeStripeConnect = async () => {
-      try {
-        // Initialize Stripe Connect with the proper API
-        // Pass the required parameters for the SDK
-        const stripeConnectInstance = await loadConnectAndInitialize({
-          publishableKey: 'pk_test', // This will be replaced by your actual publishable key in production
-          fetchClientSecret: async () => {
-            // This function is required by Stripe Connect JS
-            return '';
-          }
-        });
-        
-        setStripeConnect(stripeConnectInstance);
-        
-        // Get the account session client secret
-        if (stripeAccountId) {
-          const { data, error } = await supabase.functions.invoke('create-stripe-account-session', {
-            body: {}
-          });
-          
+    const fetchStripeAccountId = async () => {
+      if (user && user.id) {
+        try {
+          setLoading(true);
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('stripe_account_id')
+            .eq('id', user.id)
+            .single();
+
           if (error) {
-            throw new Error(`Failed to create account session: ${error.message}`);
+            console.error('Error fetching Stripe Account ID:', error);
+            toast.error('Failed to fetch Stripe Account ID.');
+          } else if (data) {
+            setStripeAccountId(data.stripe_account_id);
           }
-          
-          if (data?.clientSecret) {
-            setClientSecret(data.clientSecret);
-          } else {
-            throw new Error('No client secret returned from server');
-          }
+        } catch (error) {
+          console.error('Unexpected error:', error);
+          toast.error('Unexpected error occurred.');
+        } finally {
+          setLoading(false);
         }
-      } catch (err) {
-        console.error('Error initializing Stripe Connect:', err);
-        setError(err instanceof Error ? err.message : 'Failed to initialize Stripe Account Management');
-        toast.error('Failed to load Stripe Account Management');
-      } finally {
-        setLoading(false);
       }
     };
 
-    initializeStripeConnect();
-  }, [stripeAccountId]);
+    fetchStripeAccountId();
+  }, [user]);
 
-  const handleRefresh = async () => {
-    setLoading(true);
-    setError(null);
+  const handleCreateAccount = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('create-stripe-account-session', {
-        body: {}
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('create-stripe-account', {
+        body: { user_id: user?.id },
       });
-      
+
       if (error) {
-        throw new Error(`Failed to refresh account session: ${error.message}`);
+        console.error('Error creating Stripe account:', error);
+        toast.error('Failed to create Stripe account.');
+      } else if (data && data.account_id) {
+        setStripeAccountId(data.account_id);
+        toast.success('Stripe account created successfully!');
       }
-      
-      if (data?.clientSecret) {
-        setClientSecret(data.clientSecret);
-        toast.success('Account management refreshed');
-      } else {
-        throw new Error('No client secret returned from server');
-      }
-    } catch (err) {
-      console.error('Error refreshing account session:', err);
-      setError(err instanceof Error ? err.message : 'Failed to refresh account management');
-      toast.error('Failed to refresh account management');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      toast.error('Unexpected error occurred.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading account management...</span>
-      </div>
-    );
-  }
+  const handleCreateAccountLink = async () => {
+    if (!stripeAccountId) {
+      toast.error('Please create a Stripe account first.');
+      return;
+    }
 
-  if (error) {
-    return (
-      <div className="p-4 border rounded-md bg-destructive/10 text-destructive">
-        <p className="font-medium">Error loading account management</p>
-        <p className="text-sm mt-2">{error}</p>
-        <Button onClick={handleRefresh} variant="outline" className="mt-4">
-          Try Again
-        </Button>
-      </div>
-    );
-  }
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('create-stripe-account-link', {
+        body: { account_id: stripeAccountId },
+      });
 
-  if (!stripeConnect || !clientSecret) {
-    return (
-      <div className="p-4 border rounded-md">
-        <p>Unable to load Stripe Account Management</p>
-        <Button onClick={handleRefresh} variant="outline" className="mt-4">
-          Try Again
-        </Button>
-      </div>
-    );
-  }
+      if (error) {
+        console.error('Error creating Stripe account link:', error);
+        toast.error('Failed to create Stripe account link.');
+      } else if (data && data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      toast.error('Unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="stripe-account-management">
-      <ConnectComponentsProvider connectInstance={stripeConnect}>
-        <ConnectEmbed clientSecret={clientSecret}>
-          <ConnectAccountManagement />
-        </ConnectEmbed>
-        <div className="mt-4 text-center">
-          <Button onClick={handleRefresh} variant="outline" size="sm">
-            Refresh
+    <Card>
+      <CardHeader>
+        <CardTitle>Stripe Account Management</CardTitle>
+        <CardDescription>Manage your Stripe account for payouts.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div>Loading...</div>
+        ) : stripeAccountId ? (
+          <>
+            <p>Your Stripe Account ID: {stripeAccountId}</p>
+            <Button onClick={handleCreateAccountLink} disabled={loading}>
+              Update Account Details
+            </Button>
+            {/* <ConnectEmbed
+              stripeAccountId={stripeAccountId}
+              onAccountUpdated={() => {
+                toast.success('Stripe account updated successfully!');
+              }}
+            /> */}
+          </>
+        ) : (
+          <Button onClick={handleCreateAccount} disabled={loading}>
+            Create Stripe Account
           </Button>
-        </div>
-      </ConnectComponentsProvider>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
