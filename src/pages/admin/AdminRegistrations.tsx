@@ -47,7 +47,18 @@ interface EventData {
   start_time?: string;
 }
 
-interface JoinedData {
+// Improved type definition for joined data from Supabase
+interface RegistrationRecord {
+  id: string;
+  user_id: string;
+  event_id: string;
+  created_at: string;
+  status: string;
+  payment_status: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  payment_method?: string;
+  payment_id?: string;
   profiles?: ProfileData | null;
   events?: EventData | null;
   [key: string]: any;
@@ -87,11 +98,11 @@ const AdminRegistrations: React.FC = () => {
       
       if (error) throw error;
 
-      // Transform data to match our Registration interface
-      const formattedRegistrations: Registration[] = (data || []).map((item: JoinedData) => {
+      // Transform data to match our Registration interface with proper type safety
+      const formattedRegistrations: Registration[] = (data || []).map((item: RegistrationRecord) => {
         // Handle cases where related data might not be available
-        const profilesData: ProfileData = item.profiles || {};
-        const eventsData: EventData = item.events || {};
+        const profileData = item.profiles || {};
+        const eventData = item.events || {};
         
         return {
           id: item.id,
@@ -104,11 +115,10 @@ const AdminRegistrations: React.FC = () => {
           payment_currency: item.payment_currency,
           payment_method: item.payment_method,
           payment_id: item.payment_id,
-          // Use data from joined tables or default values
-          user_fullname: profilesData.full_name || 'Unknown',
-          user_email: profilesData.email || 'Unknown',
-          event_title: eventsData.title || 'Unknown Event',
-          event_date: eventsData.start_time
+          user_fullname: profileData.full_name || 'Unknown',
+          user_email: profileData.email || 'Unknown',
+          event_title: eventData.title || 'Unknown Event',
+          event_date: eventData.start_time
         };
       });
       

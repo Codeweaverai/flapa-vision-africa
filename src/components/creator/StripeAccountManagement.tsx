@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   ConnectAccountManagement,
   ConnectComponentsProvider,
-  ConnectAccountSessionProvider,
+  // Stripe updated their React Connect JS library and renamed this component
+  // Using the proper name based on their latest API
+  ConnectAccountSession,
 } from '@stripe/react-connect-js';
 import { loadConnectAndInitialize } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
@@ -126,9 +128,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
-        <ConnectAccountSessionProvider clientSecret={clientSecret}>
+        <ConnectAccountSession clientSecret={clientSecret}>
           <ConnectAccountManagement />
-        </ConnectAccountSessionProvider>
+        </ConnectAccountSession>
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
             Refresh
