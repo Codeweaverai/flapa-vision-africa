@@ -1,194 +1,182 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import Stripe from "https://esm.sh/stripe@12.0.0";
+// @ts-ignore - Deno imports will be available when deployed
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; 
+// @ts-ignore - Deno imports will be available when deployed
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"; 
+// @ts-ignore - Deno imports will be available when deployed
+import Stripe from "https://esm.sh/stripe@14.21.0";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// @ts-ignore - Deno namespace available at runtime in Supabase Edge Functions
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '');
 
-serve(async (req) => {
+// @ts-ignore - Deno serve method available at runtime
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders, status: 204 });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders,
+      status: 204,
+    });
   }
 
   try {
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    // Get the authorization header from the request
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing Authorization header');
+    }
+
+    // Create a Supabase client with the auth header
+    const supabaseClient = createClient(
+      // @ts-ignore - Deno env available at runtime
+      Deno.env.get('SUPABASE_URL') || '',
+      // @ts-ignore - Deno env available at runtime
+      Deno.env.get('SUPABASE_ANON_KEY') || '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
+    );
+
+    // Get the user from the client
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser();
+
+    if (userError || !user) {
+      throw new Error('Unauthorized');
+    }
 
     // Get the request body
-    const { itemType, itemId, userId } = await req.json();
+    const { courseId, eventId, returnUrl } = await req.json();
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabaseClient = createClient(supabaseUrl || "", supabaseServiceKey || "");
+    if (!courseId && !eventId) {
+      throw new Error('Missing courseId or eventId in request body');
+    }
+
+    if (!returnUrl) {
+      throw new Error('Missing returnUrl in request body');
+    }
+
+    // Check if the user already exists as a Stripe customer
+    const customers = await stripe.customers.list({
+      email: user.email,
+      limit: 1,
+    });
+
+    let customerId;
+    if (customers.data.length > 0) {
+      customerId = customers.data[0].id;
+    } else {
+      // Create a new Stripe customer
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          userId: user.id,
+        },
+      });
+      customerId = customer.id;
+    }
 
     let lineItems = [];
-    let successRedirect = "";
+    let successUrl = returnUrl;
     let metadata = {};
 
-    if (itemType === "course") {
-      // Fetch course details
+    // Set up the appropriate line items and success URL based on whether it's a course or event
+    if (courseId) {
+      // Get course details
       const { data: course, error: courseError } = await supabaseClient
-        .from("courses")
-        .select("*")
-        .eq("id", itemId)
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
         .single();
 
       if (courseError) {
-        throw new Error(`Error fetching course: ${courseError.message}`);
-      }
-
-      if (!course) {
-        throw new Error("Course not found");
-      }
-
-      // Check if user is already enrolled
-      const { data: enrollment, error: enrollmentError } = await supabaseClient
-        .from("course_enrollments")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("course_id", itemId)
-        .maybeSingle();
-
-      if (enrollmentError) {
-        throw new Error(`Error checking enrollment: ${enrollmentError.message}`);
-      }
-
-      // If already enrolled and paid, don't proceed
-      if (enrollment && enrollment.payment_status === "paid") {
-        throw new Error("User already enrolled in this course");
+        throw new Error('Failed to fetch course');
       }
 
       lineItems = [
         {
           price_data: {
-            currency: "usd",
+            currency: 'usd',
             product_data: {
-              name: course.title,
+              name: `Course: ${course.title}`,
               description: course.description,
               images: course.thumbnail_url ? [course.thumbnail_url] : [],
             },
-            unit_amount: Math.round(course.price * 100), // Convert to cents
+            unit_amount: Math.round(Number(course.price || 0) * 100),
           },
           quantity: 1,
         },
       ];
 
       metadata = {
-        course_id: course.id,
-        itemType: "course",
-        userId,
+        type: 'course',
+        courseId: courseId,
+        userId: user.id,
       };
 
-      successRedirect = `/payment/success?type=course&id=${course.id}`;
-    } else if (itemType === "event") {
-      // Fetch event details
+      successUrl = `${returnUrl}?type=course&id=${courseId}&session={CHECKOUT_SESSION_ID}`;
+    } else if (eventId) {
+      // Get event details
       const { data: event, error: eventError } = await supabaseClient
-        .from("events")
-        .select("*")
-        .eq("id", itemId)
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
         .single();
 
       if (eventError) {
-        throw new Error(`Error fetching event: ${eventError.message}`);
-      }
-
-      if (!event) {
-        throw new Error("Event not found");
-      }
-
-      // Check if user is already registered
-      const { data: registration, error: registrationError } = await supabaseClient
-        .from("registrations")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("event_id", itemId)
-        .maybeSingle();
-
-      if (registrationError) {
-        throw new Error(`Error checking registration: ${registrationError.message}`);
-      }
-
-      // If already registered and paid, don't proceed
-      if (registration && registration.payment_status === "paid") {
-        throw new Error("User already registered for this event");
+        throw new Error('Failed to fetch event');
       }
 
       lineItems = [
         {
           price_data: {
-            currency: event.currency?.toLowerCase() || "usd",
+            currency: event.currency?.toLowerCase() || 'usd',
             product_data: {
-              name: event.title,
+              name: `Event: ${event.title}`,
               description: event.description,
               images: event.image_url ? [event.image_url] : [],
             },
-            unit_amount: Math.round((event.price || 0) * 100), // Convert to cents
+            unit_amount: Math.round(Number(event.price || 0) * 100),
           },
           quantity: 1,
         },
       ];
 
       metadata = {
-        event_id: event.id,
-        itemType: "event",
-        userId,
+        type: 'event',
+        eventId: eventId,
+        userId: user.id,
       };
 
-      successRedirect = `/payment/success?type=event&id=${event.id}`;
-    } else {
-      throw new Error("Invalid item type");
+      successUrl = `${returnUrl}?type=event&id=${eventId}&session={CHECKOUT_SESSION_ID}`;
     }
 
-    // Get the user's email for customer information
-    const { data: userData, error: userError } = await supabaseClient
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    if (userError) {
-      throw new Error(`Error fetching user data: ${userError.message}`);
-    }
-
-    // Create the checkout session
+    // Create a Stripe checkout session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
+      customer: customerId,
+      payment_method_types: ['card'],
       line_items: lineItems,
-      mode: "payment",
-      success_url: `${req.headers.get("origin")}${successRedirect}`,
-      cancel_url: `${req.headers.get("origin")}/payment/cancel`,
-      customer_email: userData?.email || undefined,
+      mode: 'payment',
+      success_url: successUrl,
+      cancel_url: `${returnUrl}?canceled=true`,
       metadata: metadata,
     });
 
-    return new Response(
-      JSON.stringify({ id: session.id, url: session.url }),
-      {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return new Response(JSON.stringify({ url: session.url }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
   } catch (error) {
-    console.error("Error creating checkout session:", error);
-
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
   }
 });

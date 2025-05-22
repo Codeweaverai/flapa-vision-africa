@@ -1,118 +1,86 @@
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/layout/AdminLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import RegistrationsTable from '@/components/admin/RegistrationsTable';
-
-interface EventRegistration {
-  id: string;
-  event_id: string;
-  user_id: string;
-  status: string;
-  payment_status: string;
-  payment_method?: string;
-  payment_amount?: number;
-  payment_currency?: string;
-  created_at?: string;
-  event?: {
-    title: string;
-  };
-  profiles?: {
-    full_name?: string;
-    username?: string;
-    email?: string;
-  };
-}
-
-interface CourseEnrollment {
-  id: string;
-  course_id: string;
-  user_id: string;
-  enrollment_date?: string;
-  is_completed?: boolean;
-  payment_status?: string;
-  courses?: {
-    title: string;
-  };
-  profiles?: {
-    full_name?: string;
-    username?: string;
-    email?: string;
-  };
-}
-
-interface AdminCombinedRegistration {
-  id: string;
-  type: 'event' | 'course';
-  title: string;
-  date: string;
-  user_name: string;
-  user_email: string;
-  event_id?: string;
-  user_id: string;
-  status?: string;
-  payment_status?: string;
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/lib/supabaseClient';
 
 const AdminRegistrations = () => {
-  const [eventRegistrations, setEventRegistrations] = useState<EventRegistration[]>([]);
-  const [courseEnrollments, setCoursEnrollments] = useState<CourseEnrollment[]>([]);
-  const [combinedRegistrations, setCombinedRegistrations] = useState<AdminCombinedRegistration[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all');
-
+  const [loading, setLoading] = useState<boolean>(true);
+  const [eventRegistrations, setEventRegistrations] = useState<any[]>([]);
+  const [courseEnrollments, setCourseEnrollments] = useState<any[]>([]);
+  
   useEffect(() => {
     const fetchRegistrations = async () => {
       setLoading(true);
       try {
-        // Fetch event registrations with related event and user data
+        // Fetch event registrations with related data
         const { data: eventRegs, error: eventError } = await supabase
           .from('registrations')
-          .select('*, events(*), profiles(*)') as { data: EventRegistration[], error: any };
+          .select(`
+            *,
+            events:event_id (*),
+            profiles:user_id (id, full_name, email)
+          `);
 
-        if (eventError) throw eventError;
+        if (eventError) {
+          throw eventError;
+        }
 
-        // Fetch course enrollments with related course and user data
-        const { data: courseEnrols, error: courseError } = await supabase
+        // Fetch course enrollments with related data
+        const { data: courseEnrolls, error: courseError } = await supabase
           .from('course_enrollments')
-          .select('*, courses(*), profiles(*)') as { data: CourseEnrollment[], error: any };
+          .select(`
+            *,
+            courses:course_id (*),
+            profiles:user_id (id, full_name, email)
+          `);
 
-        if (courseError) throw courseError;
+        if (courseError) {
+          throw courseError;
+        }
 
-        setEventRegistrations(eventRegs || []);
-        setCoursEnrollments(courseEnrols || []);
+        // Format event registrations data
+        const formattedEventRegs = eventRegs?.map(reg => ({
+          id: reg.id,
+          user_id: reg.user_id,
+          entity_id: reg.event_id,
+          created_at: reg.created_at,
+          status: reg.status,
+          payment_status: reg.payment_status,
+          payment_amount: reg.payment_amount,
+          payment_currency: reg.payment_currency,
+          payment_method: reg.payment_method,
+          payment_id: reg.payment_id,
+          user_fullname: reg.profiles?.full_name || 'Unknown',
+          user_email: reg.profiles?.email || 'Unknown',
+          title: reg.events?.title || 'Unknown Event',
+          date: reg.events ? new Date(reg.events.start_time).toLocaleDateString() : 'Unknown',
+          type: 'event'
+        })) || [];
 
-        // Combine and format registrations
-        const combined: AdminCombinedRegistration[] = [
-          ...eventRegs.map(reg => ({
-            id: reg.id,
-            type: 'event' as const,
-            event_id: reg.event_id,
-            user_id: reg.user_id,
-            title: reg.event?.title || 'Unknown Event',
-            date: reg.created_at || new Date().toISOString(),
-            user_name: reg.profiles?.full_name || reg.profiles?.username || 'Unknown User',
-            user_email: reg.profiles?.email || 'No email',
-            status: reg.status,
-            payment_status: reg.payment_status
-          })),
-          ...courseEnrols.map(enrol => ({
-            id: enrol.id,
-            type: 'course' as const,
-            course_id: enrol.course_id,
-            user_id: enrol.user_id,
-            title: enrol.courses?.title || 'Unknown Course',
-            date: enrol.enrollment_date || new Date().toISOString(),
-            user_name: enrol.profiles?.full_name || enrol.profiles?.username || 'Unknown User',
-            user_email: enrol.profiles?.email || 'No email',
-            status: enrol.is_completed ? 'completed' : 'in progress',
-            payment_status: enrol.payment_status
-          }))
-        ];
+        // Format course enrollments data
+        const formattedCourseEnrolls = courseEnrolls?.map(enroll => ({
+          id: enroll.id,
+          user_id: enroll.user_id,
+          entity_id: enroll.course_id,
+          created_at: enroll.enrollment_date,
+          status: enroll.is_completed ? 'completed' : 'active',
+          payment_status: enroll.payment_status,
+          payment_amount: enroll.courses?.price || 0,
+          payment_currency: 'USD',
+          payment_id: enroll.payment_id,
+          user_fullname: enroll.profiles?.full_name || 'Unknown',
+          user_email: enroll.profiles?.email || 'Unknown',
+          title: enroll.courses?.title || 'Unknown Course',
+          date: enroll.enrollment_date ? new Date(enroll.enrollment_date).toLocaleDateString() : 'Unknown',
+          type: 'course'
+        })) || [];
 
-        setCombinedRegistrations(combined);
+        setEventRegistrations(formattedEventRegs);
+        setCourseEnrollments(formattedCourseEnrolls);
       } catch (error) {
         console.error('Error fetching registrations:', error);
         toast.error('Failed to load registrations');
@@ -124,96 +92,72 @@ const AdminRegistrations = () => {
     fetchRegistrations();
   }, []);
 
-  const updateRegistrationStatus = async (id: string, type: 'event' | 'course', status: string) => {
-    try {
-      if (type === 'event') {
-        const { error } = await supabase
-          .from('registrations')
-          .update({ status })
-          .eq('id', id);
-        
-        if (error) throw error;
-
-        setEventRegistrations(prev =>
-          prev.map(reg => (reg.id === id ? { ...reg, status } : reg))
-        );
-      } else {
-        // For courses, we handle differently based on status
-        let updateData = {};
-        if (status === 'completed') {
-          updateData = { is_completed: true };
-        } else if (status === 'paid') {
-          updateData = { payment_status: 'paid' };
-        } else if (status === 'cancelled') {
-          updateData = { payment_status: 'cancelled' };
-        }
-
-        const { error } = await supabase
-          .from('course_enrollments')
-          .update(updateData)
-          .eq('id', id);
-        
-        if (error) throw error;
-
-        setCoursEnrollments(prev =>
-          prev.map(enrol => (enrol.id === id ? { ...enrol, ...updateData } : enrol))
-        );
-      }
-
-      // Update the combined registrations
-      setCombinedRegistrations(prev => {
-        return prev.map(reg => {
-          if (reg.id === id && reg.type === type) {
-            if (type === 'event') {
-              return { ...reg, status };
-            } else {
-              if (status === 'completed') {
-                return { ...reg, status: 'completed' };
-              } else if (status === 'paid' || status === 'cancelled') {
-                return { ...reg, payment_status: status };
-              }
-            }
-          }
-          return reg;
-        });
-      });
-
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error updating registration status:', error);
-      toast.error('Failed to update status');
-      return Promise.reject(error);
-    }
-  };
-
-  const filteredRegistrations = activeTab === 'all' 
-    ? combinedRegistrations 
-    : combinedRegistrations.filter(reg => reg.type === activeTab);
-
   return (
     <AdminLayout>
-      <div className="container p-6">
-        <h1 className="text-3xl font-bold mb-6">Registrations & Enrollments</h1>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="event">Events</TabsTrigger>
-            <TabsTrigger value="course">Courses</TabsTrigger>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-6">Registrations</h1>
+        
+        <Tabs defaultValue="events" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="events">Event Registrations</TabsTrigger>
+            <TabsTrigger value="courses">Course Enrollments</TabsTrigger>
+            <TabsTrigger value="all">All Registrations</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="events">
+            <Card>
+              <CardHeader>
+                <CardTitle>Event Registrations</CardTitle>
+                <CardDescription>
+                  Manage all event registrations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RegistrationsTable 
+                  data={eventRegistrations} 
+                  loading={loading}
+                  type="event"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="courses">
+            <Card>
+              <CardHeader>
+                <CardTitle>Course Enrollments</CardTitle>
+                <CardDescription>
+                  Manage all course enrollments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RegistrationsTable 
+                  data={courseEnrollments} 
+                  loading={loading}
+                  type="course"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="all">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Registrations</CardTitle>
+                <CardDescription>
+                  View all registrations and enrollments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RegistrationsTable 
+                  data={[...eventRegistrations, ...courseEnrollments]} 
+                  loading={loading}
+                  type="all"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
-
-        {loading ? (
-          <div className="text-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-lg">Loading registrations...</p>
-          </div>
-        ) : (
-          <RegistrationsTable 
-            registrations={filteredRegistrations} 
-            onUpdateStatus={updateRegistrationStatus}
-          />
-        )}
       </div>
     </AdminLayout>
   );
