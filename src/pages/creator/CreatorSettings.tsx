@@ -1,432 +1,333 @@
 
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 import StripeAccountManagement from '@/components/creator/StripeAccountManagement';
-
-const formSchema = z.object({
-  full_name: z.string().min(1, "Full name is required"),
-  username: z.string().min(3, "Username must be at least 3 characters").optional(),
-  bio: z.string().optional(),
-  mobile_money_number: z.string().optional(),
-  payout_method: z.enum(["stripe", "mobile_money", "bank"]),
-  is_creator: z.boolean().default(true),
-});
+import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 
 const CreatorSettings = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [bankDetails, setBankDetails] = useState({
-    account_name: '',
-    account_number: '',
-    bank_name: '',
-    branch_code: '',
-  });
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      full_name: "",
-      username: "",
-      bio: "",
-      mobile_money_number: "",
-      payout_method: "stripe",
-      is_creator: true,
-    },
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [profileData, setProfileData] = useState({
+    username: '',
+    full_name: '',
+    bio: '',
+    mobile_money_number: '',
+    payout_method: 'stripe',
+    avatar_url: '',
+    bank_account_details: {
+      account_name: '',
+      account_number: '',
+      bank_name: '',
+      branch_code: '',
+    }
   });
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileData = async () => {
       if (!user) return;
-      
-      setLoading(true);
+
       try {
+        setLoading(true);
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
-        
-        if (error) {
-          toast.error("Error fetching profile data");
-          console.error("Error fetching profile:", error);
-          return;
-        }
-        
-        if (data) {
-          form.reset({
-            full_name: data.full_name || "",
-            username: data.username || "",
-            bio: data.bio || "",
-            mobile_money_number: data.mobile_money_number || "",
-            payout_method: (data.payout_method as "stripe" | "mobile_money" | "bank") || "stripe",
-            is_creator: data.is_creator || true,
-          });
-          
-          setAvatarUrl(data.avatar_url || null);
-          
-          if (data.bank_account_details) {
-            setBankDetails({
-              account_name: data.bank_account_details.account_name || '',
-              account_number: data.bank_account_details.account_number || '',
-              bank_name: data.bank_account_details.bank_name || '',
-              branch_code: data.bank_account_details.branch_code || '',
-            });
-          }
-        }
+
+        if (error) throw error;
+
+        // Cast the bank_account_details to an object or set to default if null
+        const bank_account_details = data.bank_account_details 
+          ? data.bank_account_details 
+          : { account_name: '', account_number: '', bank_name: '', branch_code: '' };
+
+        setProfileData({
+          username: data.username || '',
+          full_name: data.full_name || '',
+          bio: data.bio || '',
+          mobile_money_number: data.mobile_money_number || '',
+          payout_method: data.payout_method || 'stripe',
+          avatar_url: data.avatar_url || '',
+          bank_account_details
+        });
       } catch (error) {
-        console.error("Error in fetchProfile:", error);
-        toast.error("An unexpected error occurred");
+        console.error('Error fetching profile:', error);
+        toast.error('Error loading profile data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [user, form]);
+    fetchProfileData();
+  }, [user]);
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleSaveProfile = async () => {
     if (!user) return;
-    
-    setLoading(true);
+
     try {
-      // Prepare the data to update
-      const updates = {
-        ...values,
-        updated_at: new Date().toISOString(),
-        bank_account_details: form.watch('payout_method') === 'bank' ? bankDetails : null,
-      };
-      
+      setSaving(true);
       const { error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update({
+          username: profileData.username,
+          full_name: profileData.full_name,
+          bio: profileData.bio,
+          mobile_money_number: profileData.mobile_money_number,
+          payout_method: profileData.payout_method,
+          bank_account_details: profileData.bank_account_details,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', user.id);
-      
-      if (error) {
-        toast.error("Failed to update profile");
-        console.error("Error updating profile:", error);
-        return;
-      }
-      
-      toast.success("Profile updated successfully");
+
+      if (error) throw error;
+
+      toast.success('Profile updated successfully');
     } catch (error) {
-      console.error("Error in onSubmit:", error);
-      toast.error("An unexpected error occurred");
+      console.error('Error updating profile:', error);
+      toast.error('Error updating profile');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleAvatarUpload = (url: string) => {
-    setAvatarUrl(url);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setProfileData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleBankDetailChange = (field: keyof typeof bankDetails, value: string) => {
-    setBankDetails(prev => ({
+  const handleBankDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setProfileData(prev => ({
       ...prev,
-      [field]: value
+      bank_account_details: { ...prev.bank_account_details, [name]: value }
     }));
   };
 
+  const handleAvatarUpdate = (url: string) => {
+    setProfileData(prev => ({ ...prev, avatar_url: url }));
+    // Update avatar in database
+    if (user) {
+      supabase
+        .from('profiles')
+        .update({ avatar_url: url })
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error updating avatar:', error);
+            toast.error('Error updating avatar');
+          } else {
+            toast.success('Avatar updated successfully');
+          }
+        });
+    }
+  };
+
+  if (!user) {
+    return (
+      <CreatorLayout>
+        <div className="container py-10">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center">Please sign in to access creator settings.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </CreatorLayout>
+    );
+  }
+
   return (
     <CreatorLayout>
-      <div className="section-container">
-        <h1 className="text-2xl font-bold mb-6">Settings</h1>
-        
-        <Tabs defaultValue="profile" className="w-full">
+      <div className="container py-10">
+        <h1 className="text-3xl font-bold mb-6">Creator Settings</h1>
+
+        <Tabs defaultValue="profile">
           <TabsList className="mb-6">
             <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
+            <TabsTrigger value="payments">Payment Settings</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="profile">
             <Card>
               <CardHeader>
-                <CardTitle>Profile Settings</CardTitle>
+                <CardTitle>Creator Profile</CardTitle>
                 <CardDescription>
-                  Update your creator profile information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="flex flex-col md:flex-row gap-6">
-                      <div className="md:w-1/3">
-                        <ProfilePictureUpload 
-                          userId={user?.id} 
-                          existingUrl={avatarUrl} 
-                          onUploadComplete={handleAvatarUpload} 
-                        />
-                      </div>
-                      
-                      <div className="space-y-4 md:w-2/3">
-                        <FormField
-                          control={form.control}
-                          name="full_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Full Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Your full name" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="username"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Username</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Your username" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                This will be used for your creator profile URL
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="bio"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Bio</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  placeholder="Tell students about yourself" 
-                                  {...field} 
-                                  rows={5} 
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Briefly introduce yourself and your expertise
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="is_creator"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between">
-                              <div className="space-y-0">
-                                <FormLabel>Creator Mode</FormLabel>
-                                <FormDescription>
-                                  Enable creator features for your account
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-                    
-                    <Button type="submit" disabled={loading}>
-                      {loading ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="payments">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Methods</CardTitle>
-                  <CardDescription>
-                    Configure how you receive payments from your courses and events
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                      <FormField
-                        control={form.control}
-                        name="payout_method"
-                        render={({ field }) => (
-                          <FormItem className="space-y-3">
-                            <FormLabel>Payout Method</FormLabel>
-                            <FormControl>
-                              <div className="flex flex-col space-y-2">
-                                <label className="flex items-center space-x-2">
-                                  <input
-                                    type="radio"
-                                    value="stripe"
-                                    checked={field.value === "stripe"}
-                                    onChange={() => field.onChange("stripe")}
-                                    className="radio"
-                                  />
-                                  <span>Stripe (International)</span>
-                                </label>
-                                <label className="flex items-center space-x-2">
-                                  <input
-                                    type="radio"
-                                    value="mobile_money"
-                                    checked={field.value === "mobile_money"}
-                                    onChange={() => field.onChange("mobile_money")}
-                                    className="radio"
-                                  />
-                                  <span>Mobile Money</span>
-                                </label>
-                                <label className="flex items-center space-x-2">
-                                  <input
-                                    type="radio"
-                                    value="bank"
-                                    checked={field.value === "bank"}
-                                    onChange={() => field.onChange("bank")}
-                                    className="radio"
-                                  />
-                                  <span>Bank Transfer</span>
-                                </label>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      {form.watch('payout_method') === 'mobile_money' && (
-                        <FormField
-                          control={form.control}
-                          name="mobile_money_number"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Mobile Money Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter your mobile money number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                      
-                      {form.watch('payout_method') === 'bank' && (
-                        <div className="space-y-4">
-                          <FormItem>
-                            <FormLabel>Bank Name</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Enter bank name" 
-                                value={bankDetails.bank_name} 
-                                onChange={(e) => handleBankDetailChange('bank_name', e.target.value)} 
-                              />
-                            </FormControl>
-                          </FormItem>
-                          
-                          <FormItem>
-                            <FormLabel>Account Name</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Enter account name" 
-                                value={bankDetails.account_name} 
-                                onChange={(e) => handleBankDetailChange('account_name', e.target.value)} 
-                              />
-                            </FormControl>
-                          </FormItem>
-                          
-                          <FormItem>
-                            <FormLabel>Account Number</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Enter account number" 
-                                value={bankDetails.account_number} 
-                                onChange={(e) => handleBankDetailChange('account_number', e.target.value)} 
-                              />
-                            </FormControl>
-                          </FormItem>
-                          
-                          <FormItem>
-                            <FormLabel>Branch Code</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Enter branch code" 
-                                value={bankDetails.branch_code} 
-                                onChange={(e) => handleBankDetailChange('branch_code', e.target.value)} 
-                              />
-                            </FormControl>
-                          </FormItem>
-                        </div>
-                      )}
-                      
-                      <Button type="submit" disabled={loading}>
-                        {loading ? "Saving..." : "Save Payment Settings"}
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-              
-              {form.watch('payout_method') === 'stripe' && (
-                <StripeAccountManagement />
-              )}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="account">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
-                <CardDescription>
-                  Manage your account security and preferences
+                  Update your creator profile information that will be visible to your audience.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium">Email</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    {user?.email}
-                  </p>
-                  <Button variant="outline">Change Email</Button>
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="flex-1 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        name="username"
+                        value={profileData.username}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="full_name">Full Name</Label>
+                      <Input
+                        id="full_name"
+                        name="full_name"
+                        value={profileData.full_name}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bio">Bio</Label>
+                      <Textarea
+                        id="bio"
+                        name="bio"
+                        value={profileData.bio}
+                        onChange={handleChange}
+                        disabled={loading}
+                        rows={5}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 flex flex-col items-center">
+                    <h3 className="text-lg font-medium mb-2">Profile Picture</h3>
+                    <ProfilePictureUpload 
+                      existingUrl={profileData.avatar_url} 
+                      onUploadComplete={handleAvatarUpdate}
+                    />
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleSaveProfile} 
+                  disabled={saving || loading}
+                >
+                  {saving ? 'Saving...' : 'Save Profile'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Stripe Connect</CardTitle>
+                <CardDescription>
+                  Connect your Stripe account to receive payments directly.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StripeAccountManagement userId={user.id} />
+              </CardContent>
+            </Card>
+
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Payment Method</CardTitle>
+                <CardDescription>
+                  Choose how you want to receive your payments.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="payout_method">Payout Method</Label>
+                  <Select 
+                    value={profileData.payout_method} 
+                    onValueChange={(value) => setProfileData(prev => ({ ...prev, payout_method: value }))}
+                    disabled={loading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
-                <div>
-                  <h3 className="text-lg font-medium">Password</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    Change your password regularly to keep your account secure
-                  </p>
-                  <Button variant="outline">Change Password</Button>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium">Delete Account</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    Permanently delete your account and all your data
-                  </p>
-                  <Button variant="destructive">Delete Account</Button>
-                </div>
+                {profileData.payout_method === 'mobile_money' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="mobile_money_number">Mobile Money Number</Label>
+                    <Input
+                      id="mobile_money_number"
+                      name="mobile_money_number"
+                      value={profileData.mobile_money_number}
+                      onChange={handleChange}
+                      placeholder="+XX XXX XXX XXX"
+                      disabled={loading}
+                    />
+                  </div>
+                )}
+
+                {profileData.payout_method === 'bank_transfer' && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="account_name">Account Holder Name</Label>
+                      <Input
+                        id="account_name"
+                        name="account_name"
+                        value={typeof profileData.bank_account_details === 'object' ? 
+                          profileData.bank_account_details.account_name || '' : ''}
+                        onChange={handleBankDetailsChange}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="account_number">Account Number</Label>
+                      <Input
+                        id="account_number"
+                        name="account_number"
+                        value={typeof profileData.bank_account_details === 'object' ? 
+                          profileData.bank_account_details.account_number || '' : ''}
+                        onChange={handleBankDetailsChange}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bank_name">Bank Name</Label>
+                      <Input
+                        id="bank_name"
+                        name="bank_name"
+                        value={typeof profileData.bank_account_details === 'object' ? 
+                          profileData.bank_account_details.bank_name || '' : ''}
+                        onChange={handleBankDetailsChange}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="branch_code">Branch/Sort Code</Label>
+                      <Input
+                        id="branch_code"
+                        name="branch_code"
+                        value={typeof profileData.bank_account_details === 'object' ? 
+                          profileData.bank_account_details.branch_code || '' : ''}
+                        onChange={handleBankDetailsChange}
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleSaveProfile} 
+                  disabled={saving || loading}
+                >
+                  {saving ? 'Saving...' : 'Save Payment Settings'}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

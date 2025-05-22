@@ -1,324 +1,288 @@
 
 import React, { useState } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Search, FileDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { CSVLink } from 'react-csv';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
-import { supabase } from '@/lib/supabaseClient';
+import { format } from 'date-fns';
 
-type RegistrationType = 'event' | 'course' | 'all';
-
-interface RegistrationItem {
+interface EventRegistration {
   id: string;
+  event_id: string;
   user_id: string;
-  entity_id: string;
-  created_at: string;
   status: string;
   payment_status: string;
+  payment_method?: string;
   payment_amount?: number;
   payment_currency?: string;
-  payment_method?: string;
-  payment_id?: string;
-  user_fullname: string;
-  user_email: string;
+  created_at?: string;
+  event?: {
+    title: string;
+  };
+  profiles?: {
+    full_name?: string;
+    username?: string;
+    email?: string;
+  };
+}
+
+interface CourseEnrollment {
+  id: string;
+  course_id: string;
+  user_id: string;
+  enrollment_date?: string;
+  is_completed?: boolean;
+  payment_status?: string;
+  profiles?: {
+    full_name?: string;
+    username?: string;
+    email?: string;
+  };
+  courses?: {
+    title: string;
+  };
+}
+
+type CombinedRegistration = (EventRegistration | CourseEnrollment) & {
+  type: 'event' | 'course';
   title: string;
   date: string;
-  type: 'event' | 'course';
-}
+  user_name: string;
+  user_email: string;
+};
 
 interface RegistrationsTableProps {
-  data: RegistrationItem[];
-  loading: boolean;
-  type: RegistrationType;
+  registrations: CombinedRegistration[];
+  onUpdateStatus?: (id: string, type: 'event' | 'course', status: string) => Promise<void>;
 }
 
-const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ data, loading, type }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRegistration, setSelectedRegistration] = useState<RegistrationItem | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ 
+  registrations, 
+  onUpdateStatus 
+}) => {
+  const [selectedRegistration, setSelectedRegistration] = useState<CombinedRegistration | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value.toLowerCase());
-  };
-
-  const handleEdit = (registration: RegistrationItem) => {
+  const handleOpenDialog = (registration: CombinedRegistration) => {
     setSelectedRegistration(registration);
-    setIsEditDialogOpen(true);
+    setIsDialogOpen(true);
   };
 
-  const handleStatusUpdate = async (registrationId: string, newStatus: string, registrationType: 'event' | 'course') => {
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setSelectedRegistration(null);
+  };
+
+  const handleUpdateStatus = async (status: string) => {
+    if (!selectedRegistration || !onUpdateStatus) return;
+    
+    setIsUpdating(true);
     try {
-      if (registrationType === 'event') {
-        await supabase
-          .from('registrations')
-          .update({ status: newStatus })
-          .eq('id', registrationId);
-      } else {
-        // For course enrollments, update the corresponding field
-        await supabase
-          .from('course_enrollments')
-          .update({ 
-            is_completed: newStatus === 'completed',
-            completion_date: newStatus === 'completed' ? new Date().toISOString() : null
-          })
-          .eq('id', registrationId);
-      }
-      
-      toast.success('Registration status updated');
+      await onUpdateStatus(selectedRegistration.id, selectedRegistration.type, status);
+      toast.success(`Registration status updated to ${status}`);
+      handleCloseDialog();
     } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
+      console.error('Error updating registration:', error);
+      toast.error('Failed to update registration status');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  const handlePaymentStatusUpdate = async (registrationId: string, newStatus: string, registrationType: 'event' | 'course') => {
-    try {
-      if (registrationType === 'event') {
-        await supabase
-          .from('registrations')
-          .update({ payment_status: newStatus })
-          .eq('id', registrationId);
-      } else {
-        await supabase
-          .from('course_enrollments')
-          .update({ payment_status: newStatus })
-          .eq('id', registrationId);
-      }
-      
-      toast.success('Payment status updated');
-    } catch (error) {
-      console.error('Error updating payment status:', error);
-      toast.error('Failed to update payment status');
-    }
-  };
-
-  const filteredData = data.filter(item => {
-    const searchString = searchTerm.toLowerCase();
-    return (
-      item.user_fullname.toLowerCase().includes(searchString) ||
-      item.user_email.toLowerCase().includes(searchString) ||
-      item.title.toLowerCase().includes(searchString) ||
-      item.status.toLowerCase().includes(searchString) ||
-      item.payment_status.toLowerCase().includes(searchString)
-    );
-  });
-
-  const csvData = filteredData.map(item => ({
-    ID: item.id,
-    Type: item.type,
-    Name: item.title,
-    Date: item.date,
-    User: item.user_fullname,
-    Email: item.user_email,
-    Status: item.status,
-    'Payment Status': item.payment_status,
-    'Payment Amount': item.payment_amount,
-    'Payment Currency': item.payment_currency,
-    'Payment Method': item.payment_method,
-    'Registration Date': format(new Date(item.created_at), 'PPP')
-  }));
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'confirmed':
-      case 'active':
-      case 'completed':
         return 'bg-green-500';
       case 'pending':
         return 'bg-yellow-500';
       case 'cancelled':
         return 'bg-red-500';
+      case 'paid':
+        return 'bg-green-500';
+      case 'free':
+        return 'bg-blue-500';
+      case 'completed':
+        return 'bg-green-500';
       default:
         return 'bg-gray-500';
     }
   };
 
-  const getPaymentStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
-      case 'completed':
-        return 'bg-green-500';
-      case 'pending':
-        return 'bg-yellow-500';
-      case 'failed':
-        return 'bg-red-500';
-      case 'free':
-        return 'bg-blue-500';
-      default:
-        return 'bg-gray-500';
+  const getPaymentStatus = (registration: CombinedRegistration) => {
+    if (registration.type === 'event') {
+      const eventReg = registration as EventRegistration;
+      return eventReg.payment_status || 'unknown';
+    } else {
+      const courseReg = registration as CourseEnrollment;
+      return courseReg.payment_status || 'unknown';
+    }
+  };
+
+  const getRegistrationStatus = (registration: CombinedRegistration) => {
+    if (registration.type === 'event') {
+      const eventReg = registration as EventRegistration;
+      return eventReg.status;
+    } else {
+      const courseReg = registration as CourseEnrollment;
+      return courseReg.is_completed ? 'completed' : 'in progress';
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search registrations..."
-            value={searchTerm}
-            onChange={handleSearch}
-            className="pl-8"
-          />
-        </div>
-        <div>
-          <CSVLink
-            data={csvData}
-            filename={`${type}-registrations-${format(new Date(), 'yyyy-MM-dd')}.csv`}
-            className="inline-flex"
-          >
-            <Button variant="outline" size="sm" className="ml-2">
-              <FileDown className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </CSVLink>
-        </div>
-      </div>
+    <div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Type</TableHead>
+            <TableHead>Title</TableHead>
+            <TableHead>User</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Payment</TableHead>
+            <TableHead>Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {registrations.map((registration) => (
+            <TableRow key={`${registration.type}-${registration.id}`}>
+              <TableCell className="capitalize">
+                {registration.type}
+              </TableCell>
+              <TableCell>
+                {registration.title}
+              </TableCell>
+              <TableCell>
+                {registration.user_name}
+                <div className="text-xs text-gray-500">{registration.user_email}</div>
+              </TableCell>
+              <TableCell>
+                {registration.date && format(new Date(registration.date), 'MMM d, yyyy')}
+              </TableCell>
+              <TableCell>
+                <Badge className={getStatusBadgeVariant(getRegistrationStatus(registration))}>
+                  {getRegistrationStatus(registration)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge className={getStatusBadgeVariant(getPaymentStatus(registration))}>
+                  {getPaymentStatus(registration)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Button size="sm" variant="outline" onClick={() => handleOpenDialog(registration)}>
+                  Manage
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+          {registrations.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-6">
+                No registrations found
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
 
-      {loading ? (
-        <div className="py-8 text-center">Loading registrations...</div>
-      ) : filteredData.length === 0 ? (
-        <div className="py-8 text-center">No registrations found.</div>
-      ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {type === 'all' && <TableHead>Type</TableHead>}
-                <TableHead>Name</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Registered</TableHead>
-                <TableHead className="w-[80px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredData.map((registration) => (
-                <TableRow key={`${registration.type}-${registration.id}`}>
-                  {type === 'all' && (
-                    <TableCell>
-                      <Badge variant="outline">
-                        {registration.type === 'event' ? 'Event' : 'Course'}
-                      </Badge>
-                    </TableCell>
-                  )}
-                  <TableCell className="font-medium">{registration.title}</TableCell>
-                  <TableCell>{registration.date}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div>{registration.user_fullname}</div>
-                      <div className="text-sm text-gray-500">{registration.user_email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusBadgeColor(registration.status)}>
-                      {registration.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getPaymentStatusBadgeColor(registration.payment_status)}>
-                      {registration.payment_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {registration.payment_amount ? 
-                      `${registration.payment_currency || 'USD'} ${registration.payment_amount}` : 
-                      'Free'}
-                  </TableCell>
-                  <TableCell>
-                    {format(new Date(registration.created_at), 'MMM d, yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Open menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleEdit(registration)}>
-                          Edit Details
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuLabel>Status</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleStatusUpdate(registration.id, 'confirmed', registration.type)}>
-                          Mark as Confirmed
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusUpdate(registration.id, 'cancelled', registration.type)}>
-                          Mark as Cancelled
-                        </DropdownMenuItem>
-                        {registration.type === 'course' && (
-                          <DropdownMenuItem onClick={() => handleStatusUpdate(registration.id, 'completed', registration.type)}>
-                            Mark as Completed
-                          </DropdownMenuItem>
-                        )}
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuLabel>Payment</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handlePaymentStatusUpdate(registration.id, 'paid', registration.type)}>
-                          Mark as Paid
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePaymentStatusUpdate(registration.id, 'pending', registration.type)}>
-                          Mark as Pending
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePaymentStatusUpdate(registration.id, 'failed', registration.type)}>
-                          Mark as Failed
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-      
-      {selectedRegistration && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Edit Registration</DialogTitle>
-              <DialogDescription>
-                Update registration details for {selectedRegistration.title}
-              </DialogDescription>
-            </DialogHeader>
-            <RegistrationEditDialog 
-              registration={selectedRegistration}
-              onClose={() => setIsEditDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Registration</DialogTitle>
+          </DialogHeader>
+          {selectedRegistration && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium">Type</p>
+                  <p className="capitalize">{selectedRegistration.type}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Title</p>
+                  <p>{selectedRegistration.title}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">User</p>
+                  <p>{selectedRegistration.user_name}</p>
+                  <p className="text-xs text-gray-500">{selectedRegistration.user_email}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Date</p>
+                  <p>{selectedRegistration.date && format(new Date(selectedRegistration.date), 'PP')}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Status</p>
+                  <Badge className={getStatusBadgeVariant(getRegistrationStatus(selectedRegistration))}>
+                    {getRegistrationStatus(selectedRegistration)}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Payment</p>
+                  <Badge className={getStatusBadgeVariant(getPaymentStatus(selectedRegistration))}>
+                    {getPaymentStatus(selectedRegistration)}
+                  </Badge>
+                </div>
+              </div>
+
+              {selectedRegistration.type === 'event' && onUpdateStatus && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">Update Status</p>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleUpdateStatus('confirmed')}
+                      disabled={isUpdating}
+                    >
+                      Confirm
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleUpdateStatus('cancelled')}
+                      disabled={isUpdating}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {selectedRegistration.type === 'course' && onUpdateStatus && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">Update Status</p>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleUpdateStatus('paid')}
+                      disabled={isUpdating}
+                    >
+                      Mark Paid
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleUpdateStatus('cancelled')}
+                      disabled={isUpdating}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button variant="ghost" onClick={handleCloseDialog} disabled={isUpdating}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
