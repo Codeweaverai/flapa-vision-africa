@@ -48,8 +48,15 @@ const UserPresence: React.FC = () => {
         const formattedState: Record<string, UserPresence> = {};
         
         Object.keys(state).forEach(presence => {
-          const userPresence = state[presence][0] as UserPresence;
-          formattedState[userPresence.userId] = userPresence;
+          // Each presence can have multiple entries, take the first one
+          if (state[presence] && state[presence].length > 0) {
+            const presenceData = state[presence][0] as any;
+            
+            // Only process presences that have our expected structure
+            if (presenceData.userId) {
+              formattedState[presenceData.userId] = presenceData as UserPresence;
+            }
+          }
         });
         
         setOnlineUsers(formattedState);

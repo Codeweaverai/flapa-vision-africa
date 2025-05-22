@@ -1,20 +1,22 @@
 
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-import { format } from "date-fns";
-
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+ 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return twMerge(clsx(inputs))
 }
 
-export function formatDate(date: string | Date): string {
-  if (!date) return '';
+export function formatDuration(minutes: number): string {
+  if (!minutes || minutes < 0) return '0 min';
   
-  try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return format(dateObj, 'PPP');
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return String(date);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  
+  if (hours === 0) {
+    return `${remainingMinutes} min`;
+  } else if (remainingMinutes === 0) {
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  } else {
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ${remainingMinutes} min`;
   }
 }

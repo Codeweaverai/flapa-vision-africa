@@ -127,8 +127,17 @@ const CourseForm = ({ isCreator = false, creatorId }: CourseFormProps) => {
         values.price = 0;
       }
 
+      // Create the course data object with all required fields
       const courseData = {
-        ...values,
+        title: values.title,
+        summary: values.summary,
+        description: values.description,
+        category: values.category,
+        difficulty_level: values.difficulty_level,
+        duration_minutes: values.duration_minutes,
+        is_free: values.is_free,
+        price: values.price || 0,
+        is_published: values.is_published,
         thumbnail_url: thumbnailUrl,
         creator_id: isCreator ? creatorId : null,
       };
@@ -240,6 +249,7 @@ const CourseForm = ({ isCreator = false, creatorId }: CourseFormProps) => {
                     <Select 
                       onValueChange={field.onChange} 
                       defaultValue={field.value}
+                      value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -268,6 +278,7 @@ const CourseForm = ({ isCreator = false, creatorId }: CourseFormProps) => {
                     <Select 
                       onValueChange={field.onChange} 
                       defaultValue={field.value}
+                      value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>

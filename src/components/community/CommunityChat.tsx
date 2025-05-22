@@ -10,17 +10,19 @@ import { Loader2, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+interface User {
+  username?: string;
+  avatar_url?: string;
+  full_name?: string;
+}
+
 interface Message {
   id: string;
   content: string;
   created_at: string;
   user_id: string;
   channel: string;
-  user?: {
-    username?: string;
-    avatar_url?: string;
-    full_name?: string;
-  };
+  profiles?: User;
 }
 
 interface ChatProps {
@@ -49,14 +51,14 @@ const CommunityChat: React.FC<ChatProps> = ({ channel = 'general' }) => {
           .from('community_messages')
           .select(`
             *,
-            user:user_id (username, avatar_url, full_name)
+            profiles:user_id (username, avatar_url, full_name)
           `)
           .eq('channel', channel)
           .order('created_at', { ascending: true })
           .limit(100);
 
         if (error) throw error;
-        setMessages(data || []);
+        setMessages(data as Message[] || []);
       } catch (error) {
         console.error('Error fetching messages:', error);
         toast.error('Failed to load messages');
@@ -88,7 +90,7 @@ const CommunityChat: React.FC<ChatProps> = ({ channel = 'general' }) => {
 
           setMessages((current) => [...current, {
             ...payload.new as Message,
-            user: userData || undefined
+            profiles: userData as User || undefined
           }]);
         }
       )
@@ -146,11 +148,11 @@ const CommunityChat: React.FC<ChatProps> = ({ channel = 'general' }) => {
                 <div key={message.id} className={`flex gap-3 ${message.user_id === user?.id ? 'justify-end' : ''}`}>
                   {message.user_id !== user?.id && (
                     <Avatar className="h-8 w-8">
-                      {message.user?.avatar_url ? (
-                        <AvatarImage src={message.user.avatar_url} alt={message.user.username || 'User'} />
+                      {message.profiles?.avatar_url ? (
+                        <AvatarImage src={message.profiles.avatar_url} alt={message.profiles.username || 'User'} />
                       ) : (
                         <AvatarFallback>
-                          {(message.user?.username || 'U')[0].toUpperCase()}
+                          {(message.profiles?.username || 'U')[0].toUpperCase()}
                         </AvatarFallback>
                       )}
                     </Avatar>
@@ -166,7 +168,7 @@ const CommunityChat: React.FC<ChatProps> = ({ channel = 'general' }) => {
                     </div>
                     <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
                       <span>
-                        {message.user?.username || message.user?.full_name || 'Anonymous'}
+                        {message.profiles?.username || message.profiles?.full_name || 'Anonymous'}
                       </span>
                       <span>
                         {format(new Date(message.created_at), 'HH:mm')}
@@ -176,11 +178,11 @@ const CommunityChat: React.FC<ChatProps> = ({ channel = 'general' }) => {
                   
                   {message.user_id === user?.id && (
                     <Avatar className="h-8 w-8">
-                      {message.user?.avatar_url ? (
-                        <AvatarImage src={message.user.avatar_url} alt={message.user.username || 'User'} />
+                      {message.profiles?.avatar_url ? (
+                        <AvatarImage src={message.profiles.avatar_url} alt={message.profiles.username || 'User'} />
                       ) : (
                         <AvatarFallback>
-                          {(message.user?.username || 'U')[0].toUpperCase()}
+                          {(message.profiles?.username || 'U')[0].toUpperCase()}
                         </AvatarFallback>
                       )}
                     </Avatar>

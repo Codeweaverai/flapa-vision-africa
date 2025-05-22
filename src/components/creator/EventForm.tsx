@@ -137,9 +137,20 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
         values.currency = null;
       }
 
+      // Create complete event data object with all required fields
       const eventData = {
-        ...values,
-        image_url: imageUrl,
+        title: values.title,
+        description: values.description,
+        event_type: values.event_type,
+        start_time: values.start_time,
+        end_time: values.end_time,
+        location: values.location || null,
+        online_meeting_link: values.online_meeting_link || null,
+        capacity: values.capacity || null,
+        is_free: values.is_free,
+        price: values.is_free ? null : values.price,
+        currency: values.is_free ? null : values.currency,
+        image_url: imageUrl || null,
         creator_id: isCreator ? creatorId : null,
       };
 
@@ -236,6 +247,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
                     <Select 
                       onValueChange={field.onChange} 
                       defaultValue={field.value}
+                      value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -391,6 +403,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
                         <Select 
                           onValueChange={field.onChange} 
                           defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>

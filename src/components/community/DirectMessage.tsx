@@ -6,10 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, Search, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import UserList from './UserList';
+
+interface DirectMessageProps {
+  className?: string;
+}
 
 interface Profile {
   id: string;
@@ -18,24 +22,22 @@ interface Profile {
   full_name?: string;
 }
 
-interface DirectMessage {
+interface Message {
   id: string;
   content: string;
   created_at: string;
   sender_id: string;
   receiver_id: string;
-  sender?: Profile;
-  receiver?: Profile;
+  sender_profile?: Profile;
 }
 
-const DirectMessages: React.FC = () => {
+const DirectMessage: React.FC<DirectMessageProps> = ({ className }) => {
   const { user } = useAuth();
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom when messages change
@@ -43,53 +45,51 @@ const DirectMessages: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Load available users
+  // Load conversations when a user is selected
   useEffect(() => {
-    if (!user) return;
-
-    const fetchUsers = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, full_name')
-          .neq('id', user.id)
-          .order('username');
-
-        if (error) throw error;
-        setUsers(data || []);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-      }
-    };
-
-    fetchUsers();
-  }, [user]);
-
-  // Load messages when selected user changes
-  useEffect(() => {
-    if (!user || !selectedUserId) {
-      setMessages([]);
-      setLoading(false);
-      return;
-    }
-
+    if (!user || !selectedUser) return;
+    
     const fetchMessages = async () => {
       try {
         setLoading(true);
         
-        // Get messages where current user is sender OR receiver, and selected user is the opposite
-        const { data, error } = await supabase
+        // Get messages from both directions (sent and received)
+        const { data: sentMessages, error: sentError } = await supabase
           .from('direct_messages')
           .select(`
-            *,
-            sender:sender_id (id, username, avatar_url, full_name),
-            receiver:receiver_id (id, username, avatar_url, full_name)
+            id, 
+            content, 
+            created_at, 
+            sender_id, 
+            receiver_id,
+            sender:sender_id (id, username, avatar_url, full_name)
           `)
-          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedUserId}),and(sender_id.eq.${selectedUserId},receiver_id.eq.${user.id})`)
+          .eq('sender_id', user.id)
+          .eq('receiver_id', selectedUser.id)
           .order('created_at', { ascending: true });
 
-        if (error) throw error;
-        setMessages(data || []);
+        const { data: receivedMessages, error: receivedError } = await supabase
+          .from('direct_messages')
+          .select(`
+            id, 
+            content, 
+            created_at, 
+            sender_id, 
+            receiver_id,
+            sender:sender_id (id, username, avatar_url, full_name)
+          `)
+          .eq('sender_id', selectedUser.id)
+          .eq('receiver_id', user.id)
+          .order('created_at', { ascending: true });
+
+        if (sentError || receivedError) throw sentError || receivedError;
+
+        // Combine and sort messages
+        const allMessages = [...(sentMessages || []), ...(receivedMessages || [])].sort((a, b) => {
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        });
+        
+        setMessages(allMessages as Message[]);
       } catch (error) {
         console.error('Error fetching messages:', error);
         toast.error('Failed to load messages');
@@ -101,56 +101,70 @@ const DirectMessages: React.FC = () => {
     fetchMessages();
 
     // Subscribe to new messages
-    const subscription = supabase
-      .channel('schema-db-changes')
+    const channel = supabase
+      .channel('direct-messages-changes')
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'direct_messages',
-          filter: `or(and(sender_id.eq.${user.id},receiver_id.eq.${selectedUserId}),and(sender_id.eq.${selectedUserId},receiver_id.eq.${user.id}))`,
+          filter: `receiver_id=eq.${user.id}`,
         },
         async (payload) => {
-          // Fetch full message data with sender and receiver
-          const { data } = await supabase
-            .from('direct_messages')
-            .select(`
-              *,
-              sender:sender_id (id, username, avatar_url, full_name),
-              receiver:receiver_id (id, username, avatar_url, full_name)
-            `)
-            .eq('id', payload.new.id)
+          if (payload.new.sender_id !== selectedUser.id) return;
+          
+          // Fetch sender profile
+          const { data: senderData } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, full_name')
+            .eq('id', payload.new.sender_id)
             .single();
-
-          if (data) {
-            setMessages((current) => [...current, data]);
-          }
+            
+          const newMsg = {
+            ...payload.new as Message,
+            sender_profile: senderData || undefined
+          };
+          
+          setMessages(current => [...current, newMsg]);
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(channel);
     };
-  }, [selectedUserId, user]);
+  }, [user, selectedUser]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !user || !selectedUserId) return;
+    if (!newMessage.trim() || !user || !selectedUser) return;
     
     setSending(true);
     try {
-      const { error } = await supabase
+      const newMsg = {
+        content: newMessage.trim(),
+        sender_id: user.id,
+        receiver_id: selectedUser.id
+      };
+      
+      const { data, error } = await supabase
         .from('direct_messages')
-        .insert({
-          content: newMessage.trim(),
-          sender_id: user.id,
-          receiver_id: selectedUserId,
-        });
+        .insert(newMsg)
+        .select(`
+          id, 
+          content, 
+          created_at, 
+          sender_id, 
+          receiver_id,
+          sender:sender_id (id, username, avatar_url, full_name)
+        `)
+        .single();
         
       if (error) throw error;
+      
+      setMessages(current => [...current, data as Message]);
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -160,104 +174,105 @@ const DirectMessages: React.FC = () => {
     }
   };
 
-  const selectedUser = users.find(u => u.id === selectedUserId);
+  const handleUserSelect = (profile: Profile) => {
+    setSelectedUser(profile);
+  };
+
+  if (!user) {
+    return (
+      <Card className={className}>
+        <CardContent className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Please sign in to use direct messages</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="flex flex-col h-[70vh]">
+    <Card className={`flex flex-col ${className}`}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center justify-between">
+        <CardTitle className="text-lg flex justify-between items-center">
           <span>Direct Messages</span>
           {selectedUser && (
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6">
-                {selectedUser.avatar_url ? (
-                  <AvatarImage src={selectedUser.avatar_url} alt={selectedUser.username || 'User'} />
-                ) : (
-                  <AvatarFallback>
-                    {(selectedUser.username || selectedUser.full_name || 'U')[0].toUpperCase()}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <span className="text-sm">
-                {selectedUser.username || selectedUser.full_name || 'User'}
-              </span>
-            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
+              Back to Users
+            </Button>
           )}
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col p-4 overflow-hidden">
-        <Select onValueChange={(value) => setSelectedUserId(value)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a user to message" />
-          </SelectTrigger>
-          <SelectContent>
-            {users.map(user => (
-              <SelectItem key={user.id} value={user.id}>
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    {user.avatar_url ? (
-                      <AvatarImage src={user.avatar_url} alt={user.username || 'User'} />
-                    ) : (
-                      <AvatarFallback>
-                        {(user.username || user.full_name || 'U')[0].toUpperCase()}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <span>{user.username || user.full_name || 'User'}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {selectedUserId ? (
+      <CardContent className="flex-1 flex flex-col overflow-hidden p-4">
+        {!selectedUser ? (
+          <UserList onUserSelect={handleUserSelect} currentUserId={user.id} />
+        ) : (
           <>
+            <div className="flex items-center gap-2 p-2 border-b mb-4">
+              <Avatar className="h-8 w-8">
+                {selectedUser.avatar_url ? (
+                  <AvatarImage src={selectedUser.avatar_url} alt={selectedUser.username || 'User'} />
+                ) : (
+                  <AvatarFallback>
+                    {(selectedUser.username || 'U')[0].toUpperCase()}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div>
+                <p className="font-medium">{selectedUser.username || selectedUser.full_name || 'User'}</p>
+              </div>
+            </div>
+            
             {loading ? (
               <div className="flex-1 flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto space-y-4 mt-4 pr-2">
+              <div className="flex-1 overflow-y-auto space-y-4 pr-2">
                 {messages.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
-                    <p>No messages yet. Start a conversation!</p>
+                    <p>No messages yet. Start the conversation!</p>
                   </div>
                 ) : (
                   messages.map((message) => (
-                    <div key={message.id} className={`flex gap-3 ${message.sender_id === user?.id ? 'justify-end' : ''}`}>
-                      {message.sender_id !== user?.id && (
+                    <div key={message.id} className={`flex gap-3 ${message.sender_id === user.id ? 'justify-end' : ''}`}>
+                      {message.sender_id !== user.id && (
                         <Avatar className="h-8 w-8">
                           {message.sender?.avatar_url ? (
                             <AvatarImage src={message.sender.avatar_url} alt={message.sender.username || 'User'} />
                           ) : (
                             <AvatarFallback>
-                              {(message.sender?.username || message.sender?.full_name || 'U')[0].toUpperCase()}
+                              {((message.sender?.username || message.sender?.full_name) ? 
+                                (message.sender?.username || message.sender?.full_name)[0] : 
+                                'U').toUpperCase()}
                             </AvatarFallback>
                           )}
                         </Avatar>
                       )}
                       
-                      <div className={`max-w-[70%] ${message.sender_id === user?.id ? 'items-end' : ''}`}>
+                      <div className={`max-w-[70%] ${message.sender_id === user.id ? 'items-end' : ''}`}>
                         <div className={`px-3 py-2 rounded-lg ${
-                          message.sender_id === user?.id 
+                          message.sender_id === user.id 
                             ? 'bg-primary text-primary-foreground' 
                             : 'bg-muted'
                         }`}>
                           <p className="break-words">{message.content}</p>
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(message.created_at), 'HH:mm')}
+                        <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>
+                            {message.sender_id === user.id ? 'You' : (message.sender?.username || message.sender?.full_name || 'User')}
+                          </span>
+                          <span>
+                            {format(new Date(message.created_at), 'HH:mm')}
+                          </span>
                         </div>
                       </div>
                       
-                      {message.sender_id === user?.id && (
+                      {message.sender_id === user.id && (
                         <Avatar className="h-8 w-8">
-                          {message.sender?.avatar_url ? (
-                            <AvatarImage src={message.sender.avatar_url} alt={message.sender.username || 'User'} />
+                          {user.user_metadata?.avatar_url ? (
+                            <AvatarImage src={user.user_metadata.avatar_url} alt="You" />
                           ) : (
                             <AvatarFallback>
-                              {(message.sender?.username || message.sender?.full_name || 'U')[0].toUpperCase()}
+                              {(user.email?.[0] || 'U').toUpperCase()}
                             </AvatarFallback>
                           )}
                         </Avatar>
@@ -274,21 +289,17 @@ const DirectMessages: React.FC = () => {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type a message..."
-                disabled={!user || sending}
+                disabled={sending}
               />
-              <Button type="submit" size="icon" disabled={!user || !newMessage.trim() || sending}>
+              <Button type="submit" size="icon" disabled={!newMessage.trim() || sending}>
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </form>
           </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <p>Select a user to start messaging</p>
-          </div>
         )}
       </CardContent>
     </Card>
   );
 };
 
-export default DirectMessages;
+export default DirectMessage;
