@@ -1,12 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-// Import correct component or remove incorrect import
-// Commented out incorrect import that was causing errors
-// import { ConnectEmbed } from '@stripe/react-connect-js';
 
 const StripeAccountManagement = () => {
   const { user } = useAuth();
@@ -20,7 +18,7 @@ const StripeAccountManagement = () => {
           setLoading(true);
           const { data, error } = await supabase
             .from('profiles')
-            .select('stripe_account_id')
+            .select('stripe_connect_id')
             .eq('id', user.id)
             .single();
 
@@ -28,7 +26,7 @@ const StripeAccountManagement = () => {
             console.error('Error fetching Stripe Account ID:', error);
             toast.error('Failed to fetch Stripe Account ID.');
           } else if (data) {
-            setStripeAccountId(data.stripe_account_id);
+            setStripeAccountId(data.stripe_connect_id);
           }
         } catch (error) {
           console.error('Unexpected error:', error);
@@ -105,12 +103,6 @@ const StripeAccountManagement = () => {
             <Button onClick={handleCreateAccountLink} disabled={loading}>
               Update Account Details
             </Button>
-            {/* <ConnectEmbed
-              stripeAccountId={stripeAccountId}
-              onAccountUpdated={() => {
-                toast.success('Stripe account updated successfully!');
-              }}
-            /> */}
           </>
         ) : (
           <Button onClick={handleCreateAccount} disabled={loading}>

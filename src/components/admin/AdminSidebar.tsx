@@ -1,125 +1,58 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { useLocation, Link } from 'react-router-dom';
 import {
-  BarChart,
-  Calendar,
+  BarChart3,
+  CalendarDays,
   Users,
   BookOpen,
   FileText,
-  MessageSquare,
+  PhoneCall,
   Settings,
-  LogOut,
-  Home,
-  Mic
+  Mic,
+  ClipboardCheck,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 
-interface SidebarItemProps {
-  icon: React.ReactNode;
-  label: string;
-  href: string;
-  active?: boolean;
-}
-
-const SidebarItem: React.FC<SidebarItemProps> = ({
-  icon,
-  label,
-  href,
-  active,
-}) => {
-  return (
-    <Link
-      to={href}
-      className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent',
-        active ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
-      )}
-    >
-      {icon}
-      {label}
-    </Link>
-  );
-};
-
-const AdminSidebar: React.FC = () => {
+const AdminSidebar = () => {
   const location = useLocation();
-  const { signOut } = useAuth();
+  const isActive = (path: string) => location.pathname === path;
+
+  const navItems = [
+    { name: 'Dashboard', path: '/admin', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+    { name: 'Analytics', path: '/admin/analytics', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+    { name: 'Events', path: '/admin/events', icon: <CalendarDays className="mr-2 h-4 w-4" /> },
+    { name: 'Users', path: '/admin/users', icon: <Users className="mr-2 h-4 w-4" /> },
+    { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="mr-2 h-4 w-4" /> },
+    { name: 'Media', path: '/admin/media', icon: <FileText className="mr-2 h-4 w-4" /> },
+    { name: 'Consultations', path: '/admin/consultations', icon: <PhoneCall className="mr-2 h-4 w-4" /> },
+    { name: 'Speaking', path: '/admin/speaking', icon: <Mic className="mr-2 h-4 w-4" /> },
+    { name: 'Registrations', path: '/admin/registrations', icon: <ClipboardCheck className="mr-2 h-4 w-4" /> },
+    { name: 'Settings', path: '/admin/settings', icon: <Settings className="mr-2 h-4 w-4" /> },
+  ];
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-2">
-        <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
-          Admin Panel
-        </h2>
-        <div className="space-y-1">
-          <SidebarItem
-            icon={<Home className="h-4 w-4" />}
-            label="Dashboard"
-            href="/admin"
-            active={location.pathname === '/admin'}
-          />
-          <SidebarItem
-            icon={<BarChart className="h-4 w-4" />}
-            label="Analytics"
-            href="/admin/analytics"
-            active={location.pathname === '/admin/analytics'}
-          />
-          <SidebarItem
-            icon={<Users className="h-4 w-4" />}
-            label="Users"
-            href="/admin/users"
-            active={location.pathname === '/admin/users'}
-          />
-          <SidebarItem
-            icon={<Calendar className="h-4 w-4" />}
-            label="Events"
-            href="/admin/events"
-            active={location.pathname.startsWith('/admin/events')}
-          />
-          <SidebarItem
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Courses"
-            href="/admin/courses"
-            active={location.pathname.startsWith('/admin/courses')}
-          />
-          <SidebarItem
-            icon={<FileText className="h-4 w-4" />}
-            label="Media"
-            href="/admin/media"
-            active={location.pathname.startsWith('/admin/media')}
-          />
-          <SidebarItem
-            icon={<MessageSquare className="h-4 w-4" />}
-            label="Consultations"
-            href="/admin/consultations"
-            active={location.pathname === '/admin/consultations'}
-          />
-          <SidebarItem
-            icon={<Mic className="h-4 w-4" />}
-            label="Speaking"
-            href="/admin/speaking"
-            active={location.pathname === '/admin/speaking'}
-          />
-          <SidebarItem
-            icon={<Settings className="h-4 w-4" />}
-            label="Settings"
-            href="/admin/settings"
-            active={location.pathname === '/admin/settings'}
-          />
+    <div className="h-screen w-64 border-r bg-gray-50 dark:bg-gray-900 dark:border-gray-800">
+      <div className="flex flex-col h-full">
+        <div className="p-4 border-b dark:border-gray-800">
+          <h1 className="text-xl font-bold">Admin Panel</h1>
         </div>
-      </div>
-      <div className="mt-auto px-3 py-2">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start text-muted-foreground"
-          onClick={signOut}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
+        
+        <div className="p-4 space-y-1 flex-1 overflow-y-auto">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center px-4 py-2 rounded-md ${
+                isActive(item.path)
+                  ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
+                  : 'text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-800'
+              }`}
+            >
+              {item.icon}
+              {item.name}
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
