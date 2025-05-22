@@ -69,11 +69,13 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'About', path: '/about' },
-    { name: 'Events', path: '/events' },
     { name: 'Learning', path: '/learning' },
     { name: 'Community', path: '/community' },
     { name: 'Media', path: '/media' },
     { name: 'Consult', path: '/consult' },
+  ];
+
+  const exploreLinks = [
     { name: 'Explore Courses', path: '/explore/courses' },
     { name: 'Explore Events', path: '/explore/events' },
   ];
@@ -110,6 +112,21 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-1">
+                  <Compass className="h-4 w-4 mr-1" />
+                  Explore
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {exploreLinks.map((link) => (
+                  <DropdownMenuItem key={link.name} asChild>
+                    <Link to={link.path}>{link.name}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
         </div>
 
@@ -145,9 +162,16 @@ const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate('/account')}>
-                    Account
+                  <DropdownMenuItem onClick={() => navigate('/account/profile')}>
+                    My Profile
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/account/courses')}>
+                    My Courses
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/account/events')}>
+                    My Events
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/explore/courses')}>
                     Explore Courses
                   </DropdownMenuItem>
@@ -156,6 +180,7 @@ const Navbar = () => {
                   </DropdownMenuItem>
                   {user.user_metadata?.is_creator || user.user_metadata?.role === 'creator' ? (
                     <>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>
                         Creator Dashboard
                       </DropdownMenuItem>
@@ -165,9 +190,12 @@ const Navbar = () => {
                     </>
                   ) : null}
                   {user.user_metadata?.role === 'admin' ? (
-                    <DropdownMenuItem onClick={() => navigate('/admin')}>
-                      Admin Dashboard
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        Admin Dashboard
+                      </DropdownMenuItem>
+                    </>
                   ) : null}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
@@ -205,6 +233,19 @@ const Navbar = () => {
                     {link.name}
                   </Link>
                 ))}
+                <div className="pt-2 border-t border-border">
+                  <p className="text-sm text-muted-foreground mb-2">Explore</p>
+                  {exploreLinks.map((link) => (
+                    <Link
+                      key={link.name}
+                      to={link.path}
+                      className={`${isActive(link.path)} font-medium text-lg py-2 block`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {link.name}
+                    </Link>
+                  ))}
+                </div>
                 <div className="h-px bg-border my-2" />
                 {!user && (
                   <Button asChild>

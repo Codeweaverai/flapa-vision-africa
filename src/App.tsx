@@ -85,11 +85,18 @@ function App() {
         <Route path="/animations" element={<AnimationsPage />} />
         <Route path="/media" element={<MediaPage />} />
         <Route path="/media/:id" element={<MediaPostDetailPage />} />
+        
+        {/* Explore routes */}
+        <Route path="/explore/courses" element={<ExploreCoursesPage />} />
+        <Route path="/explore/events" element={<ExploreEventsPage />} />
+        
+        {/* Legacy routes for backward compatibility */}
         <Route path="/courses" element={<ExploreCoursesPage />} />
+        <Route path="/events" element={<ExploreEventsPage />} />
+        
         <Route path="/courses/:id" element={<CourseDetailPage />} />
         <Route path="/course/:id/learn" element={<CourseLearningPage />} />
         <Route path="/course/:courseId/lesson/:lessonId" element={<CoursePlayerPage />} />
-        <Route path="/events" element={<ExploreEventsPage />} />
         <Route path="/events/:id" element={<EventDetailPage />} />
         <Route path="/consult" element={<ConsultPage />} />
         <Route path="/account" element={<AccountPage />} />
@@ -133,7 +140,7 @@ function App() {
         <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
         
         {/* Creator routes */}
-        <Route path="/creator" element={<CreatorDashboard />} />
+        <Route path="/creator/dashboard" element={<CreatorDashboard />} />
         <Route path="/creator/analytics" element={<CreatorAnalytics />} />
         <Route path="/creator/courses" element={<CreatorCourses />} />
         <Route path="/creator/courses/new" element={<CreatorCourseForm />} />

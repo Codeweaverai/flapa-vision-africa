@@ -3,9 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   ConnectAccountManagement,
   ConnectComponentsProvider,
-  // Stripe updated their React Connect JS library and renamed this component
-  // Using the proper name based on their latest API
-  ConnectAccountSession,
+  // Use ConnectEmbed which is the correct component name in the latest API
+  ConnectEmbed
 } from '@stripe/react-connect-js';
 import { loadConnectAndInitialize } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
@@ -128,9 +127,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
-        <ConnectAccountSession clientSecret={clientSecret}>
+        <ConnectEmbed clientSecret={clientSecret}>
           <ConnectAccountManagement />
-        </ConnectAccountSession>
+        </ConnectEmbed>
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
             Refresh

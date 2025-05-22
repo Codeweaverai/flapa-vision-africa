@@ -1,5 +1,5 @@
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,6 @@ import { Card } from '@/components/ui/card';
 import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
 interface CreatorLayoutProps {

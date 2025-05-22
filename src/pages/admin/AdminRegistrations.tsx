@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
@@ -99,7 +100,7 @@ const AdminRegistrations: React.FC = () => {
       if (error) throw error;
 
       // Transform data to match our Registration interface with proper type safety
-      const formattedRegistrations: Registration[] = (data || []).map((item: RegistrationRecord) => {
+      const formattedRegistrations: Registration[] = (data || []).map((item: any) => {
         // Handle cases where related data might not be available
         const profileData = item.profiles || {};
         const eventData = item.events || {};
