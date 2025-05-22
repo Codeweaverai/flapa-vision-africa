@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ConnectAccountManagement,
   ConnectComponentsProvider,
+  AccountSession,
 } from '@stripe/react-connect-js';
 import { loadConnectAndInitialize } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
@@ -24,9 +25,8 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     const initializeStripeConnect = async () => {
       try {
         // Initialize Stripe Connect with the proper API
-        // The loadConnectAndInitialize function is called without parameters
-        // as the IStripeConnectInitParams doesn't have a clientName property
-        const stripeConnectInstance = await loadConnectAndInitialize();
+        // loadConnectAndInitialize requires an empty object at minimum
+        const stripeConnectInstance = await loadConnectAndInitialize({});
         setStripeConnect(stripeConnectInstance);
         
         // Get the account session client secret
@@ -115,14 +115,11 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
-        {/* 
-          Instead of passing clientSecret as a prop, we wrap the component with
-          an Account Session Provider which is the expected pattern for Stripe Connect
-        */}
-        <ConnectAccountManagement 
-          // Remove the clientSecret prop as it's not a valid prop for this component
-          // The client secret should be used with a different approach according to Stripe Connect docs
-        />
+        {clientSecret && (
+          <AccountSession clientSecret={clientSecret}>
+            <ConnectAccountManagement />
+          </AccountSession>
+        )}
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
             Refresh
