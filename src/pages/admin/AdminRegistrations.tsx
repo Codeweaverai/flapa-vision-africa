@@ -37,6 +37,16 @@ interface Event {
   title: string;
 }
 
+interface ProfileData {
+  full_name?: string;
+  email?: string;
+}
+
+interface EventData {
+  title?: string;
+  start_time?: string;
+}
+
 const AdminRegistrations: React.FC = () => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [filteredRegistrations, setFilteredRegistrations] = useState<Registration[]>([]);
@@ -74,8 +84,8 @@ const AdminRegistrations: React.FC = () => {
       // Transform data to match our Registration interface
       const formattedRegistrations: Registration[] = (data || []).map(item => {
         // Handle cases where related data might not be available
-        const profilesData = item.profiles || {};
-        const eventsData = item.events || {};
+        const profilesData: ProfileData = item.profiles || {};
+        const eventsData: EventData = item.events || {};
         
         return {
           id: item.id,

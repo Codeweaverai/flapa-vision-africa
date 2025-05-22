@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -76,15 +77,15 @@ const UserEvents: React.FC = () => {
       
       // Safely transform the data to match our expected types
       const typedRegistrations: EventRegistration[] = (data || []).map(reg => {
-        // Handle potentially missing or malformed events data
+        // Ensure events data exists and provide defaults if not
         const eventData = reg.events || {};
         
         const event: Event = {
           id: eventData.id || reg.event_id,
           title: eventData.title || 'Untitled Event',
           description: eventData.description || 'No description available',
-          start_time: eventData.start_time || new Date().toISOString(),
-          end_time: eventData.end_time,
+          start_time: eventData.start_time || undefined,
+          end_time: eventData.end_time || undefined,
           location: eventData.location || 'Online',
           image_url: eventData.image_url
         };
