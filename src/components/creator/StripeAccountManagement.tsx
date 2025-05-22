@@ -4,6 +4,7 @@ import {
   ConnectAccountManagement,
   ConnectComponentsProvider,
 } from '@stripe/react-connect-js';
+import { loadStripeConnect } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,10 +23,8 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   useEffect(() => {
     const initializeStripeConnect = async () => {
       try {
-        // Import the Stripe Connect JS module correctly
-        const stripeConnectModule = await import('@stripe/connect-js');
-        // Access the default export directly without using loadStripeConnect property
-        const instance = await stripeConnectModule.default();
+        // Load Stripe Connect instance correctly
+        const instance = await loadStripeConnect();
         setStripeConnect(instance);
         
         // Get the account session client secret
@@ -115,7 +114,6 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
         <ConnectAccountManagement
-          // Pass client secret directly without accountSession wrapper
           clientSecret={clientSecret}
           collectionOptions={{
             fields: 'eventually_due',

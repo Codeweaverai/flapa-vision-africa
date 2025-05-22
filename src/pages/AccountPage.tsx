@@ -12,18 +12,26 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 
+interface ProfileData {
+  id: string;
+  username: string;
+  full_name: string;
+  avatar_url: string;
+  bio: string;
+  avatar_storage_path: string | null;
+}
+
 const AccountPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<ProfileData>({
     id: '',
     username: '',
     full_name: '',
     avatar_url: '',
     bio: '',
-    // Using nullable avatar_storage_path
-    avatar_storage_path: null as string | null
+    avatar_storage_path: null
   });
 
   useEffect(() => {
