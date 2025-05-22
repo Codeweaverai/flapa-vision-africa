@@ -1,117 +1,127 @@
 
-import { useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   BarChart,
   Calendar,
-  ChevronLeft,
   Users,
+  BookOpen,
+  FileText,
+  MessageSquare,
   Settings,
   LogOut,
-  Menu,
-  MessageCircle,
-  FileText,
-  BookOpen,
   Home,
-  Image
+  Mic
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 
-const AdminSidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
-  const { user } = useAuth();
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  active?: boolean;
+}
+
+const SidebarItem: React.FC<SidebarItemProps> = ({
+  icon,
+  label,
+  href,
+  active,
+}) => {
+  return (
+    <Link
+      to={href}
+      className={cn(
+        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent',
+        active ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
+      )}
+    >
+      {icon}
+      {label}
+    </Link>
+  );
+};
+
+const AdminSidebar: React.FC = () => {
   const location = useLocation();
-
-  const menuItems = [
-    { icon: Home, label: 'Dashboard', path: '/admin' },
-    { icon: MessageCircle, label: 'Consultations', path: '/admin/consultations' },
-    { icon: Calendar, label: 'Events', path: '/admin/events' },
-    { icon: FileText, label: 'Registrations', path: '/admin/registrations' },
-    { icon: BookOpen, label: 'Courses', path: '/admin/courses' },
-    { icon: Image, label: 'Media', path: '/admin/media' },
-    { icon: Users, label: 'Users', path: '/admin/users' },
-    { icon: BarChart, label: 'Analytics', path: '/admin/analytics' },
-    { icon: Settings, label: 'Settings', path: '/admin/settings' },
-  ];
-
-  const isActive = (path: string) => {
-    if (path === '/admin' && location.pathname === '/admin') {
-      return true;
-    }
-    if (path !== '/admin' && location.pathname.startsWith(path)) {
-      return true;
-    }
-    return false;
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/admin-login';
-  };
+  const { signOut } = useAuth();
 
   return (
-    <aside
-      className={`bg-background border-r transition-all duration-300 h-screen flex flex-col ${
-        collapsed ? 'w-[72px]' : 'w-[250px]'
-      }`}
-    >
-      <div className="flex items-center justify-between h-16 px-3 border-b">
-        {!collapsed && <h1 className="text-lg font-semibold">Admin Panel</h1>}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto"
+    <div className="flex flex-col h-full">
+      <div className="px-3 py-2">
+        <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+          Admin Panel
+        </h2>
+        <div className="space-y-1">
+          <SidebarItem
+            icon={<Home className="h-4 w-4" />}
+            label="Dashboard"
+            href="/admin"
+            active={location.pathname === '/admin'}
+          />
+          <SidebarItem
+            icon={<BarChart className="h-4 w-4" />}
+            label="Analytics"
+            href="/admin/analytics"
+            active={location.pathname === '/admin/analytics'}
+          />
+          <SidebarItem
+            icon={<Users className="h-4 w-4" />}
+            label="Users"
+            href="/admin/users"
+            active={location.pathname === '/admin/users'}
+          />
+          <SidebarItem
+            icon={<Calendar className="h-4 w-4" />}
+            label="Events"
+            href="/admin/events"
+            active={location.pathname.startsWith('/admin/events')}
+          />
+          <SidebarItem
+            icon={<BookOpen className="h-4 w-4" />}
+            label="Courses"
+            href="/admin/courses"
+            active={location.pathname.startsWith('/admin/courses')}
+          />
+          <SidebarItem
+            icon={<FileText className="h-4 w-4" />}
+            label="Media"
+            href="/admin/media"
+            active={location.pathname.startsWith('/admin/media')}
+          />
+          <SidebarItem
+            icon={<MessageSquare className="h-4 w-4" />}
+            label="Consultations"
+            href="/admin/consultations"
+            active={location.pathname === '/admin/consultations'}
+          />
+          <SidebarItem
+            icon={<Mic className="h-4 w-4" />}
+            label="Speaking"
+            href="/admin/speaking"
+            active={location.pathname === '/admin/speaking'}
+          />
+          <SidebarItem
+            icon={<Settings className="h-4 w-4" />}
+            label="Settings"
+            href="/admin/settings"
+            active={location.pathname === '/admin/settings'}
+          />
+        </div>
+      </div>
+      <div className="mt-auto px-3 py-2">
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start text-muted-foreground"
+          onClick={signOut}
         >
-          {collapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
         </Button>
       </div>
-
-      <ScrollArea className="flex-1 overflow-auto">
-        <nav className="p-2">
-          <ul className="space-y-1">
-            {menuItems.map((item) => (
-              <li key={item.path}>
-                <Button
-                  asChild
-                  variant={isActive(item.path) ? "secondary" : "ghost"}
-                  size={collapsed ? "icon" : "default"}
-                  className={`w-full justify-start ${isActive(item.path) ? "bg-secondary" : ""}`}
-                >
-                  <Link to={item.path}>
-                    <item.icon size={20} className={collapsed ? "" : "mr-2"} />
-                    {!collapsed && <span>{item.label}</span>}
-                  </Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </ScrollArea>
-
-      <div className="p-2 border-t">
-        {!collapsed && (
-          <div className="mb-2 p-2">
-            <p className="text-sm font-medium truncate">
-              {user?.email}
-            </p>
-            <p className="text-xs text-muted-foreground">Administrator</p>
-          </div>
-        )}
-        <Button
-          variant="ghost"
-          size={collapsed ? "icon" : "default"}
-          className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50"
-          onClick={handleSignOut}
-        >
-          <LogOut size={20} className={collapsed ? "" : "mr-2"} />
-          {!collapsed && <span>Sign Out</span>}
-        </Button>
-      </div>
-    </aside>
+    </div>
   );
 };
 

@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
-import { MessageCircle, Send, Plus } from 'lucide-react';
+import { MessageCircle, Send, Plus, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   CommunityPost, 
@@ -172,10 +172,13 @@ const CommunityPage = () => {
                 <CardHeader>
                   <div className="flex items-start gap-4">
                     <Avatar>
-                      <AvatarImage src={post.profiles?.avatar_url || ''} />
-                      <AvatarFallback>
-                        {(post.profiles?.username || 'U').charAt(0).toUpperCase()}
-                      </AvatarFallback>
+                      {post.profiles?.avatar_url ? (
+                        <AvatarImage src={post.profiles.avatar_url} alt={post.profiles.username || 'User'} />
+                      ) : (
+                        <AvatarFallback>
+                          <User className="h-4 w-4" />
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <div className="flex-1">
                       <CardTitle className="text-xl">{post.title}</CardTitle>

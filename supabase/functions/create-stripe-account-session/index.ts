@@ -88,9 +88,6 @@ serve(async (req) => {
       components: {
         account_management: {
           enabled: true,
-          features: {
-            external_account_collection: true,
-          },
         },
       },
     });

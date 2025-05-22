@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
-import { Send } from 'lucide-react';
+import { Send, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { 
   CommunityMessage, 
@@ -153,10 +153,13 @@ const CommunityChatPage = () => {
                     }`}
                   >
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={message.profiles?.avatar_url || ''} />
-                      <AvatarFallback>
-                        {message.profiles?.username?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
+                      {message.profiles?.avatar_url ? (
+                        <AvatarImage src={message.profiles.avatar_url} alt={message.profiles.username || 'User'} />
+                      ) : (
+                        <AvatarFallback>
+                          <User className="h-4 w-4" />
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <div>
                       <div 

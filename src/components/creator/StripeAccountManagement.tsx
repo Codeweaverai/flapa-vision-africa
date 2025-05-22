@@ -22,9 +22,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   useEffect(() => {
     const initializeStripeConnect = async () => {
       try {
-        // Import the Stripe Connect JS module directly
-        const StripeConnectModule = await import('@stripe/connect-js');
-        const instance = await StripeConnectModule.loadStripeConnect();
+        // Import the Stripe Connect JS module correctly
+        const stripeConnectModule = await import('@stripe/connect-js');
+        const instance = await stripeConnectModule.default.loadStripeConnect();
         setStripeConnect(instance);
         
         // Get the account session client secret
@@ -114,6 +114,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
         <ConnectAccountManagement 
+          accountSession={{
+            clientSecret: clientSecret,
+          }}
           collectionOptions={{
             fields: 'eventually_due',
             futureRequirements: 'include',
