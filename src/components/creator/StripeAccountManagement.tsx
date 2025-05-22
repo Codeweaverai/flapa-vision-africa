@@ -4,7 +4,6 @@ import {
   ConnectAccountManagement,
   ConnectComponentsProvider,
 } from '@stripe/react-connect-js';
-import { loadStripeConnect } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,7 +22,8 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   useEffect(() => {
     const initializeStripeConnect = async () => {
       try {
-        // Load Stripe Connect with loadStripeConnect function
+        // Import the module dynamically
+        const { loadStripeConnect } = await import('@stripe/connect-js');
         const stripeConnectInstance = await loadStripeConnect();
         setStripeConnect(stripeConnectInstance);
         
@@ -115,10 +115,6 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
       <ConnectComponentsProvider connectInstance={stripeConnect}>
         <ConnectAccountManagement
           clientSecret={clientSecret}
-          collectionOptions={{
-            fields: 'eventually_due',
-            futureRequirements: 'include',
-          }}
         />
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
