@@ -25,14 +25,22 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     const initializeStripeConnect = async () => {
       try {
         // Initialize Stripe Connect with the proper API
-        // Pass an empty object as required by the SDK
-        const stripeConnectInstance = await loadConnectAndInitialize({});
+        // Pass the required parameters for the SDK
+        const stripeConnectInstance = await loadConnectAndInitialize({
+          publishableKey: 'pk_test', // This will be replaced by your actual publishable key in production
+          fetchClientSecret: async () => {
+            // This function is required by Stripe Connect JS
+            return '';
+          }
+        });
         
         setStripeConnect(stripeConnectInstance);
         
         // Get the account session client secret
         if (stripeAccountId) {
-          const { data, error } = await supabase.functions.invoke('create-stripe-account-session');
+          const { data, error } = await supabase.functions.invoke('create-stripe-account-session', {
+            body: {}
+          });
           
           if (error) {
             throw new Error(`Failed to create account session: ${error.message}`);
@@ -60,7 +68,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase.functions.invoke('create-stripe-account-session');
+      const { data, error } = await supabase.functions.invoke('create-stripe-account-session', {
+        body: {}
+      });
       
       if (error) {
         throw new Error(`Failed to refresh account session: ${error.message}`);

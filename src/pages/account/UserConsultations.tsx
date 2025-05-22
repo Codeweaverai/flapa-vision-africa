@@ -41,15 +41,29 @@ const UserConsultations: React.FC = () => {
         throw new Error("User not authenticated");
       }
 
+      // Using the correct table name and type-safe approach
       const { data, error } = await supabase
-        .from('consultations')
+        .from('consultation_bookings')
         .select('*')
         .eq('user_id', user.id)
         .order('consultation_date', { ascending: true });
 
       if (error) throw error;
       
-      setConsultations(data || []);
+      // Safely cast the data to our Consultation type
+      const typedConsultations: Consultation[] = (data || []).map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        consultation_date: item.consultation_date,
+        start_time: item.start_time,
+        end_time: item.end_time,
+        status: item.status,
+        meeting_link: item.meeting_link,
+        topic: item.topic || 'General Consultation',
+        created_at: item.created_at
+      }));
+      
+      setConsultations(typedConsultations);
     } catch (error) {
       console.error('Error fetching consultations:', error);
       toast.error('Failed to load your consultations');

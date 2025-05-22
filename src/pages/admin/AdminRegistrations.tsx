@@ -1,69 +1,104 @@
+
 import React, { useState, useEffect } from 'react';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Search, FileDown, Trash2, Eye, Edit } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { Registration } from '@/services/eventService';
+import AdminLayout from '@/components/admin/AdminLayout';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FileSpreadsheet, FileDown, RefreshCw, Search } from 'lucide-react';
+import { CSVLink } from 'react-csv';
+
+interface Registration {
+  id: string;
+  user_id: string;
+  event_id: string;
+  created_at: string;
+  status: string;
+  payment_status: string;
+  amount?: number;
+  currency?: string;
+  payment_method?: string;
+  payment_id?: string;
+  user_email?: string;
+  user_fullname?: string;
+  event_title?: string;
+  event_date?: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
+}
 
 const AdminRegistrations: React.FC = () => {
-  const [registrations, setRegistrations] = useState<(Registration & {event_title?: string, user_name?: string, user_email?: string})[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [filteredRegistrations, setFilteredRegistrations] = useState<Registration[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
+  const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
-  const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
+  const [paymentFilter, setPaymentFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<string>('all');
 
   useEffect(() => {
     fetchRegistrations();
+    fetchEvents();
   }, []);
 
   const fetchRegistrations = async () => {
     try {
       setLoading(true);
-
+      
+      // Using table joins to get user and event data
       const { data, error } = await supabase
         .from('registrations')
         .select(`
           *,
-          events:event_id (id, title),
-          profiles:user_id (id, full_name, email)
+          profiles:user_id (full_name, email),
+          events:event_id (title, event_date)
         `)
         .order('created_at', { ascending: false });
+      
+      if (error) throw error;
 
-      if (error) {
-        throw error;
-      }
-
-      // Format the data to include event title and user info
-      const formattedRegistrations = data.map(registration => ({
-        ...registration,
-        event_title: registration.events?.title,
-        // Use optional chaining to safely access properties
-        user_name: registration.profiles?.full_name || 'Unknown',
-        user_email: registration.profiles?.email || 'Unknown'
-      }));
-
+      // Transform data to match our Registration interface
+      const formattedRegistrations: Registration[] = (data || []).map(item => {
+        // Handle cases where related data might not be available
+        const profiles = item.profiles || {};
+        const events = item.events || {};
+        
+        return {
+          id: item.id,
+          user_id: item.user_id,
+          event_id: item.event_id,
+          created_at: item.created_at,
+          status: item.status || 'pending',
+          payment_status: item.payment_status || 'pending',
+          amount: item.amount,
+          currency: item.currency,
+          payment_method: item.payment_method,
+          payment_id: item.payment_id,
+          // Use unknown/undefined if the joined data is not available
+          user_fullname: profiles.full_name || 'Unknown',
+          user_email: profiles.email || 'Unknown',
+          event_title: events.title || 'Unknown Event',
+          event_date: events.event_date
+        };
+      });
+      
       setRegistrations(formattedRegistrations);
+      setFilteredRegistrations(formattedRegistrations);
     } catch (error) {
       console.error('Error fetching registrations:', error);
       toast.error('Failed to load registrations');
@@ -72,277 +107,420 @@ const AdminRegistrations: React.FC = () => {
     }
   };
 
-  const handleDeleteRegistration = async (id: string) => {
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, title')
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      setEvents(data || []);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast.error('Failed to load events');
+    }
+  };
+
+  useEffect(() => {
+    filterRegistrations();
+  }, [selectedEvent, searchTerm, statusFilter, paymentFilter, activeTab, registrations]);
+
+  const filterRegistrations = () => {
+    let filtered = [...registrations];
+    
+    // Filter by event
+    if (selectedEvent !== 'all') {
+      filtered = filtered.filter(reg => reg.event_id === selectedEvent);
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(reg => 
+        (reg.user_email?.toLowerCase().includes(term)) ||
+        (reg.user_fullname?.toLowerCase().includes(term)) ||
+        (reg.event_title?.toLowerCase().includes(term))
+      );
+    }
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(reg => reg.status === statusFilter);
+    }
+    
+    // Filter by payment status
+    if (paymentFilter !== 'all') {
+      filtered = filtered.filter(reg => reg.payment_status === paymentFilter);
+    }
+    
+    // Filter by tab (registration age)
+    if (activeTab === 'recent') {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      filtered = filtered.filter(reg => new Date(reg.created_at) >= oneWeekAgo);
+    }
+    
+    setFilteredRegistrations(filtered);
+  };
+
+  const handleEditRegistration = (registration: Registration) => {
+    setSelectedRegistration(registration);
+    setDialogOpen(true);
+  };
+
+  const handleUpdateRegistration = async () => {
+    if (!selectedRegistration) return;
+    
     try {
       const { error } = await supabase
         .from('registrations')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw error;
-      }
-
-      // Update state after successful deletion
-      setRegistrations(prevRegistrations => 
-        prevRegistrations.filter(reg => reg.id !== id)
-      );
+        .update({
+          status: selectedRegistration.status,
+          payment_status: selectedRegistration.payment_status,
+        })
+        .eq('id', selectedRegistration.id);
+        
+      if (error) throw error;
       
-      toast.success('Registration deleted successfully');
+      // Update local state
+      setRegistrations(prev => prev.map(reg => 
+        reg.id === selectedRegistration.id ? selectedRegistration : reg
+      ));
+      
+      setDialogOpen(false);
+      toast.success('Registration updated successfully');
     } catch (error) {
-      console.error('Error deleting registration:', error);
-      toast.error('Failed to delete registration');
-    } finally {
-      setDeleteRegistrationId(null);
+      console.error('Error updating registration:', error);
+      toast.error('Failed to update registration');
     }
   };
 
-  // Filter registrations based on search term and filters
-  const filteredRegistrations = registrations.filter(registration => {
-    const matchesSearch = 
-      searchTerm === '' || 
-      (registration.user_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (registration.user_email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (registration.event_title?.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-    const matchesStatus = 
-      statusFilter === 'all' || 
-      registration.status === statusFilter;
-      
-    const matchesPaymentStatus = 
-      paymentStatusFilter === 'all' || 
-      registration.payment_status === paymentStatusFilter;
-      
-    return matchesSearch && matchesStatus && matchesPaymentStatus;
-  });
-
-  const exportToCsv = () => {
-    if (filteredRegistrations.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
+  const exportRegistrationsToCSV = () => {
+    // Format the data for CSV export
+    const csvData = filteredRegistrations.map(reg => ({
+      'Registration ID': reg.id,
+      'User': reg.user_fullname,
+      'Email': reg.user_email,
+      'Event': reg.event_title,
+      'Event Date': reg.event_date ? format(new Date(reg.event_date), 'MMM d, yyyy') : 'Unknown',
+      'Registration Date': format(new Date(reg.created_at), 'MMM d, yyyy'),
+      'Status': reg.status,
+      'Payment Status': reg.payment_status,
+      'Amount': reg.amount ? `${reg.currency} ${reg.amount}` : 'N/A',
+      'Payment Method': reg.payment_method || 'N/A',
+    }));
     
-    // Create CSV headers
-    const headers = ['ID', 'User', 'Email', 'Event', 'Status', 'Payment Status', 'Amount', 'Date', 'Phone Number'];
-    
-    // Format data for CSV
-    const data = filteredRegistrations.map(reg => [
-      reg.id,
-      reg.user_name || 'N/A',
-      reg.user_email || 'N/A',
-      reg.event_title || 'N/A',
-      reg.status || 'N/A',
-      reg.payment_status || 'N/A',
-      reg.payment_amount ? `${reg.payment_currency} ${reg.payment_amount}` : 'N/A',
-      new Date(reg.created_at || '').toLocaleDateString(),
-      reg.phone_number || 'N/A'
-    ]);
-    
-    // Combine headers and data
-    const csvContent = [headers, ...data]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
-    
-    // Create download link
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `registrations-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    return csvData;
   };
+
+  const csvHeaders = [
+    { label: "Registration ID", key: "Registration ID" },
+    { label: "User", key: "User" },
+    { label: "Email", key: "Email" },
+    { label: "Event", key: "Event" },
+    { label: "Event Date", key: "Event Date" },
+    { label: "Registration Date", key: "Registration Date" },
+    { label: "Status", key: "Status" },
+    { label: "Payment Status", key: "Payment Status" },
+    { label: "Amount", key: "Amount" },
+    { label: "Payment Method", key: "Payment Method" }
+  ];
 
   return (
     <AdminLayout>
-      <div className="container py-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Event Registrations</h1>
-            <p className="text-muted-foreground">Manage all event registrations and attendees</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Event Registrations</h1>
+          <div className="space-x-2">
+            <CSVLink 
+              data={exportRegistrationsToCSV()} 
+              headers={csvHeaders}
+              filename={`event-registrations-${new Date().toISOString().split('T')[0]}.csv`}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              Export CSV
+            </CSVLink>
+            <Button variant="outline" onClick={fetchRegistrations}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
           </div>
-          
-          <Button variant="outline" onClick={exportToCsv}>
-            <FileDown className="h-4 w-4 mr-2" />
-            Export to CSV
-          </Button>
         </div>
-        
-        <Card className="mb-8">
-          <CardHeader className="pb-2">
-            <CardTitle>Filters</CardTitle>
-            <CardDescription>Filter registrations by status or search for specific records</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search by name, email, or event..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_3fr] gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+              <CardDescription>Filter registrations by various criteria</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="event-filter">Event</Label>
+                <Select 
+                  value={selectedEvent} 
+                  onValueChange={setSelectedEvent}
+                >
+                  <SelectTrigger id="event-filter">
+                    <SelectValue placeholder="All Events" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Events</SelectItem>
+                    {events.map(event => (
+                      <SelectItem key={event.id} value={event.id}>
+                        {event.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="status-filter">Registration Status</Label>
+                <Select 
+                  value={statusFilter} 
+                  onValueChange={setStatusFilter}
+                >
+                  <SelectTrigger id="status-filter">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="attended">Attended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="payment-filter">Payment Status</Label>
+                <Select 
+                  value={paymentFilter} 
+                  onValueChange={setPaymentFilter}
+                >
+                  <SelectTrigger id="payment-filter">
+                    <SelectValue placeholder="All Payment Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Payment Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                    <SelectItem value="refunded">Refunded</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="search">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="search"
+                    placeholder="Search by name or email"
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <div className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="all">All Registrations</TabsTrigger>
+                <TabsTrigger value="recent">Recent (Last 7 days)</TabsTrigger>
+              </TabsList>
+              <TabsContent value="all" className="border rounded-md p-4">
+                <RegistrationsTable 
+                  registrations={filteredRegistrations} 
+                  loading={loading}
+                  onEditRegistration={handleEditRegistration}
                 />
+              </TabsContent>
+              <TabsContent value="recent" className="border rounded-md p-4">
+                <RegistrationsTable 
+                  registrations={filteredRegistrations}
+                  loading={loading}
+                  onEditRegistration={handleEditRegistration}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      </div>
+      
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Registration</DialogTitle>
+            <DialogDescription>
+              Update the status of this registration
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectedRegistration && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium mb-1">Event</p>
+                    <p className="text-sm">{selectedRegistration.event_title}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-1">Registrant</p>
+                    <p className="text-sm">{selectedRegistration.user_fullname}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-1">Email</p>
+                    <p className="text-sm">{selectedRegistration.user_email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-1">Registration Date</p>
+                    <p className="text-sm">
+                      {format(new Date(selectedRegistration.created_at), 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="status">Registration Status</Label>
+                  <Select 
+                    value={selectedRegistration.status} 
+                    onValueChange={(value) => setSelectedRegistration({...selectedRegistration, status: value})}
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="attended">Attended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="payment-status">Payment Status</Label>
+                  <Select 
+                    value={selectedRegistration.payment_status} 
+                    onValueChange={(value) => setSelectedRegistration({...selectedRegistration, payment_status: value})}
+                  >
+                    <SelectTrigger id="payment-status">
+                      <SelectValue placeholder="Select payment status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                      <SelectItem value="refunded">Refunded</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateRegistration}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AdminLayout>
+  );
+};
+
+interface RegistrationsTableProps {
+  registrations: Registration[];
+  loading: boolean;
+  onEditRegistration: (registration: Registration) => void;
+}
+
+const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ registrations, loading, onEditRegistration }) => {
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (registrations.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground" />
+        <h3 className="mt-4 text-lg font-medium">No registrations found</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          No registrations match your current filters.
+        </p>
+      </div>
+    );
+  }
+  
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Registrant</TableHead>
+          <TableHead>Event</TableHead>
+          <TableHead>Date</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Payment</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {registrations.map((registration) => (
+          <TableRow key={registration.id}>
+            <TableCell>
+              <div>
+                <p className="font-medium">{registration.user_fullname}</p>
+                <p className="text-sm text-muted-foreground">{registration.user_email}</p>
               </div>
-              
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Registration Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Payment Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Payment Statuses</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>All Registrations</CardTitle>
-            <CardDescription>
-              Showing {filteredRegistrations.length} registrations 
-              {searchTerm || statusFilter !== 'all' || paymentStatusFilter !== 'all' ? ' (filtered)' : ''}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-16">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-              </div>
-            ) : filteredRegistrations.length === 0 ? (
-              <div className="text-center py-12">
-                <h3 className="text-lg font-medium mb-2">No registrations found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm || statusFilter !== 'all' || paymentStatusFilter !== 'all' ? 
-                    'Try adjusting your search or filter criteria' : 
-                    'No registrations have been made yet'}
+            </TableCell>
+            <TableCell>{registration.event_title}</TableCell>
+            <TableCell>
+              <div>
+                <p className="text-sm">
+                  {registration.event_date ? format(new Date(registration.event_date), 'MMM d, yyyy') : 'N/A'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Registered: {format(new Date(registration.created_at), 'MMM d, yyyy')}
                 </p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Attendee</TableHead>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Payment</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Phone Number</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRegistrations.map((registration) => (
-                      <TableRow key={registration.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{registration.user_name || 'N/A'}</div>
-                            <div className="text-sm text-muted-foreground">{registration.user_email || 'N/A'}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{registration.event_title || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            registration.status === 'confirmed' ? 'default' :
-                            registration.status === 'pending' ? 'outline' :
-                            'destructive'
-                          }>
-                            {registration.status || 'N/A'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            registration.payment_status === 'paid' ? 'success' :
-                            registration.payment_status === 'free' ? 'default' :
-                            registration.payment_status === 'pending' ? 'outline' :
-                            'destructive'
-                          }>
-                            {registration.payment_status || 'N/A'}
-                          </Badge>
-                          {registration.payment_amount && (
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {registration.payment_currency} {registration.payment_amount}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {registration.created_at ? 
-                            new Date(registration.created_at).toLocaleDateString() : 
-                            'N/A'
-                          }
-                        </TableCell>
-                        <TableCell>{registration.phone_number || 'N/A'}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog open={deleteRegistrationId === registration.id}>
-                              <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => setDeleteRegistrationId(registration.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Registration</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this registration? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setDeleteRegistrationId(null)}>
-                                    Cancel
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    onClick={() => handleDeleteRegistration(registration.id)}
-                                    className="bg-destructive hover:bg-destructive/90"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </AdminLayout>
+            </TableCell>
+            <TableCell>
+              <Badge variant={
+                registration.status === 'confirmed' ? 'default' :
+                registration.status === 'cancelled' ? 'destructive' :
+                registration.status === 'attended' ? 'success' : 'outline'
+              }>
+                {registration.status}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant={
+                registration.payment_status === 'paid' ? 'success' :
+                registration.payment_status === 'failed' ? 'destructive' :
+                registration.payment_status === 'refunded' ? 'secondary' : 'outline'
+              }>
+                {registration.payment_status}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-right">
+              <Button variant="outline" size="sm" onClick={() => onEditRegistration(registration)}>
+                Edit
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 };
 

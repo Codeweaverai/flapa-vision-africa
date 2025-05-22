@@ -11,21 +11,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  event_date: string; // Using event_date instead of start_date
+  end_date?: string;
+  location: string;
+  image_url?: string;
+}
+
 interface EventRegistration {
   id: string;
   event_id: string;
   created_at: string;
   status: string;
   payment_status: string;
-  events: {
-    id: string;
-    title: string;
-    description: string;
-    start_date: string;
-    end_date: string;
-    location: string;
-    image_url: string;
-  };
+  events: Event;
 }
 
 const UserEvents: React.FC = () => {
@@ -47,6 +49,7 @@ const UserEvents: React.FC = () => {
         throw new Error("User not authenticated");
       }
 
+      // Using correct field names based on your database schema
       const { data, error } = await supabase
         .from('registrations')
         .select(`
@@ -59,7 +62,7 @@ const UserEvents: React.FC = () => {
             id,
             title,
             description,
-            start_date,
+            event_date,
             end_date,
             location,
             image_url
@@ -70,7 +73,32 @@ const UserEvents: React.FC = () => {
 
       if (error) throw error;
       
-      setRegistrations(data || []);
+      // Safely transform the data to match our expected types
+      const typedRegistrations: EventRegistration[] = (data || []).map(reg => {
+        // Handle potentially missing or malformed events data
+        const eventData = reg.events || {};
+        
+        const event: Event = {
+          id: eventData.id || reg.event_id,
+          title: eventData.title || 'Untitled Event',
+          description: eventData.description || 'No description available',
+          event_date: eventData.event_date || new Date().toISOString(),
+          end_date: eventData.end_date,
+          location: eventData.location || 'Online',
+          image_url: eventData.image_url
+        };
+        
+        return {
+          id: reg.id,
+          event_id: reg.event_id,
+          created_at: reg.created_at,
+          status: reg.status || 'pending',
+          payment_status: reg.payment_status || 'pending',
+          events: event
+        };
+      });
+      
+      setRegistrations(typedRegistrations);
     } catch (error) {
       console.error('Error fetching registrations:', error);
       toast.error('Failed to load your event registrations');
@@ -121,7 +149,7 @@ const UserEvents: React.FC = () => {
                       <div className="flex items-center text-sm">
                         <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                         <span>
-                          {format(new Date(registration.events.start_date), 'MMM d, yyyy')}
+                          {format(new Date(registration.events.event_date), 'MMM d, yyyy')}
                           {registration.events.end_date && (
                             <> - {format(new Date(registration.events.end_date), 'MMM d, yyyy')}</>
                           )}
