@@ -20,3 +20,12 @@ export function formatDuration(minutes: number): string {
     return `${hours} ${hours === 1 ? 'hour' : 'hours'} ${remainingMinutes} min`;
   }
 }
+
+export function formatDate(date: string | Date): string {
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
