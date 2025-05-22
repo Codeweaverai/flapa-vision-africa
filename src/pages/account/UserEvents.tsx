@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -29,7 +28,7 @@ interface EventRegistration {
   created_at: string;
   status: string;
   payment_status: string;
-  event: Event; // Changed to singular since we're joining one event per registration
+  event: Event; 
 }
 
 const UserEvents: React.FC = () => {

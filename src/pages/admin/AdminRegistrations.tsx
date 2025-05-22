@@ -74,8 +74,8 @@ const AdminRegistrations: React.FC = () => {
       // Transform data to match our Registration interface
       const formattedRegistrations: Registration[] = (data || []).map(item => {
         // Handle cases where related data might not be available
-        const profiles = item.profiles || {};
-        const events = item.events || {};
+        const profilesData = item.profiles || {};
+        const eventsData = item.events || {};
         
         return {
           id: item.id,
@@ -89,10 +89,10 @@ const AdminRegistrations: React.FC = () => {
           payment_method: item.payment_method,
           payment_id: item.payment_id,
           // Use data from joined tables or default values
-          user_fullname: profiles.full_name || 'Unknown',
-          user_email: profiles.email || 'Unknown',
-          event_title: events.title || 'Unknown Event',
-          event_date: events.start_time
+          user_fullname: profilesData.full_name || 'Unknown',
+          user_email: profilesData.email || 'Unknown',
+          event_title: eventsData.title || 'Unknown Event',
+          event_date: eventsData.start_time
         };
       });
       

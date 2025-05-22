@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ConnectAccountManagement,
   ConnectComponentsProvider,
-  ConnectAccountSessionProvider,
+  ConnectAccountSessionProvider as ConnectAcctSessionProvider,
 } from '@stripe/react-connect-js';
 import { loadConnectAndInitialize } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
@@ -126,9 +126,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
-        <ConnectAccountSessionProvider clientSecret={clientSecret}>
+        <ConnectAcctSessionProvider clientSecret={clientSecret}>
           <ConnectAccountManagement />
-        </ConnectAccountSessionProvider>
+        </ConnectAcctSessionProvider>
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
             Refresh
