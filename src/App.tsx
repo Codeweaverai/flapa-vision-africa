@@ -64,6 +64,13 @@ import CreatorStudents from './pages/creator/CreatorStudents';
 import CreatorSettings from './pages/creator/CreatorSettings';
 import CreatorPayments from './pages/creator/CreatorPayments';
 
+// User Account Pages
+import UserCourses from './pages/account/UserCourses';
+import UserEvents from './pages/account/UserEvents';
+import UserConsultations from './pages/account/UserConsultations';
+import UserProfile from './pages/account/UserProfile';
+import UserSettings from './pages/account/UserSettings';
+
 function App() {
   return (
     <>
@@ -90,6 +97,13 @@ function App() {
         <Route path="/payment/success" element={<PaymentSuccessPage />} />
         <Route path="/payment/cancel" element={<PaymentCancelPage />} />
         <Route path="/payment/result" element={<PaymentResultPage />} />
+        
+        {/* User Account routes */}
+        <Route path="/account/courses" element={<UserCourses />} />
+        <Route path="/account/events" element={<UserEvents />} />
+        <Route path="/account/consultations" element={<UserConsultations />} />
+        <Route path="/account/profile" element={<UserProfile />} />
+        <Route path="/account/settings" element={<UserSettings />} />
         
         {/* Community routes */}
         <Route path="/community" element={<CommunityPage />} />

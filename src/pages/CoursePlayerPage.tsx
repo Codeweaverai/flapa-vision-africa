@@ -1,9 +1,16 @@
-
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { SimplifiedCourse, SimplifiedModule, SimplifiedLesson } from '@/types/eventTypes';
+import VideoPlayer from '@/components/course/VideoPlayer';
+import Layout from '@/components/layout/Layout';
+import CourseModuleList from '@/components/course/CourseModuleList';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, BookOpen, CheckCircle, Clock, FileText } from 'lucide-react';
 
 interface LessonProgress {
   position: number;
@@ -11,13 +18,13 @@ interface LessonProgress {
 }
 
 const CoursePlayerPage: React.FC = () => {
-  const { courseId } = useParams<{ courseId: string }>();
+  const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const [course, setCourse] = useState<SimplifiedCourse | null>(null);
   const [currentLesson, setCurrentLesson] = useState<SimplifiedLesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(true);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [activeTab, setActiveTab] = useState('content');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,8 +42,17 @@ const CoursePlayerPage: React.FC = () => {
         setCourse(course);
         setEnrollmentId(enrollmentId);
         
-        // Set initial lesson
-        if (course.modules.length > 0 && course.modules[0].lessons.length > 0) {
+        // If lessonId is provided in URL params, set it as current lesson
+        if (lessonId && course.modules.length > 0) {
+          const foundLesson = findLessonById(course.modules, lessonId);
+          if (foundLesson) {
+            setCurrentLesson(foundLesson);
+          } else {
+            // If lesson not found, set first lesson as default
+            setCurrentLesson(course.modules[0].lessons[0]);
+          }
+        } else if (course.modules.length > 0 && course.modules[0].lessons.length > 0) {
+          // Otherwise set first lesson as default
           setCurrentLesson(course.modules[0].lessons[0]);
         }
       } catch (error: any) {
@@ -49,41 +65,32 @@ const CoursePlayerPage: React.FC = () => {
     };
     
     loadCourse();
-  }, [courseId, navigate]);
+  }, [courseId, lessonId, navigate]);
 
-  useEffect(() => {
-    if (videoRef.current && currentLesson?.video_url) {
-      setVideoLoading(true);
-      videoRef.current.src = currentLesson.video_url;
-      videoRef.current.load();
+  const findLessonById = (modules: SimplifiedModule[], id: string): SimplifiedLesson | null => {
+    for (const module of modules) {
+      const lesson = module.lessons.find(l => l.id === id);
+      if (lesson) return lesson;
     }
-  }, [currentLesson]);
+    return null;
+  }
 
   const handleLessonChange = (lesson: SimplifiedLesson) => {
     setCurrentLesson(lesson);
+    // Update URL without full page reload
+    navigate(`/course/${courseId}/lesson/${lesson.id}`);
   };
 
-  const handleLoaded = () => {
-    setVideoLoading(false);
-  };
-
-  const handleVideoError = () => {
-    setVideoLoading(false);
-    toast.error("Failed to load video");
-  };
-
-  const handleTimeUpdate = () => {
-    if (videoRef.current && enrollmentId && currentLesson) {
-      const position = videoRef.current.currentTime;
-      const completed = videoRef.current.currentTime >= videoRef.current.duration * 0.95; // Consider completed at 95%
-      
-      saveLessonProgress(currentLesson.id, enrollmentId, { position, completed });
+  const handleTimeUpdate = (currentTime: number, duration: number) => {
+    if (enrollmentId && currentLesson) {
+      const completed = currentTime >= duration * 0.95; // Consider completed at 95%
+      saveLessonProgress(currentLesson.id, enrollmentId, { position: currentTime, completed });
     }
   };
 
   const handleVideoEnded = async () => {
-    if (videoRef.current && enrollmentId && currentLesson) {
-      await saveLessonProgress(currentLesson.id, enrollmentId, { position: videoRef.current.duration, completed: true });
+    if (enrollmentId && currentLesson) {
+      await saveLessonProgress(currentLesson.id, enrollmentId, { position: 0, completed: true });
       
       // Mark lesson as completed in state
       setCourse(prevCourse => {
@@ -98,6 +105,19 @@ const CoursePlayerPage: React.FC = () => {
         
         return { ...prevCourse, modules: updatedModules };
       });
+
+      toast.success("Lesson completed!");
+      
+      // Move to next lesson if available
+      if (course) {
+        const allLessons = course.modules.flatMap(m => m.lessons);
+        const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
+        
+        if (currentIndex < allLessons.length - 1) {
+          const nextLesson = allLessons[currentIndex + 1];
+          handleLessonChange(nextLesson);
+        }
+      }
     }
   };
 
@@ -250,49 +270,238 @@ const CoursePlayerPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <Layout>
+        <div className="container flex justify-center items-center py-16">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading course content...</p>
+          </div>
+        </div>
+      </Layout>
+    );
   }
 
   if (!course) {
-    return <div>Course not found.</div>;
+    return (
+      <Layout>
+        <div className="container py-16 text-center">
+          <h2 className="text-2xl font-bold mb-2">Course not found</h2>
+          <p className="mb-6 text-muted-foreground">The course you're looking for doesn't exist or you don't have access to it.</p>
+          <Button asChild>
+            <Link to="/courses">Browse Courses</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
   }
 
   return (
-    <div className="course-player-container">
-      <h1>{course.title}</h1>
-      <div className="video-player">
-        {videoLoading ? (
-          <div>Loading video...</div>
-        ) : null}
-        <video
-          ref={videoRef}
-          controls
-          onLoadedData={handleLoaded}
-          onError={handleVideoError}
-          onTimeUpdate={handleTimeUpdate}
-          onEnded={handleVideoEnded}
-          style={{ width: '100%', maxWidth: '800px' }}
-        >
-          Your browser does not support the video tag.
-        </video>
-      </div>
-      <div className="course-content">
-        {course.modules.map((module) => (
-          <div key={module.id} className="module">
-            <h2>{module.title}</h2>
-            <ul>
-              {module.lessons.map((lesson) => (
-                <li key={lesson.id}>
-                  <button onClick={() => handleLessonChange(lesson)}>
-                    {lesson.title} - {lesson.is_completed ? 'Completed' : 'Not Completed'}
-                  </button>
-                </li>
-              ))}
-            </ul>
+    <Layout>
+      <div className="container py-8">
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" asChild className="mb-4">
+            <Link to={`/courses/${courseId}`}><ArrowLeft className="mr-2 h-4 w-4" /> Back to Course</Link>
+          </Button>
+          <h1 className="text-2xl font-bold">{course.title}</h1>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left side: Course navigation */}
+          <div className="hidden lg:block">
+            <div className="sticky top-24">
+              <h3 className="text-lg font-semibold mb-4">Course Content</h3>
+              <CourseModuleList
+                modules={course.modules}
+                currentLessonId={currentLesson?.id}
+                onSelectLesson={handleLessonChange}
+                isEnrolled={!!enrollmentId}
+              />
+            </div>
           </div>
-        ))}
+          
+          {/* Main content area */}
+          <div className="lg:col-span-2">
+            {currentLesson ? (
+              <div className="space-y-6">
+                {/* Video Player */}
+                {currentLesson.video_url ? (
+                  <div className="bg-black rounded-md overflow-hidden">
+                    <VideoPlayer
+                      src={currentLesson.video_url}
+                      onTimeUpdate={handleTimeUpdate}
+                      onEnded={handleVideoEnded}
+                      controls={true}
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-video flex items-center justify-center bg-muted rounded-md">
+                    <div className="text-center p-8">
+                      <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                      <h3 className="text-lg font-medium">No video content available</h3>
+                      <p className="text-muted-foreground">This lesson contains text content only.</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Lesson details */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold">{currentLesson.title}</h2>
+                    {currentLesson.is_completed && (
+                      <Badge variant="success" className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        <span>Completed</span>
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {currentLesson.description && (
+                    <p className="text-muted-foreground mt-2">{currentLesson.description}</p>
+                  )}
+                </div>
+                
+                {/* Tabs for different content types */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="content">Lesson Content</TabsTrigger>
+                    {currentLesson.content_type === 'quiz' && (
+                      <TabsTrigger value="quiz">Quiz</TabsTrigger>
+                    )}
+                    {Array.isArray(currentLesson.materials_urls) && currentLesson.materials_urls.length > 0 && (
+                      <TabsTrigger value="materials">Additional Materials</TabsTrigger>
+                    )}
+                  </TabsList>
+                  
+                  <TabsContent value="content" className="min-h-[300px] bg-card p-6 rounded-md border">
+                    {currentLesson.content ? (
+                      <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: typeof currentLesson.content === 'string' ? currentLesson.content : JSON.stringify(currentLesson.content) }} />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full py-12">
+                        <BookOpen className="h-12 w-12 mb-4 text-muted-foreground/40" />
+                        <h3 className="font-medium text-lg mb-2">No additional content</h3>
+                        <p className="text-muted-foreground text-center">
+                          This lesson doesn't have any additional text content.
+                          <br />Watch the video above to learn about this topic.
+                        </p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  {currentLesson.content_type === 'quiz' && (
+                    <TabsContent value="quiz">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Lesson Quiz</CardTitle>
+                          <CardDescription>
+                            Test your knowledge of the concepts covered in this lesson
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-center py-8">
+                            <p className="text-muted-foreground">Quiz content will be loaded here</p>
+                          </div>
+                        </CardContent>
+                        <CardFooter>
+                          <Button disabled>Start Quiz</Button>
+                        </CardFooter>
+                      </Card>
+                    </TabsContent>
+                  )}
+                  
+                  {Array.isArray(currentLesson.materials_urls) && currentLesson.materials_urls.length > 0 && (
+                    <TabsContent value="materials">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Additional Materials</CardTitle>
+                          <CardDescription>
+                            Download resources related to this lesson
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-3">
+                            {currentLesson.materials_urls.map((url, idx) => (
+                              <li key={idx}>
+                                <a 
+                                  href={url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="flex items-center p-3 border rounded-md hover:bg-accent transition-colors"
+                                >
+                                  <FileText className="h-5 w-5 mr-2 text-primary" />
+                                  <span>Material {idx + 1}</span>
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  )}
+                </Tabs>
+                
+                {/* Lesson navigation */}
+                <div className="flex justify-between pt-4 mt-8 border-t">
+                  <Button 
+                    variant="outline"
+                    disabled={!course.modules.length}
+                    onClick={() => {
+                      if (!course.modules.length) return;
+                      
+                      const allLessons = course.modules.flatMap(m => m.lessons);
+                      const currentIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
+                      
+                      if (currentIndex > 0) {
+                        handleLessonChange(allLessons[currentIndex - 1]);
+                      }
+                    }}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Previous Lesson
+                  </Button>
+                  
+                  <Button 
+                    disabled={!course.modules.length}
+                    onClick={() => {
+                      if (!course.modules.length) return;
+                      
+                      const allLessons = course.modules.flatMap(m => m.lessons);
+                      const currentIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
+                      
+                      if (currentIndex >= 0 && currentIndex < allLessons.length - 1) {
+                        handleLessonChange(allLessons[currentIndex + 1]);
+                      }
+                    }}
+                  >
+                    Next Lesson <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>Welcome to the Course</CardTitle>
+                  <CardDescription>Select a lesson from the course outline to begin</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>{course?.description}</p>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Mobile course navigation */}
+            <div className="lg:hidden mt-12">
+              <h3 className="text-lg font-semibold mb-4">Course Content</h3>
+              <CourseModuleList
+                modules={course.modules}
+                currentLessonId={currentLesson?.id}
+                onSelectLesson={handleLessonChange}
+                isEnrolled={!!enrollmentId}
+              />
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

@@ -25,8 +25,12 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
     const initializeStripeConnect = async () => {
       try {
         // Initialize Stripe Connect with the proper API
-        // loadConnectAndInitialize requires an empty object at minimum
-        const stripeConnectInstance = await loadConnectAndInitialize({});
+        // Pass an empty object as required by the SDK
+        const stripeConnectInstance = await loadConnectAndInitialize({
+          publishableKey: 'pk_test_dummy', // This will be overridden by the client secret
+          fetchClientSecret: async () => ({ clientSecret: '' }) // Placeholder, not actually used
+        });
+        
         setStripeConnect(stripeConnectInstance);
         
         // Get the account session client secret
@@ -115,11 +119,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
-        {clientSecret && (
-          <AccountSession clientSecret={clientSecret}>
-            <ConnectAccountManagement />
-          </AccountSession>
-        )}
+        <AccountSession clientSecret={clientSecret}>
+          <ConnectAccountManagement />
+        </AccountSession>
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
             Refresh

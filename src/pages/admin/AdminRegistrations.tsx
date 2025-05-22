@@ -1,592 +1,346 @@
 
 import React, { useState, useEffect } from 'react';
+import AdminLayout from '@/components/admin/AdminLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Search, FileDown, Trash2, Eye, Edit } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Download, Calendar, Users, GraduationCap, FileText } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { EventWithRegistrations, CombinedRegistration } from '@/types/eventTypes';
-import { format } from 'date-fns';
-import { CSVLink } from 'react-csv';
-import RegistrationsTable from '@/components/admin/RegistrationsTable';
-import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
-import EnrollmentsTable from '@/components/admin/EnrollmentsTable';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { Registration } from '@/services/eventService';
 
-const AdminRegistrations = () => {
-  const [events, setEvents] = useState<EventWithRegistrations[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('events');
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedRegistration, setSelectedRegistration] = useState<CombinedRegistration | null>(null);
-  const [enrollmentsList, setEnrollmentsList] = useState<any[]>([]);
+const AdminRegistrations: React.FC = () => {
+  const [registrations, setRegistrations] = useState<(Registration & {event_title?: string, user_name?: string, user_email?: string})[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
+  const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeTab === 'events') {
-      fetchEvents();
-    } else {
-      fetchCourses();
-    }
-  }, [activeTab]);
+    fetchRegistrations();
+  }, []);
 
-  const fetchEvents = async () => {
-    setLoading(true);
+  const fetchRegistrations = async () => {
     try {
-      // Fetch events with registration counts
-      const { data: eventsData, error } = await supabase
-        .from('events')
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('registrations')
         .select(`
           *,
-          registrations:registrations(count)
+          events:event_id (id, title),
+          profiles:user_id (id, full_name, email)
         `)
-        .order('start_time', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      // Fetch detailed registrations for each event
-      const eventsWithRegistrations = await Promise.all(
-        eventsData.map(async (event) => {
-          const { data: registrations, error: regError } = await supabase
-            .from('registrations')
-            .select(`
-              *,
-              profiles:profiles(id, email, full_name)
-            `)
-            .eq('event_id', event.id);
-
-          if (regError) {
-            console.error('Error fetching registrations:', regError);
-            return {
-              ...event,
-              date: event.start_time,
-              registrations: []
-            };
-          }
-
-          // Format registrations properly
-          const formattedRegistrations = registrations.map((reg: any) => ({
-            ...reg,
-            user: {
-              id: reg.profiles?.id,
-              email: reg.profiles?.email,
-              full_name: reg.profiles?.full_name
-            }
-          }));
-
-          return {
-            ...event,
-            date: event.start_time,
-            registrations: formattedRegistrations as CombinedRegistration[]
-          };
-        })
-      );
-
-      setEvents(eventsWithRegistrations as EventWithRegistrations[]);
-    } catch (error: any) {
-      console.error('Error fetching events:', error);
-      toast.error('Failed to load events');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCourses = async () => {
-    setLoading(true);
-    try {
-      // Fetch courses
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (coursesError) throw coursesError;
-
-      // Fetch enrollments for all courses
-      const { data: enrollmentsData, error: enrollmentsError } = await supabase
-        .from('course_enrollments')
-        .select(`
-          *,
-          profiles:profiles(id, email, full_name),
-          courses:course_id(title, price, is_free)
-        `);
-
-      if (enrollmentsError) throw enrollmentsError;
-
-      const formattedEnrollments = enrollmentsData.map((enrollment: any) => ({
-        ...enrollment,
-        user: {
-          id: enrollment.profiles?.id,
-          email: enrollment.profiles?.email,
-          full_name: enrollment.profiles?.full_name
-        },
-        course_title: enrollment.courses?.title || 'Unknown',
-        course_price: enrollment.courses?.price || 0,
-        is_free: enrollment.courses?.is_free || false
+      // Format the data to include event title and user info
+      const formattedRegistrations = data.map(registration => ({
+        ...registration,
+        event_title: registration.events?.title,
+        user_name: registration.profiles?.full_name,
+        user_email: registration.profiles?.email
       }));
 
-      setEnrollmentsList(formattedEnrollments);
-
-      // Group enrollments by course
-      const coursesWithEnrollments = coursesData.map((course) => {
-        const courseEnrollments = formattedEnrollments.filter(
-          (enrollment) => enrollment.course_id === course.id
-        );
-        
-        return {
-          ...course,
-          enrollments: courseEnrollments,
-          enrollmentCount: courseEnrollments.length
-        };
-      });
-
-      setCourses(coursesWithEnrollments);
-    } catch (error: any) {
-      console.error('Error fetching courses and enrollments:', error);
-      toast.error('Failed to load courses and enrollments');
+      setRegistrations(formattedRegistrations);
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
+      toast.error('Failed to load registrations');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredEvents = events.filter((event) => {
-    const matchesSearch = 
-      event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.location?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
-  });
-
-  const filteredCourses = courses.filter((course) => {
-    return course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           course.description?.toLowerCase().includes(searchTerm.toLowerCase());
-  });
-
-  const filteredEnrollments = enrollmentsList.filter((enrollment) => {
-    return enrollment.course_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           enrollment.user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           enrollment.user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-  });
-
-  const getTotalRegistrations = (event: EventWithRegistrations) => {
-    return event.registrations?.length || 0;
-  };
-
-  const getRegistrationData = () => {
-    const data: any[] = [];
-    
-    events.forEach(event => {
-      event.registrations?.forEach(reg => {
-        data.push({
-          'Event Name': event.title,
-          'Event Date': format(new Date(event.date), 'PPP'),
-          'Registration Date': reg.created_at ? format(new Date(reg.created_at), 'PPP') : 'N/A',
-          'Attendee Name': reg.user?.full_name || 'N/A',
-          'Attendee Email': reg.user?.email || 'N/A',
-          'Phone Number': reg.phone_number || 'N/A',
-          'Status': reg.status,
-          'Payment Status': reg.payment_status
-        });
-      });
-    });
-    
-    return data;
-  };
-
-  const getEnrollmentData = () => {
-    return enrollmentsList.map(enrollment => ({
-      'Course': enrollment.course_title,
-      'Student Name': enrollment.user?.full_name || 'N/A',
-      'Student Email': enrollment.user?.email || 'N/A',
-      'Enrollment Date': enrollment.enrollment_date ? format(new Date(enrollment.enrollment_date), 'PPP') : 'N/A',
-      'Completion Status': enrollment.is_completed ? 'Completed' : 'In Progress',
-      'Completion Date': enrollment.completion_date ? format(new Date(enrollment.completion_date), 'PPP') : 'N/A',
-      'Payment Status': enrollment.payment_status
-    }));
-  };
-
-  const getAllRegistrations = () => {
-    return events.flatMap(event => 
-      event.registrations.map(reg => ({
-        ...reg,
-        events: event
-      }))
-    );
-  };
-
-  const handleEditRegistration = (registration: CombinedRegistration) => {
-    setSelectedRegistration(registration);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleDeleteRegistration = async (registration: CombinedRegistration) => {
-    if (!window.confirm('Are you sure you want to delete this registration?')) {
-      return;
-    }
-
+  const handleDeleteRegistration = async (id: string) => {
     try {
       const { error } = await supabase
         .from('registrations')
         .delete()
-        .eq('id', registration.id);
+        .eq('id', id);
 
       if (error) {
         throw error;
       }
 
-      // Update state by removing the deleted registration
-      setEvents(prevEvents => 
-        prevEvents.map(event => ({
-          ...event,
-          registrations: event.registrations.filter(reg => reg.id !== registration.id)
-        }))
+      // Update state after successful deletion
+      setRegistrations(prevRegistrations => 
+        prevRegistrations.filter(reg => reg.id !== id)
       );
-
+      
       toast.success('Registration deleted successfully');
     } catch (error) {
       console.error('Error deleting registration:', error);
       toast.error('Failed to delete registration');
+    } finally {
+      setDeleteRegistrationId(null);
     }
   };
 
-  const handleSaveRegistration = async (updatedRegistration: CombinedRegistration) => {
-    try {
-      const { error } = await supabase
-        .from('registrations')
-        .update({
-          status: updatedRegistration.status,
-          payment_status: updatedRegistration.payment_status,
-          phone_number: updatedRegistration.phone_number,
-          mobile_operator: updatedRegistration.mobile_operator
-        })
-        .eq('id', updatedRegistration.id);
+  // Filter registrations based on search term and filters
+  const filteredRegistrations = registrations.filter(registration => {
+    const matchesSearch = 
+      searchTerm === '' || 
+      (registration.user_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (registration.user_email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (registration.event_title?.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+    const matchesStatus = 
+      statusFilter === 'all' || 
+      registration.status === statusFilter;
+      
+    const matchesPaymentStatus = 
+      paymentStatusFilter === 'all' || 
+      registration.payment_status === paymentStatusFilter;
+      
+    return matchesSearch && matchesStatus && matchesPaymentStatus;
+  });
 
-      if (error) throw error;
-
-      // Update state
-      setEvents(prevEvents => 
-        prevEvents.map(event => ({
-          ...event,
-          registrations: event.registrations.map(reg => 
-            reg.id === updatedRegistration.id ? updatedRegistration : reg
-          )
-        }))
-      );
-
-      toast.success('Registration updated successfully');
-      setIsEditDialogOpen(false);
-    } catch (error) {
-      console.error('Error updating registration:', error);
-      toast.error('Failed to update registration');
-    }
-  };
-
-  const handleDeleteEnrollment = async (enrollmentId: string) => {
-    if (!window.confirm('Are you sure you want to delete this enrollment?')) {
+  const exportToCsv = () => {
+    if (filteredRegistrations.length === 0) {
+      toast.error('No data to export');
       return;
     }
-
-    try {
-      const { error } = await supabase
-        .from('course_enrollments')
-        .delete()
-        .eq('id', enrollmentId);
-
-      if (error) throw error;
-
-      // Update local state
-      setEnrollmentsList(prev => prev.filter(e => e.id !== enrollmentId));
-      
-      // Update courses with enrollments
-      setCourses(prev => 
-        prev.map(course => ({
-          ...course,
-          enrollments: course.enrollments.filter((e: any) => e.id !== enrollmentId),
-          enrollmentCount: course.enrollments.filter((e: any) => e.id !== enrollmentId).length
-        }))
-      );
-
-      toast.success('Enrollment deleted successfully');
-    } catch (error) {
-      console.error('Error deleting enrollment:', error);
-      toast.error('Failed to delete enrollment');
-    }
-  };
-
-  const exportRegistrationsToPDF = () => {
-    const doc = new jsPDF();
     
-    // Add title
-    doc.setFontSize(18);
-    doc.text('Event Registrations Report', 14, 22);
+    // Create CSV headers
+    const headers = ['ID', 'User', 'Email', 'Event', 'Status', 'Payment Status', 'Amount', 'Date', 'Phone Number'];
     
-    // Add date
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Generated on ${format(new Date(), 'PPP')}`, 14, 30);
+    // Format data for CSV
+    const data = filteredRegistrations.map(reg => [
+      reg.id,
+      reg.user_name || 'N/A',
+      reg.user_email || 'N/A',
+      reg.event_title || 'N/A',
+      reg.status || 'N/A',
+      reg.payment_status || 'N/A',
+      reg.payment_amount ? `${reg.payment_currency} ${reg.payment_amount}` : 'N/A',
+      new Date(reg.created_at || '').toLocaleDateString(),
+      reg.phone_number || 'N/A'
+    ]);
     
-    const registrationData = getRegistrationData();
-    const headers = registrationData.length > 0 ? Object.keys(registrationData[0]) : [];
+    // Combine headers and data
+    const csvContent = [headers, ...data]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
     
-    const rows = registrationData.map(item => headers.map(header => item[header]));
-    
-    autoTable(doc, {
-      head: [headers],
-      body: rows,
-      startY: 40,
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [75, 75, 250] }
-    });
-    
-    doc.save('event-registrations-report.pdf');
-  };
-  
-  const exportEnrollmentsToPDF = () => {
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(18);
-    doc.text('Course Enrollments Report', 14, 22);
-    
-    // Add date
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Generated on ${format(new Date(), 'PPP')}`, 14, 30);
-    
-    const enrollmentData = getEnrollmentData();
-    const headers = enrollmentData.length > 0 ? Object.keys(enrollmentData[0]) : [];
-    
-    const rows = enrollmentData.map(item => headers.map(header => item[header]));
-    
-    autoTable(doc, {
-      head: [headers],
-      body: rows,
-      startY: 40,
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [75, 75, 250] }
-    });
-    
-    doc.save('course-enrollments-report.pdf');
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `registrations-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
     <AdminLayout>
-      <div className="container mx-auto py-6">
+      <div className="container py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Registrations & Enrollments</h1>
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Event Registrations</h1>
+            <p className="text-muted-foreground">Manage all event registrations and attendees</p>
+          </div>
+          
+          <Button variant="outline" onClick={exportToCsv}>
+            <FileDown className="h-4 w-4 mr-2" />
+            Export to CSV
+          </Button>
         </div>
-
-        <Tabs defaultValue="events" className="w-full" onValueChange={(value) => setActiveTab(value)}>
-          <TabsList className="grid grid-cols-2 mb-8 w-[400px]">
-            <TabsTrigger value="events">Event Registrations</TabsTrigger>
-            <TabsTrigger value="courses">Course Enrollments</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="events">
-            <div className="grid gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Event Registration Analytics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-muted/50 p-4 rounded-lg flex items-center">
-                      <Calendar className="h-8 w-8 mr-4 text-primary" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Events</p>
-                        <p className="text-2xl font-bold">{events.length}</p>
-                      </div>
-                    </div>
-                    <div className="bg-muted/50 p-4 rounded-lg flex items-center">
-                      <Users className="h-8 w-8 mr-4 text-primary" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Registrations</p>
-                        <p className="text-2xl font-bold">
-                          {events.reduce((acc, event) => acc + getTotalRegistrations(event), 0)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-muted/50 p-4 rounded-lg flex items-center">
-                      <Calendar className="h-8 w-8 mr-4 text-primary" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Upcoming Events</p>
-                        <p className="text-2xl font-bold">
-                          {events.filter(event => new Date(event.date) > new Date()).length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-between items-center mb-4">
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search events..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex space-x-2">
-                  <CSVLink 
-                    data={getRegistrationData()} 
-                    filename="event-registrations.csv"
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Export CSV
-                  </CSVLink>
-                  <Button variant="outline" onClick={exportRegistrationsToPDF}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Export PDF
-                  </Button>
-                </div>
+        
+        <Card className="mb-8">
+          <CardHeader className="pb-2">
+            <CardTitle>Filters</CardTitle>
+            <CardDescription>Filter registrations by status or search for specific records</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search by name, email, or event..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>All Event Registrations</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RegistrationsTable
-                    registrations={getAllRegistrations()}
-                    onEdit={handleEditRegistration}
-                    onDelete={handleDeleteRegistration}
-                    loading={loading}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Individual Event Registrations */}
-              {filteredEvents.map(event => (
-                <Card key={event.id} id={`tab-${event.id}`} className="mt-6">
-                  <CardHeader>
-                    <CardTitle>{event.title} - Registrations</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <RegistrationsTable
-                      registrations={event.registrations.map(reg => ({...reg, events: event}))}
-                      onEdit={handleEditRegistration}
-                      onDelete={handleDeleteRegistration}
-                      loading={loading}
-                    />
-                  </CardContent>
-                </Card>
-              ))}
+              
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Registration Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Payment Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Payment Statuses</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </TabsContent>
-
-          <TabsContent value="courses">
-            <div className="grid gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Course Enrollment Analytics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-muted/50 p-4 rounded-lg flex items-center">
-                      <GraduationCap className="h-8 w-8 mr-4 text-primary" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Courses</p>
-                        <p className="text-2xl font-bold">{courses.length}</p>
-                      </div>
-                    </div>
-                    <div className="bg-muted/50 p-4 rounded-lg flex items-center">
-                      <Users className="h-8 w-8 mr-4 text-primary" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Enrollments</p>
-                        <p className="text-2xl font-bold">{enrollmentsList.length}</p>
-                      </div>
-                    </div>
-                    <div className="bg-muted/50 p-4 rounded-lg flex items-center">
-                      <GraduationCap className="h-8 w-8 mr-4 text-primary" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Completed Courses</p>
-                        <p className="text-2xl font-bold">
-                          {enrollmentsList.filter(e => e.is_completed).length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-between items-center mb-4">
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search courses or students..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex space-x-2">
-                  <CSVLink 
-                    data={getEnrollmentData()} 
-                    filename="course-enrollments.csv"
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Export CSV
-                  </CSVLink>
-                  <Button variant="outline" onClick={exportEnrollmentsToPDF}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Export PDF
-                  </Button>
-                </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>All Registrations</CardTitle>
+            <CardDescription>
+              Showing {filteredRegistrations.length} registrations 
+              {searchTerm || statusFilter !== 'all' || paymentStatusFilter !== 'all' ? ' (filtered)' : ''}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>All Enrollments</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <EnrollmentsTable 
-                    enrollments={filteredEnrollments}
-                    loading={loading}
-                    onDelete={handleDeleteEnrollment}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Individual Course Enrollments */}
-              {filteredCourses.map(course => (
-                <Card key={course.id} className="mt-6">
-                  <CardHeader>
-                    <CardTitle>{course.title} - Enrollments ({course.enrollmentCount})</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <EnrollmentsTable 
-                      enrollments={course.enrollments}
-                      loading={loading}
-                      onDelete={handleDeleteEnrollment}
-                    />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {selectedRegistration && (
-          <RegistrationEditDialog
-            isOpen={isEditDialogOpen}
-            onClose={() => setIsEditDialogOpen(false)}
-            registration={selectedRegistration}
-            onSave={handleSaveRegistration}
-          />
-        )}
+            ) : filteredRegistrations.length === 0 ? (
+              <div className="text-center py-12">
+                <h3 className="text-lg font-medium mb-2">No registrations found</h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || statusFilter !== 'all' || paymentStatusFilter !== 'all' ? 
+                    'Try adjusting your search or filter criteria' : 
+                    'No registrations have been made yet'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Attendee</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Phone Number</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRegistrations.map((registration) => (
+                      <TableRow key={registration.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{registration.user_name || 'N/A'}</div>
+                            <div className="text-sm text-muted-foreground">{registration.user_email || 'N/A'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{registration.event_title || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            registration.status === 'confirmed' ? 'default' :
+                            registration.status === 'pending' ? 'outline' :
+                            'destructive'
+                          }>
+                            {registration.status || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            registration.payment_status === 'paid' ? 'success' :
+                            registration.payment_status === 'free' ? 'default' :
+                            registration.payment_status === 'pending' ? 'warning' :
+                            'destructive'
+                          }>
+                            {registration.payment_status || 'N/A'}
+                          </Badge>
+                          {registration.payment_amount && (
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {registration.payment_currency} {registration.payment_amount}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {registration.created_at ? 
+                            new Date(registration.created_at).toLocaleDateString() : 
+                            'N/A'
+                          }
+                        </TableCell>
+                        <TableCell>{registration.phone_number || 'N/A'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog open={deleteRegistrationId === registration.id}>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => setDeleteRegistrationId(registration.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Registration</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this registration? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setDeleteRegistrationId(null)}>
+                                    Cancel
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteRegistration(registration.id)}
+                                    className="bg-destructive hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AdminLayout>
   );
