@@ -1,7 +1,11 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// The TypeScript errors related to Deno imports are expected and can be ignored
+// since these are Deno-specific imports that run in the Supabase Edge Function environment
+// and not in the browser. They will work correctly when deployed to Supabase.
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';

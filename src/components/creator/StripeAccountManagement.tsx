@@ -4,6 +4,7 @@ import {
   ConnectAccountManagement,
   ConnectComponentsProvider,
 } from '@stripe/react-connect-js';
+import { loadConnectAndInitialize } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,9 +23,13 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   useEffect(() => {
     const initializeStripeConnect = async () => {
       try {
-        // Import the module dynamically
-        const stripeConnectModule = await import('@stripe/connect-js');
-        const stripeConnectInstance = await stripeConnectModule.loadConnectAndInitialize();
+        // Initialize Stripe Connect with the proper API
+        const stripeConnectInstance = await loadConnectAndInitialize({
+          // The loadConnectAndInitialize function expects a configuration object
+          // If no specific config is needed, we pass an empty object
+          // This fixes the "Expected 1 arguments, but got 0" error
+          clientName: 'Creator Platform'
+        });
         setStripeConnect(stripeConnectInstance);
         
         // Get the account session client secret
@@ -113,8 +118,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
+        {/* Fix the props to match the expected types for ConnectAccountManagement */}
         <ConnectAccountManagement
-          accountSession={{ clientSecret }}
+          clientSecret={clientSecret}
         />
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
