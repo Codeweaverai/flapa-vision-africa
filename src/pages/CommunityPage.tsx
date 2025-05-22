@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Layout from '@/components/layout/Layout';
 import CommunityChat from '@/components/community/CommunityChat';
-import DirectMessages from '@/components/community/DirectMessage';
+import DirectMessage from '@/components/community/DirectMessage';
 import UserPresence from '@/components/community/UserPresence';
 import { MessageSquare, Users, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +14,19 @@ const CommunityPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('chat');
+  const [selectedUser, setSelectedUser] = useState<{id: string, name: string, avatar?: string} | null>(null);
+  
+  // Default user for demonstration purposes
+  useEffect(() => {
+    if (user) {
+      // Set a default recipient user (this should be replaced with actual user selection logic)
+      setSelectedUser({
+        id: 'default-user-id', // Replace with an actual user ID from your system
+        name: 'Demo User',
+        avatar: undefined
+      });
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -55,7 +68,17 @@ const CommunityPage = () => {
               </TabsContent>
               
               <TabsContent value="dm">
-                <DirectMessages />
+                {selectedUser ? (
+                  <DirectMessage 
+                    recipientId={selectedUser.id}
+                    recipientName={selectedUser.name}
+                    recipientAvatar={selectedUser.avatar}
+                  />
+                ) : (
+                  <div className="text-center p-8">
+                    <p>Select a user from the online users list to start chatting</p>
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="users" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

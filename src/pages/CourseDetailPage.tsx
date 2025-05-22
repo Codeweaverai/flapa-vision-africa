@@ -117,8 +117,8 @@ const CourseDetailPage = () => {
         <div className="container py-12">
           <h1 className="text-2xl font-bold">Course not found</h1>
           <p className="mt-4">The course you're looking for doesn't exist or has been removed.</p>
-          <Button as={Link} to="/courses" className="mt-6">
-            Browse all courses
+          <Button asChild>
+            <Link to="/courses">Browse all courses</Link>
           </Button>
         </div>
       </Layout>

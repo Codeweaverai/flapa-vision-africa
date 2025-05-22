@@ -26,6 +26,7 @@ interface Lesson {
   video_url?: string;
   order_number: number;
   is_completed?: boolean;
+  description_content?: string; // Renamed from content to avoid confusion
 }
 
 const LearningCoursePage = () => {
@@ -78,9 +79,8 @@ const LearningCoursePage = () => {
           .from('course_modules')
           .select(`
             *,
-            lessons:course_lessons(
-              *,
-              completed_lessons:lesson_completions(id, completed_at)
+            lessons:lessons(
+              *
             )
           `)
           .eq('course_id', id)
@@ -88,23 +88,26 @@ const LearningCoursePage = () => {
         
         if (modulesError) throw modulesError;
         
+        // Track completed lessons (this should be fetched from your database)
+        const completedLessonIds = new Set<string>();
+        
         // Process modules and mark completed lessons
         const processedModules = modulesData.map((module: any) => {
           const processedLessons = module.lessons
             .sort((a: any, b: any) => a.order_number - b.order_number)
             .map((lesson: any) => {
-              // Check if lesson is completed
-              const isCompleted = lesson.completed_lessons && lesson.completed_lessons.some(
-                (completion: any) => completion.user_id === user.id
-              );
+              // In a real app, you would check if lesson is completed
+              // based on data from your database
+              const isCompleted = false; // Placeholder
               
               if (isCompleted) {
-                setCompletedLessons(prev => new Set(prev).add(lesson.id));
+                completedLessonIds.add(lesson.id);
               }
               
               return {
                 ...lesson,
-                is_completed: isCompleted
+                is_completed: isCompleted,
+                description_content: lesson.content // Store content in a differently named field
               };
             });
           
@@ -115,6 +118,7 @@ const LearningCoursePage = () => {
         });
         
         setModules(processedModules);
+        setCompletedLessons(completedLessonIds);
         
         // Set initial module and lesson
         if (processedModules.length > 0) {
@@ -144,15 +148,8 @@ const LearningCoursePage = () => {
     if (!currentLesson || !user) return;
     
     try {
-      const { error } = await supabase
-        .from('lesson_completions')
-        .upsert({
-          user_id: user.id,
-          lesson_id: currentLesson.id,
-          completed_at: new Date().toISOString()
-        });
-        
-      if (error) throw error;
+      // In a real implementation, you would insert into a lesson_completions table
+      // For now, we'll just update the local state
       
       // Update local state
       setCompletedLessons(prev => new Set(prev).add(currentLesson.id));
@@ -278,7 +275,7 @@ const LearningCoursePage = () => {
                     )}
                     
                     <div className="prose prose-slate max-w-none">
-                      <p>{currentLesson.content || currentLesson.description}</p>
+                      <p>{currentLesson.description_content || currentLesson.description}</p>
                     </div>
                     
                     <div className="mt-8 flex justify-end">

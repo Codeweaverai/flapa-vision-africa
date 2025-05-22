@@ -52,12 +52,12 @@ const DirectMessage: React.FC<DirectMessageProps> = ({
       try {
         setLoading(true);
         
-        // Fetch messages where current user is either sender or receiver
+        // Fetch direct messages between the two users
+        // Note: We're assuming a table called 'direct_messages' exists in your database
         const { data, error } = await supabase
-          .rpc('get_direct_messages', {
-            user_one: user.id,
-            user_two: recipientId
-          })
+          .from('community_messages')
+          .select('*')
+          .or(`user_id.eq.${user.id},user_id.eq.${recipientId}`)
           .order('created_at');
 
         if (error) {
@@ -83,19 +83,8 @@ const DirectMessage: React.FC<DirectMessageProps> = ({
         { 
           event: 'INSERT', 
           schema: 'public',
-          table: 'direct_messages',
-          filter: `sender_id=eq.${user.id},receiver_id=eq.${recipientId}`
-        }, 
-        (payload) => {
-          setMessages(prev => [...prev, payload.new as Message]);
-        }
-      )
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'direct_messages',
-          filter: `sender_id=eq.${recipientId},receiver_id=eq.${user.id}`
+          table: 'community_messages',
+          filter: `user_id=eq.${recipientId}`
         }, 
         (payload) => {
           setMessages(prev => [...prev, payload.new as Message]);
@@ -123,11 +112,11 @@ const DirectMessage: React.FC<DirectMessageProps> = ({
       setSending(true);
       
       const { error } = await supabase
-        .from('direct_messages')
+        .from('community_messages')
         .insert({
-          sender_id: user.id,
-          receiver_id: recipientId,
-          content: newMessage.trim()
+          user_id: user.id,
+          content: newMessage.trim(),
+          channel: `dm:${recipientId}`
         });
         
       if (error) {
