@@ -872,6 +872,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_storage_path: string | null
           avatar_url: string | null
           bank_account_details: Json | null
           bio: string | null
@@ -887,6 +888,7 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          avatar_storage_path?: string | null
           avatar_url?: string | null
           bank_account_details?: Json | null
           bio?: string | null
@@ -902,6 +904,7 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          avatar_storage_path?: string | null
           avatar_url?: string | null
           bank_account_details?: Json | null
           bio?: string | null
