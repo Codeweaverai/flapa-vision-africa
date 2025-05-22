@@ -7,50 +7,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
-interface EventRegistration {
+interface CombinedRegistration {
   id: string;
-  event_id: string;
-  user_id: string;
-  status: string;
-  payment_status: string;
-  payment_method?: string;
-  payment_amount?: number;
-  payment_currency?: string;
-  created_at?: string;
-  event?: {
-    title: string;
-  };
-  profiles?: {
-    full_name?: string;
-    username?: string;
-    email?: string;
-  };
-}
-
-interface CourseEnrollment {
-  id: string;
-  course_id: string;
-  user_id: string;
-  enrollment_date?: string;
-  is_completed?: boolean;
-  payment_status?: string;
-  profiles?: {
-    full_name?: string;
-    username?: string;
-    email?: string;
-  };
-  courses?: {
-    title: string;
-  };
-}
-
-type CombinedRegistration = (EventRegistration | CourseEnrollment) & {
   type: 'event' | 'course';
   title: string;
   date: string;
   user_name: string;
   user_email: string;
-};
+  status?: string;
+  payment_status?: string;
+  user_id: string;
+  event_id?: string;
+  course_id?: string;
+}
 
 interface RegistrationsTableProps {
   registrations: CombinedRegistration[];
@@ -91,7 +60,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string | undefined) => {
     switch (status?.toLowerCase()) {
       case 'confirmed':
         return 'bg-green-500';
@@ -105,28 +74,10 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
         return 'bg-blue-500';
       case 'completed':
         return 'bg-green-500';
+      case 'in progress':
+        return 'bg-blue-500';
       default:
         return 'bg-gray-500';
-    }
-  };
-
-  const getPaymentStatus = (registration: CombinedRegistration) => {
-    if (registration.type === 'event') {
-      const eventReg = registration as EventRegistration;
-      return eventReg.payment_status || 'unknown';
-    } else {
-      const courseReg = registration as CourseEnrollment;
-      return courseReg.payment_status || 'unknown';
-    }
-  };
-
-  const getRegistrationStatus = (registration: CombinedRegistration) => {
-    if (registration.type === 'event') {
-      const eventReg = registration as EventRegistration;
-      return eventReg.status;
-    } else {
-      const courseReg = registration as CourseEnrollment;
-      return courseReg.is_completed ? 'completed' : 'in progress';
     }
   };
 
@@ -161,13 +112,13 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 {registration.date && format(new Date(registration.date), 'MMM d, yyyy')}
               </TableCell>
               <TableCell>
-                <Badge className={getStatusBadgeVariant(getRegistrationStatus(registration))}>
-                  {getRegistrationStatus(registration)}
+                <Badge className={getStatusBadgeVariant(registration.status)}>
+                  {registration.status || 'Unknown'}
                 </Badge>
               </TableCell>
               <TableCell>
-                <Badge className={getStatusBadgeVariant(getPaymentStatus(registration))}>
-                  {getPaymentStatus(registration)}
+                <Badge className={getStatusBadgeVariant(registration.payment_status)}>
+                  {registration.payment_status || 'Unknown'}
                 </Badge>
               </TableCell>
               <TableCell>
@@ -214,14 +165,14 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 </div>
                 <div>
                   <p className="text-sm font-medium">Status</p>
-                  <Badge className={getStatusBadgeVariant(getRegistrationStatus(selectedRegistration))}>
-                    {getRegistrationStatus(selectedRegistration)}
+                  <Badge className={getStatusBadgeVariant(selectedRegistration.status)}>
+                    {selectedRegistration.status || 'Unknown'}
                   </Badge>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Payment</p>
-                  <Badge className={getStatusBadgeVariant(getPaymentStatus(selectedRegistration))}>
-                    {getPaymentStatus(selectedRegistration)}
+                  <Badge className={getStatusBadgeVariant(selectedRegistration.payment_status)}>
+                    {selectedRegistration.payment_status || 'Unknown'}
                   </Badge>
                 </div>
               </div>
@@ -261,6 +212,14 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                       disabled={isUpdating}
                     >
                       Mark Paid
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleUpdateStatus('completed')}
+                      disabled={isUpdating}
+                    >
+                      Mark Completed
                     </Button>
                     <Button 
                       variant="outline" 

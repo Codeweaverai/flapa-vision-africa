@@ -43,7 +43,7 @@ interface CourseEnrollment {
   };
 }
 
-type CombinedRegistration = {
+interface AdminCombinedRegistration {
   id: string;
   type: 'event' | 'course';
   title: string;
@@ -52,12 +52,14 @@ type CombinedRegistration = {
   user_email: string;
   event_id?: string;
   user_id: string;
-};
+  status?: string;
+  payment_status?: string;
+}
 
 const AdminRegistrations = () => {
   const [eventRegistrations, setEventRegistrations] = useState<EventRegistration[]>([]);
   const [courseEnrollments, setCoursEnrollments] = useState<CourseEnrollment[]>([]);
-  const [combinedRegistrations, setCombinedRegistrations] = useState<CombinedRegistration[]>([]);
+  const [combinedRegistrations, setCombinedRegistrations] = useState<AdminCombinedRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
 
@@ -83,7 +85,7 @@ const AdminRegistrations = () => {
         setCoursEnrollments(courseEnrols || []);
 
         // Combine and format registrations
-        const combined: CombinedRegistration[] = [
+        const combined: AdminCombinedRegistration[] = [
           ...eventRegs.map(reg => ({
             id: reg.id,
             type: 'event' as const,
@@ -92,7 +94,9 @@ const AdminRegistrations = () => {
             title: reg.event?.title || 'Unknown Event',
             date: reg.created_at || new Date().toISOString(),
             user_name: reg.profiles?.full_name || reg.profiles?.username || 'Unknown User',
-            user_email: reg.profiles?.email || 'No email'
+            user_email: reg.profiles?.email || 'No email',
+            status: reg.status,
+            payment_status: reg.payment_status
           })),
           ...courseEnrols.map(enrol => ({
             id: enrol.id,
@@ -102,7 +106,9 @@ const AdminRegistrations = () => {
             title: enrol.courses?.title || 'Unknown Course',
             date: enrol.enrollment_date || new Date().toISOString(),
             user_name: enrol.profiles?.full_name || enrol.profiles?.username || 'Unknown User',
-            user_email: enrol.profiles?.email || 'No email'
+            user_email: enrol.profiles?.email || 'No email',
+            status: enrol.is_completed ? 'completed' : 'in progress',
+            payment_status: enrol.payment_status
           }))
         ];
 
@@ -158,7 +164,15 @@ const AdminRegistrations = () => {
       setCombinedRegistrations(prev => {
         return prev.map(reg => {
           if (reg.id === id && reg.type === type) {
-            return { ...reg };  // We don't update the combined view status directly
+            if (type === 'event') {
+              return { ...reg, status };
+            } else {
+              if (status === 'completed') {
+                return { ...reg, status: 'completed' };
+              } else if (status === 'paid' || status === 'cancelled') {
+                return { ...reg, payment_status: status };
+              }
+            }
           }
           return reg;
         });
