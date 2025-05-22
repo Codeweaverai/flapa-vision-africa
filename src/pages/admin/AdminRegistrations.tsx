@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,8 +58,9 @@ const AdminRegistrations: React.FC = () => {
       const formattedRegistrations = data.map(registration => ({
         ...registration,
         event_title: registration.events?.title,
-        user_name: registration.profiles?.full_name,
-        user_email: registration.profiles?.email
+        // Use optional chaining to safely access properties
+        user_name: registration.profiles?.full_name || 'Unknown',
+        user_email: registration.profiles?.email || 'Unknown'
       }));
 
       setRegistrations(formattedRegistrations);
@@ -275,7 +275,7 @@ const AdminRegistrations: React.FC = () => {
                           <Badge variant={
                             registration.payment_status === 'paid' ? 'success' :
                             registration.payment_status === 'free' ? 'default' :
-                            registration.payment_status === 'pending' ? 'warning' :
+                            registration.payment_status === 'pending' ? 'outline' :
                             'destructive'
                           }>
                             {registration.payment_status || 'N/A'}

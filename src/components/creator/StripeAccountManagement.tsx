@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ConnectAccountManagement,
   ConnectComponentsProvider,
-  AccountSession,
+  ConnectAccountSessionWrapper,
 } from '@stripe/react-connect-js';
 import { loadConnectAndInitialize } from '@stripe/connect-js';
 import { Button } from '@/components/ui/button';
@@ -26,10 +26,7 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
       try {
         // Initialize Stripe Connect with the proper API
         // Pass an empty object as required by the SDK
-        const stripeConnectInstance = await loadConnectAndInitialize({
-          publishableKey: 'pk_test_dummy', // This will be overridden by the client secret
-          fetchClientSecret: async () => ({ clientSecret: '' }) // Placeholder, not actually used
-        });
+        const stripeConnectInstance = await loadConnectAndInitialize({});
         
         setStripeConnect(stripeConnectInstance);
         
@@ -119,9 +116,9 @@ const StripeAccountManagement: React.FC<StripeAccountManagementProps> = ({ strip
   return (
     <div className="stripe-account-management">
       <ConnectComponentsProvider connectInstance={stripeConnect}>
-        <AccountSession clientSecret={clientSecret}>
+        <ConnectAccountSessionWrapper clientSecret={clientSecret}>
           <ConnectAccountManagement />
-        </AccountSession>
+        </ConnectAccountSessionWrapper>
         <div className="mt-4 text-center">
           <Button onClick={handleRefresh} variant="outline" size="sm">
             Refresh

@@ -368,9 +368,6 @@ const CoursePlayerPage: React.FC = () => {
                     {currentLesson.content_type === 'quiz' && (
                       <TabsTrigger value="quiz">Quiz</TabsTrigger>
                     )}
-                    {Array.isArray(currentLesson.materials_urls) && currentLesson.materials_urls.length > 0 && (
-                      <TabsTrigger value="materials">Additional Materials</TabsTrigger>
-                    )}
                   </TabsList>
                   
                   <TabsContent value="content" className="min-h-[300px] bg-card p-6 rounded-md border">
@@ -405,36 +402,6 @@ const CoursePlayerPage: React.FC = () => {
                         <CardFooter>
                           <Button disabled>Start Quiz</Button>
                         </CardFooter>
-                      </Card>
-                    </TabsContent>
-                  )}
-                  
-                  {Array.isArray(currentLesson.materials_urls) && currentLesson.materials_urls.length > 0 && (
-                    <TabsContent value="materials">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Additional Materials</CardTitle>
-                          <CardDescription>
-                            Download resources related to this lesson
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-3">
-                            {currentLesson.materials_urls.map((url, idx) => (
-                              <li key={idx}>
-                                <a 
-                                  href={url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="flex items-center p-3 border rounded-md hover:bg-accent transition-colors"
-                                >
-                                  <FileText className="h-5 w-5 mr-2 text-primary" />
-                                  <span>Material {idx + 1}</span>
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
                       </Card>
                     </TabsContent>
                   )}
