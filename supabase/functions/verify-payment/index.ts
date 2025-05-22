@@ -1,173 +1,201 @@
 
-// @ts-ignore - Deno imports will be available when deployed
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore - Deno imports will be available when deployed
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// @ts-ignore - Deno imports will be available when deployed
-import Stripe from "https://esm.sh/stripe@14.21.0";
-import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import Stripe from "https://esm.sh/stripe@12.0.0";
 
-// @ts-ignore - Deno namespace available at runtime
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '');
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-// @ts-ignore - Deno serve method available at runtime
-Deno.serve(async (req) => {
-  // Handle CORS preflight request
-  if (req.method === 'OPTIONS') {
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
-
+  
   try {
-    // Get the authorization header from the request
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16",
+    });
+    
+    const { sessionId } = await req.json();
+    
+    if (!sessionId) {
+      throw new Error("No session ID provided");
     }
-
-    // Create a Supabase client with the auth header
-    const supabaseClient = createClient(
-      // @ts-ignore - Deno env available at runtime
-      Deno.env.get('SUPABASE_URL') || '',
-      // @ts-ignore - Deno env available at runtime
-      Deno.env.get('SUPABASE_ANON_KEY') || '',
-      {
-        global: {
-          headers: {
-            Authorization: authHeader,
-          },
-        },
-      }
-    );
-
-    // Get the user from the client
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
-
-    if (userError || !user) {
-      throw new Error('Unauthorized');
-    }
-
-    // Get the request body
-    const { sessionId, userId, type, itemId } = await req.json();
-
-    if (!sessionId || !userId || !type || !itemId) {
-      throw new Error('Missing required parameters');
-    }
-
-    // Verify that the user ID matches the authenticated user
-    if (userId !== user.id) {
-      throw new Error('User ID mismatch');
-    }
-
-    // Retrieve the Stripe checkout session
+    
+    // Retrieve the session
     const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    // Verify that the session was paid
-    if (session.payment_status !== 'paid') {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Payment has not been completed',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
+    
+    if (!session) {
+      throw new Error("Session not found");
     }
-
-    let title = '';
-
-    // Update the appropriate record based on the type
-    if (type === 'course') {
-      // Get the course details
-      const { data: course, error: courseError } = await supabaseClient
-        .from('courses')
-        .select('title')
-        .eq('id', itemId)
-        .single();
-
-      if (courseError) {
-        throw new Error('Failed to fetch course');
-      }
-
-      title = course.title;
-
-      // Update the course enrollment status
-      const { error: enrollError } = await supabaseClient
-        .from('course_enrollments')
-        .upsert({
-          user_id: userId,
-          course_id: itemId,
-          payment_status: 'paid',
-          payment_id: sessionId,
-          enrollment_date: new Date().toISOString(),
-        });
-
-      if (enrollError) {
-        throw new Error('Failed to update course enrollment');
-      }
-    } else if (type === 'event') {
-      // Get the event details
-      const { data: event, error: eventError } = await supabaseClient
-        .from('events')
-        .select('title')
-        .eq('id', itemId)
-        .single();
-
-      if (eventError) {
-        throw new Error('Failed to fetch event');
-      }
-
-      title = event.title;
-
-      // Update the event registration status
-      const { error: regError } = await supabaseClient
-        .from('registrations')
-        .upsert({
-          user_id: userId,
-          event_id: itemId,
-          status: 'confirmed',
-          payment_status: 'paid',
-          payment_id: sessionId,
-          created_at: new Date().toISOString(),
-        });
-
-      if (regError) {
-        throw new Error('Failed to update registration');
-      }
+    
+    // Create Supabase client with service role key to bypass RLS
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseClient = createClient(supabaseUrl || "", supabaseServiceKey || "");
+    
+    const metadata = session.metadata || {};
+    const paymentStatus = session.payment_status;
+    const userId = metadata.userId;
+    
+    if (!userId) {
+      throw new Error("No user ID found in session metadata");
     }
-
-    // Create a payment transaction record
-    const { error: paymentError } = await supabaseClient
-      .from('payment_transactions')
-      .insert({
-        user_id: userId,
-        reference_id: itemId,
-        reference_type: type,
-        amount: session.amount_total ? session.amount_total / 100 : 0,
-        currency: session.currency?.toUpperCase() || 'USD',
-        status: 'completed',
-        provider: 'stripe',
-        provider_transaction_id: sessionId,
-        created_at: new Date().toISOString(),
-      });
-
-    if (paymentError) {
-      throw new Error('Failed to create payment transaction record');
+    
+    let result;
+    
+    // Handle different item types
+    if (metadata.itemType === "course") {
+      const courseId = metadata.course_id;
+      
+      if (!courseId) {
+        throw new Error("No course ID found in session metadata");
+      }
+      
+      // Update course enrollment or create if it doesn't exist
+      const { data: existingEnrollment, error: enrollmentCheckError } = await supabaseClient
+        .from("course_enrollments")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("course_id", courseId)
+        .maybeSingle();
+      
+      if (enrollmentCheckError) {
+        throw new Error(`Error checking enrollment: ${enrollmentCheckError.message}`);
+      }
+      
+      if (existingEnrollment) {
+        // Update existing enrollment
+        const { data: enrollment, error: updateError } = await supabaseClient
+          .from("course_enrollments")
+          .update({
+            payment_status: paymentStatus === "paid" ? "paid" : "pending",
+            payment_id: session.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingEnrollment.id)
+          .select()
+          .single();
+        
+        if (updateError) {
+          throw new Error(`Error updating enrollment: ${updateError.message}`);
+        }
+        
+        result = { success: true, enrollment };
+      } else {
+        // Create new enrollment
+        const { data: enrollment, error: insertError } = await supabaseClient
+          .from("course_enrollments")
+          .insert({
+            user_id: userId,
+            course_id: courseId,
+            payment_status: paymentStatus === "paid" ? "paid" : "pending",
+            payment_id: session.id,
+            enrollment_date: new Date().toISOString(),
+            is_completed: false,
+          })
+          .select()
+          .single();
+        
+        if (insertError) {
+          throw new Error(`Error creating enrollment: ${insertError.message}`);
+        }
+        
+        result = { success: true, enrollment };
+      }
+    } else if (metadata.itemType === "event") {
+      const eventId = metadata.event_id;
+      
+      if (!eventId) {
+        throw new Error("No event ID found in session metadata");
+      }
+      
+      // Update registration or create if it doesn't exist
+      const { data: existingRegistration, error: registrationCheckError } = await supabaseClient
+        .from("registrations")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("event_id", eventId)
+        .maybeSingle();
+      
+      if (registrationCheckError) {
+        throw new Error(`Error checking registration: ${registrationCheckError.message}`);
+      }
+      
+      if (existingRegistration) {
+        // Update existing registration
+        const { data: registration, error: updateError } = await supabaseClient
+          .from("registrations")
+          .update({
+            payment_status: paymentStatus === "paid" ? "paid" : "pending",
+            status: paymentStatus === "paid" ? "confirmed" : existingRegistration.status,
+            payment_id: session.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingRegistration.id)
+          .select()
+          .single();
+        
+        if (updateError) {
+          throw new Error(`Error updating registration: ${updateError.message}`);
+        }
+        
+        result = { success: true, registration };
+      } else {
+        // Create new registration
+        const { data: registration, error: insertError } = await supabaseClient
+          .from("registrations")
+          .insert({
+            user_id: userId,
+            event_id: eventId,
+            payment_status: paymentStatus === "paid" ? "paid" : "pending",
+            status: paymentStatus === "paid" ? "confirmed" : "pending",
+            payment_id: session.id,
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        
+        if (insertError) {
+          throw new Error(`Error creating registration: ${insertError.message}`);
+        }
+        
+        result = { success: true, registration };
+      }
+    } else {
+      throw new Error("Invalid item type");
     }
-
+    
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Payment verified successfully',
-        title: title,
+        payment_status: paymentStatus,
+        session_id: session.id,
+        result,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
     );
   } catch (error) {
+    console.error("Error verifying payment:", error);
+    
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      JSON.stringify({ error: error.message }),
+      {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
     );
   }
 });
