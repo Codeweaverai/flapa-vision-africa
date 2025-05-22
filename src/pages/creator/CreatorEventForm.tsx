@@ -1,19 +1,19 @@
 
 import React from "react";
-import EventForm from "@/pages/admin/EventForm";
 import { useAuth } from "@/contexts/AuthContext";
-import Layout from "@/components/layout/Layout";
+import CreatorLayout from "@/components/creator/CreatorLayout";
+import EventForm from "@/components/creator/EventForm";
 
 const CreatorEventForm = () => {
   const { user } = useAuth();
   
   return (
-    <Layout>
-      <div className="section-container">
+    <CreatorLayout>
+      <div className="container py-8 max-w-4xl">
         <h1 className="text-2xl font-bold mb-6">Manage Event</h1>
         <EventForm isCreator={true} creatorId={user?.id} />
       </div>
-    </Layout>
+    </CreatorLayout>
   );
 };
 

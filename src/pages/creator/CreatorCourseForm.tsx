@@ -1,19 +1,19 @@
 
 import React from "react";
-import CourseForm from "@/pages/admin/CourseForm";
+import CourseForm from "@/components/creator/CourseForm";
 import { useAuth } from "@/contexts/AuthContext";
-import Layout from "@/components/layout/Layout";
+import CreatorLayout from "@/components/creator/CreatorLayout";
 
 const CreatorCourseForm = () => {
   const { user } = useAuth();
   
   return (
-    <Layout>
-      <div className="section-container">
+    <CreatorLayout>
+      <div className="container py-8 max-w-4xl">
         <h1 className="text-2xl font-bold mb-6">Manage Course</h1>
         <CourseForm isCreator={true} creatorId={user?.id} />
       </div>
-    </Layout>
+    </CreatorLayout>
   );
 };
 

@@ -1,94 +1,105 @@
+
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import Layout from '@/components/layout/Layout';
-import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import Layout from '@/components/layout/Layout';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { Course, CourseModule, checkEnrollmentStatus, enrollInCourse, fetchCourseWithModulesAndLessons } from '@/services/courseService';
-import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
+import { Clock, BookOpen, Users, Award } from 'lucide-react';
+import CourseModuleList from '@/components/creator/CourseModuleList';
+import CourseEnrollButton from '@/components/payment/CourseEnrollButton';
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  summary: string;
+  thumbnail_url: string;
+  category: string;
+  difficulty_level: string;
+  duration_minutes: number;
+  is_free: boolean;
+  price: number;
+  creator_id?: string;
+  creator?: {
+    full_name?: string;
+    username?: string;
+    avatar_url?: string;
+  };
+}
 
 const CourseDetailPage = () => {
-  const { courseId } = useParams<{ courseId: string }>();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
-  const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [checkingEnrollment, setCheckingEnrollment] = useState(true);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [enrollmentCount, setEnrollmentCount] = useState(0);
 
   useEffect(() => {
-    const loadCourse = async () => {
-      if (!courseId) return;
-      
-      setLoading(true);
-      const courseData = await fetchCourseWithModulesAndLessons(courseId);
-      setCourse(courseData);
-      
-      if (user) {
-        checkEnrollmentStatus(user.id, courseId).then(status => {
-          setIsEnrolled(status);
-          setCheckingEnrollment(false);
-        });
+    const fetchCourse = async () => {
+      try {
+        // Fetch course details
+        const { data, error } = await supabase
+          .from('courses')
+          .select(`
+            *,
+            creator:creator_id (
+              full_name,
+              username,
+              avatar_url
+            )
+          `)
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+        setCourse(data);
+
+        // Fetch enrollment count
+        const { count: enrollCount, error: countError } = await supabase
+          .from('course_enrollments')
+          .select('*', { count: 'exact', head: true })
+          .eq('course_id', id);
+
+        if (countError) throw countError;
+        setEnrollmentCount(enrollCount || 0);
+
+        // Check if the current user is enrolled
+        if (user) {
+          const { data: enrollmentData, error: enrollmentError } = await supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', id)
+            .eq('user_id', user.id)
+            .single();
+
+          if (!enrollmentError) {
+            setIsEnrolled(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading course:', error);
+        toast.error('Failed to load course details');
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
-    
-    loadCourse();
-  }, [courseId, user]);
 
-  const checkEnrollment = async () => {
-    if (user && course && courseId) {
-      // Pass user.id instead of user object
-      const isEnrolled = await checkEnrollmentStatus(courseId, user.id);
-      setIsEnrolled(isEnrolled);
+    if (id) {
+      fetchCourse();
     }
-  };
-
-  const handleEnroll = async () => {
-    if (!user) {
-      toast.error('Please log in to enroll in courses');
-      navigate('/auth', { state: { from: `/learning/course/${courseId}` } });
-      return;
-    }
-    
-    if (!course) return;
-    
-    setEnrolling(true);
-    
-    try {
-      // Pass user.id instead of user object
-      const success = await enrollInCourse(course.id, user.id);
-      
-      if (success) {
-        setIsEnrolled(true);
-        toast.success('Successfully enrolled in the course!');
-      }
-    } catch (error) {
-      console.error('Enrollment error:', error);
-      toast.error('Failed to enroll in the course');
-    } finally {
-      setEnrolling(false);
-    }
-  };
-
-  const startCourse = () => {
-    navigate(`/learning/player/${courseId}`);
-  };
+  }, [id, user]);
 
   if (loading) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="flex justify-center items-center min-h-screen">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          </div>
+        <div className="container py-8 flex justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </Layout>
     );
@@ -97,14 +108,12 @@ const CourseDetailPage = () => {
   if (!course) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
-            <p className="mb-6">The course you are looking for might have been removed or doesn't exist.</p>
-            <Button asChild>
-              <Link to="/learning">Browse Courses</Link>
-            </Button>
-          </div>
+        <div className="container py-12 text-center">
+          <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
+          <p className="mb-8">The course you are looking for does not exist or has been removed.</p>
+          <Button asChild>
+            <Link to="/courses">Browse Courses</Link>
+          </Button>
         </div>
       </Layout>
     );
@@ -112,204 +121,120 @@ const CourseDetailPage = () => {
 
   return (
     <Layout>
-      <div className="bg-light-purple">
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-2">
-              <div className="bg-card rounded-lg shadow-lg overflow-hidden">
+      <div className="container py-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="md:col-span-2 space-y-6">
+            <h1 className="text-3xl font-bold">{course.title}</h1>
+            
+            <div className="flex flex-wrap gap-2 items-center">
+              <Badge variant="outline">{course.category}</Badge>
+              <Badge variant="outline">{course.difficulty_level}</Badge>
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Clock className="mr-1 h-4 w-4" />
+                {Math.ceil(course.duration_minutes / 60)} hours
+              </div>
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Users className="mr-1 h-4 w-4" />
+                {enrollmentCount} student{enrollmentCount !== 1 ? 's' : ''}
+              </div>
+            </div>
+            
+            {course.summary && (
+              <p className="text-lg">{course.summary}</p>
+            )}
+            
+            <Tabs defaultValue="about" className="w-full">
+              <TabsList>
+                <TabsTrigger value="about">About</TabsTrigger>
+                <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="about" className="space-y-4 mt-4">
+                <div className="prose max-w-none dark:prose-invert">
+                  <h2 className="text-2xl font-semibold mb-4">About This Course</h2>
+                  <p className="whitespace-pre-line">{course.description}</p>
+                </div>
+                
+                {course.creator && (
+                  <div className="mt-8">
+                    <h2 className="text-2xl font-semibold mb-4">Instructor</h2>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-muted overflow-hidden">
+                        {course.creator.avatar_url ? (
+                          <img 
+                            src={course.creator.avatar_url} 
+                            alt={course.creator.full_name || course.creator.username || 'Instructor'} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-xl font-bold">
+                            {(course.creator.full_name || course.creator.username || 'I')[0].toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-lg">
+                          {course.creator.full_name || course.creator.username || 'Instructor'}
+                        </h3>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="curriculum" className="mt-4">
+                <h2 className="text-2xl font-semibold mb-4">Course Curriculum</h2>
+                {course && <CourseModuleList courseId={course.id} />}
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          <div className="md:col-span-1">
+            <Card className="sticky top-20 overflow-hidden">
+              <div className="aspect-video w-full bg-muted overflow-hidden">
                 {course.thumbnail_url ? (
                   <img 
                     src={course.thumbnail_url} 
                     alt={course.title} 
-                    className="w-full h-64 object-cover"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-64 bg-muted flex items-center justify-center">
-                    <BookOpen className="h-16 w-16 text-muted-foreground/40" />
+                  <div className="w-full h-full flex items-center justify-center bg-muted">
+                    <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
                   </div>
                 )}
-                
-                <div className="p-6">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge>{course.category}</Badge>
-                    <Badge variant="outline">{course.difficulty_level}</Badge>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <div className="flex items-center justify-center">
+                  <div className="text-3xl font-bold">
                     {course.is_free ? (
-                      <Badge variant="secondary">Free</Badge>
+                      'Free'
                     ) : (
-                      <Badge variant="secondary">${course.price}</Badge>
+                      `$${course.price}`
                     )}
                   </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <CourseEnrollButton 
+                    courseId={course.id}
+                    title={course.title}
+                    isFree={course.is_free}
+                    price={course.price}
+                    isEnrolled={isEnrolled}
+                    className="w-full"
+                  />
                   
-                  <h1 className="text-3xl font-bold mb-4">{course.title}</h1>
-                  
-                  <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mt-6">
-                    <TabsList className="grid w-full grid-cols-3 mb-8">
-                      <TabsTrigger value="overview">Overview</TabsTrigger>
-                      <TabsTrigger value="content">Course Content</TabsTrigger>
-                      <TabsTrigger value="discussion">Discussion</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="overview" className="space-y-6">
-                      <p className="text-lg">{course.summary}</p>
-                      <div className="mt-4">{course.description}</div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <Clock className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Duration</div>
-                          <div>{Math.round(course.duration_minutes / 60)} hours</div>
-                        </div>
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <BookOpen className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Modules</div>
-                          <div>{course.modules?.length || 0}</div>
-                        </div>
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <Award className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Certificate</div>
-                          <div>{course.certificate_enabled ? 'Yes' : 'No'}</div>
-                        </div>
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Community</div>
-                          <div>Active</div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="content">
-                      <div className="space-y-6">
-                        {course.modules && course.modules.length > 0 ? (
-                          course.modules.map((module: CourseModule, index) => (
-                            <div key={module.id} className="border rounded-lg overflow-hidden">
-                              <div className="bg-muted p-4 font-medium flex justify-between">
-                                <div>Module {index + 1}: {module.title}</div>
-                                <div className="text-muted-foreground">
-                                  {module.lessons?.length || 0} lessons
-                                </div>
-                              </div>
-                              <div className="divide-y">
-                                {module.lessons?.map((lesson, lessonIndex) => (
-                                  <div key={lesson.id} className="p-4 flex items-center justify-between">
-                                    <div>
-                                      <div className="font-medium">
-                                        {lessonIndex + 1}. {lesson.title}
-                                      </div>
-                                      {lesson.description && (
-                                        <div className="text-sm text-muted-foreground">
-                                          {lesson.description}
-                                        </div>
-                                      )}
-                                    </div>
-                                    {lesson.video_url ? (
-                                      <Badge variant="outline">
-                                        <Play className="h-3 w-3 mr-1" />
-                                        Video
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline">Text</Badge>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center p-12">
-                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
-                            <h3 className="text-lg font-medium mb-2">No content available yet</h3>
-                            <p className="text-muted-foreground">
-                              This course is still being developed. Check back soon!
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="discussion">
-                      {user ? (
-                        <CourseDiscussionSection course={course} userId={user.id} />
-                      ) : (
-                        <div className="text-center p-12">
-                          <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary/40" />
-                          <h3 className="text-lg font-medium mb-4">Sign in to join the discussion</h3>
-                          <Button asChild>
-                            <Link to="/auth" state={{ from: `/learning/course/${courseId}` }}>
-                              Sign In
-                            </Link>
-                          </Button>
-                        </div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
+                  <div className="text-sm text-muted-foreground">
+                    <p className="flex items-center justify-center">
+                      <Award className="h-4 w-4 mr-2" />
+                      Certificate of completion
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="md:col-span-1">
-              <Card className="sticky top-24">
-                <CardContent className="p-6">
-                  {course.is_free ? (
-                    <div className="text-2xl font-bold mb-2">Free</div>
-                  ) : (
-                    <div className="text-2xl font-bold mb-2">${course.price}</div>
-                  )}
-                  
-                  {isEnrolled ? (
-                    <>
-                      <Button className="w-full mb-4" onClick={startCourse}>
-                        <Play className="h-4 w-4 mr-2" />
-                        Continue Learning
-                      </Button>
-                      <div className="flex items-center text-sm text-primary mb-4">
-                        <Check className="h-4 w-4 mr-1" />
-                        <span>You are enrolled in this course</span>
-                      </div>
-                    </>
-                  ) : (
-                    <Button
-                      className="w-full mb-4"
-                      onClick={handleEnroll}
-                      disabled={enrolling}
-                    >
-                      {enrolling ? 'Enrolling...' : 'Enroll Now'}
-                    </Button>
-                  )}
-                  
-                  <Button variant="outline" className="w-full mb-6" asChild>
-                    <Link to={`/community/courses?course=${courseId}`}>
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Join Discussion
-                    </Link>
-                  </Button>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>{Math.round(course.duration_minutes / 60)} hours of content</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>{course.modules?.length || 0} modules</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>Full lifetime access</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>Access on mobile and desktop</span>
-                    </div>
-                    {course.certificate_enabled && (
-                      <div className="flex items-center">
-                        <Check className="h-5 w-5 text-primary mr-3" />
-                        <span>Certificate of completion</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            </Card>
           </div>
         </div>
       </div>
