@@ -32,6 +32,17 @@ interface EventRegistration {
   event: Event; 
 }
 
+// Define interfaces for the data returned from Supabase
+interface EventData {
+  id?: string;
+  title?: string;
+  description?: string;
+  start_time?: string;
+  end_time?: string;
+  location?: string;
+  image_url?: string;
+}
+
 const UserEvents: React.FC = () => {
   const { user } = useAuth();
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
@@ -78,7 +89,7 @@ const UserEvents: React.FC = () => {
       // Safely transform the data to match our expected types
       const typedRegistrations: EventRegistration[] = (data || []).map(reg => {
         // Ensure events data exists and provide defaults if not
-        const eventData = reg.events || {};
+        const eventData: EventData = reg.events || {};
         
         const event: Event = {
           id: eventData.id || reg.event_id,

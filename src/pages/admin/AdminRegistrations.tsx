@@ -47,6 +47,12 @@ interface EventData {
   start_time?: string;
 }
 
+interface JoinedData {
+  profiles?: ProfileData | null;
+  events?: EventData | null;
+  [key: string]: any;
+}
+
 const AdminRegistrations: React.FC = () => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [filteredRegistrations, setFilteredRegistrations] = useState<Registration[]>([]);
@@ -82,7 +88,7 @@ const AdminRegistrations: React.FC = () => {
       if (error) throw error;
 
       // Transform data to match our Registration interface
-      const formattedRegistrations: Registration[] = (data || []).map(item => {
+      const formattedRegistrations: Registration[] = (data || []).map((item: JoinedData) => {
         // Handle cases where related data might not be available
         const profilesData: ProfileData = item.profiles || {};
         const eventsData: EventData = item.events || {};
