@@ -22,7 +22,8 @@ const AccountPage = () => {
     full_name: '',
     avatar_url: '',
     bio: '',
-    avatar_storage_path: ''
+    // Using nullable avatar_storage_path
+    avatar_storage_path: null as string | null
   });
 
   useEffect(() => {
@@ -49,7 +50,7 @@ const AccountPage = () => {
             full_name: data.full_name || '',
             avatar_url: data.avatar_url || '',
             bio: data.bio || '',
-            avatar_storage_path: data.avatar_storage_path || ''
+            avatar_storage_path: data.avatar_storage_path || null
           });
         }
       } catch (error) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -227,61 +226,43 @@ const AdminAnalytics = () => {
   
   const prepareUserSignupsData = async (startDate: Date, endDate: Date) => {
     try {
-      // Fetch user signups by date
-      const result = await supabase.rpc('get_user_signups_by_date', {
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString()
-      });
+      // Instead of calling an RPC function which doesn't exist, fetch and process the data directly
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('created_at')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
       
-      if (result.error) throw result.error;
+      // Process the data manually
+      const dailyData: {[key: string]: any} = {};
+      const currentDate = new Date(startDate);
       
-      // If RPC function doesn't exist, fetch directly
-      if (!result.data) {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('created_at')
-          .gte('created_at', startDate.toISOString())
-          .lte('created_at', endDate.toISOString());
-        
-        // Process the data manually
-        const dailyData: {[key: string]: any} = {};
-        const currentDate = new Date(startDate);
-        
-        // Initialize each date in the range
-        while (currentDate <= endDate) {
-          const dateKey = format(currentDate, 'yyyy-MM-dd');
-          dailyData[dateKey] = {
-            date: dateKey,
-            count: 0
-          };
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-        
-        // Count signups for each date
-        if (profilesData) {
-          profilesData.forEach(profile => {
-            const dateKey = format(new Date(profile.created_at), 'yyyy-MM-dd');
-            if (dailyData[dateKey]) {
-              dailyData[dateKey].count += 1;
-            }
-          });
-        }
-        
-        // Convert to array and sort by date
-        const signupData = Object.values(dailyData).sort((a, b) => 
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-        
-        setUserSignups(signupData);
-      } else {
-        // Format the result data
-        const formattedData = result.data.map((item: any) => ({
-          date: item.date,
-          count: parseInt(item.count)
-        }));
-        
-        setUserSignups(formattedData);
+      // Initialize each date in the range
+      while (currentDate <= endDate) {
+        const dateKey = format(currentDate, 'yyyy-MM-dd');
+        dailyData[dateKey] = {
+          date: dateKey,
+          count: 0
+        };
+        currentDate.setDate(currentDate.getDate() + 1);
       }
+      
+      // Count signups for each date
+      if (profilesData) {
+        profilesData.forEach(profile => {
+          const dateKey = format(new Date(profile.created_at), 'yyyy-MM-dd');
+          if (dailyData[dateKey]) {
+            dailyData[dateKey].count += 1;
+          }
+        });
+      }
+      
+      // Convert to array and sort by date
+      const signupData = Object.values(dailyData).sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      
+      setUserSignups(signupData);
     } catch (error) {
       console.error('Error fetching user signup data:', error);
       // Provide empty data in case of error
