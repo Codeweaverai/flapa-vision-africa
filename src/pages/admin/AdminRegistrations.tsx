@@ -23,12 +23,12 @@ interface Registration {
   created_at: string;
   status: string;
   payment_status: string;
-  amount?: number;
-  currency?: string;
+  payment_amount?: number;
+  payment_currency?: string;
   payment_method?: string;
   payment_id?: string;
-  user_email?: string;
   user_fullname?: string;
+  user_email?: string;
   event_title?: string;
   event_date?: string;
 }
@@ -66,7 +66,7 @@ const AdminRegistrations: React.FC = () => {
         .select(`
           *,
           profiles:user_id (full_name, email),
-          events:event_id (title, event_date)
+          events:event_id (title, start_time)
         `)
         .order('created_at', { ascending: false });
       
@@ -85,15 +85,15 @@ const AdminRegistrations: React.FC = () => {
           created_at: item.created_at,
           status: item.status || 'pending',
           payment_status: item.payment_status || 'pending',
-          amount: item.amount,
-          currency: item.currency,
+          payment_amount: item.payment_amount,
+          payment_currency: item.payment_currency,
           payment_method: item.payment_method,
           payment_id: item.payment_id,
-          // Use unknown/undefined if the joined data is not available
+          // Use data from joined tables or default values
           user_fullname: profiles.full_name || 'Unknown',
           user_email: profiles.email || 'Unknown',
           event_title: events.title || 'Unknown Event',
-          event_date: events.event_date
+          event_date: events.start_time
         };
       });
       
@@ -207,7 +207,7 @@ const AdminRegistrations: React.FC = () => {
       'Registration Date': format(new Date(reg.created_at), 'MMM d, yyyy'),
       'Status': reg.status,
       'Payment Status': reg.payment_status,
-      'Amount': reg.amount ? `${reg.currency} ${reg.amount}` : 'N/A',
+      'Amount': reg.payment_amount && reg.payment_currency ? `${reg.payment_currency} ${reg.payment_amount}` : 'N/A',
       'Payment Method': reg.payment_method || 'N/A',
     }));
     

@@ -15,8 +15,10 @@ interface Event {
   id: string;
   title: string;
   description: string;
-  event_date: string; // Using event_date instead of start_date
-  end_date?: string;
+  event_date?: string; 
+  event_type?: string;
+  start_time?: string;
+  end_time?: string;
   location: string;
   image_url?: string;
 }
@@ -27,7 +29,7 @@ interface EventRegistration {
   created_at: string;
   status: string;
   payment_status: string;
-  events: Event;
+  event: Event; // Changed to singular since we're joining one event per registration
 }
 
 const UserEvents: React.FC = () => {
@@ -62,8 +64,8 @@ const UserEvents: React.FC = () => {
             id,
             title,
             description,
-            event_date,
-            end_date,
+            start_time,
+            end_time,
             location,
             image_url
           )
@@ -82,8 +84,8 @@ const UserEvents: React.FC = () => {
           id: eventData.id || reg.event_id,
           title: eventData.title || 'Untitled Event',
           description: eventData.description || 'No description available',
-          event_date: eventData.event_date || new Date().toISOString(),
-          end_date: eventData.end_date,
+          start_time: eventData.start_time || new Date().toISOString(),
+          end_time: eventData.end_time,
           location: eventData.location || 'Online',
           image_url: eventData.image_url
         };
@@ -94,7 +96,7 @@ const UserEvents: React.FC = () => {
           created_at: reg.created_at,
           status: reg.status || 'pending',
           payment_status: reg.payment_status || 'pending',
-          events: event
+          event: event
         };
       });
       
@@ -121,11 +123,11 @@ const UserEvents: React.FC = () => {
             {registrations.map((registration) => (
               <Card key={registration.id} className="overflow-hidden">
                 <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
-                  {registration.events.image_url && (
+                  {registration.event.image_url && (
                     <div className="relative h-40 md:h-full">
                       <img 
-                        src={registration.events.image_url} 
-                        alt={registration.events.title}
+                        src={registration.event.image_url} 
+                        alt={registration.event.title}
                         className="absolute inset-0 h-full w-full object-cover"
                       />
                     </div>
@@ -140,31 +142,31 @@ const UserEvents: React.FC = () => {
                           {registration.payment_status}
                         </Badge>
                       </div>
-                      <CardTitle className="text-xl">{registration.events.title}</CardTitle>
+                      <CardTitle className="text-xl">{registration.event.title}</CardTitle>
                       <CardDescription className="line-clamp-2 mt-1">
-                        {registration.events.description}
+                        {registration.event.description}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0 space-y-3">
                       <div className="flex items-center text-sm">
                         <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                         <span>
-                          {format(new Date(registration.events.event_date), 'MMM d, yyyy')}
-                          {registration.events.end_date && (
-                            <> - {format(new Date(registration.events.end_date), 'MMM d, yyyy')}</>
+                          {registration.event.start_time && format(new Date(registration.event.start_time), 'MMM d, yyyy')}
+                          {registration.event.end_time && (
+                            <> - {format(new Date(registration.event.end_time), 'MMM d, yyyy')}</>
                           )}
                         </span>
                       </div>
-                      {registration.events.location && (
+                      {registration.event.location && (
                         <div className="flex items-center text-sm">
                           <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span>{registration.events.location}</span>
+                          <span>{registration.event.location}</span>
                         </div>
                       )}
                     </CardContent>
                     <CardFooter className="p-0 pt-4">
                       <Button asChild variant="outline">
-                        <Link to={`/events/${registration.events.id}`}>
+                        <Link to={`/events/${registration.event.id}`}>
                           View Event <ExternalLink className="ml-1 h-3 w-3" />
                         </Link>
                       </Button>

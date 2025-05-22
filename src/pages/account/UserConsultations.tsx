@@ -13,11 +13,10 @@ import { Badge } from '@/components/ui/badge';
 interface Consultation {
   id: string;
   user_id: string;
-  consultation_date: string;
-  start_time: string;
-  end_time: string;
+  scheduled_time: string;
+  duration: number;
   status: string;
-  meeting_link?: string;
+  online_meeting_link?: string;
   topic: string;
   created_at: string;
 }
@@ -46,7 +45,7 @@ const UserConsultations: React.FC = () => {
         .from('consultation_bookings')
         .select('*')
         .eq('user_id', user.id)
-        .order('consultation_date', { ascending: true });
+        .order('scheduled_time', { ascending: true });
 
       if (error) throw error;
       
@@ -54,11 +53,10 @@ const UserConsultations: React.FC = () => {
       const typedConsultations: Consultation[] = (data || []).map(item => ({
         id: item.id,
         user_id: item.user_id,
-        consultation_date: item.consultation_date,
-        start_time: item.start_time,
-        end_time: item.end_time,
+        scheduled_time: item.scheduled_time,
+        duration: item.duration,
         status: item.status,
-        meeting_link: item.meeting_link,
+        online_meeting_link: item.online_meeting_link,
         topic: item.topic || 'General Consultation',
         created_at: item.created_at
       }));
@@ -92,9 +90,15 @@ const UserConsultations: React.FC = () => {
         ) : consultations.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {consultations.map((consultation) => {
-              const consultationDate = new Date(consultation.consultation_date);
+              const consultationDate = new Date(consultation.scheduled_time);
               const isPast = consultationDate < new Date();
               const isToday = format(consultationDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+              
+              // Calculate end time based on duration
+              const startTime = new Date(consultation.scheduled_time);
+              const endTime = new Date(startTime.getTime() + consultation.duration * 60000);
+              const formattedStartTime = format(startTime, 'h:mm a');
+              const formattedEndTime = format(endTime, 'h:mm a');
               
               return (
                 <Card key={consultation.id} className={isPast ? 'opacity-70' : ''}>
@@ -119,15 +123,15 @@ const UserConsultations: React.FC = () => {
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
                       <span>
-                        {consultation.start_time} - {consultation.end_time}
+                        {formattedStartTime} - {formattedEndTime}
                       </span>
                     </div>
                   </CardContent>
                   <CardFooter>
-                    {consultation.meeting_link && consultation.status === 'confirmed' && !isPast ? (
+                    {consultation.online_meeting_link && consultation.status === 'confirmed' && !isPast ? (
                       <Button 
                         className="w-full" 
-                        onClick={() => joinMeeting(consultation.meeting_link || '')}
+                        onClick={() => joinMeeting(consultation.online_meeting_link || '')}
                       >
                         Join Meeting <Video className="ml-2 h-4 w-4" />
                       </Button>

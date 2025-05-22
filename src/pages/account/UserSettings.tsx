@@ -16,9 +16,9 @@ interface UserSettings {
   full_name: string;
   username: string;
   bio: string;
-  website?: string; // Optional field
-  email_notifications?: boolean; // Optional field
-  marketing_emails?: boolean; // Optional field
+  website?: string;
+  email_notifications?: boolean;
+  marketing_emails?: boolean;
 }
 
 const UserSettings: React.FC = () => {
@@ -61,9 +61,10 @@ const UserSettings: React.FC = () => {
         full_name: data.full_name || '',
         username: data.username || '',
         bio: data.bio || '',
-        website: data.website || '', // Use default value if not in database
-        email_notifications: data.email_notifications !== undefined ? data.email_notifications : true,
-        marketing_emails: data.marketing_emails !== undefined ? data.marketing_emails : false
+        // Provide default values for optional fields that might not exist in the database
+        website: '',
+        email_notifications: true,
+        marketing_emails: false
       });
     } catch (error) {
       console.error('Error fetching user settings:', error);
@@ -91,17 +92,14 @@ const UserSettings: React.FC = () => {
         throw new Error("User not authenticated");
       }
 
-      // Only update fields that exist in the profiles table
+      // Only update fields that are guaranteed to exist in the profiles table
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: settings.full_name,
           username: settings.username,
           bio: settings.bio,
-          // Only include these if they exist in your DB schema
-          ...(settings.website !== undefined && { website: settings.website }),
-          ...(settings.email_notifications !== undefined && { email_notifications: settings.email_notifications }),
-          ...(settings.marketing_emails !== undefined && { marketing_emails: settings.marketing_emails })
+          // Additional fields may need a migration to be added to the table
         })
         .eq('id', user.id);
 
@@ -138,7 +136,7 @@ const UserSettings: React.FC = () => {
               <CardDescription>Update your profile picture</CardDescription>
             </CardHeader>
             <CardContent>
-              <ProfilePictureUpload userId={user?.id || ''} />
+              <ProfilePictureUpload />
             </CardContent>
           </Card>
           
