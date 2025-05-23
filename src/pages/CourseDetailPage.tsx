@@ -227,19 +227,10 @@ const CourseDetailPage = () => {
                     </TabsContent>
                     
                     <TabsContent value="discussion">
-                      {user ? (
-                        <CourseDiscussionSection course={course} userId={user.id} />
-                      ) : (
-                        <div className="text-center p-12">
-                          <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary/40" />
-                          <h3 className="text-lg font-medium mb-4">Sign in to join the discussion</h3>
-                          <Button asChild>
-                            <Link to="/auth" state={{ from: `/learning/course/${courseId}` }}>
-                              Sign In
-                            </Link>
-                          </Button>
-                        </div>
-                      )}
+                      {/* Course Discussion Section */}
+                      <section className="mt-16">
+                        <CourseDiscussionSection courseId={course.id} />
+                      </section>
                     </TabsContent>
                   </Tabs>
                 </div>

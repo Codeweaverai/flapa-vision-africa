@@ -1,445 +1,350 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient';
 
-import React from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import Layout from "@/components/layout/Layout";
-import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { useParams, useNavigate } from "react-router-dom";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { supabase } from "@/lib/supabaseClient";
-import { toast } from "sonner";
-import { useEffect, useState } from "react";
-
-const formSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  summary: z.string().min(1, "Summary is required"),
-  category: z.string().min(1, "Category is required"),
-  difficulty_level: z.string().min(1, "Difficulty level is required"),
-  duration_minutes: z.number().min(1, "Duration is required"),
-  is_free: z.boolean(),
-  price: z.number().nullable(),
-  certificate_enabled: z.boolean(),
-  is_published: z.boolean(),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+interface CourseFormData {
+  title?: string;
+  description?: string;
+  difficulty_level?: string;
+  category?: string;
+  duration_minutes?: number;
+  is_free?: boolean;
+  price?: number;
+  certificate_enabled?: boolean;
+  thumbnail_url?: string;
+  summary?: string;
+}
 
 const CreatorCourseForm = () => {
   const { user } = useAuth();
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
-  
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      summary: "",
-      category: "",
-      difficulty_level: "beginner",
-      duration_minutes: 60,
-      is_free: true,
-      price: null,
-      certificate_enabled: false,
-      is_published: false,
-    },
-  });
+  const { courseId } = useParams<{ courseId?: string }>();
+  const [formData, setFormData] = useState<CourseFormData>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      loadCourse(id);
+    if (courseId) {
+      loadCourseData();
     }
-  }, [id]);
+  }, [courseId]);
 
-  const loadCourse = async (courseId: string) => {
+  const loadCourseData = async () => {
     try {
-      setLoading(true);
-      const { data: course, error } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("id", courseId)
-        .eq("creator_id", user?.id)
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      if (course) {
-        form.reset({
-          title: course.title,
-          description: course.description,
-          summary: course.summary,
-          category: course.category,
-          difficulty_level: course.difficulty_level,
-          duration_minutes: course.duration_minutes,
-          is_free: course.is_free,
-          price: course.price,
-          certificate_enabled: course.certificate_enabled,
-          is_published: course.is_published,
-        });
-
-        if (course.thumbnail_url) {
-          setThumbnailPreview(course.thumbnail_url);
-        }
-      }
+      setFormData({
+        title: data.title,
+        description: data.description,
+        difficulty_level: data.difficulty_level,
+        category: data.category,
+        duration_minutes: data.duration_minutes,
+        is_free: data.is_free,
+        price: data.price,
+        certificate_enabled: data.certificate_enabled,
+        thumbnail_url: data.thumbnail_url,
+        summary: data.summary,
+      });
     } catch (error) {
-      console.error("Error loading course:", error);
-      toast.error("Failed to load course details");
-    } finally {
-      setLoading(false);
+      console.error('Error fetching course:', error);
+      toast.error('Failed to load course data');
     }
   };
 
-  const onSubmit = async (values: FormValues) => {
-    if (!user?.id) {
-      toast.error("You must be logged in to create a course");
-      return;
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setFormData(prev => ({ ...prev, [name]: checked }));
+  };
+
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value ? parseInt(value, 10) : undefined,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
     try {
-      setLoading(true);
-      
-      let thumbnailUrl = thumbnailPreview;
-      
-      // Upload thumbnail if provided
-      if (thumbnailFile) {
-        const fileExt = thumbnailFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `course-thumbnails/${fileName}`;
-        
-        const { error: uploadError } = await supabase
-          .storage
-          .from('course_images')
-          .upload(filePath, thumbnailFile);
-          
-        if (uploadError) throw uploadError;
-        
-        const { data: publicURL } = supabase
-          .storage
-          .from('course_images')
-          .getPublicUrl(filePath);
-          
-        thumbnailUrl = publicURL.publicUrl;
+      // Validate required fields
+      if (!formData.title?.trim()) {
+        toast.error("Title is required");
+        setIsSubmitting(false);
+        return;
       }
       
-      // Save course data
-      const courseData = {
-        ...values,
-        creator_id: user.id,
-        thumbnail_url: thumbnailUrl,
-        updated_at: new Date().toISOString(),
-      };
+      if (!formData.description?.trim()) {
+        toast.error("Description is required");
+        setIsSubmitting(false);
+        return;
+      }
       
-      if (id) {
+      if (!formData.difficulty_level?.trim()) {
+        toast.error("Difficulty level is required");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!formData.category?.trim()) {
+        toast.error("Category is required");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!formData.duration_minutes || formData.duration_minutes <= 0) {
+        toast.error("Valid duration is required");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!formData.summary?.trim()) {
+        toast.error("Summary is required");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const courseData = {
+        title: formData.title,
+        description: formData.description,
+        difficulty_level: formData.difficulty_level,
+        category: formData.category,
+        duration_minutes: formData.duration_minutes,
+        is_free: formData.is_free ?? true,
+        summary: formData.summary,
+        price: formData.is_free ? 0 : formData.price ?? 0,
+        certificate_enabled: formData.certificate_enabled ?? false,
+        thumbnail_url: formData.thumbnail_url,
+        creator_id: user?.id
+      };
+
+      let result;
+      
+      if (courseId) {
         // Update existing course
-        const { error } = await supabase
-          .from("courses")
+        const { data, error } = await supabase
+          .from('courses')
           .update(courseData)
-          .eq("id", id)
-          .eq("creator_id", user.id);
-          
-        if (error) throw error;
+          .eq('id', courseId)
+          .select()
+          .single();
         
-        toast.success("Course updated successfully");
+        if (error) throw error;
+        result = data;
+        toast.success("Course updated successfully!");
       } else {
         // Create new course
         const { data, error } = await supabase
-          .from("courses")
-          .insert({
-            ...courseData,
-            created_at: new Date().toISOString(),
-          })
-          .select();
-          
+          .from('courses')
+          .insert(courseData)
+          .select()
+          .single();
+        
         if (error) throw error;
-        
-        toast.success("Course created successfully");
-        
-        // Navigate to course content page to add modules and lessons
-        navigate(`/creator/courses/${data[0].id}/content`);
+        result = data;
+        toast.success("Course created successfully!");
       }
       
+      // Redirect to course content page for module/lesson management
+      navigate(`/creator/courses/${result.id}/content`);
     } catch (error) {
-      console.error("Error saving course:", error);
+      console.error('Error saving course:', error);
       toast.error("Failed to save course");
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setThumbnailFile(file);
-      setThumbnailPreview(URL.createObjectURL(file));
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Layout>
-      <div className="section-container">
-        <h1 className="text-2xl font-bold mb-6">{id ? "Edit Course" : "Create New Course"}</h1>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Course Title</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter course title" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="summary"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Summary</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Brief summary of the course" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="Detailed description of what students will learn" {...field} rows={6} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="category"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Category</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Programming, Design, Business" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="difficulty_level"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Difficulty Level</FormLabel>
-                          <FormControl>
-                            <select
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                              {...field}
-                            >
-                              <option value="beginner">Beginner</option>
-                              <option value="intermediate">Intermediate</option>
-                              <option value="advanced">Advanced</option>
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="duration_minutes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Duration (minutes)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="1"
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value, 10))} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div>
-                      <FormLabel>Thumbnail Image</FormLabel>
-                      <div className="mt-2">
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleThumbnailChange}
-                        />
-                      </div>
-                      {thumbnailPreview && (
-                        <div className="mt-2 aspect-video rounded-md bg-muted overflow-hidden">
-                          <img
-                            src={thumbnailPreview}
-                            alt="Thumbnail preview"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="is_free"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Free Course</FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Make this course available for free
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={(checked) => {
-                              field.onChange(checked);
-                              if (checked) {
-                                form.setValue('price', null);
-                              } else {
-                                form.setValue('price', 0);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {!form.watch("is_free") && (
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price (USD)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              step="0.01"
-                              placeholder="e.g., 29.99" 
-                              {...field}
-                              value={field.value === null ? '' : field.value}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="certificate_enabled"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Enable Certificate</FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Students can receive a certificate upon completion
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="is_published"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Publish Course</FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Make this course visible to students
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <div className="flex justify-end gap-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => navigate('/creator/courses')}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? "Saving..." : id ? "Update Course" : "Create Course"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+    <div className="container mx-auto py-10">
+      <div className="mb-8">
+        <Button asChild variant="ghost">
+          <Link to="/creator/courses" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Courses
+          </Link>
+        </Button>
       </div>
-    </Layout>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{courseId ? 'Edit Course' : 'Create New Course'}</CardTitle>
+          <CardDescription>Fill in the details for your course.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Title */}
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input
+                type="text"
+                id="title"
+                name="title"
+                value={formData.title || ''}
+                onChange={handleChange}
+                placeholder="Enter course title"
+                required
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formData.description || ''}
+                onChange={handleChange}
+                placeholder="Enter course description"
+                required
+              />
+            </div>
+
+            {/* Summary */}
+            <div>
+              <Label htmlFor="summary">Summary</Label>
+              <Textarea
+                id="summary"
+                name="summary"
+                value={formData.summary || ''}
+                onChange={handleChange}
+                placeholder="Enter course summary"
+                required
+              />
+            </div>
+
+            {/* Difficulty Level */}
+            <div>
+              <Label htmlFor="difficulty_level">Difficulty Level</Label>
+              <Select onValueChange={(value) => handleSelectChange('difficulty_level', value)} defaultValue={formData.difficulty_level || ''}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select difficulty level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Beginner">Beginner</SelectItem>
+                  <SelectItem value="Intermediate">Intermediate</SelectItem>
+                  <SelectItem value="Advanced">Advanced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Category */}
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Select onValueChange={(value) => handleSelectChange('category', value)} defaultValue={formData.category || ''}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Technology">Technology</SelectItem>
+                  <SelectItem value="Design">Design</SelectItem>
+                  <SelectItem value="Marketing">Marketing</SelectItem>
+                  <SelectItem value="Business">Business</SelectItem>
+                  <SelectItem value="Personal Development">Personal Development</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Duration Minutes */}
+            <div>
+              <Label htmlFor="duration_minutes">Duration (minutes)</Label>
+              <Input
+                type="number"
+                id="duration_minutes"
+                name="duration_minutes"
+                value={formData.duration_minutes || ''}
+                onChange={handleNumberChange}
+                placeholder="Enter duration in minutes"
+                required
+              />
+            </div>
+
+            {/* Thumbnail URL */}
+            <div>
+              <Label htmlFor="thumbnail_url">Thumbnail URL</Label>
+              <Input
+                type="text"
+                id="thumbnail_url"
+                name="thumbnail_url"
+                value={formData.thumbnail_url || ''}
+                onChange={handleChange}
+                placeholder="Enter thumbnail URL"
+              />
+            </div>
+
+            <Separator />
+
+            {/* Is Free */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="is_free">Is Free</Label>
+              <Switch
+                id="is_free"
+                name="is_free"
+                checked={formData.is_free ?? false}
+                onCheckedChange={(checked) => handleSwitchChange('is_free', checked)}
+              />
+            </div>
+
+            {/* Price (only show if not free) */}
+            {!formData.is_free && (
+              <div>
+                <Label htmlFor="price">Price</Label>
+                <Input
+                  type="number"
+                  id="price"
+                  name="price"
+                  value={formData.price || ''}
+                  onChange={handleNumberChange}
+                  placeholder="Enter price"
+                />
+              </div>
+            )}
+
+            {/* Certificate Enabled */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="certificate_enabled">Certificate Enabled</Label>
+              <Switch
+                id="certificate_enabled"
+                name="certificate_enabled"
+                checked={formData.certificate_enabled ?? false}
+                onCheckedChange={(checked) => handleSwitchChange('certificate_enabled', checked)}
+              />
+            </div>
+
+            <Button disabled={isSubmitting} type="submit">
+              {isSubmitting ? 'Submitting...' : 'Save Course'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

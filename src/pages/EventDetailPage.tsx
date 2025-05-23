@@ -113,7 +113,9 @@ const EventDetailPage = () => {
       <Layout>
         <div className="section-container min-h-[50vh] flex flex-col justify-center items-center gap-4">
           <p>Event not found</p>
-          <Button as={Link} to="/events">Back to Events</Button>
+          <Button asChild>
+            <Link to="/events">Back to Events</Link>
+          </Button>
         </div>
       </Layout>
     );
