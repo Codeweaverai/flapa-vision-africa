@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,6 +48,14 @@ const CreatorSettings = () => {
     },
   });
 
+  // Type definitions for bank account details
+  interface BankAccountDetails {
+    account_name?: string;
+    account_number?: string;
+    bank_name?: string;
+    branch_code?: string;
+  }
+
   useEffect(() => {
     const fetchProfile = async () => {
       if (!user) return;
@@ -79,13 +86,28 @@ const CreatorSettings = () => {
           
           setAvatarUrl(data.avatar_url || null);
           
+          // Update this part to handle bank_account_details correctly
           if (data.bank_account_details) {
-            setBankDetails({
-              account_name: data.bank_account_details.account_name || '',
-              account_number: data.bank_account_details.account_number || '',
-              bank_name: data.bank_account_details.bank_name || '',
-              branch_code: data.bank_account_details.branch_code || '',
-            });
+            let bankDetails: BankAccountDetails = {};
+            
+            // Parse bank_account_details if it's a string
+            if (typeof data.bank_account_details === 'string') {
+              try {
+                bankDetails = JSON.parse(data.bank_account_details);
+              } catch (e) {
+                console.error("Error parsing bank_account_details:", e);
+              }
+            } 
+            // If it's already an object, use it directly
+            else if (typeof data.bank_account_details === 'object') {
+              bankDetails = data.bank_account_details as any;
+            }
+            
+            // Now set the form fields safely
+            form.setValue('account_name', bankDetails.account_name || '');
+            form.setValue('account_number', bankDetails.account_number || '');
+            form.setValue('bank_name', bankDetails.bank_name || '');
+            form.setValue('branch_code', bankDetails.branch_code || '');
           }
         }
       } catch (error) {
@@ -168,9 +190,9 @@ const CreatorSettings = () => {
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="md:w-1/3">
                         <ProfilePictureUpload 
-                          userId={user?.id} 
-                          existingUrl={avatarUrl} 
-                          onUploadComplete={handleAvatarUpload} 
+                          currentImageUrl={avatarUrl}
+                          username={profile?.username || profile?.full_name}
+                          onUploadComplete={(url) => handleAvatarUpload(url)}
                         />
                       </div>
                       

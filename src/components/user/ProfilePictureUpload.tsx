@@ -11,17 +11,21 @@ import { v4 as uuidv4 } from 'uuid';
 interface ProfilePictureUploadProps {
   currentImageUrl?: string;
   username?: string;
+  userId?: string; // Added this prop to match usage in CreatorSettings.tsx
+  existingUrl?: string; // Added this prop to match usage in CreatorSettings.tsx
   onUploadComplete?: (url: string, path: string) => void;
 }
 
 const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   currentImageUrl,
   username,
+  userId,
+  existingUrl,
   onUploadComplete
 }) => {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [imageUrl, setImageUrl] = useState(currentImageUrl || '');
+  const [imageUrl, setImageUrl] = useState(currentImageUrl || existingUrl || '');
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
@@ -31,7 +35,7 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     const file = event.target.files[0];
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${user?.id}/${fileName}`;
+    const filePath = `${userId || user?.id}/${fileName}`;
 
     setUploading(true);
     try {

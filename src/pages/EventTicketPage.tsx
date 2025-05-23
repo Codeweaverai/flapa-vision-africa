@@ -25,7 +25,7 @@ interface Booking {
   updated_at: string;
   booking_date?: string;
   payment_id?: string;
-  ticket_number?: string;
+  ticket_number?: string; // Added ticket_number to the interface
 }
 
 interface Event {
@@ -67,7 +67,7 @@ const EventTicketPage = () => {
       const shortTicket = uuidv4().substring(0, 8).toUpperCase();
       setTicketNumber(`TCKT-${shortTicket}`);
     }
-  }, [user, eventId, bookingId]);
+  }, [user, eventId, bookingId, ticketNumber]);
   
   const fetchData = async () => {
     setLoading(true);
