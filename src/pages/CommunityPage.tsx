@@ -1,102 +1,318 @@
 
-import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Layout from '@/components/layout/Layout';
-import CommunityChat from '@/components/community/CommunityChat';
-import DirectMessage from '@/components/community/DirectMessage';
-import UserPresence from '@/components/community/UserPresence';
-import { MessageSquare, Users, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import CommunityLayout from '@/components/community/CommunityLayout';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { format } from 'date-fns';
+import { MessageCircle, Send, Plus, User } from 'lucide-react';
+import { toast } from 'sonner';
+import { 
+  CommunityPost, 
+  fetchCommunityPosts, 
+  createCommunityPost,
+  createCommunityComment 
+} from '@/services/communityService';
+import { supabase } from '@/lib/supabaseClient';
+
+interface CommentFormProps {
+  postId: string;
+  onCommentSubmit: () => void;
+}
+
+const CommentForm: React.FC<CommentFormProps> = ({ postId, onCommentSubmit }) => {
+  const { user } = useAuth();
+  const [content, setContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!content.trim()) {
+      toast.error("Comment cannot be empty");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      await createCommunityComment(user?.id || '', postId, content);
+      setContent('');
+      onCommentSubmit();
+    } catch (error) {
+      console.error("Error submitting comment:", error);
+      toast.error("Failed to submit comment");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-2 flex gap-2">
+      <Input 
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Write a reply..."
+        className="flex-1"
+      />
+      <Button type="submit" size="sm" disabled={isSubmitting}>
+        {isSubmitting ? 'Posting...' : <Send className="h-4 w-4" />}
+      </Button>
+    </form>
+  );
+};
 
 const CommunityPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('chat');
-  const [selectedUser, setSelectedUser] = useState<{id: string, name: string, avatar?: string} | null>(null);
-  
-  // Default user for demonstration purposes
-  useEffect(() => {
-    if (user) {
-      // Set a default recipient user (this should be replaced with actual user selection logic)
-      setSelectedUser({
-        id: 'default-user-id', // Replace with an actual user ID from your system
-        name: 'Demo User',
-        avatar: undefined
-      });
-    }
-  }, [user]);
+  const location = useLocation();
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostContent, setNewPostContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showNewPostForm, setShowNewPostForm] = useState(false);
+  const [activeTab, setActiveTab] = useState('feed');
+  const [activeReplyPostId, setActiveReplyPostId] = useState<string | null>(null);
 
+  // Redirect to login if not authenticated
   if (!user) {
-    return (
-      <Layout>
-        <div className="container py-20 text-center">
-          <h1 className="text-3xl font-bold mb-6">Community Forum</h1>
-          <p className="text-xl mb-8">Please sign in to join the community discussions.</p>
-          <Button onClick={() => navigate('/auth')}>Sign In</Button>
-        </div>
-      </Layout>
-    );
+    return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
   }
 
+  useEffect(() => {
+    loadPosts();
+    
+    // Set up realtime subscription for new posts
+    const channel = supabase
+      .channel('public:community_posts')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'community_posts' 
+        }, 
+        (payload) => {
+          console.log('Post change received!', payload);
+          loadPosts(); // Reload all posts when there's a change
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'post_comments' 
+        }, 
+        (payload) => {
+          console.log('Comment change received!', payload);
+          loadPosts(); // Reload posts when comments change
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const loadPosts = async () => {
+    const data = await fetchCommunityPosts();
+    setPosts(data);
+  };
+
+  const handleNewPost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newPostTitle.trim() || !newPostContent.trim()) {
+      toast.error('Please provide both a title and content for your post');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    const post = await createCommunityPost(user?.id, newPostTitle, newPostContent);
+    if (post) {
+      setNewPostTitle('');
+      setNewPostContent('');
+      setShowNewPostForm(false);
+      // No need to manually update the posts array as the realtime subscription will handle it
+    }
+    
+    setIsSubmitting(false);
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
+    switch (value) {
+      case 'feed':
+        navigate('/community');
+        break;
+      case 'chat':
+        navigate('/community/chat');
+        break;
+      case 'courses':
+        navigate('/community/courses');
+        break;
+      case 'notifications':
+        navigate('/community/notifications');
+        break;
+    }
+  };
+
+  const toggleReplyForm = (postId: string) => {
+    setActiveReplyPostId(activeReplyPostId === postId ? null : postId);
+  };
+
   return (
-    <Layout>
-      <div className="container py-8">
-        <h1 className="text-3xl font-bold mb-6">Community</h1>
+    <CommunityLayout activeTab={activeTab} onTabChange={handleTabChange}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Community Feed</h2>
+          <Button onClick={() => setShowNewPostForm(!showNewPostForm)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Post
+          </Button>
+        </div>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full md:w-auto grid-cols-3 mb-8">
-            <TabsTrigger value="chat" className="flex items-center">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              <span className="hidden md:inline">Group Chat</span>
-            </TabsTrigger>
-            <TabsTrigger value="dm" className="flex items-center">
-              <MessageCircle className="h-4 w-4 mr-2" />
-              <span className="hidden md:inline">Direct Messages</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center">
-              <Users className="h-4 w-4 mr-2" />
-              <span className="hidden md:inline">Online Users</span>
-            </TabsTrigger>
-          </TabsList>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className={`md:col-span-${activeTab === 'users' ? '4' : '3'}`}>
-              <TabsContent value="chat">
-                <CommunityChat channel="general" />
-              </TabsContent>
-              
-              <TabsContent value="dm">
-                {selectedUser ? (
-                  <DirectMessage 
-                    recipientId={selectedUser.id}
-                    recipientName={selectedUser.name}
-                    recipientAvatar={selectedUser.avatar}
+        {showNewPostForm && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Create a New Post</CardTitle>
+              <CardDescription>Share your thoughts with the community</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleNewPost}>
+              <CardContent className="space-y-4">
+                <div>
+                  <Input
+                    placeholder="Post title"
+                    value={newPostTitle}
+                    onChange={(e) => setNewPostTitle(e.target.value)}
+                    className="mb-2"
                   />
-                ) : (
-                  <div className="text-center p-8">
-                    <p>Select a user from the online users list to start chatting</p>
+                </div>
+                <div>
+                  <Textarea
+                    placeholder="What's on your mind?"
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => setShowNewPostForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Posting...' : 'Post'}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        )}
+        
+        {posts.length === 0 ? (
+          <Card className="p-8 text-center">
+            <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary/40" />
+            <h3 className="text-xl font-semibold mb-2">No posts yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Be the first to start a conversation in the community!
+            </p>
+            <Button onClick={() => setShowNewPostForm(true)}>Create a Post</Button>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {posts.map((post) => (
+              <Card key={post.id} className="overflow-hidden">
+                <CardHeader>
+                  <div className="flex items-start gap-4">
+                    <Avatar>
+                      {post.profiles?.avatar_url ? (
+                        <AvatarImage src={post.profiles.avatar_url} alt={post.profiles.username || 'User'} />
+                      ) : (
+                        <AvatarFallback>
+                          <User className="h-4 w-4" />
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="flex-1">
+                      <CardTitle className="text-xl">{post.title}</CardTitle>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{post.profiles?.full_name || post.profiles?.username || 'Anonymous'}</span>
+                        <span>•</span>
+                        <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="whitespace-pre-line">{post.content}</p>
+                  
+                  {/* Comments section */}
+                  {post.comments && post.comments.length > 0 && (
+                    <div className="mt-6">
+                      <Separator className="my-4" />
+                      <h4 className="text-sm font-medium mb-3">Replies</h4>
+                      <div className="space-y-4">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3 items-start">
+                            <Avatar className="h-8 w-8">
+                              {comment.profiles?.avatar_url ? (
+                                <AvatarImage src={comment.profiles.avatar_url} alt={comment.profiles.username || 'User'} />
+                              ) : (
+                                <AvatarFallback>
+                                  <User className="h-3 w-3" />
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-muted p-3 rounded-md">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium">{comment.profiles?.full_name || comment.profiles?.username || 'Anonymous'}</span>
+                                  <span className="text-xs text-muted-foreground">{format(new Date(comment.created_at), 'MMM d, yyyy')}</span>
+                                </div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter className="bg-muted/20 py-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-muted-foreground"
+                    onClick={() => toggleReplyForm(post.id)}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-1" />
+                    Reply
+                  </Button>
+                </CardFooter>
+                
+                {/* Reply form */}
+                {activeReplyPostId === post.id && (
+                  <div className="px-4 pb-4">
+                    <CommentForm postId={post.id} onCommentSubmit={loadPosts} />
                   </div>
                 )}
-              </TabsContent>
-              
-              <TabsContent value="users" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="md:col-span-4">
-                  <UserPresence />
-                </div>
-              </TabsContent>
-            </div>
-            
-            {activeTab !== 'users' && (
-              <div className="hidden md:block">
-                <UserPresence />
-              </div>
-            )}
+              </Card>
+            ))}
           </div>
-        </Tabs>
+        )}
       </div>
-    </Layout>
+    </CommunityLayout>
   );
 };
 

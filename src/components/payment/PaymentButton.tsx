@@ -1,85 +1,97 @@
 
 import React, { useState } from 'react';
-import { Button, ButtonProps } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-interface PaymentButtonProps extends ButtonProps {
-  itemType: 'course' | 'event';
-  itemId: string;
-  label?: string;
-  price?: number;
+interface PaymentButtonProps {
+  courseId?: string;
+  eventId?: string;
+  price: number;
+  title: string;
+  buttonText?: string;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  className?: string;
   disabled?: boolean;
-  variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
 }
 
-export const PaymentButton: React.FC<PaymentButtonProps> = ({
-  itemType,
-  itemId,
-  label = 'Pay Now',
-  price = 0,
-  disabled = false,
-  variant = 'default',
-  ...props
+const PaymentButton: React.FC<PaymentButtonProps> = ({
+  courseId,
+  eventId,
+  price,
+  title,
+  buttonText = "Proceed to Payment",
+  variant = "default",
+  className = "",
+  disabled = false
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  if (price <= 0) {
+    // For free items, don't show a payment button
+    return null;
+  }
 
   const handlePayment = async () => {
+    if (!user) {
+      toast.error("Please sign in to continue");
+      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      return;
+    }
+
+    if (!courseId && !eventId) {
+      toast.error("Invalid item for payment");
+      return;
+    }
+
+    setLoading(true);
     try {
-      if (!user) {
-        toast.error('Please log in to purchase');
-        navigate('/auth?redirect=' + window.location.pathname);
-        return;
+      let returnUrl;
+      if (courseId) {
+        returnUrl = `${window.location.origin}/payment/result?type=course&id=${courseId}`;
+      } else if (eventId) {
+        returnUrl = `${window.location.origin}/payment/result?type=event&id=${eventId}`;
+      } else {
+        returnUrl = `${window.location.origin}/payment/result`;
       }
 
-      setIsLoading(true);
-      
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
-          itemType,
-          itemId,
-          userId: user.id
+          courseId,
+          eventId,
+          returnUrl
         }
       });
-      
+
       if (error) {
-        throw new Error(`Error creating checkout session: ${error.message}`);
+        throw error;
       }
-      
-      if (!data || !data.url) {
-        throw new Error('No checkout URL returned');
+
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
       }
-      
-      // Redirect to Stripe Checkout
-      window.location.href = data.url;
-      
     } catch (error) {
-      console.error('Payment process error:', error);
-      toast.error('Failed to process payment. Please try again.');
+      console.error('Payment error:', error);
+      toast.error("Payment initialization failed. Please try again.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
+
   return (
-    <Button
-      onClick={handlePayment}
-      disabled={disabled || isLoading || price <= 0}
-      variant={variant}
-      {...props}
+    <Button 
+      variant={variant} 
+      onClick={handlePayment} 
+      disabled={disabled || loading} 
+      className={className}
     >
-      {isLoading ? (
-        <>
-          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-current"></span>
-          Processing...
-        </>
-      ) : (
-        label
-      )}
+      {loading ? "Processing..." : buttonText}
     </Button>
   );
 };

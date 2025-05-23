@@ -2,129 +2,86 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
 
 interface EventRegistrationButtonProps {
   eventId: string;
-  title: string;
+  eventName: string;
   isFree: boolean;
   price?: number;
   currency?: string;
-  isRegistered?: boolean;
-  className?: string;
+  isUserRegistered?: boolean;
 }
 
-const EventRegistrationButton = ({
+const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
   eventId,
-  title,
+  eventName,
   isFree,
-  price = 0,
+  price,
   currency = 'USD',
-  isRegistered = false,
-  className = ''
-}: EventRegistrationButtonProps) => {
+  isUserRegistered = false,
+}) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = async () => {
+  const handleRegistration = async () => {
     if (!user) {
-      toast.error('Please sign in to register');
-      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
+      toast.error('Please sign in to register for this event');
+      navigate('/auth', { state: { from: `/events/${eventId}` } });
       return;
     }
 
-    setLoading(true);
+    if (isUserRegistered) {
+      toast.info('You are already registered for this event');
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
-      // Check if already registered
-      const { data: existingRegistration, error: checkError } = await supabase
-        .from('registrations')
-        .select('id, status')
-        .eq('user_id', user.id)
-        .eq('event_id', eventId)
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-
-      if (existingRegistration) {
-        if (existingRegistration.status === 'cancelled') {
-          toast.info('Your previous registration was cancelled. Please register again.');
-        } else {
-          toast.info('You are already registered for this event');
-          return;
-        }
-      }
-
       if (isFree) {
-        // Process free registration directly
-        const { error: regError } = await supabase
-          .from('registrations')
-          .upsert({
-            user_id: user.id,
-            event_id: eventId,
-            status: 'confirmed',
-            payment_status: 'free',
-            created_at: new Date().toISOString()
-          });
-
-        if (regError) throw regError;
-
-        toast.success('Successfully registered for event!');
-      } else {
-        // Process paid registration with Stripe
-        const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-          body: {
-            amount: price,
-            currency: currency.toLowerCase(),
-            itemName: `Event: ${title}`,
-            itemId: eventId,
-            itemType: 'event'
-          }
+        // For free events, directly create a booking record
+        const { error } = await supabase.from('event_bookings').insert({
+          event_id: eventId,
+          user_id: user.id,
+          status: 'confirmed',
+          payment_status: 'free',
         });
 
         if (error) throw error;
 
-        if (data?.url) {
-          // Open Stripe checkout in a new tab
-          window.open(data.url, '_blank');
-        } else {
-          throw new Error('Invalid response from payment service');
-        }
+        toast.success('Successfully registered for this event!');
+      } else {
+        // For paid events, navigate to payment form
+        navigate(`/events/${eventId}/register`, { 
+          state: { 
+            eventId, 
+            eventName,
+            price,
+            currency
+          } 
+        });
       }
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error('Failed to process registration');
+      toast.error('Failed to register for this event');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (isRegistered) {
-    return (
-      <Button 
-        variant="secondary"
-        className={className}
-        disabled
-      >
-        Registered
-      </Button>
-    );
-  }
-
   return (
-    <Button 
-      onClick={handleRegister} 
-      disabled={loading}
-      className={className}
+    <Button
+      onClick={handleRegistration}
+      disabled={isLoading || isUserRegistered}
+      className="w-full"
     >
-      {loading ? (
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      ) : null}
-      {isFree ? 'Register for Free' : `Register for ${currency} ${price}`}
+      {isLoading ? 'Processing...' : 
+       isUserRegistered ? 'Already Registered' : 
+       isFree ? 'Register for Free' : `Register for ${currency} ${price?.toFixed(2)}`}
     </Button>
   );
 };

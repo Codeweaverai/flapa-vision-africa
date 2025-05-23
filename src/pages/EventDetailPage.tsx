@@ -1,92 +1,108 @@
 
-import React, { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
+import { format } from 'date-fns';
+import { Calendar, MapPin, Users, Clock, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, MapPin, User, Users, ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import EventRegistrationButton from '@/components/payment/EventRegistrationButton';
-import { formatDate } from '@/lib/utils';
+
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  event_type: string;
+  location: string;
+  is_free: boolean;
+  price: number;
+  currency: string;
+  capacity: number;
+  image_url: string;
+  online_meeting_link: string;
+}
 
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
-  const [event, setEvent] = useState<any>(null);
-  const [isRegistered, setIsRegistered] = useState(false);
+  const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const [attendeeCount, setAttendeeCount] = useState(0);
+  const [registeredCount, setRegisteredCount] = useState(0);
+  const [isUserRegistered, setIsUserRegistered] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
-    const fetchEvent = async () => {
-      try {
-        setLoading(true);
-        
-        // Get event details
-        const { data: eventData, error: eventError } = await supabase
-          .from('events')
-          .select(`
-            *,
-            profiles:creator_id (username, full_name, avatar_url)
-          `)
-          .eq('id', id)
-          .single();
-
-        if (eventError) throw eventError;
-        setEvent(eventData);
-        
-        // Check if user is registered
-        if (user) {
-          const { data: registrationData, error: registrationError } = await supabase
-            .from('registrations')
-            .select('id, payment_status')
-            .eq('user_id', user.id)
-            .eq('event_id', id)
-            .maybeSingle();
-            
-          if (!registrationError && registrationData) {
-            setIsRegistered(true);
-          }
-        }
-        
-        // Get attendee count
-        const { count, error: countError } = await supabase
-          .from('registrations')
-          .select('id', { count: 'exact', head: true })
-          .eq('event_id', id);
-          
-        if (!countError) {
-          setAttendeeCount(count || 0);
-        }
-      } catch (error) {
-        console.error('Error fetching event:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchEvent();
+    if (!id) return;
+    
+    fetchEventDetails();
+    fetchRegistrationsCount();
+    
+    if (user) {
+      checkUserRegistration();
     }
   }, [id, user]);
+
+  const fetchEventDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      setEvent(data as Event);
+    } catch (error) {
+      console.error('Error fetching event:', error);
+      toast.error('Failed to load event details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRegistrationsCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', id);
+      
+      if (error) throw error;
+      setRegisteredCount(data?.length || 0);
+    } catch (error) {
+      console.error('Error fetching registrations count:', error);
+    }
+  };
+
+  const checkUserRegistration = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select()
+        .eq('event_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      setIsUserRegistered(!!data);
+    } catch (error) {
+      console.error('Error checking registration:', error);
+    }
+  };
 
   if (loading) {
     return (
       <Layout>
-        <div className="container py-12">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-            <div className="space-y-4">
-              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded"></div>
-            </div>
-          </div>
+        <div className="section-container min-h-[50vh] flex justify-center items-center">
+          <p>Loading event details...</p>
         </div>
       </Layout>
     );
@@ -95,12 +111,11 @@ const EventDetailPage = () => {
   if (!event) {
     return (
       <Layout>
-        <div className="container py-12">
-          <h1 className="text-2xl font-bold">Event not found</h1>
-          <p className="mt-4">The event you're looking for doesn't exist or has been removed.</p>
-          <Link to="/events" className="mt-4 inline-block">
-            <Button>Browse all events</Button>
-          </Link>
+        <div className="section-container min-h-[50vh] flex flex-col justify-center items-center gap-4">
+          <p>Event not found</p>
+          <Button asChild>
+            <Link to="/events">Back to Events</Link>
+          </Button>
         </div>
       </Layout>
     );
@@ -108,190 +123,100 @@ const EventDetailPage = () => {
 
   return (
     <Layout>
-      <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Left column - event info */}
+      <div className="section-container">
+        <Button variant="ghost" className="mb-4" asChild>
+          <Link to="/events" className="flex items-center gap-1">
+            <ArrowLeft className="h-4 w-4" /> Back to Events
+          </Link>
+        </Button>
+        
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Main content */}
           <div className="md:col-span-2 space-y-6">
             <div>
+              <Badge className="mb-2">{event.event_type}</Badge>
               <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
-              <p className="text-lg text-muted-foreground">{event.summary}</p>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{event.category}</Badge>
-              <Badge variant="outline">{event.format}</Badge>
-              {event.is_free ? (
-                <Badge variant="secondary">Free</Badge>
-              ) : (
-                <Badge variant="secondary">${event.price}</Badge>
-              )}
-            </div>
-            
-            <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>{formatDate(event.start_date)}</span>
-              </div>
               
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span>{new Date(event.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <span>{attendeeCount} registered</span>
-              </div>
-            </div>
-            
-            <Tabs defaultValue="details" className="mt-8">
-              <TabsList>
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="location">Location</TabsTrigger>
-                <TabsTrigger value="host">Host</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="details" className="mt-4 space-y-6">
-                <div>
-                  <h2 className="text-xl font-semibold mb-3">About this event</h2>
-                  <p className="whitespace-pre-line">{event.description}</p>
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-6">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {format(new Date(event.start_time), "MMM d, yyyy")}
+                  </span>
                 </div>
-                
-                {event.agenda && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-3">Agenda</h2>
-                    <p className="whitespace-pre-line">{event.agenda}</p>
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="location" className="mt-4">
-                <h2 className="text-xl font-semibold mb-3">Location</h2>
-                
-                {event.format === 'Online' ? (
-                  <div className="space-y-4">
-                    <p>This is an online event. Registered participants will receive a link to join.</p>
-                    
-                    {isRegistered && event.meeting_link && (
-                      <div className="mt-4">
-                        <Button variant="outline" asChild>
-                          <a href={event.meeting_link} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Join Event
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div>
-                        <p className="font-medium">{event.venue_name}</p>
-                        <p className="text-muted-foreground">{event.address}</p>
-                        {event.address_details && (
-                          <p className="text-muted-foreground">{event.address_details}</p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {event.google_maps_url && (
-                      <div>
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={event.google_maps_url} target="_blank" rel="noopener noreferrer">
-                            <MapPin className="h-4 w-4 mr-2" />
-                            View on Google Maps
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="host" className="mt-4">
-                <h2 className="text-xl font-semibold mb-3">Event Host</h2>
-                
-                {event?.profiles && (
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-                      {event.profiles.avatar_url ? (
-                        <img 
-                          src={event.profiles.avatar_url} 
-                          alt={event.profiles.username || 'Host'} 
-                          className="h-12 w-12 rounded-full object-cover"
-                        />
-                      ) : (
-                        <User className="h-6 w-6 text-primary" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{event.profiles.full_name || event.profiles.username}</p>
-                      <p className="text-sm text-muted-foreground">Event Host</p>
-                    </div>
-                  </div>
-                )}
-                
-                {event.host_info && (
-                  <div className="mt-4">
-                    <p className="whitespace-pre-line">{event.host_info}</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {format(new Date(event.start_time), "h:mm a")} - {format(new Date(event.end_time), "h:mm a")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  <span>{event.location || 'Online'}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  <span>{registeredCount} registered</span>
+                </div>
+              </div>
+            </div>
+            
+            {event.image_url && (
+              <div className="aspect-video rounded-lg overflow-hidden bg-muted mb-8">
+                <img 
+                  src={event.image_url} 
+                  alt={event.title} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            
+            <div>
+              <h2 className="text-xl font-semibold mb-4">About This Event</h2>
+              <p className="whitespace-pre-line">{event.description}</p>
+            </div>
+            
+            {event.online_meeting_link && isUserRegistered && (
+              <div className="bg-muted p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Meeting Link</h3>
+                <a 
+                  href={event.online_meeting_link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline break-all"
+                >
+                  {event.online_meeting_link}
+                </a>
+              </div>
+            )}
           </div>
           
-          {/* Right column - registration card */}
-          <div className="md:col-span-1">
+          {/* Sidebar */}
+          <div className="space-y-6">
             <Card>
               <CardContent className="p-6 space-y-6">
-                {event.image_url && (
-                  <div className="aspect-video overflow-hidden rounded-md mb-4">
-                    <img 
-                      src={event.image_url} 
-                      alt={event.title} 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                
-                <div className="text-center">
-                  {event.is_free ? (
-                    <h3 className="text-2xl font-bold">Free</h3>
-                  ) : (
-                    <h3 className="text-2xl font-bold">${event.price}</h3>
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold">
+                    {event.is_free ? 'Free' : `${event.currency} ${event.price?.toFixed(2)}`}
+                  </p>
+                  
+                  {event.capacity > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {event.capacity - registeredCount} spots left
+                    </p>
                   )}
                 </div>
                 
-                <EventRegistrationButton 
-                  eventId={event.id} 
-                  title={event.title}
-                  isFree={event.is_free} 
+                <Separator />
+                
+                <EventRegistrationButton
+                  eventId={event.id}
+                  eventName={event.title}
+                  isFree={event.is_free}
                   price={event.price}
-                  isRegistered={isRegistered}
-                  className="w-full"
+                  currency={event.currency}
+                  isUserRegistered={isUserRegistered}
                 />
-                
-                <Separator className="my-4" />
-                
-                <div className="space-y-2 text-sm">
-                  <h4 className="font-medium">Event details:</h4>
-                  <ul className="space-y-2">
-                    <li className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>{formatDate(event.start_date)}</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>{new Date(event.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{event.format === 'Online' ? 'Online Event' : event.venue_name}</span>
-                    </li>
-                  </ul>
-                </div>
               </CardContent>
             </Card>
           </div>
