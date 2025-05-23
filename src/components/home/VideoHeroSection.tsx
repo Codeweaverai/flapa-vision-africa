@@ -1,10 +1,11 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import VideoPlayer from '@/components/video/VideoPlayer';
+import ReactPlayer from 'react-player';
 import { cn } from '@/lib/utils';
 
 const VideoHeroSection: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -29,18 +30,42 @@ const VideoHeroSection: React.FC = () => {
     };
   }, []);
 
+  const handleReady = () => {
+    setIsReady(true);
+  };
+
   return (
     <section ref={sectionRef} className="relative h-[90vh] w-full overflow-hidden bg-black">
       {/* Background Video */}
       <div className="absolute inset-0 w-full h-full">
-        <VideoPlayer
-          src="https://s3.eu-west-1.wasabisys.com/skillpulse/1115056_Broadcast_Man_3840x2160.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=HDSCC6MSIYKGL4EUVTAN%2F20250523%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Date=20250523T113031Z&X-Amz-Expires=7200&X-Amz-Signature=71cb4b8770b58881eeb2e5f5b8218f657b6586ca02b94319c5484e108697d385&X-Amz-SignedHeaders=host&x-id=GetObject"
-          autoplay={true}
-          controls={false}
-          className="object-cover w-full h-full"
+        <ReactPlayer
+          url="https://youtu.be/IJh6KbJznx8"
+          playing={true}
+          loop={true}
+          muted={true}
+          width="100%"
+          height="100%"
+          config={{
+            youtube: {
+              playerVars: {
+                autoplay: 1,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                iv_load_policy: 3,
+                modestbranding: 1,
+                playsinline: 1,
+                rel: 0,
+                showinfo: 0,
+              },
+            },
+          }}
+          style={{ position: 'absolute', top: 0, left: 0 }}
+          className="object-cover"
+          onReady={handleReady}
         />
         {/* Dark overlay for better text visibility */}
-        <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
 
       {/* Text Animation Container */}
