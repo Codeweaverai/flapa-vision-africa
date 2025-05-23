@@ -1,294 +1,225 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { CalendarDays, Clock, MapPin, User, Users, Share2, ArrowLeft } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { toast } from 'sonner';
 
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { format } from 'date-fns';
+import { Calendar, MapPin, Users, Clock, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import Layout from '@/components/layout/Layout';
-import EventRegistrationForm from '@/components/event/EventRegistrationForm';
-import { Event, fetchEvents, registerForEvent, cancelRegistration, fetchUserRegistrations } from '@/services/eventService';
-import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from "@/components/ui/scroll-area";
+import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import EventRegistrationButton from '@/components/payment/EventRegistrationButton';
+
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  event_type: string;
+  location: string;
+  is_free: boolean;
+  price: number;
+  currency: string;
+  capacity: number;
+  image_url: string;
+  online_meeting_link: string;
+}
 
 const EventDetailPage = () => {
-  const { eventId } = useParams<{ eventId: string }>();
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRegistered, setIsRegistered] = useState(false);
-  const [registrations, setRegistrations] = useState([]);
-  const [showRegistrationForm, setShowRegistrationForm] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
-  
+  const [registeredCount, setRegisteredCount] = useState(0);
+  const [isUserRegistered, setIsUserRegistered] = useState(false);
+  const { user } = useAuth();
+
   useEffect(() => {
-    const loadEvent = async () => {
-      setLoading(true);
-      try {
-        const events = await fetchEvents();
-        const selectedEvent = events.find((event) => event.id === eventId);
-        if (selectedEvent) {
-          setEvent(selectedEvent);
-        } else {
-          toast.error('Event not found');
-          navigate('/events');
-        }
-      } catch (error) {
-        console.error('Error fetching event:', error);
-        toast.error('Failed to load event details');
-        navigate('/events');
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!id) return;
     
-    loadEvent();
-  }, [eventId, navigate]);
-  
-  useEffect(() => {
-    const checkRegistration = async () => {
-      if (user && eventId) {
-        try {
-          const userRegistrations = await fetchUserRegistrations(user);
-          setRegistrations(userRegistrations);
-          const registered = userRegistrations.some(reg => reg.event_id === eventId && reg.status !== 'cancelled');
-          setIsRegistered(registered);
-        } catch (error) {
-          console.error('Error checking registration:', error);
-          toast.error('Failed to check registration status');
-        }
-      } else {
-        setIsRegistered(false);
-      }
-    };
+    fetchEventDetails();
+    fetchRegistrationsCount();
     
-    checkRegistration();
-  }, [user, eventId]);
-  
-  const handleRegisterClick = () => {
     if (user) {
-      setShowRegistrationForm(true);
-    } else {
-      toast.error("Please sign in to register for events");
+      checkUserRegistration();
     }
-  };
-  
-  const handleCloseEventRegistration = () => {
-    setShowRegistrationForm(false);
-  };
-  
-  const handleRegistrationSuccess = () => {
-    setIsRegistered(true);
-    setShowRegistrationForm(false);
-    toast.success('Registration successful!');
-  };
-  
-  const handleCancelRegistration = async () => {
-    if (!user || !event) return;
-    
-    setIsCancelling(true);
+  }, [id, user]);
+
+  const fetchEventDetails = async () => {
     try {
-      // Find the registration to cancel
-      const registrationToCancel = registrations.find(reg => reg.event_id === eventId && reg.user_id === user.id);
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', id)
+        .single();
       
-      if (registrationToCancel) {
-        const success = await cancelRegistration(registrationToCancel.id, user);
-        if (success) {
-          setIsRegistered(false);
-          // Optimistically update the registrations state
-          setRegistrations(prevRegistrations =>
-            prevRegistrations.map(reg =>
-              reg.id === registrationToCancel.id ? { ...reg, status: 'cancelled' } : reg
-            )
-          );
-          toast.success('Registration cancelled successfully.');
-        } else {
-          toast.error('Failed to cancel registration.');
-        }
-      } else {
-        toast.error('No registration found to cancel.');
-      }
+      if (error) throw error;
+      setEvent(data as Event);
     } catch (error) {
-      console.error('Error cancelling registration:', error);
-      toast.error('An unexpected error occurred.');
+      console.error('Error fetching event:', error);
+      toast.error('Failed to load event details');
     } finally {
-      setIsCancelling(false);
+      setLoading(false);
     }
   };
-  
+
+  const fetchRegistrationsCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', id);
+      
+      if (error) throw error;
+      setRegisteredCount(data?.length || 0);
+    } catch (error) {
+      console.error('Error fetching registrations count:', error);
+    }
+  };
+
+  const checkUserRegistration = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select()
+        .eq('event_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      setIsUserRegistered(!!data);
+    } catch (error) {
+      console.error('Error checking registration:', error);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
-        <div className="section-container py-12">
-          <div className="w-full max-w-3xl mx-auto">
-            <Button variant="ghost" onClick={() => navigate('/events')} className="mb-4">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Events
-            </Button>
-            <Card className="shadow-lg">
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <Skeleton className="h-8 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-48 w-full" />
-                  <div className="flex gap-2">
-                    <Skeleton className="h-5 w-16" />
-                    <Skeleton className="h-5 w-20" />
-                  </div>
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-10 w-32" />
+        <div className="section-container min-h-[50vh] flex justify-center items-center">
+          <p>Loading event details...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!event) {
+    return (
+      <Layout>
+        <div className="section-container min-h-[50vh] flex flex-col justify-center items-center gap-4">
+          <p>Event not found</p>
+          <Button as={Link} to="/events">Back to Events</Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="section-container">
+        <Button variant="ghost" className="mb-4" asChild>
+          <Link to="/events" className="flex items-center gap-1">
+            <ArrowLeft className="h-4 w-4" /> Back to Events
+          </Link>
+        </Button>
+        
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Main content */}
+          <div className="md:col-span-2 space-y-6">
+            <div>
+              <Badge className="mb-2">{event.event_type}</Badge>
+              <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
+              
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-6">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {format(new Date(event.start_time), "MMM d, yyyy")}
+                  </span>
                 </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {format(new Date(event.start_time), "h:mm a")} - {format(new Date(event.end_time), "h:mm a")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  <span>{event.location || 'Online'}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  <span>{registeredCount} registered</span>
+                </div>
+              </div>
+            </div>
+            
+            {event.image_url && (
+              <div className="aspect-video rounded-lg overflow-hidden bg-muted mb-8">
+                <img 
+                  src={event.image_url} 
+                  alt={event.title} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            
+            <div>
+              <h2 className="text-xl font-semibold mb-4">About This Event</h2>
+              <p className="whitespace-pre-line">{event.description}</p>
+            </div>
+            
+            {event.online_meeting_link && isUserRegistered && (
+              <div className="bg-muted p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Meeting Link</h3>
+                <a 
+                  href={event.online_meeting_link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline break-all"
+                >
+                  {event.online_meeting_link}
+                </a>
+              </div>
+            )}
+          </div>
+          
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold">
+                    {event.is_free ? 'Free' : `${event.currency} ${event.price?.toFixed(2)}`}
+                  </p>
+                  
+                  {event.capacity > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {event.capacity - registeredCount} spots left
+                    </p>
+                  )}
+                </div>
+                
+                <Separator />
+                
+                <EventRegistrationButton
+                  eventId={event.id}
+                  eventName={event.title}
+                  isFree={event.is_free}
+                  price={event.price}
+                  currency={event.currency}
+                  isUserRegistered={isUserRegistered}
+                />
               </CardContent>
             </Card>
           </div>
         </div>
-      </Layout>
-    );
-  }
-  
-  if (!event) {
-    return (
-      <Layout>
-        <div className="section-container py-12">
-          <div className="w-full max-w-3xl mx-auto text-center">
-            <h2 className="text-2xl font-bold">Event Not Found</h2>
-            <p>The event you are looking for does not exist.</p>
-            <Button asChild variant="outline" className="mt-4">
-              <Link to="/events">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Events
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-  
-  return (
-    <Layout>
-      <div className="section-container py-12">
-        <div className="w-full max-w-3xl mx-auto">
-          <Button variant="ghost" onClick={() => navigate('/events')} className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Events
-          </Button>
-          
-          <Card className="shadow-lg">
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                <h1 className="text-3xl font-bold">{event?.title}</h1>
-                
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{event?.event_type}</Badge>
-                  {event?.is_free ? (
-                    <Badge variant="outline">Free</Badge>
-                  ) : (
-                    <Badge variant="default">
-                      {event?.currency} {event?.price}
-                    </Badge>
-                  )}
-                </div>
-                
-                {event?.image_url && (
-                  <img
-                    src={event.image_url}
-                    alt={event.title}
-                    className="w-full rounded-md aspect-video object-cover"
-                  />
-                )}
-                
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <CalendarDays className="h-4 w-4" />
-                    <span>
-                      {event?.start_time && format(parseISO(event.start_time), 'MMMM dd, yyyy')}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {event?.start_time && format(parseISO(event.start_time), 'h:mm a')} -{' '}
-                      {event?.end_time && format(parseISO(event.end_time), 'h:mm a')}
-                    </span>
-                  </div>
-                  
-                  {event?.location && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span>{event.location}</span>
-                    </div>
-                  )}
-                  
-                  {event?.capacity && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      <span>Capacity: {event.capacity}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <Separator />
-                
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-bold">About this event</h2>
-                  <p>{event?.description || 'No description provided.'}</p>
-                </div>
-                
-                <Separator />
-                
-                <div className="flex justify-between items-center">
-                  <div>
-                    {isRegistered ? (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">You are registered</Badge>
-                    ) : (
-                      <Badge variant="secondary">Limited seats available</Badge>
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button variant="outline">
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Share
-                    </Button>
-                    
-                    {isRegistered ? (
-                      <Button 
-                        variant="destructive"
-                        onClick={handleCancelRegistration}
-                        disabled={isCancelling}
-                      >
-                        {isCancelling && <Clock className="mr-2 h-4 w-4 animate-spin" />}
-                        Cancel Registration
-                      </Button>
-                    ) : (
-                      <Button onClick={handleRegisterClick}>
-                        Register Now
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
-      
-      {showRegistrationForm && event && (
-        <EventRegistrationForm 
-          event={event} 
-          onCancel={handleCloseEventRegistration}
-          user={user}
-          onRegistrationSuccess={handleRegistrationSuccess}
-        />
-      )}
     </Layout>
   );
 };

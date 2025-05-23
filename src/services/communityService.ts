@@ -60,7 +60,7 @@ export const fetchCommunityPosts = async (): Promise<CommunityPost[]> => {
       return [];
     }
 
-    return posts as CommunityPost[];
+    return posts as unknown as CommunityPost[];
   } catch (error) {
     console.error('Error in fetchCommunityPosts:', error);
     toast.error('Failed to load community posts');
@@ -122,7 +122,14 @@ export const createCommunityComment = async (
         post_id: postId,
         content,
       })
-      .select()
+      .select(`
+        id,
+        post_id,
+        user_id,
+        content,
+        created_at,
+        profiles: user_id (id, username, full_name, avatar_url)
+      `)
       .single();
 
     if (error) {
@@ -132,7 +139,7 @@ export const createCommunityComment = async (
     }
 
     toast.success('Comment added successfully!');
-    return data as Comment;
+    return data as unknown as Comment;
   } catch (error) {
     console.error('Error in createCommunityComment:', error);
     toast.error('Failed to add comment');
