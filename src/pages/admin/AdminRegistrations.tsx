@@ -53,7 +53,7 @@ const AdminRegistrations = () => {
           payment_status: reg.payment_status || 'pending',
           payment_amount: reg.payment_amount,
           payment_currency: reg.payment_currency,
-          payment_method: reg.payment_method,
+          payment_method: reg.payment_method || 'Unknown',
           payment_id: reg.payment_id,
           user_fullname: reg.profiles?.full_name || 'Unknown',
           user_email: reg.profiles?.email || 'Unknown',

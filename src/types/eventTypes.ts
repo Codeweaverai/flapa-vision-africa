@@ -1,4 +1,3 @@
-
 // Add missing types for events and registrations
 export interface EventWithRegistrations {
   id: string;

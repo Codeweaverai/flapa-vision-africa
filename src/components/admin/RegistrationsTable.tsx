@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   Table,
@@ -7,300 +8,217 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Search, FileDown } from 'lucide-react';
+import { Search, Calendar, Ban, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
-import { CSVLink } from 'react-csv';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
-import { supabase } from '@/lib/supabaseClient';
 import { RegistrationItem } from '@/types/eventTypes';
-
-type RegistrationType = 'event' | 'course' | 'all';
+import { Link } from 'react-router-dom';
 
 interface RegistrationsTableProps {
   data: RegistrationItem[];
-  loading: boolean;
-  type: RegistrationType;
+  loading?: boolean;
+  type: 'event' | 'course' | 'all';
 }
 
-const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ data, loading, type }) => {
+const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ 
+  data, 
+  loading = false,
+  type
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRegistration, setSelectedRegistration] = useState<RegistrationItem | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value.toLowerCase());
-  };
-
-  const handleEdit = (registration: RegistrationItem) => {
-    setSelectedRegistration(registration);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleStatusUpdate = async (registrationId: string, newStatus: string, registrationType: 'event' | 'course') => {
-    try {
-      if (registrationType === 'event') {
-        await supabase
-          .from('registrations')
-          .update({ status: newStatus })
-          .eq('id', registrationId);
-      } else {
-        // For course enrollments, update the corresponding field
-        await supabase
-          .from('course_enrollments')
-          .update({ 
-            is_completed: newStatus === 'completed',
-            completion_date: newStatus === 'completed' ? new Date().toISOString() : null
-          })
-          .eq('id', registrationId);
-      }
-      
-      toast.success('Registration status updated');
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
-    }
-  };
-
-  const handlePaymentStatusUpdate = async (registrationId: string, newStatus: string, registrationType: 'event' | 'course') => {
-    try {
-      if (registrationType === 'event') {
-        await supabase
-          .from('registrations')
-          .update({ payment_status: newStatus })
-          .eq('id', registrationId);
-      } else {
-        await supabase
-          .from('course_enrollments')
-          .update({ payment_status: newStatus })
-          .eq('id', registrationId);
-      }
-      
-      toast.success('Payment status updated');
-    } catch (error) {
-      console.error('Error updating payment status:', error);
-      toast.error('Failed to update payment status');
-    }
-  };
-
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [paymentFilter, setPaymentFilter] = useState<string | null>(null);
+  
   const filteredData = data.filter(item => {
-    const searchString = searchTerm.toLowerCase();
-    return (
-      item.user_fullname.toLowerCase().includes(searchString) ||
-      item.user_email.toLowerCase().includes(searchString) ||
-      item.title.toLowerCase().includes(searchString) ||
-      item.status.toLowerCase().includes(searchString) ||
-      item.payment_status.toLowerCase().includes(searchString)
-    );
+    // Apply search filter
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = 
+      item.user_fullname?.toLowerCase().includes(searchLower) || 
+      item.user_email?.toLowerCase().includes(searchLower) ||
+      item.title?.toLowerCase().includes(searchLower) ||
+      (item.ticket_number && item.ticket_number.toLowerCase().includes(searchLower));
+    
+    // Apply status filter
+    const matchesStatus = !statusFilter || item.status === statusFilter;
+    
+    // Apply payment filter
+    const matchesPayment = !paymentFilter || item.payment_status === paymentFilter;
+    
+    return matchesSearch && matchesStatus && matchesPayment;
   });
-
-  const csvData = filteredData.map(item => ({
-    ID: item.id,
-    Type: item.type,
-    Name: item.title,
-    Date: item.date,
-    User: item.user_fullname,
-    Email: item.user_email,
-    Status: item.status,
-    'Payment Status': item.payment_status,
-    'Payment Amount': item.payment_amount,
-    'Payment Currency': item.payment_currency,
-    'Payment Method': item.payment_method,
-    'Registration Date': format(new Date(item.created_at), 'PPP')
-  }));
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
+  
+  const getStatusBadge = (status: string) => {
+    switch (status) {
       case 'confirmed':
-      case 'active':
       case 'completed':
-        return 'bg-green-500';
+        return <Badge variant="outline" className="bg-green-100 text-green-800">Confirmed</Badge>;
       case 'pending':
-        return 'bg-yellow-500';
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
       case 'cancelled':
-        return 'bg-red-500';
+        return <Badge variant="outline" className="bg-red-100 text-red-800">Cancelled</Badge>;
       default:
-        return 'bg-gray-500';
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
-
-  const getPaymentStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
+  
+  const getPaymentStatusBadge = (status: string) => {
+    switch (status) {
       case 'completed':
-        return 'bg-green-500';
+        return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
       case 'pending':
-        return 'bg-yellow-500';
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
       case 'failed':
-        return 'bg-red-500';
+        return <Badge className="bg-red-100 text-red-800">Failed</Badge>;
       case 'free':
-        return 'bg-blue-500';
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Free</Badge>;
       default:
-        return 'bg-gray-500';
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
-
+  
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <div className="relative flex-grow">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search registrations..."
-            value={searchTerm}
-            onChange={handleSearch}
+            placeholder="Search by name, email, or event..."
             className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div>
-          <CSVLink
-            data={csvData}
-            filename={`${type}-registrations-${format(new Date(), 'yyyy-MM-dd')}.csv`}
-            className="inline-flex"
-          >
-            <Button variant="outline" size="sm" className="ml-2">
-              <FileDown className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </CSVLink>
-        </div>
       </div>
-
-      {loading ? (
-        <div className="py-8 text-center">Loading registrations...</div>
-      ) : filteredData.length === 0 ? (
-        <div className="py-8 text-center">No registrations found.</div>
-      ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
+      
+      <div className="flex flex-wrap gap-2">
+        <Button 
+          variant={statusFilter === null ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter(null)}
+        >
+          All Statuses
+        </Button>
+        <Button 
+          variant={statusFilter === 'confirmed' ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter('confirmed')}
+          className="flex items-center gap-1"
+        >
+          <CheckCircle className="h-3 w-3" /> Confirmed
+        </Button>
+        <Button 
+          variant={statusFilter === 'pending' ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter('pending')}
+          className="flex items-center gap-1"
+        >
+          <Calendar className="h-3 w-3" /> Pending
+        </Button>
+        <Button 
+          variant={statusFilter === 'cancelled' ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter('cancelled')}
+          className="flex items-center gap-1"
+        >
+          <Ban className="h-3 w-3" /> Cancelled
+        </Button>
+      </div>
+      
+      <div className="flex flex-wrap gap-2">
+        <Button 
+          variant={paymentFilter === null ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setPaymentFilter(null)}
+        >
+          All Payments
+        </Button>
+        <Button 
+          variant={paymentFilter === 'completed' ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setPaymentFilter('completed')}
+          className="flex items-center gap-1"
+        >
+          <CheckCircle className="h-3 w-3" /> Paid
+        </Button>
+        <Button 
+          variant={paymentFilter === 'pending' ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setPaymentFilter('pending')}
+          className="flex items-center gap-1"
+        >
+          <Calendar className="h-3 w-3" /> Pending
+        </Button>
+        <Button 
+          variant={paymentFilter === 'free' ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setPaymentFilter('free')}
+        >
+          Free
+        </Button>
+      </div>
+      
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>{type === 'course' ? 'Course' : 'Event'}</TableHead>
+              <TableHead>Date</TableHead>
+              {type === 'event' && <TableHead>Ticket #</TableHead>}
+              <TableHead>Status</TableHead>
+              <TableHead>Payment</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                {type === 'all' && <TableHead>Type</TableHead>}
-                <TableHead>Name</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Registered</TableHead>
-                <TableHead className="w-[80px]">Actions</TableHead>
+                <TableCell colSpan={8} className="text-center py-8">
+                  Loading registrations...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredData.map((registration) => (
-                <TableRow key={`${registration.type}-${registration.id}`}>
-                  {type === 'all' && (
-                    <TableCell>
-                      <Badge variant="outline">
-                        {registration.type === 'event' ? 'Event' : 'Course'}
-                      </Badge>
-                    </TableCell>
+            ) : filteredData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8">
+                  No registrations found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredData.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">{item.user_fullname || 'Unknown'}</TableCell>
+                  <TableCell>{item.user_email || 'Unknown'}</TableCell>
+                  <TableCell>{item.title}</TableCell>
+                  <TableCell>
+                    {format(new Date(item.date), 'MMM d, yyyy')}
+                  </TableCell>
+                  {type === 'event' && (
+                    <TableCell>{item.ticket_number || 'N/A'}</TableCell>
                   )}
-                  <TableCell className="font-medium">{registration.title}</TableCell>
-                  <TableCell>{registration.date}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div>{registration.user_fullname}</div>
-                      <div className="text-sm text-gray-500">{registration.user_email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusBadgeColor(registration.status)}>
-                      {registration.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getPaymentStatusBadgeColor(registration.payment_status)}>
-                      {registration.payment_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {registration.payment_amount ? 
-                      `${registration.payment_currency || 'USD'} ${registration.payment_amount}` : 
-                      'Free'}
-                  </TableCell>
-                  <TableCell>
-                    {format(new Date(registration.created_at), 'MMM d, yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Open menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleEdit(registration)}>
-                          Edit Details
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuLabel>Status</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleStatusUpdate(registration.id, 'confirmed', registration.type)}>
-                          Mark as Confirmed
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusUpdate(registration.id, 'cancelled', registration.type)}>
-                          Mark as Cancelled
-                        </DropdownMenuItem>
-                        {registration.type === 'course' && (
-                          <DropdownMenuItem onClick={() => handleStatusUpdate(registration.id, 'completed', registration.type)}>
-                            Mark as Completed
-                          </DropdownMenuItem>
-                        )}
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuLabel>Payment</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handlePaymentStatusUpdate(registration.id, 'paid', registration.type)}>
-                          Mark as Paid
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePaymentStatusUpdate(registration.id, 'pending', registration.type)}>
-                          Mark as Pending
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePaymentStatusUpdate(registration.id, 'failed', registration.type)}>
-                          Mark as Failed
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <TableCell>{getStatusBadge(item.status)}</TableCell>
+                  <TableCell>{getPaymentStatusBadge(item.payment_status)}</TableCell>
+                  <TableCell className="text-right">
+                    {item.type === 'event' ? (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/events/${item.entity_id}/ticket/${item.id}`}>
+                          View Ticket
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm">
+                        View Details
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-      
-      {selectedRegistration && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Edit Registration</DialogTitle>
-              <DialogDescription>
-                Update registration details for {selectedRegistration.title}
-              </DialogDescription>
-            </DialogHeader>
-            <RegistrationEditDialog 
-              registration={selectedRegistration}
-              onClose={() => setIsEditDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };
