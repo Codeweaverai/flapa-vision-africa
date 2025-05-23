@@ -8,6 +8,60 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/lib/supabaseClient';
 import { RegistrationItem } from '@/types/eventTypes';
 
+// Define more specific types to handle the database responses
+interface EventBooking {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: string;
+  payment_status: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  created_at: string;
+  booking_date: string;
+  payment_id?: string;
+  phone_number?: string;
+  mobile_operator?: string;
+  updated_at: string;
+  ticket_number?: string;
+  payment_method?: string;
+  events?: {
+    id: string;
+    title: string;
+    start_time: string;
+    [key: string]: any;
+  };
+  profiles?: {
+    id: string;
+    full_name?: string;
+    email?: string;
+    [key: string]: any;
+  } | null;
+}
+
+interface CourseEnrollment {
+  id: string;
+  course_id: string;
+  user_id: string;
+  enrollment_date: string;
+  completion_date?: string;
+  is_completed: boolean;
+  payment_id?: string;
+  payment_status?: string;
+  created_at?: string;
+  courses?: {
+    id: string;
+    title: string;
+    [key: string]: any;
+  };
+  profiles?: {
+    id: string;
+    full_name?: string;
+    email?: string;
+    [key: string]: any;
+  } | null;
+}
+
 const AdminRegistrations = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [eventRegistrations, setEventRegistrations] = useState<RegistrationItem[]>([]);
@@ -44,38 +98,38 @@ const AdminRegistrations = () => {
         }
 
         // Format event registrations data
-        const formattedEventRegs = eventRegs?.map(reg => ({
+        const formattedEventRegs = (eventRegs as EventBooking[])?.map(reg => ({
           id: reg.id,
           user_id: reg.user_id,
           entity_id: reg.event_id,
-          created_at: reg.created_at,
+          created_at: reg.created_at || reg.booking_date || '',
           status: reg.status || 'pending',
           payment_status: reg.payment_status || 'pending',
           payment_amount: reg.payment_amount,
           payment_currency: reg.payment_currency,
-          payment_method: reg.payment_method || 'Unknown', // Provide default for missing property
+          payment_method: reg.payment_method || 'Unknown',
           payment_id: reg.payment_id,
-          user_fullname: reg.profiles?.full_name || 'Unknown', // Handle potential undefined with optional chaining
-          user_email: reg.profiles?.email || 'Unknown', // Handle potential undefined with optional chaining
+          user_fullname: reg.profiles?.full_name || 'Unknown',
+          user_email: reg.profiles?.email || 'Unknown',
           title: reg.events?.title || 'Unknown Event',
           date: reg.events ? new Date(reg.events.start_time).toLocaleDateString() : 'Unknown',
           type: 'event' as const,
-          ticket_number: reg.ticket_number || '' // Handle potential undefined
+          ticket_number: reg.ticket_number || ''
         })) || [];
 
         // Format course enrollments data
-        const formattedCourseEnrolls = courseEnrolls?.map(enroll => ({
+        const formattedCourseEnrolls = (courseEnrolls as CourseEnrollment[])?.map(enroll => ({
           id: enroll.id,
           user_id: enroll.user_id,
           entity_id: enroll.course_id,
-          created_at: enroll.created_at || enroll.enrollment_date || '', // Handle potential missing created_at
+          created_at: enroll.created_at || enroll.enrollment_date || '',
           status: enroll.is_completed ? 'completed' : 'active',
           payment_status: enroll.payment_status || 'pending',
           payment_amount: enroll.courses?.price || 0,
           payment_currency: 'USD',
           payment_id: enroll.payment_id,
-          user_fullname: enroll.profiles?.full_name || 'Unknown', // Handle potential undefined with optional chaining
-          user_email: enroll.profiles?.email || 'Unknown', // Handle potential undefined with optional chaining
+          user_fullname: enroll.profiles?.full_name || 'Unknown',
+          user_email: enroll.profiles?.email || 'Unknown',
           title: enroll.courses?.title || 'Unknown Course',
           date: enroll.enrollment_date ? new Date(enroll.enrollment_date).toLocaleDateString() : 'Unknown',
           type: 'course' as const

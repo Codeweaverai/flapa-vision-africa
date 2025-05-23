@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +24,7 @@ interface Booking {
   updated_at: string;
   booking_date?: string;
   payment_id?: string;
-  ticket_number?: string; // Added ticket_number to the interface
+  ticket_number?: string;
 }
 
 interface Event {
