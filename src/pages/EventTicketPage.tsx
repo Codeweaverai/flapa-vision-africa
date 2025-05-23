@@ -96,7 +96,7 @@ const EventTicketPage = () => {
         setBooking(bookingData as Booking);
         
         // If booking has a ticket number, use it
-        if (bookingData.ticket_number) {
+        if (bookingData && bookingData.ticket_number) {
           setTicketNumber(bookingData.ticket_number);
         }
       }

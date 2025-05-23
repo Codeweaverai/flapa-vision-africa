@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,6 +26,14 @@ const formSchema = z.object({
   is_creator: z.boolean().default(true),
 });
 
+// Type definitions for bank account details
+interface BankAccountDetails {
+  account_name?: string;
+  account_number?: string;
+  bank_name?: string;
+  branch_code?: string;
+}
+
 const CreatorSettings = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -35,6 +44,7 @@ const CreatorSettings = () => {
     bank_name: '',
     branch_code: '',
   });
+  const [userData, setUserData] = useState<any>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,14 +57,6 @@ const CreatorSettings = () => {
       is_creator: true,
     },
   });
-
-  // Type definitions for bank account details
-  interface BankAccountDetails {
-    account_name?: string;
-    account_number?: string;
-    bank_name?: string;
-    branch_code?: string;
-  }
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -75,6 +77,7 @@ const CreatorSettings = () => {
         }
         
         if (data) {
+          setUserData(data);
           form.reset({
             full_name: data.full_name || "",
             username: data.username || "",
@@ -88,26 +91,28 @@ const CreatorSettings = () => {
           
           // Update this part to handle bank_account_details correctly
           if (data.bank_account_details) {
-            let bankDetails: BankAccountDetails = {};
+            let bankAccountDetails: BankAccountDetails = {};
             
             // Parse bank_account_details if it's a string
             if (typeof data.bank_account_details === 'string') {
               try {
-                bankDetails = JSON.parse(data.bank_account_details);
+                bankAccountDetails = JSON.parse(data.bank_account_details);
               } catch (e) {
                 console.error("Error parsing bank_account_details:", e);
               }
             } 
             // If it's already an object, use it directly
             else if (typeof data.bank_account_details === 'object') {
-              bankDetails = data.bank_account_details as any;
+              bankAccountDetails = data.bank_account_details as any;
             }
             
-            // Now set the form fields safely
-            form.setValue('account_name', bankDetails.account_name || '');
-            form.setValue('account_number', bankDetails.account_number || '');
-            form.setValue('bank_name', bankDetails.bank_name || '');
-            form.setValue('branch_code', bankDetails.branch_code || '');
+            // Now set the state with the bank details
+            setBankDetails({
+              account_name: bankAccountDetails.account_name || '',
+              account_number: bankAccountDetails.account_number || '',
+              bank_name: bankAccountDetails.bank_name || '',
+              branch_code: bankAccountDetails.branch_code || '',
+            });
           }
         }
       } catch (error) {
@@ -191,7 +196,7 @@ const CreatorSettings = () => {
                       <div className="md:w-1/3">
                         <ProfilePictureUpload 
                           currentImageUrl={avatarUrl}
-                          username={profile?.username || profile?.full_name}
+                          username={userData?.username || userData?.full_name}
                           onUploadComplete={(url) => handleAvatarUpload(url)}
                         />
                       </div>

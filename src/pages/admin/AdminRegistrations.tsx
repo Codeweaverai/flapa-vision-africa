@@ -53,14 +53,14 @@ const AdminRegistrations = () => {
           payment_status: reg.payment_status || 'pending',
           payment_amount: reg.payment_amount,
           payment_currency: reg.payment_currency,
-          payment_method: reg.payment_method || 'Unknown',
+          payment_method: reg.payment_method || 'Unknown', // Provide default for missing property
           payment_id: reg.payment_id,
-          user_fullname: reg.profiles?.full_name || 'Unknown',
-          user_email: reg.profiles?.email || 'Unknown',
+          user_fullname: reg.profiles?.full_name || 'Unknown', // Handle potential undefined with optional chaining
+          user_email: reg.profiles?.email || 'Unknown', // Handle potential undefined with optional chaining
           title: reg.events?.title || 'Unknown Event',
           date: reg.events ? new Date(reg.events.start_time).toLocaleDateString() : 'Unknown',
           type: 'event' as const,
-          ticket_number: reg.ticket_number
+          ticket_number: reg.ticket_number || '' // Handle potential undefined
         })) || [];
 
         // Format course enrollments data
@@ -68,14 +68,14 @@ const AdminRegistrations = () => {
           id: enroll.id,
           user_id: enroll.user_id,
           entity_id: enroll.course_id,
-          created_at: enroll.enrollment_date || enroll.created_at,
+          created_at: enroll.created_at || enroll.enrollment_date || '', // Handle potential missing created_at
           status: enroll.is_completed ? 'completed' : 'active',
           payment_status: enroll.payment_status || 'pending',
           payment_amount: enroll.courses?.price || 0,
           payment_currency: 'USD',
           payment_id: enroll.payment_id,
-          user_fullname: enroll.profiles?.full_name || 'Unknown',
-          user_email: enroll.profiles?.email || 'Unknown',
+          user_fullname: enroll.profiles?.full_name || 'Unknown', // Handle potential undefined with optional chaining
+          user_email: enroll.profiles?.email || 'Unknown', // Handle potential undefined with optional chaining
           title: enroll.courses?.title || 'Unknown Course',
           date: enroll.enrollment_date ? new Date(enroll.enrollment_date).toLocaleDateString() : 'Unknown',
           type: 'course' as const
