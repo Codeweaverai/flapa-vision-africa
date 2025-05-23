@@ -7,6 +7,54 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabaseClient';
 
+// Define types for safer handling of Supabase query results
+interface EventRegistration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  created_at: string;
+  status: string;
+  payment_status: string;
+  payment_amount: number | null;
+  payment_currency: string | null;
+  payment_method: string | null;
+  payment_id: string | null;
+  events: {
+    title: string;
+    start_time: string;
+    [key: string]: any;
+  } | null;
+  profiles: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    [key: string]: any;
+  } | null;
+}
+
+interface CourseEnrollment {
+  id: string;
+  user_id: string;
+  course_id: string;
+  enrollment_date: string;
+  is_completed: boolean;
+  completion_date: string | null;
+  payment_status: string;
+  payment_id: string | null;
+  courses: {
+    title: string;
+    price: number | null;
+    [key: string]: any;
+  } | null;
+  profiles: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    [key: string]: any;
+  } | null;
+  created_at: string; // Adding this field which was causing an error
+}
+
 const AdminRegistrations = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [eventRegistrations, setEventRegistrations] = useState<any[]>([]);
@@ -42,8 +90,8 @@ const AdminRegistrations = () => {
           throw courseError;
         }
 
-        // Format event registrations data
-        const formattedEventRegs = eventRegs?.map(reg => ({
+        // Format event registrations data with safer type handling
+        const formattedEventRegs = eventRegs?.map((reg: EventRegistration) => ({
           id: reg.id,
           user_id: reg.user_id,
           entity_id: reg.event_id,
@@ -52,7 +100,7 @@ const AdminRegistrations = () => {
           payment_status: reg.payment_status,
           payment_amount: reg.payment_amount,
           payment_currency: reg.payment_currency,
-          payment_method: reg.payment_method,
+          payment_method: reg.payment_method || 'Unknown',
           payment_id: reg.payment_id,
           user_fullname: reg.profiles?.full_name || 'Unknown',
           user_email: reg.profiles?.email || 'Unknown',
@@ -61,12 +109,12 @@ const AdminRegistrations = () => {
           type: 'event'
         })) || [];
 
-        // Format course enrollments data
-        const formattedCourseEnrolls = courseEnrolls?.map(enroll => ({
+        // Format course enrollments data with safer type handling
+        const formattedCourseEnrolls = courseEnrolls?.map((enroll: CourseEnrollment) => ({
           id: enroll.id,
           user_id: enroll.user_id,
           entity_id: enroll.course_id,
-          created_at: enroll.enrollment_date,
+          created_at: enroll.enrollment_date || enroll.created_at,
           status: enroll.is_completed ? 'completed' : 'active',
           payment_status: enroll.payment_status,
           payment_amount: enroll.courses?.price || 0,

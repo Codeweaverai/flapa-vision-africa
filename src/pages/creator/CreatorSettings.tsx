@@ -17,6 +17,14 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 import StripeAccountManagement from '@/components/creator/StripeAccountManagement';
 
+// Define interface for bank account details for type safety
+interface BankAccountDetails {
+  account_name: string;
+  account_number: string;
+  bank_name: string;
+  branch_code: string;
+}
+
 const formSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
   username: z.string().min(3, "Username must be at least 3 characters").optional(),
@@ -30,7 +38,7 @@ const CreatorSettings = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [bankDetails, setBankDetails] = useState({
+  const [bankDetails, setBankDetails] = useState<BankAccountDetails>({
     account_name: '',
     account_number: '',
     bank_name: '',
@@ -79,12 +87,14 @@ const CreatorSettings = () => {
           
           setAvatarUrl(data.avatar_url || null);
           
-          if (data.bank_account_details) {
+          // Safely handle bank_account_details which could be null or not a proper object
+          if (data.bank_account_details && typeof data.bank_account_details === 'object') {
+            const bankData = data.bank_account_details as Record<string, any>;
             setBankDetails({
-              account_name: data.bank_account_details.account_name || '',
-              account_number: data.bank_account_details.account_number || '',
-              bank_name: data.bank_account_details.bank_name || '',
-              branch_code: data.bank_account_details.branch_code || '',
+              account_name: bankData.account_name || '',
+              account_number: bankData.account_number || '',
+              bank_name: bankData.bank_name || '',
+              branch_code: bankData.branch_code || '',
             });
           }
         }
@@ -135,7 +145,7 @@ const CreatorSettings = () => {
     setAvatarUrl(url);
   };
 
-  const handleBankDetailChange = (field: keyof typeof bankDetails, value: string) => {
+  const handleBankDetailChange = (field: keyof BankAccountDetails, value: string) => {
     setBankDetails(prev => ({
       ...prev,
       [field]: value
@@ -167,8 +177,9 @@ const CreatorSettings = () => {
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="md:w-1/3">
+                        {/* Updated to match the ProfilePictureUpload component props */}
                         <ProfilePictureUpload 
-                          userId={user?.id} 
+                          id={user?.id} 
                           existingUrl={avatarUrl} 
                           onUploadComplete={handleAvatarUpload} 
                         />

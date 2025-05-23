@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Table,
@@ -26,6 +25,7 @@ import { CSVLink } from 'react-csv';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
 import { supabase } from '@/lib/supabaseClient';
+import { CombinedRegistration } from '@/types/eventTypes';
 
 type RegistrationType = 'event' | 'course' | 'all';
 
@@ -45,6 +45,12 @@ interface RegistrationItem {
   title: string;
   date: string;
   type: 'event' | 'course';
+  event_id?: string;
+  user?: {
+    email: string;
+    full_name: string;
+    [key: string]: any;
+  };
 }
 
 interface RegistrationsTableProps {
@@ -313,7 +319,7 @@ const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ data, loading, 
               </DialogDescription>
             </DialogHeader>
             <RegistrationEditDialog 
-              registration={selectedRegistration}
+              registration={selectedRegistration as unknown as CombinedRegistration}
               onClose={() => setIsEditDialogOpen(false)}
             />
           </DialogContent>
