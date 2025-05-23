@@ -8,7 +8,6 @@ import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
 import AnimationsSection from '@/components/home/AnimationsSection';
 import CallToAction from '@/components/home/CallToAction';
-import VideoHeroSection from '@/components/home/VideoHeroSection';
 
 const HomePage = () => {
   return (
@@ -16,7 +15,6 @@ const HomePage = () => {
       <HeroSection />
       <AboutSection />
       <CoursesSection />
-      <VideoHeroSection />
       <AnimationsSection />
       <EventsSection />
       <MediaSection />

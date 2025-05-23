@@ -7,80 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabaseClient';
 
-// Define types for safer handling of Supabase query results
-interface EventRegistration {
-  id: string;
-  event_id: string;
-  user_id: string;
-  created_at: string;
-  status: string;
-  payment_status: string;
-  payment_amount: number | null;
-  payment_currency: string | null;
-  payment_method: string | null;
-  payment_id: string | null;
-  phone_number?: string;
-  mobile_operator?: string;
-  events: {
-    title: string;
-    start_time: string;
-    [key: string]: any;
-  } | null;
-  profiles: {
-    id: string;
-    full_name: string | null;
-    email: string | null;
-    [key: string]: any;
-  } | null;
-}
-
-interface CourseEnrollment {
-  id: string;
-  user_id: string;
-  course_id: string;
-  enrollment_date: string;
-  is_completed: boolean;
-  completion_date: string | null;
-  payment_status: string;
-  payment_id: string | null;
-  created_at: string; // Adding this field which was causing an error
-  courses: {
-    title: string;
-    price: number | null;
-    [key: string]: any;
-  } | null;
-  profiles: {
-    id: string;
-    full_name: string | null;
-    email: string | null;
-    [key: string]: any;
-  } | null;
-}
-
-interface RegistrationData {
-  id: string;
-  user_id: string;
-  entity_id: string;
-  created_at: string;
-  status: string;
-  payment_status: string;
-  payment_amount: number;
-  payment_currency: string;
-  payment_method: string;
-  payment_id: string | null;
-  user_fullname: string;
-  user_email: string;
-  title: string;
-  date: string;
-  type: 'event' | 'course';
-  phone_number?: string;
-  mobile_operator?: string;
-}
-
 const AdminRegistrations = () => {
   const [loading, setLoading] = useState<boolean>(true);
-  const [eventRegistrations, setEventRegistrations] = useState<RegistrationData[]>([]);
-  const [courseEnrollments, setCourseEnrollments] = useState<RegistrationData[]>([]);
+  const [eventRegistrations, setEventRegistrations] = useState<any[]>([]);
+  const [courseEnrollments, setCourseEnrollments] = useState<any[]>([]);
   
   useEffect(() => {
     const fetchRegistrations = async () => {
@@ -112,45 +42,42 @@ const AdminRegistrations = () => {
           throw courseError;
         }
 
-        // Format event registrations data with safer type handling
-        const formattedEventRegs: RegistrationData[] = (eventRegs || []).map((reg: any) => ({
+        // Format event registrations data
+        const formattedEventRegs = eventRegs?.map(reg => ({
           id: reg.id,
           user_id: reg.user_id,
           entity_id: reg.event_id,
           created_at: reg.created_at,
           status: reg.status,
           payment_status: reg.payment_status,
-          payment_amount: reg.payment_amount || 0,
-          payment_currency: reg.payment_currency || 'USD',
-          payment_method: reg.payment_method || 'Unknown',
+          payment_amount: reg.payment_amount,
+          payment_currency: reg.payment_currency,
+          payment_method: reg.payment_method,
           payment_id: reg.payment_id,
-          phone_number: reg.phone_number,
-          mobile_operator: reg.mobile_operator,
           user_fullname: reg.profiles?.full_name || 'Unknown',
           user_email: reg.profiles?.email || 'Unknown',
           title: reg.events?.title || 'Unknown Event',
-          date: reg.events?.start_time ? new Date(reg.events.start_time).toLocaleDateString() : 'Unknown',
+          date: reg.events ? new Date(reg.events.start_time).toLocaleDateString() : 'Unknown',
           type: 'event'
-        }));
+        })) || [];
 
-        // Format course enrollments data with safer type handling
-        const formattedCourseEnrolls: RegistrationData[] = (courseEnrolls || []).map((enroll: any) => ({
+        // Format course enrollments data
+        const formattedCourseEnrolls = courseEnrolls?.map(enroll => ({
           id: enroll.id,
           user_id: enroll.user_id,
           entity_id: enroll.course_id,
-          created_at: enroll.enrollment_date || enroll.created_at,
+          created_at: enroll.enrollment_date,
           status: enroll.is_completed ? 'completed' : 'active',
           payment_status: enroll.payment_status,
           payment_amount: enroll.courses?.price || 0,
           payment_currency: 'USD',
-          payment_method: 'Unknown',
           payment_id: enroll.payment_id,
           user_fullname: enroll.profiles?.full_name || 'Unknown',
           user_email: enroll.profiles?.email || 'Unknown',
           title: enroll.courses?.title || 'Unknown Course',
           date: enroll.enrollment_date ? new Date(enroll.enrollment_date).toLocaleDateString() : 'Unknown',
           type: 'course'
-        }));
+        })) || [];
 
         setEventRegistrations(formattedEventRegs);
         setCourseEnrollments(formattedCourseEnrolls);
