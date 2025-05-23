@@ -1,82 +1,55 @@
+
 import React, { useEffect, useState } from 'react';
 import {
-  BrowserRouter as Router,
   Route,
   Routes,
   Navigate,
   useLocation,
 } from 'react-router-dom';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
-import Account from './pages/Account';
-import Home from './pages/Home';
-import Pricing from './pages/Pricing';
-import CoursesPage from './pages/CoursesPage';
-import CourseDetailsPage from './pages/CourseDetailsPage';
-import CreatorDashboard from './pages/creator/CreatorDashboard';
-import CreatorCourse from './pages/creator/CreatorCourse';
-import CreatorEditCourse from './pages/creator/CreatorEditCourse';
-import CommunityPage from './pages/CommunityPage';
-import CommunityChatPage from './pages/CommunityChatPage';
-import CommunityCoursesPage from './pages/CommunityCoursesPage';
-import CommunityNotificationsPage from './pages/CommunityNotificationsPage';
-import EventsPage from './pages/EventsPage';
-import EventDetailPage from './pages/EventDetailPage';
-import EventRegistrationPage from './pages/EventRegistrationPage';
-import CreatorEvents from './pages/creator/CreatorEvents';
-import CreatorEventForm from './pages/creator/CreatorEventForm';
-import CreatorEditEventForm from './pages/creator/CreatorEditEventForm';
-import CreatorEventRegistrations from './pages/creator/CreatorEventRegistrations';
-import PaymentSuccessPage from './pages/PaymentSuccessPage';
-import PaymentCancelPage from './pages/PaymentCancelPage';
-import CreatorPaymentsPage from './pages/creator/CreatorPaymentsPage';
+import { useAuth } from '@/contexts/AuthContext';
 import EventTicketPage from './pages/EventTicketPage';
 
 const App = () => {
   const [protectedRoutes, setProtectedRoutes] = useState<
     { path: string; element: JSX.Element }[]
   >([]);
-  const session = useSession();
-  const supabase = useSupabaseClient();
+  const { user } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
     setProtectedRoutes([
-      { path: '/account', element: <Account key="account" /> },
-      { path: '/courses', element: <CoursesPage key="courses" /> },
+      { path: '/account', element: <div>Account Page</div> },
+      { path: '/courses', element: <div>Courses Page</div> },
       {
         path: '/courses/:courseId',
-        element: <CourseDetailsPage key="courseDetails" />,
+        element: <div>Course Details Page</div>,
       },
-      { path: '/community', element: <CommunityPage key="community" /> },
+      { path: '/community', element: <div>Community Page</div> },
       {
         path: '/community/chat',
-        element: <CommunityChatPage key="communityChat" />,
+        element: <div>Community Chat Page</div>,
       },
       {
         path: '/community/courses',
-        element: <CommunityCoursesPage key="communityCourses" />,
+        element: <div>Community Courses Page</div>,
       },
       {
         path: '/community/notifications',
-        element: (
-          <CommunityNotificationsPage key="communityNotifications" />
-        ),
+        element: <div>Community Notifications Page</div>,
       },
-      { path: '/events', element: <EventsPage key="events" /> },
-      { path: '/events/:id', element: <EventDetailPage key="eventDetail" /> },
+      { path: '/events', element: <div>Events Page</div> },
+      { path: '/events/:id', element: <div>Event Detail Page</div> },
       {
         path: '/events/:id/register',
-        element: <EventRegistrationPage key="eventRegistration" />,
+        element: <div>Event Registration Page</div>,
       },
       {
         path: '/payment/success',
-        element: <PaymentSuccessPage key="paymentSuccess" />,
+        element: <div>Payment Success Page</div>,
       },
       {
         path: '/payment/cancel',
-        element: <PaymentCancelPage key="paymentCancel" />,
+        element: <div>Payment Cancel Page</div>,
       },
       {
         path: '/events/:eventId/ticket/:bookingId',
@@ -87,18 +60,13 @@ const App = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/" element={<div>Home Page</div>} />
+      <Route path="/pricing" element={<div>Pricing Page</div>} />
       <Route
         path="/auth"
         element={
-          !session ? (
-            <Auth
-              supabaseClient={supabase}
-              appearance={{ theme: ThemeSupa }}
-              providers={['google', 'github']}
-              redirectTo={`${window.location.origin}/account`}
-            />
+          !user ? (
+            <div>Auth Page</div>
           ) : (
             <Navigate to="/account" replace state={{ from: location }} />
           )
@@ -112,8 +80,8 @@ const App = () => {
       <Route
         path="/creator/dashboard"
         element={
-          session ? (
-            <CreatorDashboard />
+          user ? (
+            <div>Creator Dashboard</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )
@@ -122,8 +90,8 @@ const App = () => {
       <Route
         path="/creator/courses"
         element={
-          session ? (
-            <CreatorCourse />
+          user ? (
+            <div>Creator Courses</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )
@@ -132,8 +100,8 @@ const App = () => {
       <Route
         path="/creator/courses/edit/:courseId"
         element={
-          session ? (
-            <CreatorEditCourse />
+          user ? (
+            <div>Creator Edit Course</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )
@@ -142,8 +110,8 @@ const App = () => {
       <Route
         path="/creator/events"
         element={
-          session ? (
-            <CreatorEvents />
+          user ? (
+            <div>Creator Events</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )
@@ -152,8 +120,8 @@ const App = () => {
       <Route
         path="/creator/events/new"
         element={
-          session ? (
-            <CreatorEventForm />
+          user ? (
+            <div>Creator New Event Form</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )
@@ -162,8 +130,8 @@ const App = () => {
       <Route
         path="/creator/events/edit/:eventId"
         element={
-          session ? (
-            <CreatorEditEventForm />
+          user ? (
+            <div>Creator Edit Event Form</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )
@@ -172,8 +140,8 @@ const App = () => {
       <Route
         path="/creator/events/:eventId/registrations"
         element={
-          session ? (
-            <CreatorEventRegistrations />
+          user ? (
+            <div>Creator Event Registrations</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )
@@ -182,8 +150,8 @@ const App = () => {
       <Route
         path="/creator/payments"
         element={
-          session ? (
-            <CreatorPaymentsPage />
+          user ? (
+            <div>Creator Payments Page</div>
           ) : (
             <Navigate to="/auth" state={{ from: location }} replace />
           )

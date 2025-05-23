@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Table,
@@ -26,26 +25,9 @@ import { CSVLink } from 'react-csv';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import RegistrationEditDialog from '@/components/admin/RegistrationEditDialog';
 import { supabase } from '@/lib/supabaseClient';
+import { RegistrationItem } from '@/types/eventTypes';
 
 type RegistrationType = 'event' | 'course' | 'all';
-
-interface RegistrationItem {
-  id: string;
-  user_id: string;
-  entity_id: string;
-  created_at: string;
-  status: string;
-  payment_status: string;
-  payment_amount?: number;
-  payment_currency?: string;
-  payment_method?: string;
-  payment_id?: string;
-  user_fullname: string;
-  user_email: string;
-  title: string;
-  date: string;
-  type: 'event' | 'course';
-}
 
 interface RegistrationsTableProps {
   data: RegistrationItem[];

@@ -6,11 +6,12 @@ import RegistrationsTable from '@/components/admin/RegistrationsTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabaseClient';
+import { RegistrationItem } from '@/types/eventTypes';
 
 const AdminRegistrations = () => {
   const [loading, setLoading] = useState<boolean>(true);
-  const [eventRegistrations, setEventRegistrations] = useState<any[]>([]);
-  const [courseEnrollments, setCourseEnrollments] = useState<any[]>([]);
+  const [eventRegistrations, setEventRegistrations] = useState<RegistrationItem[]>([]);
+  const [courseEnrollments, setCourseEnrollments] = useState<RegistrationItem[]>([]);
   
   useEffect(() => {
     const fetchRegistrations = async () => {
@@ -18,7 +19,7 @@ const AdminRegistrations = () => {
       try {
         // Fetch event registrations with related data
         const { data: eventRegs, error: eventError } = await supabase
-          .from('registrations')
+          .from('event_bookings')
           .select(`
             *,
             events:event_id (*),
@@ -48,8 +49,8 @@ const AdminRegistrations = () => {
           user_id: reg.user_id,
           entity_id: reg.event_id,
           created_at: reg.created_at,
-          status: reg.status,
-          payment_status: reg.payment_status,
+          status: reg.status || 'pending',
+          payment_status: reg.payment_status || 'pending',
           payment_amount: reg.payment_amount,
           payment_currency: reg.payment_currency,
           payment_method: reg.payment_method,
@@ -58,7 +59,8 @@ const AdminRegistrations = () => {
           user_email: reg.profiles?.email || 'Unknown',
           title: reg.events?.title || 'Unknown Event',
           date: reg.events ? new Date(reg.events.start_time).toLocaleDateString() : 'Unknown',
-          type: 'event'
+          type: 'event' as const,
+          ticket_number: reg.ticket_number
         })) || [];
 
         // Format course enrollments data
@@ -66,9 +68,9 @@ const AdminRegistrations = () => {
           id: enroll.id,
           user_id: enroll.user_id,
           entity_id: enroll.course_id,
-          created_at: enroll.enrollment_date,
+          created_at: enroll.enrollment_date || enroll.created_at,
           status: enroll.is_completed ? 'completed' : 'active',
-          payment_status: enroll.payment_status,
+          payment_status: enroll.payment_status || 'pending',
           payment_amount: enroll.courses?.price || 0,
           payment_currency: 'USD',
           payment_id: enroll.payment_id,
@@ -76,7 +78,7 @@ const AdminRegistrations = () => {
           user_email: enroll.profiles?.email || 'Unknown',
           title: enroll.courses?.title || 'Unknown Course',
           date: enroll.enrollment_date ? new Date(enroll.enrollment_date).toLocaleDateString() : 'Unknown',
-          type: 'course'
+          type: 'course' as const
         })) || [];
 
         setEventRegistrations(formattedEventRegs);

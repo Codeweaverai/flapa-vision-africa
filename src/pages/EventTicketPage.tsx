@@ -11,13 +11,50 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
+interface Booking {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: string;
+  payment_status: string;
+  created_at: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  phone_number?: string;
+  mobile_operator?: string;
+  updated_at: string;
+  booking_date?: string;
+  payment_id?: string;
+  ticket_number?: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  location?: string;
+  is_free: boolean;
+  price?: number;
+  currency?: string;
+  image_url?: string;
+  online_meeting_link?: string;
+}
+
+interface Profile {
+  id: string;
+  full_name?: string;
+  email?: string;
+}
+
 const EventTicketPage = () => {
   const { eventId, bookingId } = useParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [event, setEvent] = useState<any>(null);
-  const [booking, setBooking] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [ticketNumber, setTicketNumber] = useState<string>('');
   
   useEffect(() => {
@@ -44,7 +81,7 @@ const EventTicketPage = () => {
           .single();
           
         if (eventError) throw eventError;
-        setEvent(eventData);
+        setEvent(eventData as Event);
       }
       
       // Fetch booking details
@@ -56,7 +93,7 @@ const EventTicketPage = () => {
           .single();
           
         if (bookingError) throw bookingError;
-        setBooking(bookingData);
+        setBooking(bookingData as Booking);
         
         // If booking has a ticket number, use it
         if (bookingData.ticket_number) {
@@ -72,7 +109,7 @@ const EventTicketPage = () => {
         .single();
         
       if (profileError) throw profileError;
-      setProfile(profileData);
+      setProfile(profileData as Profile);
       
     } catch (error) {
       console.error('Error fetching ticket data:', error);

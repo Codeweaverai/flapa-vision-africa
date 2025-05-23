@@ -1,5 +1,5 @@
 
--- Add ticket_number column to event_bookings table
+-- Add ticket_number column to event_bookings table if it doesn't exist already
 ALTER TABLE IF EXISTS public.event_bookings
 ADD COLUMN IF NOT EXISTS ticket_number TEXT;
 
