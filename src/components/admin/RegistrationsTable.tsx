@@ -46,6 +46,8 @@ interface RegistrationItem {
   date: string;
   type: 'event' | 'course';
   event_id?: string;
+  phone_number?: string;
+  mobile_operator?: string;
   user?: {
     email: string;
     full_name: string;
@@ -71,6 +73,36 @@ const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ data, loading, 
   const handleEdit = (registration: RegistrationItem) => {
     setSelectedRegistration(registration);
     setIsEditDialogOpen(true);
+  };
+
+  const handleSaveRegistration = async (updatedRegistration: CombinedRegistration) => {
+    try {
+      if (updatedRegistration.type === 'event') {
+        await supabase
+          .from('registrations')
+          .update({ 
+            status: updatedRegistration.status,
+            payment_status: updatedRegistration.payment_status,
+            phone_number: updatedRegistration.phone_number,
+            mobile_operator: updatedRegistration.mobile_operator
+          })
+          .eq('id', updatedRegistration.id);
+      } else {
+        await supabase
+          .from('course_enrollments')
+          .update({ 
+            is_completed: updatedRegistration.status === 'completed',
+            payment_status: updatedRegistration.payment_status,
+          })
+          .eq('id', updatedRegistration.id);
+      }
+      
+      toast.success('Registration updated successfully');
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating registration:', error);
+      toast.error('Failed to update registration');
+    }
   };
 
   const handleStatusUpdate = async (registrationId: string, newStatus: string, registrationType: 'event' | 'course') => {
@@ -321,6 +353,7 @@ const RegistrationsTable: React.FC<RegistrationsTableProps> = ({ data, loading, 
             <RegistrationEditDialog 
               registration={selectedRegistration as unknown as CombinedRegistration}
               onClose={() => setIsEditDialogOpen(false)}
+              onSave={handleSaveRegistration}
             />
           </DialogContent>
         </Dialog>

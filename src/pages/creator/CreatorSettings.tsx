@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,6 +23,9 @@ interface BankAccountDetails {
   bank_name: string;
   branch_code: string;
 }
+
+// Create a type that will be compatible with Json
+type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 const formSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
@@ -114,11 +116,16 @@ const CreatorSettings = () => {
     
     setLoading(true);
     try {
+      // Convert bankDetails to a JsonValue compatible object
+      const bankAccountDetailsJson: JsonValue = form.watch('payout_method') === 'bank' 
+        ? bankDetails as unknown as JsonValue
+        : null;
+      
       // Prepare the data to update
       const updates = {
         ...values,
         updated_at: new Date().toISOString(),
-        bank_account_details: form.watch('payout_method') === 'bank' ? bankDetails : null,
+        bank_account_details: bankAccountDetailsJson,
       };
       
       const { error } = await supabase
@@ -177,12 +184,13 @@ const CreatorSettings = () => {
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="md:w-1/3">
-                        {/* Updated to match the ProfilePictureUpload component props */}
-                        <ProfilePictureUpload 
-                          id={user?.id} 
-                          existingUrl={avatarUrl} 
-                          onUploadComplete={handleAvatarUpload} 
-                        />
+                        {user && (
+                          <ProfilePictureUpload 
+                            userId={user.id} 
+                            existingUrl={avatarUrl} 
+                            onUploadComplete={handleAvatarUpload} 
+                          />
+                        )}
                       </div>
                       
                       <div className="space-y-4 md:w-2/3">
