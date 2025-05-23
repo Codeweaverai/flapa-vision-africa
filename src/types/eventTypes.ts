@@ -1,3 +1,4 @@
+
 // Add missing types for events and registrations
 export interface EventWithRegistrations {
   id: string;
@@ -30,11 +31,9 @@ export interface CombinedRegistration {
   created_at?: string;
   status: string;
   payment_status: string;
-  ticket_number?: string; // Add ticket_number field
   user: {
     email: string;
     full_name: string;
-    id: string;
     [key: string]: any;
   };
   [key: string]: any; // Allow for additional properties
@@ -46,7 +45,7 @@ export interface CourseWithEnrollment {
   title: string;
   description: string;
   thumbnail_url?: string;
-  image_url?: string;
+  image_url?: string; // Add this field
   duration_minutes?: number;
   price?: number;
   is_free?: boolean;
@@ -61,6 +60,7 @@ export interface CourseWithEnrollment {
     completion_date?: string;
     is_completed: boolean;
   };
+  // Add modules for course detail page
   modules?: {
     id: string;
     title: string;
@@ -69,7 +69,7 @@ export interface CourseWithEnrollment {
       title: string;
     }[];
   }[];
-  [key: string]: any;
+  [key: string]: any; // Allow for additional properties
 }
 
 // Add simplified non-recursive types for CoursePlayerPage
@@ -99,23 +99,4 @@ export interface SimplifiedCourse {
   title: string;
   description: string;
   modules: SimplifiedModule[];
-}
-
-export interface RegistrationItem {
-  id: string;
-  user_id: string;
-  entity_id: string;
-  created_at: string;
-  status: string;
-  payment_status: string;
-  payment_amount?: number;
-  payment_currency?: string;
-  payment_method?: string;
-  payment_id?: string;
-  user_fullname: string;
-  user_email: string;
-  title: string;
-  date: string;
-  type: 'event' | 'course';
-  ticket_number?: string;
 }

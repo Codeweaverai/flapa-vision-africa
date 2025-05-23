@@ -1,173 +1,141 @@
 
-// @ts-ignore - Deno imports will be available when deployed
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore - Deno imports will be available when deployed
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// @ts-ignore - Deno imports will be available when deployed
-import Stripe from "https://esm.sh/stripe@14.21.0";
-import { corsHeaders } from "../_shared/cors.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import Stripe from "https://esm.sh/stripe@12.18.0?target=deno";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.6";
 
-// @ts-ignore - Deno namespace available at runtime
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '');
+// Set up CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-// @ts-ignore - Deno serve method available at runtime
-Deno.serve(async (req) => {
-  // Handle CORS preflight request
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 });
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Get the authorization header from the request
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('Missing Authorization header');
+      throw new Error('Missing authorization header');
     }
-
-    // Create a Supabase client with the auth header
-    const supabaseClient = createClient(
-      // @ts-ignore - Deno env available at runtime
-      Deno.env.get('SUPABASE_URL') || '',
-      // @ts-ignore - Deno env available at runtime
-      Deno.env.get('SUPABASE_ANON_KEY') || '',
-      {
-        global: {
-          headers: {
-            Authorization: authHeader,
-          },
-        },
-      }
-    );
-
-    // Get the user from the client
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
-
-    if (userError || !user) {
-      throw new Error('Unauthorized');
-    }
-
-    // Get the request body
-    const { sessionId, userId, type, itemId } = await req.json();
-
-    if (!sessionId || !userId || !type || !itemId) {
+    
+    // Get the session ID from the request
+    const { sessionId, itemType, itemId } = await req.json();
+    if (!sessionId || !itemType || !itemId) {
       throw new Error('Missing required parameters');
     }
 
-    // Verify that the user ID matches the authenticated user
-    if (userId !== user.id) {
-      throw new Error('User ID mismatch');
-    }
+    // Create Stripe client
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(),
+    });
 
-    // Retrieve the Stripe checkout session
+    // Create Supabase client using the service role key to bypass RLS
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+      { auth: { persistSession: false } }
+    );
+    
+    // Authenticate the user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      throw new Error('Unauthorized');
+    }
+    
+    // Retrieve the Stripe session
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-    // Verify that the session was paid
-    if (session.payment_status !== 'paid') {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Payment has not been completed',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
+    // Check if the payment was successful
+    const paymentStatus = session.payment_status;
+    const paymentSuccessful = paymentStatus === 'paid';
 
-    let title = '';
-
-    // Update the appropriate record based on the type
-    if (type === 'course') {
-      // Get the course details
-      const { data: course, error: courseError } = await supabaseClient
-        .from('courses')
-        .select('title')
-        .eq('id', itemId)
-        .single();
-
-      if (courseError) {
-        throw new Error('Failed to fetch course');
+    // Record the payment result in the database based on the item type
+    if (paymentSuccessful) {
+      if (itemType === 'course') {
+        // Check if enrollment already exists
+        const { data: existingEnrollment } = await supabase
+          .from('course_enrollments')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('course_id', itemId)
+          .maybeSingle();
+          
+        if (!existingEnrollment) {
+          // Create course enrollment
+          await supabase.from('course_enrollments').insert({
+            user_id: user.id,
+            course_id: itemId,
+            payment_status: 'paid',
+            enrollment_date: new Date().toISOString()
+          });
+        } else {
+          // Update existing enrollment
+          await supabase
+            .from('course_enrollments')
+            .update({ payment_status: 'paid' })
+            .eq('id', existingEnrollment.id);
+        }
+      } 
+      else if (itemType === 'event') {
+        // Check if registration already exists
+        const { data: existingRegistration } = await supabase
+          .from('registrations')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('event_id', itemId)
+          .maybeSingle();
+          
+        if (!existingRegistration) {
+          // Create event registration
+          await supabase.from('registrations').insert({
+            user_id: user.id,
+            event_id: itemId,
+            status: 'confirmed',
+            payment_status: 'paid',
+            payment_id: session.id,
+            created_at: new Date().toISOString()
+          });
+        } else {
+          // Update existing registration
+          await supabase
+            .from('registrations')
+            .update({ payment_status: 'paid', status: 'confirmed' })
+            .eq('id', existingRegistration.id);
+        }
       }
 
-      title = course.title;
-
-      // Update the course enrollment status
-      const { error: enrollError } = await supabaseClient
-        .from('course_enrollments')
-        .upsert({
-          user_id: userId,
-          course_id: itemId,
-          payment_status: 'paid',
-          payment_id: sessionId,
-          enrollment_date: new Date().toISOString(),
-        });
-
-      if (enrollError) {
-        throw new Error('Failed to update course enrollment');
-      }
-    } else if (type === 'event') {
-      // Get the event details
-      const { data: event, error: eventError } = await supabaseClient
-        .from('events')
-        .select('title')
-        .eq('id', itemId)
-        .single();
-
-      if (eventError) {
-        throw new Error('Failed to fetch event');
-      }
-
-      title = event.title;
-
-      // Update the event registration status
-      const { error: regError } = await supabaseClient
-        .from('registrations')
-        .upsert({
-          user_id: userId,
-          event_id: itemId,
-          status: 'confirmed',
-          payment_status: 'paid',
-          payment_id: sessionId,
-          created_at: new Date().toISOString(),
-        });
-
-      if (regError) {
-        throw new Error('Failed to update registration');
-      }
-    }
-
-    // Create a payment transaction record
-    const { error: paymentError } = await supabaseClient
-      .from('payment_transactions')
-      .insert({
-        user_id: userId,
+      // Record payment transaction
+      await supabase.from('payment_transactions').insert({
+        user_id: user.id,
         reference_id: itemId,
-        reference_type: type,
+        reference_type: itemType,
         amount: session.amount_total ? session.amount_total / 100 : 0,
-        currency: session.currency?.toUpperCase() || 'USD',
+        currency: session.currency || 'usd',
         status: 'completed',
         provider: 'stripe',
-        provider_transaction_id: sessionId,
-        created_at: new Date().toISOString(),
+        provider_transaction_id: session.id,
       });
-
-    if (paymentError) {
-      throw new Error('Failed to create payment transaction record');
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Payment verified successfully',
-        title: title,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
+    return new Response(JSON.stringify({ 
+      success: paymentSuccessful,
+      status: paymentStatus,
+      session: session
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-    );
+    console.error("Error verifying payment:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });

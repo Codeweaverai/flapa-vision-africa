@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
-interface EventRegistrationButtonProps {
+interface EventRegisterButtonProps {
   eventId: string;
   title: string;
   isFree: boolean;
@@ -17,7 +17,7 @@ interface EventRegistrationButtonProps {
   className?: string;
 }
 
-const EventRegistrationButton = ({
+const EventRegisterButton = ({
   eventId,
   title,
   isFree,
@@ -25,7 +25,7 @@ const EventRegistrationButton = ({
   currency = 'USD',
   isRegistered = false,
   className = ''
-}: EventRegistrationButtonProps) => {
+}: EventRegisterButtonProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -129,4 +129,4 @@ const EventRegistrationButton = ({
   );
 };
 
-export default EventRegistrationButton;
+export default EventRegisterButton;

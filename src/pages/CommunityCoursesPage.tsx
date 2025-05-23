@@ -95,7 +95,7 @@ const CommunityCoursesPage = () => {
         
         <div className="md:col-span-2">
           {selectedCourse ? (
-            <CourseDiscussionSection courseId={selectedCourse.id} />
+            <CourseDiscussionSection course={selectedCourse} userId={user.id} />
           ) : (
             <Card className="p-8 text-center">
               <BookOpen className="h-12 w-12 mx-auto mb-4 text-primary/40" />

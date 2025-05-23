@@ -1,29 +1,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-
-export interface CommentProfile {
-  id: string;
-  username?: string;
-  full_name?: string;
-  avatar_url?: string;
-}
-
-export interface Comment {
-  id: string;
-  post_id: string;
-  user_id: string;
-  content: string;
-  created_at: string;
-  profiles?: CommentProfile;
-}
-
-export interface Profile {
-  id: string;
-  username?: string;
-  full_name?: string;
-  avatar_url?: string;
-}
+import { User } from '@supabase/supabase-js';
 
 export interface CommunityPost {
   id: string;
@@ -32,8 +10,25 @@ export interface CommunityPost {
   content: string;
   created_at: string;
   updated_at: string;
-  profiles?: Profile;
-  comments?: Comment[];
+  profiles?: {
+    username: string;
+    avatar_url: string;
+    full_name: string;
+  };
+}
+
+export interface CourseComment {
+  id: string;
+  course_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  profiles?: {
+    username: string;
+    avatar_url: string;
+    full_name: string;
+  };
 }
 
 export interface CommunityMessage {
@@ -43,9 +38,9 @@ export interface CommunityMessage {
   created_at: string;
   channel: string;
   profiles?: {
-    username?: string;
-    full_name?: string;
-    avatar_url?: string;
+    username: string;
+    avatar_url: string;
+    full_name: string;
   };
 }
 
@@ -54,209 +49,216 @@ export interface Notification {
   user_id: string;
   content: string;
   type: string;
+  related_id: string;
   is_read: boolean;
-  related_id?: string;
   created_at: string;
 }
 
+// Community Posts Functions
 export const fetchCommunityPosts = async (): Promise<CommunityPost[]> => {
   try {
-    const { data: posts, error } = await supabase
+    // First fetch the posts
+    const { data: posts, error: postsError } = await supabase
       .from('community_posts')
-      .select(`
-        *,
-        profiles: user_id (id, username, full_name, avatar_url),
-        comments: post_comments (
-          id,
-          post_id,
-          user_id,
-          content,
-          created_at,
-          profiles: user_id (id, username, full_name, avatar_url)
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching community posts:', error);
-      toast.error('Failed to load community posts');
+    if (postsError) throw postsError;
+    
+    if (!posts || posts.length === 0) {
       return [];
     }
 
-    return posts as unknown as CommunityPost[];
+    // Then fetch the profiles for these posts
+    const userIds = [...new Set(posts.map(post => post.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, full_name')
+      .in('id', userIds);
+
+    if (profilesError) throw profilesError;
+
+    // Merge the data
+    const postsWithProfiles = posts.map(post => {
+      const userProfile = profiles?.find(profile => profile.id === post.user_id);
+      return {
+        ...post,
+        profiles: userProfile || null
+      };
+    });
+
+    return postsWithProfiles as CommunityPost[];
   } catch (error) {
-    console.error('Error in fetchCommunityPosts:', error);
+    console.error('Error fetching community posts:', error);
     toast.error('Failed to load community posts');
     return [];
   }
 };
 
-export const createCommunityPost = async (
-  userId?: string,
-  title?: string,
-  content?: string
-): Promise<CommunityPost | null> => {
+export const createCommunityPost = async (userId: string, title: string, content: string): Promise<CommunityPost | null> => {
   try {
-    if (!userId || !title || !content) {
-      toast.error('Missing required fields');
-      return null;
-    }
-
     const { data, error } = await supabase
       .from('community_posts')
       .insert({
         user_id: userId,
         title,
-        content,
+        content
       })
-      .select()
+      .select('*')
       .single();
 
-    if (error) {
-      console.error('Error creating post:', error);
-      toast.error('Failed to create post');
-      return null;
-    }
-
-    toast.success('Post created successfully!');
-    return data as CommunityPost;
+    if (error) throw error;
+    toast.success('Post created successfully');
+    return data;
   } catch (error) {
-    console.error('Error in createCommunityPost:', error);
+    console.error('Error creating community post:', error);
     toast.error('Failed to create post');
     return null;
   }
 };
 
-export const createCommunityComment = async (
-  userId: string,
-  postId: string,
-  content: string
-): Promise<Comment | null> => {
+// Course Comments Functions
+export const fetchCourseComments = async (courseId: string): Promise<CourseComment[]> => {
   try {
-    if (!userId || !postId || !content) {
-      toast.error('Missing required fields');
-      return null;
+    // First fetch the comments
+    const { data: comments, error: commentsError } = await supabase
+      .from('course_comments')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: true });
+
+    if (commentsError) throw commentsError;
+    
+    if (!comments || comments.length === 0) {
+      return [];
     }
 
+    // Then fetch the profiles for these comments
+    const userIds = [...new Set(comments.map(comment => comment.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, full_name')
+      .in('id', userIds);
+
+    if (profilesError) throw profilesError;
+
+    // Merge the data
+    const commentsWithProfiles = comments.map(comment => {
+      const userProfile = profiles?.find(profile => profile.id === comment.user_id);
+      return {
+        ...comment,
+        profiles: userProfile || null
+      };
+    });
+
+    return commentsWithProfiles as CourseComment[];
+  } catch (error) {
+    console.error('Error fetching course comments:', error);
+    toast.error('Failed to load comments');
+    return [];
+  }
+};
+
+export const createCourseComment = async (userId: string, courseId: string, content: string): Promise<CourseComment | null> => {
+  try {
     const { data, error } = await supabase
-      .from('post_comments')
+      .from('course_comments')
       .insert({
         user_id: userId,
-        post_id: postId,
-        content,
+        course_id: courseId,
+        content
       })
-      .select(`
-        id,
-        post_id,
-        user_id,
-        content,
-        created_at,
-        profiles: user_id (id, username, full_name, avatar_url)
-      `)
+      .select('*')
       .single();
 
-    if (error) {
-      console.error('Error creating comment:', error);
-      toast.error('Failed to create comment');
-      return null;
-    }
-
-    toast.success('Comment added successfully!');
-    return data as unknown as Comment;
+    if (error) throw error;
+    toast.success('Comment added successfully');
+    return data;
   } catch (error) {
-    console.error('Error in createCommunityComment:', error);
+    console.error('Error creating course comment:', error);
     toast.error('Failed to add comment');
     return null;
   }
 };
 
-// Chat message functions
-export const fetchChatMessages = async (): Promise<CommunityMessage[]> => {
+// Chat Messages Functions
+export const fetchChatMessages = async (channel = 'general'): Promise<CommunityMessage[]> => {
   try {
-    const { data, error } = await supabase
+    // First fetch the messages
+    const { data: messages, error: messagesError } = await supabase
       .from('community_messages')
-      .select(`
-        *,
-        profiles: user_id (username, full_name, avatar_url)
-      `)
-      .eq('channel', 'general')
-      .order('created_at', { ascending: true });
+      .select('*')
+      .eq('channel', channel)
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-    if (error) {
-      console.error('Error fetching chat messages:', error);
-      toast.error('Failed to load chat messages');
+    if (messagesError) throw messagesError;
+    
+    if (!messages || messages.length === 0) {
       return [];
     }
 
-    return data as unknown as CommunityMessage[];
+    // Then fetch the profiles for these messages
+    const userIds = [...new Set(messages.map(message => message.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, full_name')
+      .in('id', userIds);
+
+    if (profilesError) throw profilesError;
+
+    // Merge the data
+    const messagesWithProfiles = messages.map(message => {
+      const userProfile = profiles?.find(profile => profile.id === message.user_id);
+      return {
+        ...message,
+        profiles: userProfile || null
+      };
+    });
+
+    return messagesWithProfiles as CommunityMessage[];
   } catch (error) {
-    console.error('Error in fetchChatMessages:', error);
-    toast.error('Failed to load chat messages');
+    console.error('Error fetching chat messages:', error);
+    toast.error('Failed to load messages');
     return [];
   }
 };
 
-export const sendChatMessage = async (
-  userId: string,
-  content: string,
-  channel: string = 'general'
-): Promise<CommunityMessage | null> => {
+export const sendChatMessage = async (userId: string, content: string, channel = 'general'): Promise<CommunityMessage | null> => {
   try {
-    if (!userId || !content) {
-      toast.error('Missing required fields');
-      return null;
-    }
-
     const { data, error } = await supabase
       .from('community_messages')
       .insert({
         user_id: userId,
         content,
-        channel,
+        channel
       })
-      .select(`
-        *,
-        profiles: user_id (username, full_name, avatar_url)
-      `)
+      .select('*')
       .single();
 
-    if (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message');
-      return null;
-    }
-
-    return data as unknown as CommunityMessage;
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error('Error in sendChatMessage:', error);
+    console.error('Error sending chat message:', error);
     toast.error('Failed to send message');
     return null;
   }
 };
 
-// Notification functions
+// Notifications Functions
 export const fetchUserNotifications = async (userId: string): Promise<Notification[]> => {
   try {
-    if (!userId) {
-      return [];
-    }
-
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-    if (error) {
-      console.error('Error fetching user notifications:', error);
-      toast.error('Failed to load notifications');
-      return [];
-    }
-
-    return data as Notification[];
+    if (error) throw error;
+    return data || [];
   } catch (error) {
-    console.error('Error in fetchUserNotifications:', error);
-    toast.error('Failed to load notifications');
+    console.error('Error fetching notifications:', error);
     return [];
   }
 };
@@ -268,16 +270,10 @@ export const markNotificationAsRead = async (notificationId: string): Promise<bo
       .update({ is_read: true })
       .eq('id', notificationId);
 
-    if (error) {
-      console.error('Error marking notification as read:', error);
-      toast.error('Failed to update notification');
-      return false;
-    }
-
+    if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Error in markNotificationAsRead:', error);
-    toast.error('Failed to update notification');
+    console.error('Error marking notification as read:', error);
     return false;
   }
 };
@@ -287,94 +283,12 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<boolea
     const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
+      .eq('user_id', userId);
 
-    if (error) {
-      console.error('Error marking all notifications as read:', error);
-      toast.error('Failed to update notifications');
-      return false;
-    }
-
-    toast.success('All notifications marked as read');
+    if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Error in markAllNotificationsAsRead:', error);
-    toast.error('Failed to update notifications');
+    console.error('Error marking all notifications as read:', error);
     return false;
   }
-};
-
-// Configure Realtime subscriptions
-export const subscribeToPostComments = (postId: string, onNewComment: (comment: Comment) => void) => {
-  const channel = supabase
-    .channel('post_comments_channel')
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'post_comments',
-        filter: `post_id=eq.${postId}`
-      },
-      async (payload) => {
-        console.log('New comment received:', payload);
-        // Fetch complete comment data with user profile
-        const { data, error } = await supabase
-          .from('post_comments')
-          .select(`
-            id,
-            post_id,
-            user_id,
-            content,
-            created_at,
-            profiles: user_id (id, username, full_name, avatar_url)
-          `)
-          .eq('id', payload.new.id)
-          .single();
-          
-        if (!error && data) {
-          onNewComment(data as unknown as Comment);
-        }
-      }
-    )
-    .subscribe();
-    
-  return channel;
-};
-
-export const subscribeToChatMessages = (
-  channel: string = 'general', 
-  onNewMessage: (message: CommunityMessage) => void
-) => {
-  const realtimeChannel = supabase
-    .channel('chat_messages_channel')
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'community_messages',
-        filter: `channel=eq.${channel}`
-      },
-      async (payload) => {
-        console.log('New chat message received:', payload);
-        // Fetch complete message data with user profile
-        const { data, error } = await supabase
-          .from('community_messages')
-          .select(`
-            *,
-            profiles: user_id (username, full_name, avatar_url)
-          `)
-          .eq('id', payload.new.id)
-          .single();
-          
-        if (!error && data) {
-          onNewMessage(data as unknown as CommunityMessage);
-        }
-      }
-    )
-    .subscribe();
-    
-  return realtimeChannel;
 };

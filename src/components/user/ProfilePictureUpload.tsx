@@ -1,111 +1,183 @@
 
 import React, { useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Upload, User } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { Upload, User, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
-import { v4 as uuidv4 } from 'uuid';
 
-interface ProfilePictureUploadProps {
-  currentImageUrl?: string;
-  username?: string;
-  userId?: string; // Added this prop to match usage in CreatorSettings.tsx
-  existingUrl?: string; // Added this prop to match usage in CreatorSettings.tsx
-  onUploadComplete?: (url: string, path: string) => void;
+export interface ProfilePictureUploadProps {
+  existingUrl?: string;
+  onUploadComplete: (url: string) => void;
 }
 
 const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
-  currentImageUrl,
-  username,
-  userId,
   existingUrl,
   onUploadComplete
 }) => {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [imageUrl, setImageUrl] = useState(currentImageUrl || existingUrl || '');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(existingUrl || null);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) {
-      return;
-    }
-
-    const file = event.target.files[0];
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${userId || user?.id}/${fileName}`;
-
-    setUploading(true);
+  const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      // Upload the file to Supabase storage
-      const { data, error } = await supabase.storage
-        .from('profile_pictures')
-        .upload(filePath, file, { upsert: true });
+      setUploading(true);
       
-      if (error) throw error;
-
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile_pictures')
-        .getPublicUrl(filePath);
+      if (!user) {
+        toast.error('You must be logged in to upload an avatar');
+        return;
+      }
       
-      // Update the local state
-      setImageUrl(publicUrl);
+      const files = event.target.files;
+      if (!files || files.length === 0) {
+        toast.error('You must select an image to upload.');
+        return;
+      }
       
-      // If callback function is provided, call it with the new URL
-      if (onUploadComplete) {
-        onUploadComplete(publicUrl, filePath);
+      const file = files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+      
+      // Create profile_pictures bucket if it doesn't exist
+      const { data: buckets } = await supabase.storage.getBucket('profile_pictures');
+      if (!buckets) {
+        await supabase.storage.createBucket('profile_pictures', {
+          public: true,
+          fileSizeLimit: 1024 * 1024 * 2, // 2MB
+          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+        });
       }
 
-      toast.success('Profile picture uploaded successfully');
+      // Upload image to storage bucket
+      const { error: uploadError } = await supabase.storage
+        .from('profile_pictures')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('profile_pictures')
+        .getPublicUrl(filePath);
+
+      const avatarUrl = urlData.publicUrl;
+      
+      // Save avatar_url and storage_path in profiles table
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          avatar_url: avatarUrl,
+          avatar_storage_path: filePath
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+      
+      setAvatarUrl(avatarUrl);
+      onUploadComplete(avatarUrl);
+      toast.success('Avatar updated successfully');
     } catch (error) {
-      toast.error('Error uploading profile picture');
-      console.error('Error uploading profile picture:', error);
+      console.error('Error uploading avatar:', error);
+      toast.error('Error uploading avatar');
     } finally {
       setUploading(false);
     }
   };
 
-  const getInitials = () => {
-    if (username) {
-      return username.charAt(0).toUpperCase();
+  const removeAvatar = async () => {
+    try {
+      setUploading(true);
+      
+      if (!user) {
+        toast.error('You must be logged in to remove your avatar');
+        return;
+      }
+      
+      // Get the current avatar storage path
+      const { data, error: fetchError } = await supabase
+        .from('profiles')
+        .select('avatar_storage_path')
+        .eq('id', user.id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      if (data?.avatar_storage_path) {
+        // Remove file from storage
+        const { error: removeError } = await supabase.storage
+          .from('profile_pictures')
+          .remove([data.avatar_storage_path]);
+          
+        if (removeError) throw removeError;
+      }
+      
+      // Update profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          avatar_url: null,
+          avatar_storage_path: null
+        })
+        .eq('id', user.id);
+        
+      if (updateError) throw updateError;
+      
+      setAvatarUrl(null);
+      onUploadComplete('');
+      toast.success('Avatar removed');
+    } catch (error) {
+      console.error('Error removing avatar:', error);
+      toast.error('Error removing avatar');
+    } finally {
+      setUploading(false);
     }
-    return 'U';
   };
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <Avatar className="h-24 w-24">
-        <AvatarImage src={imageUrl} alt="Profile" className="object-cover" />
+      <Avatar className="h-32 w-32">
+        <AvatarImage src={avatarUrl || undefined} />
         <AvatarFallback>
-          <User className="h-12 w-12 text-muted-foreground" />
+          <User className="h-12 w-12 text-gray-400" />
         </AvatarFallback>
       </Avatar>
       
-      <div className="flex items-center gap-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="relative"
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
           disabled={uploading}
+          className="relative"
         >
           <input
             type="file"
-            className="absolute inset-0 opacity-0 cursor-pointer"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             accept="image/png, image/jpeg, image/gif, image/webp"
-            onChange={handleFileChange}
+            onChange={uploadAvatar}
             disabled={uploading}
           />
           <Upload className="h-4 w-4 mr-2" />
-          {uploading ? 'Uploading...' : 'Upload Photo'}
+          {uploading ? 'Uploading...' : 'Upload'}
         </Button>
+        
+        {avatarUrl && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={removeAvatar}
+            disabled={uploading}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Remove
+          </Button>
+        )}
       </div>
-      
-      <p className="text-xs text-muted-foreground mt-1">
-        Recommended: Square image, at least 300x300px
-      </p>
     </div>
   );
 };
