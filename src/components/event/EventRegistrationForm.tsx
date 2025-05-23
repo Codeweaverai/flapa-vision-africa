@@ -12,12 +12,14 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMobileOperators } from '@/hooks/useMobileOperators';
-import { Event, registerForEvent } from '@/services/eventService';
+import { Event } from '@/services/eventService';
+import { supabase } from '@/lib/supabaseClient';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface EventRegistrationFormProps {
   event: Event; 
   user: User | null;
-  onRegistrationSuccess?: () => void;
+  onRegistrationSuccess?: (bookingId: string) => void;
   onCancel?: () => void;
 }
 
@@ -56,10 +58,27 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
     setLoading(true);
     try {
-      const result = await registerForEvent(event, user);
-      if (result) {
-        toast.success(`Successfully registered for ${event.title}`);
-        if (onRegistrationSuccess) onRegistrationSuccess();
+      // Generate a unique ticket number
+      const ticketNumber = `TCKT-${uuidv4().substring(0, 8).toUpperCase()}`;
+      
+      // Create booking record for free event
+      const { data, error } = await supabase.from('event_bookings').insert({
+        event_id: event.id,
+        user_id: user.id,
+        status: 'confirmed',
+        payment_status: 'free',
+        ticket_number: ticketNumber
+      }).select();
+
+      if (error) throw error;
+
+      toast.success(`Successfully registered for ${event.title}`);
+      
+      if (onRegistrationSuccess && data && data[0]) {
+        onRegistrationSuccess(data[0].id);
+      } else {
+        // Redirect to ticket page if no callback provided
+        navigate(`/events/${event.id}/ticket/${data[0].id}`);
       }
     } catch (error) {
       console.error("Error during free registration:", error);
@@ -78,11 +97,51 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
     setLoading(true);
     try {
-      const result = await registerForEvent(event, user, data.phoneNumber, data.mobileOperator);
+      // Generate a unique ticket number
+      const ticketNumber = `TCKT-${uuidv4().substring(0, 8).toUpperCase()}`;
       
-      if (result && onRegistrationSuccess) {
-        // Success will be handled by a redirect to the payment provider
-        onRegistrationSuccess();
+      // Create booking record with pending status
+      const { data: bookingData, error: bookingError } = await supabase.from('event_bookings').insert({
+        event_id: event.id,
+        user_id: user.id,
+        status: 'pending',
+        payment_status: 'pending',
+        phone_number: data.phoneNumber,
+        mobile_operator: data.mobileOperator,
+        ticket_number: ticketNumber
+      }).select();
+      
+      if (bookingError) throw bookingError;
+      
+      if (!bookingData || !bookingData[0]) {
+        throw new Error("Failed to create booking record");
+      }
+      
+      // Create a checkout session using Stripe
+      const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          eventId: event.id,
+          eventName: event.title,
+          price: event.price || 0,
+          currency: event.currency || 'USD',
+          returnUrl: `${window.location.origin}/events/${event.id}/ticket/${bookingData[0].id}`
+        }
+      });
+      
+      if (checkoutError) throw checkoutError;
+      
+      if (!checkoutData?.url) {
+        throw new Error("Failed to generate checkout URL");
+      }
+      
+      // Open Stripe checkout in a new tab
+      window.open(checkoutData.url, '_blank');
+      
+      // Redirect to ticket page (it will show pending until payment is complete)
+      if (onRegistrationSuccess) {
+        onRegistrationSuccess(bookingData[0].id);
+      } else {
+        navigate(`/events/${event.id}/ticket/${bookingData[0].id}`);
       }
     } catch (error) {
       console.error("Error during paid registration:", error);
@@ -179,7 +238,7 @@ const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Processing..." : "Pay Now"}
+                {loading ? "Processing..." : "Proceed to Payment"}
               </Button>
             </div>
           </form>

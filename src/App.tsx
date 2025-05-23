@@ -1,165 +1,196 @@
-
-import { Routes, Route } from 'react-router-dom';
-import { Toaster } from './components/ui/toaster';
-import { Toaster as SonnerToaster } from 'sonner';
-
-// Public Pages
-import HomePage from './pages/HomePage';
-import AuthPage from './pages/AuthPage';
-import AboutPage from './pages/AboutPage';
-import LearningPage from './pages/LearningPage';
-import SpeakingPage from './pages/SpeakingPage';
-import VenturesPage from './pages/VenturesPage';
-import AnimationsPage from './pages/AnimationsPage';
-import MediaPage from './pages/MediaPage';
-import MediaPostDetailPage from './pages/MediaPostDetailPage';
-import ExploreCoursesPage from './pages/ExploreCoursesPage';
-import ExploreEventsPage from './pages/ExploreEventsPage';
-import ConsultPage from './pages/ConsultPage';
-import CourseDetailPage from './pages/CourseDetailPage';
-import CoursePlayerPage from './pages/CoursePlayerPage';
-import CourseLearningPage from './pages/CourseLearningPage';
-import EventDetailPage from './pages/EventDetailPage';
-import AccountPage from './pages/AccountPage';
-import NotFoundPage from './pages/NotFoundPage';
-import HelpCenterPage from './pages/HelpCenterPage';
-import PaymentSuccessPage from './pages/PaymentSuccessPage';
-import PaymentCancelPage from './pages/PaymentCancelPage';
-import PaymentResultPage from './pages/PaymentResultPage';
-
-// Community Pages
+import React, { useEffect, useState } from 'react';
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
+import Account from './pages/Account';
+import Home from './pages/Home';
+import Pricing from './pages/Pricing';
+import CoursesPage from './pages/CoursesPage';
+import CourseDetailsPage from './pages/CourseDetailsPage';
+import CreatorDashboard from './pages/creator/CreatorDashboard';
+import CreatorCourse from './pages/creator/CreatorCourse';
+import CreatorEditCourse from './pages/creator/CreatorEditCourse';
 import CommunityPage from './pages/CommunityPage';
 import CommunityChatPage from './pages/CommunityChatPage';
 import CommunityCoursesPage from './pages/CommunityCoursesPage';
 import CommunityNotificationsPage from './pages/CommunityNotificationsPage';
-
-// Admin Pages
-import AdminRoute from './components/admin/AdminRoute';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminAnalytics from './pages/admin/AdminAnalytics';
-import AdminEvents from './pages/admin/AdminEvents';
-import AdminEventForm from './pages/admin/AdminEventForm';
-import AdminEventRegistrations from './pages/admin/AdminEventRegistrations';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminCourses from './pages/admin/AdminCourses';
-import AdminCourseForm from './pages/admin/AdminCourseForm';
-import AdminCourseContent from './pages/admin/AdminCourseContent';
-import AdminMedia from './pages/admin/AdminMedia';
-import AdminMediaForm from './pages/admin/AdminMediaForm';
-import AdminConsultations from './pages/admin/AdminConsultations';
-import AdminRegistrations from './pages/admin/AdminRegistrations';
-import AdminSettings from './pages/admin/AdminSettings';
-import AdminSpeaking from './pages/admin/AdminSpeaking';
-
-// Creator Pages
-import CreatorDashboard from './pages/creator/CreatorDashboard';
-import CreatorAnalytics from './pages/creator/CreatorAnalytics';
-import CreatorCourses from './pages/creator/CreatorCourses';
-import CreatorCourseForm from './pages/creator/CreatorCourseForm';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
+import EventRegistrationPage from './pages/EventRegistrationPage';
 import CreatorEvents from './pages/creator/CreatorEvents';
 import CreatorEventForm from './pages/creator/CreatorEventForm';
+import CreatorEditEventForm from './pages/creator/CreatorEditEventForm';
 import CreatorEventRegistrations from './pages/creator/CreatorEventRegistrations';
-import CreatorStudents from './pages/creator/CreatorStudents';
-import CreatorSettings from './pages/creator/CreatorSettings';
-import CreatorPayments from './pages/creator/CreatorPayments';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import PaymentCancelPage from './pages/PaymentCancelPage';
+import CreatorPaymentsPage from './pages/creator/CreatorPaymentsPage';
+import EventTicketPage from './pages/EventTicketPage';
 
-// User Account Pages
-import UserCourses from './pages/account/UserCourses';
-import UserEvents from './pages/account/UserEvents';
-import UserConsultations from './pages/account/UserConsultations';
-import UserProfile from './pages/account/UserProfile';
-import UserSettings from './pages/account/UserSettings';
+const App = () => {
+  const [protectedRoutes, setProtectedRoutes] = useState<
+    { path: string; element: JSX.Element }[]
+  >([]);
+  const session = useSession();
+  const supabase = useSupabaseClient();
+  const location = useLocation();
 
-function App() {
+  useEffect(() => {
+    setProtectedRoutes([
+      { path: '/account', element: <Account key="account" /> },
+      { path: '/courses', element: <CoursesPage key="courses" /> },
+      {
+        path: '/courses/:courseId',
+        element: <CourseDetailsPage key="courseDetails" />,
+      },
+      { path: '/community', element: <CommunityPage key="community" /> },
+      {
+        path: '/community/chat',
+        element: <CommunityChatPage key="communityChat" />,
+      },
+      {
+        path: '/community/courses',
+        element: <CommunityCoursesPage key="communityCourses" />,
+      },
+      {
+        path: '/community/notifications',
+        element: (
+          <CommunityNotificationsPage key="communityNotifications" />
+        ),
+      },
+      { path: '/events', element: <EventsPage key="events" /> },
+      { path: '/events/:id', element: <EventDetailPage key="eventDetail" /> },
+      {
+        path: '/events/:id/register',
+        element: <EventRegistrationPage key="eventRegistration" />,
+      },
+      {
+        path: '/payment/success',
+        element: <PaymentSuccessPage key="paymentSuccess" />,
+      },
+      {
+        path: '/payment/cancel',
+        element: <PaymentCancelPage key="paymentCancel" />,
+      },
+      {
+        path: '/events/:eventId/ticket/:bookingId',
+        element: <EventTicketPage />,
+      },
+    ]);
+  }, []);
+
   return (
-    <>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/learning" element={<LearningPage />} />
-        <Route path="/speaking" element={<SpeakingPage />} />
-        <Route path="/ventures" element={<VenturesPage />} />
-        <Route path="/animations" element={<AnimationsPage />} />
-        <Route path="/media" element={<MediaPage />} />
-        <Route path="/media/:id" element={<MediaPostDetailPage />} />
-        
-        {/* Explore routes */}
-        <Route path="/explore/courses" element={<ExploreCoursesPage />} />
-        <Route path="/explore/events" element={<ExploreEventsPage />} />
-        
-        {/* Legacy routes for backward compatibility */}
-        <Route path="/courses" element={<ExploreCoursesPage />} />
-        <Route path="/events" element={<ExploreEventsPage />} />
-        
-        <Route path="/courses/:id" element={<CourseDetailPage />} />
-        <Route path="/course/:id/learn" element={<CourseLearningPage />} />
-        <Route path="/course/:courseId/lesson/:lessonId" element={<CoursePlayerPage />} />
-        <Route path="/events/:id" element={<EventDetailPage />} />
-        <Route path="/consult" element={<ConsultPage />} />
-        <Route path="/account" element={<AccountPage />} />
-        <Route path="/help" element={<HelpCenterPage />} />
-        <Route path="/payment/success" element={<PaymentSuccessPage />} />
-        <Route path="/payment/cancel" element={<PaymentCancelPage />} />
-        <Route path="/payment/result" element={<PaymentResultPage />} />
-        
-        {/* User Account routes */}
-        <Route path="/account/courses" element={<UserCourses />} />
-        <Route path="/account/events" element={<UserEvents />} />
-        <Route path="/account/consultations" element={<UserConsultations />} />
-        <Route path="/account/profile" element={<UserProfile />} />
-        <Route path="/account/settings" element={<UserSettings />} />
-        
-        {/* Community routes */}
-        <Route path="/community" element={<CommunityPage />} />
-        <Route path="/community/chat" element={<CommunityChatPage />} />
-        <Route path="/community/courses" element={<CommunityCoursesPage />} />
-        <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
-        
-        {/* Admin routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-        <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
-        <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
-        <Route path="/admin/events/create" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
-        <Route path="/admin/events/edit/:id" element={<AdminRoute><AdminEventForm /></AdminRoute>} />
-        <Route path="/admin/events/:id/registrations" element={<AdminRoute><AdminEventRegistrations /></AdminRoute>} />
-        <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-        <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
-        <Route path="/admin/courses/create" element={<AdminRoute><AdminCourseForm /></AdminRoute>} />
-        <Route path="/admin/courses/edit/:id" element={<AdminRoute><AdminCourseForm /></AdminRoute>} />
-        <Route path="/admin/courses/:id/content" element={<AdminRoute><AdminCourseContent /></AdminRoute>} />
-        <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
-        <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
-        <Route path="/admin/media/edit/:id" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
-        <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
-        <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
-        <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
-        <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
-        
-        {/* Creator routes */}
-        <Route path="/creator/dashboard" element={<CreatorDashboard />} />
-        <Route path="/creator/analytics" element={<CreatorAnalytics />} />
-        <Route path="/creator/courses" element={<CreatorCourses />} />
-        <Route path="/creator/courses/new" element={<CreatorCourseForm />} />
-        <Route path="/creator/courses/edit/:id" element={<CreatorCourseForm />} />
-        <Route path="/creator/events" element={<CreatorEvents />} />
-        <Route path="/creator/events/new" element={<CreatorEventForm />} />
-        <Route path="/creator/events/edit/:id" element={<CreatorEventForm />} />
-        <Route path="/creator/events/:id/registrations" element={<CreatorEventRegistrations />} />
-        <Route path="/creator/students" element={<CreatorStudents />} />
-        <Route path="/creator/settings" element={<CreatorSettings />} />
-        <Route path="/creator/payments" element={<CreatorPayments />} />
-        
-        {/* 404 route */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-      <Toaster />
-      <SonnerToaster position="top-right" />
-    </>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/pricing" element={<Pricing />} />
+      <Route
+        path="/auth"
+        element={
+          !session ? (
+            <Auth
+              supabaseClient={supabase}
+              appearance={{ theme: ThemeSupa }}
+              providers={['google', 'github']}
+              redirectTo={`${window.location.origin}/account`}
+            />
+          ) : (
+            <Navigate to="/account" replace state={{ from: location }} />
+          )
+        }
+      />
+      {protectedRoutes.map((route) => (
+        <Route key={route.path} path={route.path} element={route.element} />
+      ))}
+
+      {/* Creator Routes - Protected by session and creator role */}
+      <Route
+        path="/creator/dashboard"
+        element={
+          session ? (
+            <CreatorDashboard />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+      <Route
+        path="/creator/courses"
+        element={
+          session ? (
+            <CreatorCourse />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+      <Route
+        path="/creator/courses/edit/:courseId"
+        element={
+          session ? (
+            <CreatorEditCourse />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+      <Route
+        path="/creator/events"
+        element={
+          session ? (
+            <CreatorEvents />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+      <Route
+        path="/creator/events/new"
+        element={
+          session ? (
+            <CreatorEventForm />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+      <Route
+        path="/creator/events/edit/:eventId"
+        element={
+          session ? (
+            <CreatorEditEventForm />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+      <Route
+        path="/creator/events/:eventId/registrations"
+        element={
+          session ? (
+            <CreatorEventRegistrations />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+      <Route
+        path="/creator/payments"
+        element={
+          session ? (
+            <CreatorPaymentsPage />
+          ) : (
+            <Navigate to="/auth" state={{ from: location }} replace />
+          )
+        }
+      />
+    </Routes>
   );
-}
+};
 
 export default App;

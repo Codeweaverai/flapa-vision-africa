@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { v4 as uuidv4 } from 'uuid';
 
 interface EventRegistrationButtonProps {
   eventId: string;
@@ -42,28 +43,53 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
     setIsLoading(true);
 
     try {
+      // Generate a unique ticket number
+      const ticketNumber = `TCKT-${uuidv4().substring(0, 8).toUpperCase()}`;
+      
       if (isFree) {
         // For free events, directly create a booking record
-        const { error } = await supabase.from('event_bookings').insert({
+        const { data, error } = await supabase.from('event_bookings').insert({
           event_id: eventId,
           user_id: user.id,
           status: 'confirmed',
           payment_status: 'free',
-        });
+          ticket_number: ticketNumber
+        }).select();
 
         if (error) throw error;
 
         toast.success('Successfully registered for this event!');
+        
+        // Navigate to the ticket page
+        navigate(`/events/${eventId}/ticket/${data[0].id}`);
       } else {
-        // For paid events, navigate to payment form
-        navigate(`/events/${eventId}/register`, { 
-          state: { 
-            eventId, 
-            eventName,
-            price,
-            currency
-          } 
+        // For paid events, create a booking record with pending status
+        const { data: bookingData, error: bookingError } = await supabase.from('event_bookings').insert({
+          event_id: eventId,
+          user_id: user.id,
+          status: 'pending',
+          payment_status: 'pending',
+          ticket_number: ticketNumber
+        }).select();
+        
+        if (bookingError) throw bookingError;
+        
+        // Create a checkout session using the create-checkout-session Edge Function
+        const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+          body: {
+            eventId,
+            returnUrl: `${window.location.origin}/events/${eventId}/ticket/${bookingData[0].id}`
+          }
         });
+
+        if (error) throw error;
+
+        if (data?.url) {
+          // Open Stripe checkout in a new tab
+          window.open(data.url, '_blank');
+        } else {
+          throw new Error("No checkout URL returned");
+        }
       }
     } catch (error) {
       console.error('Registration error:', error);

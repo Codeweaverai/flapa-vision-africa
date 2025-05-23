@@ -1,16 +1,11 @@
 
-// @ts-ignore - Deno imports will be available when deployed
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; 
-// @ts-ignore - Deno imports will be available when deployed
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"; 
-// @ts-ignore - Deno imports will be available when deployed
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
-// @ts-ignore - Deno namespace available at runtime in Supabase Edge Functions
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '');
 
-// @ts-ignore - Deno serve method available at runtime
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -29,9 +24,7 @@ Deno.serve(async (req) => {
 
     // Create a Supabase client with the auth header
     const supabaseClient = createClient(
-      // @ts-ignore - Deno env available at runtime
       Deno.env.get('SUPABASE_URL') || '',
-      // @ts-ignore - Deno env available at runtime
       Deno.env.get('SUPABASE_ANON_KEY') || '',
       {
         global: {
@@ -53,10 +46,10 @@ Deno.serve(async (req) => {
     }
 
     // Get the request body
-    const { courseId, eventId, returnUrl } = await req.json();
+    const { eventId, returnUrl } = await req.json();
 
-    if (!courseId && !eventId) {
-      throw new Error('Missing courseId or eventId in request body');
+    if (!eventId) {
+      throw new Error('Missing eventId in request body');
     }
 
     if (!returnUrl) {
@@ -83,80 +76,39 @@ Deno.serve(async (req) => {
       customerId = customer.id;
     }
 
-    let lineItems = [];
-    let successUrl = returnUrl;
-    let metadata = {};
+    // Get event details from Supabase
+    const { data: event, error: eventError } = await supabaseClient
+      .from('events')
+      .select('*')
+      .eq('id', eventId)
+      .single();
 
-    // Set up the appropriate line items and success URL based on whether it's a course or event
-    if (courseId) {
-      // Get course details
-      const { data: course, error: courseError } = await supabaseClient
-        .from('courses')
-        .select('*')
-        .eq('id', courseId)
-        .single();
-
-      if (courseError) {
-        throw new Error('Failed to fetch course');
-      }
-
-      lineItems = [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Course: ${course.title}`,
-              description: course.description,
-              images: course.thumbnail_url ? [course.thumbnail_url] : [],
-            },
-            unit_amount: Math.round(Number(course.price || 0) * 100),
-          },
-          quantity: 1,
-        },
-      ];
-
-      metadata = {
-        type: 'course',
-        courseId: courseId,
-        userId: user.id,
-      };
-
-      successUrl = `${returnUrl}?type=course&id=${courseId}&session={CHECKOUT_SESSION_ID}`;
-    } else if (eventId) {
-      // Get event details
-      const { data: event, error: eventError } = await supabaseClient
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single();
-
-      if (eventError) {
-        throw new Error('Failed to fetch event');
-      }
-
-      lineItems = [
-        {
-          price_data: {
-            currency: event.currency?.toLowerCase() || 'usd',
-            product_data: {
-              name: `Event: ${event.title}`,
-              description: event.description,
-              images: event.image_url ? [event.image_url] : [],
-            },
-            unit_amount: Math.round(Number(event.price || 0) * 100),
-          },
-          quantity: 1,
-        },
-      ];
-
-      metadata = {
-        type: 'event',
-        eventId: eventId,
-        userId: user.id,
-      };
-
-      successUrl = `${returnUrl}?type=event&id=${eventId}&session={CHECKOUT_SESSION_ID}`;
+    if (eventError || !event) {
+      throw new Error('Failed to fetch event details');
     }
+
+    // Create line items for Stripe checkout
+    const lineItems = [
+      {
+        price_data: {
+          currency: event.currency?.toLowerCase() || 'usd',
+          product_data: {
+            name: `Event: ${event.title}`,
+            description: event.description || 'Event registration',
+            images: event.image_url ? [event.image_url] : [],
+          },
+          unit_amount: Math.round(Number(event.price || 0) * 100),
+        },
+        quantity: 1,
+      },
+    ];
+
+    // Set up metadata for the session
+    const metadata = {
+      type: 'event',
+      eventId: eventId,
+      userId: user.id,
+    };
 
     // Create a Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -164,7 +116,7 @@ Deno.serve(async (req) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: successUrl,
+      success_url: returnUrl,
       cancel_url: `${returnUrl}?canceled=true`,
       metadata: metadata,
     });
@@ -174,6 +126,7 @@ Deno.serve(async (req) => {
       status: 200,
     });
   } catch (error) {
+    console.error('Checkout session error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

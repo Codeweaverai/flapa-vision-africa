@@ -170,7 +170,7 @@ export const createCommunityComment = async (
   }
 };
 
-// Add the missing chat message functions
+// Chat message functions
 export const fetchChatMessages = async (): Promise<CommunityMessage[]> => {
   try {
     const { data, error } = await supabase
@@ -234,7 +234,7 @@ export const sendChatMessage = async (
   }
 };
 
-// Add the missing notification functions
+// Notification functions
 export const fetchUserNotifications = async (userId: string): Promise<Notification[]> => {
   try {
     if (!userId) {
@@ -303,4 +303,78 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<boolea
     toast.error('Failed to update notifications');
     return false;
   }
+};
+
+// Configure Realtime subscriptions
+export const subscribeToPostComments = (postId: string, onNewComment: (comment: Comment) => void) => {
+  const channel = supabase
+    .channel('post_comments_channel')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'post_comments',
+        filter: `post_id=eq.${postId}`
+      },
+      async (payload) => {
+        console.log('New comment received:', payload);
+        // Fetch complete comment data with user profile
+        const { data, error } = await supabase
+          .from('post_comments')
+          .select(`
+            id,
+            post_id,
+            user_id,
+            content,
+            created_at,
+            profiles: user_id (id, username, full_name, avatar_url)
+          `)
+          .eq('id', payload.new.id)
+          .single();
+          
+        if (!error && data) {
+          onNewComment(data as unknown as Comment);
+        }
+      }
+    )
+    .subscribe();
+    
+  return channel;
+};
+
+export const subscribeToChatMessages = (
+  channel: string = 'general', 
+  onNewMessage: (message: CommunityMessage) => void
+) => {
+  const realtimeChannel = supabase
+    .channel('chat_messages_channel')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'community_messages',
+        filter: `channel=eq.${channel}`
+      },
+      async (payload) => {
+        console.log('New chat message received:', payload);
+        // Fetch complete message data with user profile
+        const { data, error } = await supabase
+          .from('community_messages')
+          .select(`
+            *,
+            profiles: user_id (username, full_name, avatar_url)
+          `)
+          .eq('id', payload.new.id)
+          .single();
+          
+        if (!error && data) {
+          onNewMessage(data as unknown as CommunityMessage);
+        }
+      }
+    )
+    .subscribe();
+    
+  return realtimeChannel;
 };
