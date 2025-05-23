@@ -10,6 +10,7 @@ import EventsSection from '@/components/home/EventsSection';
 import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
 import CallToAction from '@/components/home/CallToAction';
+import VideoHeroSection from '@/components/home/VideoHeroSection';
 
 const Index = () => {
   return (
@@ -18,6 +19,7 @@ const Index = () => {
       <AboutSection />
       <VenturesSection />
       <CoursesSection />
+      <VideoHeroSection />
       <MediaSection />
       <AnimationsSection />
       <SpeakingSection />
