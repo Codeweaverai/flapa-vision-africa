@@ -15,9 +15,57 @@ import { toast } from 'sonner';
 import { 
   CommunityPost, 
   fetchCommunityPosts, 
-  createCommunityPost 
+  createCommunityPost,
+  createCommunityComment 
 } from '@/services/communityService';
 import { supabase } from '@/lib/supabaseClient';
+
+interface CommentFormProps {
+  postId: string;
+  onCommentSubmit: () => void;
+}
+
+const CommentForm: React.FC<CommentFormProps> = ({ postId, onCommentSubmit }) => {
+  const { user } = useAuth();
+  const [content, setContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!content.trim()) {
+      toast.error("Comment cannot be empty");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      await createCommunityComment(user?.id || '', postId, content);
+      setContent('');
+      onCommentSubmit();
+    } catch (error) {
+      console.error("Error submitting comment:", error);
+      toast.error("Failed to submit comment");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-2 flex gap-2">
+      <Input 
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Write a reply..."
+        className="flex-1"
+      />
+      <Button type="submit" size="sm" disabled={isSubmitting}>
+        {isSubmitting ? 'Posting...' : <Send className="h-4 w-4" />}
+      </Button>
+    </form>
+  );
+};
 
 const CommunityPage = () => {
   const { user } = useAuth();
@@ -29,6 +77,7 @@ const CommunityPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showNewPostForm, setShowNewPostForm] = useState(false);
   const [activeTab, setActiveTab] = useState('feed');
+  const [activeReplyPostId, setActiveReplyPostId] = useState<string | null>(null);
 
   // Redirect to login if not authenticated
   if (!user) {
@@ -48,8 +97,19 @@ const CommunityPage = () => {
           table: 'community_posts' 
         }, 
         (payload) => {
-          console.log('Change received!', payload);
+          console.log('Post change received!', payload);
           loadPosts(); // Reload all posts when there's a change
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'post_comments' 
+        }, 
+        (payload) => {
+          console.log('Comment change received!', payload);
+          loadPosts(); // Reload posts when comments change
         }
       )
       .subscribe();
@@ -102,6 +162,10 @@ const CommunityPage = () => {
         navigate('/community/notifications');
         break;
     }
+  };
+
+  const toggleReplyForm = (postId: string) => {
+    setActiveReplyPostId(activeReplyPostId === postId ? null : postId);
   };
 
   return (
@@ -192,13 +256,57 @@ const CommunityPage = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="whitespace-pre-line">{post.content}</p>
+                  
+                  {/* Comments section */}
+                  {post.comments && post.comments.length > 0 && (
+                    <div className="mt-6">
+                      <Separator className="my-4" />
+                      <h4 className="text-sm font-medium mb-3">Replies</h4>
+                      <div className="space-y-4">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3 items-start">
+                            <Avatar className="h-8 w-8">
+                              {comment.profiles?.avatar_url ? (
+                                <AvatarImage src={comment.profiles.avatar_url} alt={comment.profiles.username || 'User'} />
+                              ) : (
+                                <AvatarFallback>
+                                  <User className="h-3 w-3" />
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-muted p-3 rounded-md">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium">{comment.profiles?.full_name || comment.profiles?.username || 'Anonymous'}</span>
+                                  <span className="text-xs text-muted-foreground">{format(new Date(comment.created_at), 'MMM d, yyyy')}</span>
+                                </div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter className="bg-muted/20 py-2">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-muted-foreground"
+                    onClick={() => toggleReplyForm(post.id)}
+                  >
                     <MessageCircle className="h-4 w-4 mr-1" />
                     Reply
                   </Button>
                 </CardFooter>
+                
+                {/* Reply form */}
+                {activeReplyPostId === post.id && (
+                  <div className="px-4 pb-4">
+                    <CommentForm postId={post.id} onCommentSubmit={loadPosts} />
+                  </div>
+                )}
               </Card>
             ))}
           </div>
