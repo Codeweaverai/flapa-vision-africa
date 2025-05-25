@@ -18,3 +18,15 @@ export function formatDate(date: string | Date): string {
     return String(date);
   }
 }
+
+export function formatDateTime(date: string | Date): string {
+  if (!date) return '';
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return format(dateObj, 'PPp');
+  } catch (error) {
+    console.error('Error formatting date time:', error);
+    return String(date);
+  }
+}

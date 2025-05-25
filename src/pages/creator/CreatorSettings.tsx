@@ -62,12 +62,21 @@ const CreatorSettings = () => {
       if (error) throw error;
 
       if (data) {
-        setProfile(data);
-        if (data.payout_method && typeof data.payout_method === 'string') {
-          setProfile(prev => prev ? { ...prev, payout_method: data.payout_method as 'stripe' | 'mobile_money' | 'bank' } : null);
-        }
+        const profileData: Profile = {
+          id: data.id,
+          username: data.username,
+          full_name: data.full_name,
+          bio: data.bio,
+          avatar_url: data.avatar_url,
+          is_creator: data.is_creator,
+          payout_method: data.payout_method as 'stripe' | 'mobile_money' | 'bank',
+          mobile_money_number: data.mobile_money_number,
+        };
+
+        setProfile(profileData);
+
         if (data.bank_account_details && typeof data.bank_account_details === 'object') {
-          setBankDetails(data.bank_account_details as BankAccountDetails);
+          setBankDetails(data.bank_account_details as unknown as BankAccountDetails);
         }
       }
     } catch (error) {
@@ -107,7 +116,7 @@ const CreatorSettings = () => {
         is_creator: profile.is_creator,
         payout_method: profile.payout_method,
         mobile_money_number: profile.mobile_money_number,
-        bank_account_details: bankDetails as any,
+        bank_account_details: bankDetails,
         updated_at: new Date().toISOString()
       };
 
@@ -168,7 +177,6 @@ const CreatorSettings = () => {
             <div className="space-y-4">
               <Label htmlFor="avatar">Profile Picture</Label>
               <ProfilePictureUpload
-                existingUrl={profile.avatar_url || ''}
                 onUploadComplete={handleAvatarUpload}
               />
             </div>

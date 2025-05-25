@@ -24,7 +24,7 @@ interface EventRegistration {
   updated_at: string;
   events: {
     title: string;
-  };
+  } | null;
   profiles: {
     full_name: string;
     email: string;
@@ -42,7 +42,7 @@ interface CourseEnrollment {
   completion_date: string | null;
   courses: {
     title: string;
-  };
+  } | null;
   profiles: {
     full_name: string;
     email: string;
@@ -84,8 +84,17 @@ const AdminRegistrations = () => {
 
       if (courseError) throw courseError;
 
-      setEventRegistrations(eventRegs || []);
-      setCourseEnrollments(courseEnrolls || []);
+      // Filter out registrations with profile errors
+      const validEventRegs = (eventRegs || []).filter(reg => 
+        reg.profiles && typeof reg.profiles === 'object' && 'full_name' in reg.profiles
+      ) as EventRegistration[];
+
+      const validCourseEnrolls = (courseEnrolls || []).filter(enroll => 
+        enroll.profiles && typeof enroll.profiles === 'object' && 'full_name' in enroll.profiles
+      ) as CourseEnrollment[];
+
+      setEventRegistrations(validEventRegs);
+      setCourseEnrollments(validCourseEnrolls);
     } catch (error) {
       console.error('Error loading registrations:', error);
       toast.error('Failed to load registrations');

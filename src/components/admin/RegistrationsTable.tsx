@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Table,
@@ -12,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Edit, Eye, Trash2 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
-import { RegistrationEditDialog } from './RegistrationEditDialog';
+import RegistrationEditDialog from './RegistrationEditDialog';
 
 export interface RegistrationItem {
   id: string;
@@ -33,6 +32,8 @@ export interface RegistrationItem {
 
 interface CombinedRegistration extends RegistrationItem {
   event_id?: string;
+  phone_number?: string;
+  mobile_operator?: string;
   user?: {
     id: string;
     full_name: string;
