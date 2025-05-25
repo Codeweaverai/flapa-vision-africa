@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Edit, Eye, Trash2 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import RegistrationEditDialog from './RegistrationEditDialog';
+import { CombinedRegistration } from '@/types/eventTypes';
 
 export interface RegistrationItem {
   id: string;
@@ -28,17 +29,6 @@ export interface RegistrationItem {
   payment_currency: string | null;
   payment_method: string | null;
   type: string;
-}
-
-interface CombinedRegistration extends RegistrationItem {
-  event_id?: string;
-  phone_number?: string;
-  mobile_operator?: string;
-  user?: {
-    id: string;
-    full_name: string;
-    email: string;
-  };
 }
 
 interface RegistrationsTableProps {
@@ -88,12 +78,18 @@ const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
 
   const handleEdit = (registration: RegistrationItem) => {
     const combinedRegistration: CombinedRegistration = {
-      ...registration,
-      event_id: registration.entity_type === 'event' ? registration.entity_id : undefined,
+      id: registration.id,
+      event_id: registration.entity_type === 'event' ? registration.entity_id : '',
+      user_id: registration.user_id,
+      registration_date: registration.created_at,
+      created_at: registration.created_at,
+      status: registration.status,
+      payment_status: registration.payment_status,
+      phone_number: '',
+      mobile_operator: '',
       user: {
-        id: registration.user_id,
-        full_name: registration.user_name,
         email: registration.user_email,
+        full_name: registration.user_name,
       },
     };
     setSelectedRegistration(combinedRegistration);

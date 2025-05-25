@@ -84,14 +84,24 @@ const AdminRegistrations = () => {
 
       if (courseError) throw courseError;
 
-      // Filter out registrations with profile errors
-      const validEventRegs = (eventRegs || []).filter(reg => 
-        reg.profiles && typeof reg.profiles === 'object' && 'full_name' in reg.profiles
-      ) as EventRegistration[];
+      // Filter out registrations with invalid profile data
+      const validEventRegs = (eventRegs || []).filter(reg => {
+        return reg.profiles && 
+               typeof reg.profiles === 'object' && 
+               reg.profiles !== null &&
+               !('error' in reg.profiles) &&
+               'full_name' in reg.profiles &&
+               'email' in reg.profiles;
+      }) as EventRegistration[];
 
-      const validCourseEnrolls = (courseEnrolls || []).filter(enroll => 
-        enroll.profiles && typeof enroll.profiles === 'object' && 'full_name' in enroll.profiles
-      ) as CourseEnrollment[];
+      const validCourseEnrolls = (courseEnrolls || []).filter(enroll => {
+        return enroll.profiles && 
+               typeof enroll.profiles === 'object' && 
+               enroll.profiles !== null &&
+               !('error' in enroll.profiles) &&
+               'full_name' in enroll.profiles &&
+               'email' in enroll.profiles;
+      }) as CourseEnrollment[];
 
       setEventRegistrations(validEventRegs);
       setCourseEnrollments(validCourseEnrolls);

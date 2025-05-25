@@ -116,7 +116,7 @@ const CreatorSettings = () => {
         is_creator: profile.is_creator,
         payout_method: profile.payout_method,
         mobile_money_number: profile.mobile_money_number,
-        bank_account_details: bankDetails,
+        bank_account_details: bankDetails as any,
         updated_at: new Date().toISOString()
       };
 
