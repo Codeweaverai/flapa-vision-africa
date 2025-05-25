@@ -116,14 +116,12 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
     setSubmitting(true);
     
     try {
-      // Validate dates
       if (new Date(event.start_time!) > new Date(event.end_time!)) {
         toast.error('End time must be after start time');
         setSubmitting(false);
         return;
       }
       
-      // Get current user from auth context
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
         toast.error('Not authenticated');
@@ -135,24 +133,22 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
       let imageUrl = event.image_url;
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
-        // Generate unique filename using UUID and timestamp
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        // Upload to the event-images bucket
-        const { error: uploadError, data: uploadData } = await supabase.storage
+        const filePath = `event-images/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
           .from('event-images')
-          .upload(fileName, imageFile);
+          .upload(filePath, imageFile);
           
         if (uploadError) throw uploadError;
         
-        // Get the public URL for the uploaded image
         const { data: urlData } = supabase.storage
           .from('event-images')
-          .getPublicUrl(fileName);
+          .getPublicUrl(filePath);
           
         imageUrl = urlData.publicUrl;
       }
       
-      // Ensure event_type is lowercase to match database constraints
       const processedEventData = {
         ...event,
         event_type: event.event_type?.toLowerCase(),
@@ -160,7 +156,6 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
       };
       
       if (isEditing && eventId) {
-        // Update existing event
         const { error } = await supabase
           .from('events')
           .update({
@@ -174,10 +169,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
         toast.success('Event updated successfully');
         navigate(isCreator ? '/creator/events' : '/admin/events');
       } else {
-        // Create new event
-        // Use the passed creatorId or current user's ID
         const effectiveCreatorId = creatorId || userData.user.id;
-
         const newEvent = await createEventWithCreator(processedEventData, effectiveCreatorId);
         
         if (newEvent) {
@@ -414,7 +406,7 @@ const EventForm = ({ isCreator = false, creatorId }: EventFormProps) => {
                 <div className="mt-2">
                   <img 
                     src={event.image_url} 
-                    alt="Event" 
+                    alt="Current event image" 
                     className="max-h-48 rounded-md" 
                   />
                 </div>

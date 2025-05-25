@@ -49,6 +49,16 @@ interface CourseEnrollment {
   } | null;
 }
 
+// Type guards
+const isValidProfile = (profile: any): profile is { full_name: string; email: string } => {
+  return profile && 
+         typeof profile === 'object' && 
+         profile !== null &&
+         !('error' in profile) &&
+         typeof profile.full_name === 'string' &&
+         typeof profile.email === 'string';
+};
+
 const AdminRegistrations = () => {
   const [eventRegistrations, setEventRegistrations] = useState<EventRegistration[]>([]);
   const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollment[]>([]);
@@ -84,24 +94,14 @@ const AdminRegistrations = () => {
 
       if (courseError) throw courseError;
 
-      // Filter out registrations with invalid profile data
-      const validEventRegs = (eventRegs || []).filter(reg => {
-        return reg.profiles && 
-               typeof reg.profiles === 'object' && 
-               reg.profiles !== null &&
-               !('error' in reg.profiles) &&
-               'full_name' in reg.profiles &&
-               'email' in reg.profiles;
-      }) as EventRegistration[];
+      // Filter out registrations with invalid profile data using type guards
+      const validEventRegs: EventRegistration[] = (eventRegs || []).filter((reg): reg is EventRegistration => {
+        return isValidProfile(reg.profiles);
+      });
 
-      const validCourseEnrolls = (courseEnrolls || []).filter(enroll => {
-        return enroll.profiles && 
-               typeof enroll.profiles === 'object' && 
-               enroll.profiles !== null &&
-               !('error' in enroll.profiles) &&
-               'full_name' in enroll.profiles &&
-               'email' in enroll.profiles;
-      }) as CourseEnrollment[];
+      const validCourseEnrolls: CourseEnrollment[] = (courseEnrolls || []).filter((enroll): enroll is CourseEnrollment => {
+        return isValidProfile(enroll.profiles);
+      });
 
       setEventRegistrations(validEventRegs);
       setCourseEnrollments(validCourseEnrolls);

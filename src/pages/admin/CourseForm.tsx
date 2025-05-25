@@ -110,13 +110,11 @@ const CourseForm = ({ creatorId, isCreator = false }: CourseFormProps) => {
       let thumbnailUrl = course.thumbnail_url;
       if (thumbnailFile) {
         const fileExt = thumbnailFile.name.split('.').pop();
-        // Generate a unique filename using UUID and current timestamp
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        // Use the correct path: course-materials/courses/posts/[filename]
-        const filePath = `courses/posts/${fileName}`;
+        const filePath = `thumbnails/${fileName}`;
 
-        const { error: uploadError, data: uploadData } = await supabase.storage
-          .from('course-materials')
+        const { error: uploadError } = await supabase.storage
+          .from('courses')
           .upload(filePath, thumbnailFile);
 
         if (uploadError) {
@@ -124,14 +122,13 @@ const CourseForm = ({ creatorId, isCreator = false }: CourseFormProps) => {
         }
 
         const { data: urlData } = supabase.storage
-          .from('course-materials')
+          .from('courses')
           .getPublicUrl(filePath);
 
         thumbnailUrl = urlData.publicUrl;
       }
 
       if (isEditing && courseId) {
-        // Update existing course
         const result = await updateCourse(courseId, {
           ...course,
           thumbnail_url: thumbnailUrl
@@ -142,8 +139,6 @@ const CourseForm = ({ creatorId, isCreator = false }: CourseFormProps) => {
           navigate(isCreator ? '/creator/courses' : '/admin/courses');
         }
       } else {
-        // Create new course, making sure all required fields are included
-        // Use the provided creatorId if available, otherwise use the current user's id
         const effectiveCreatorId = creatorId || userData.user.id;
         
         const result = await createCourseWithCreator({
@@ -314,16 +309,18 @@ const CourseForm = ({ creatorId, isCreator = false }: CourseFormProps) => {
               </div>
 
               <div>
-                <Label htmlFor="thumbnail_url">Course Thumbnail</Label>
+                <Label htmlFor="thumbnail_file">Course Thumbnail</Label>
                 <Input
                   type="file"
-                  id="thumbnail_url"
-                  name="thumbnail_url"
+                  id="thumbnail_file"
+                  name="thumbnail_file"
                   accept="image/*"
                   onChange={handleThumbnailChange}
                 />
                 {course.thumbnail_url && typeof course.thumbnail_url === 'string' && (
-                  <img src={course.thumbnail_url} alt="Thumbnail" className="mt-2 max-h-40" />
+                  <div className="mt-2">
+                    <img src={course.thumbnail_url} alt="Current thumbnail" className="max-h-40 rounded-md" />
+                  </div>
                 )}
               </div>
 
