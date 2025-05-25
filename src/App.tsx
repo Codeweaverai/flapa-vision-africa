@@ -143,10 +143,10 @@ function App() {
         <Route path="/creator/dashboard" element={<CreatorDashboard />} />
         <Route path="/creator/analytics" element={<CreatorAnalytics />} />
         <Route path="/creator/courses" element={<CreatorCourses />} />
-        <Route path="/creator/courses/new" element={<CreatorCourseForm />} />
+        <Route path="/creator/courses/create" element={<CreatorCourseForm />} />
         <Route path="/creator/courses/edit/:id" element={<CreatorCourseForm />} />
         <Route path="/creator/events" element={<CreatorEvents />} />
-        <Route path="/creator/events/new" element={<CreatorEventForm />} />
+        <Route path="/creator/events/create" element={<CreatorEventForm />} />
         <Route path="/creator/events/edit/:id" element={<CreatorEventForm />} />
         <Route path="/creator/events/:id/registrations" element={<CreatorEventRegistrations />} />
         <Route path="/creator/students" element={<CreatorStudents />} />

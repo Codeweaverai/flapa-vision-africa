@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -94,12 +93,9 @@ const Navbar = () => {
       <div className="container mx-auto px-4 flex h-20 items-center justify-between">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center">
-            <img 
-              src="/placeholder.svg" 
-              alt="Logo" 
-              className="h-10 w-10 mr-2"
-            />
-            <span className="font-bold text-xl">Skillpulse</span>
+            <span className="font-bold text-xl bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+              SkillPulse
+            </span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
@@ -219,7 +215,11 @@ const Navbar = () => {
             </SheetTrigger>
             <SheetContent>
               <SheetHeader className="mb-4">
-                <SheetTitle>Skillpulse</SheetTitle>
+                <SheetTitle>
+                  <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                    SkillPulse
+                  </span>
+                </SheetTitle>
                 <SheetDescription>Navigate through our platform</SheetDescription>
               </SheetHeader>
               <nav className="flex flex-col space-y-4">

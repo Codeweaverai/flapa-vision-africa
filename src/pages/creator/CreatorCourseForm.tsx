@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
+import CreatorLayout from '@/components/creator/CreatorLayout';
 
 interface CourseFormData {
   title?: string;
@@ -30,7 +32,7 @@ interface CourseFormData {
 const CreatorCourseForm = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { courseId } = useParams<{ courseId?: string }>();
+  const { id: courseId } = useParams<{ id?: string }>();
   const [formData, setFormData] = useState<CourseFormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -172,8 +174,8 @@ const CreatorCourseForm = () => {
         toast.success("Course created successfully!");
       }
       
-      // Redirect to course content page for module/lesson management
-      navigate(`/creator/courses/${result.id}/content`);
+      // Redirect to courses list
+      navigate('/creator/courses');
     } catch (error) {
       console.error('Error saving course:', error);
       toast.error("Failed to save course");
@@ -183,8 +185,8 @@ const CreatorCourseForm = () => {
   };
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="mb-8">
+    <CreatorLayout title={courseId ? 'Edit Course' : 'Create New Course'}>
+      <div className="mb-6">
         <Button asChild variant="ghost">
           <Link to="/creator/courses" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
@@ -338,13 +340,25 @@ const CreatorCourseForm = () => {
               />
             </div>
 
-            <Button disabled={isSubmitting} type="submit">
-              {isSubmitting ? 'Submitting...' : 'Save Course'}
-            </Button>
+            <div className="flex gap-4">
+              <Button disabled={isSubmitting} type="submit">
+                {isSubmitting ? 'Submitting...' : 'Save Course'}
+              </Button>
+              
+              {courseId && (
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => navigate(`/creator/courses/${courseId}/content`)}
+                >
+                  Course Content
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
-    </div>
+    </CreatorLayout>
   );
 };
 
