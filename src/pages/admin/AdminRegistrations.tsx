@@ -20,6 +20,7 @@ interface EventRegistration {
   payment_method: string | null;
   mobile_operator: string | null;
   phone_number: string | null;
+  payment_id: string | null;
   created_at: string;
   updated_at: string;
   events: {
@@ -49,7 +50,49 @@ interface CourseEnrollment {
   } | null;
 }
 
-// Type guards
+// Raw data types from Supabase
+interface RawEventRegistration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: string;
+  payment_status: string;
+  payment_amount: number | null;
+  payment_currency: string | null;
+  payment_method: string | null;
+  mobile_operator: string | null;
+  phone_number: string | null;
+  payment_id: string | null;
+  created_at: string;
+  updated_at: string;
+  events: {
+    title: string;
+  } | null;
+  profiles: {
+    full_name: string;
+    email: string;
+  } | null | any;
+}
+
+interface RawCourseEnrollment {
+  id: string;
+  course_id: string;
+  user_id: string;
+  enrollment_date: string;
+  is_completed: boolean;
+  payment_status: string;
+  payment_id: string | null;
+  completion_date: string | null;
+  courses: {
+    title: string;
+  } | null;
+  profiles: {
+    full_name: string;
+    email: string;
+  } | null | any;
+}
+
+// Type guards for validating profile data
 const isValidProfile = (profile: any): profile is { full_name: string; email: string } => {
   return profile && 
          typeof profile === 'object' && 
@@ -57,6 +100,14 @@ const isValidProfile = (profile: any): profile is { full_name: string; email: st
          !('error' in profile) &&
          typeof profile.full_name === 'string' &&
          typeof profile.email === 'string';
+};
+
+const isValidEventRegistration = (reg: RawEventRegistration): reg is EventRegistration => {
+  return isValidProfile(reg.profiles);
+};
+
+const isValidCourseEnrollment = (enroll: RawCourseEnrollment): enroll is CourseEnrollment => {
+  return isValidProfile(enroll.profiles);
 };
 
 const AdminRegistrations = () => {
@@ -95,13 +146,8 @@ const AdminRegistrations = () => {
       if (courseError) throw courseError;
 
       // Filter out registrations with invalid profile data using type guards
-      const validEventRegs: EventRegistration[] = (eventRegs || []).filter((reg): reg is EventRegistration => {
-        return isValidProfile(reg.profiles);
-      });
-
-      const validCourseEnrolls: CourseEnrollment[] = (courseEnrolls || []).filter((enroll): enroll is CourseEnrollment => {
-        return isValidProfile(enroll.profiles);
-      });
+      const validEventRegs = (eventRegs as RawEventRegistration[] || []).filter(isValidEventRegistration);
+      const validCourseEnrolls = (courseEnrolls as RawCourseEnrollment[] || []).filter(isValidCourseEnrollment);
 
       setEventRegistrations(validEventRegs);
       setCourseEnrollments(validCourseEnrolls);
