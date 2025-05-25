@@ -2,19 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Save, User, CreditCard, Settings } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
-import { supabase } from '@/lib/supabaseClient';
 
 interface BankAccountDetails {
   account_name: string;
@@ -23,23 +20,28 @@ interface BankAccountDetails {
   branch_code: string;
 }
 
-interface ProfileData {
+interface Profile {
+  id: string;
   username?: string;
   full_name?: string;
   bio?: string;
-  is_creator?: boolean;
-  mobile_money_number?: string;
-  payout_method?: 'stripe' | 'mobile_money' | 'bank';
-  bank_account_details?: BankAccountDetails | null;
   avatar_url?: string;
+  is_creator?: boolean;
+  payout_method?: 'stripe' | 'mobile_money' | 'bank';
+  mobile_money_number?: string;
+  bank_account_details?: BankAccountDetails;
 }
 
 const CreatorSettings = () => {
   const { user } = useAuth();
-  const [profileData, setProfileData] = useState<ProfileData>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bankDetails, setBankDetails] = useState<BankAccountDetails>({
+    account_name: '',
+    account_number: '',
+    bank_name: '',
+    branch_code: ''
+  });
 
   useEffect(() => {
     if (user) {
@@ -49,8 +51,7 @@ const CreatorSettings = () => {
 
   const loadProfile = async () => {
     if (!user) return;
-    
-    setLoading(true);
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -58,152 +59,130 @@ const CreatorSettings = () => {
         .eq('id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data) {
-        setProfileData({
-          username: data.username || '',
-          full_name: data.full_name || '',
-          bio: data.bio || '',
-          is_creator: data.is_creator || false,
-          mobile_money_number: data.mobile_money_number || '',
-          payout_method: data.payout_method || 'stripe',
-          bank_account_details: data.bank_account_details as BankAccountDetails || null,
-          avatar_url: data.avatar_url || '',
-        });
+        setProfile(data);
+        if (data.payout_method && typeof data.payout_method === 'string') {
+          setProfile(prev => prev ? { ...prev, payout_method: data.payout_method as 'stripe' | 'mobile_money' | 'bank' } : null);
+        }
+        if (data.bank_account_details && typeof data.bank_account_details === 'object') {
+          setBankDetails(data.bank_account_details as BankAccountDetails);
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
-      toast.error('Failed to load profile data');
-    } finally {
-      setLoading(false);
+      toast.error('Failed to load profile');
     }
   };
 
-  const handleInputChange = (field: keyof ProfileData, value: string | boolean) => {
-    setProfileData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setProfile(prev => prev ? { ...prev, [name]: value } : null);
   };
 
-  const handleBankDetailsChange = (field: keyof BankAccountDetails, value: string) => {
-    setProfileData(prev => ({
-      ...prev,
-      bank_account_details: {
-        ...prev.bank_account_details as BankAccountDetails,
-        [field]: value
-      }
-    }));
+  const handleBankDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setBankDetails(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveProfile = async () => {
-    if (!user) return;
-    
-    setSaving(true);
+  const handlePayoutMethodChange = (value: string) => {
+    setProfile(prev => prev ? { 
+      ...prev, 
+      payout_method: value as 'stripe' | 'mobile_money' | 'bank' 
+    } : null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !profile) return;
+
+    setIsSubmitting(true);
+
     try {
       const updateData = {
-        username: profileData.username,
-        full_name: profileData.full_name,
-        bio: profileData.bio,
-        is_creator: profileData.is_creator,
-        mobile_money_number: profileData.mobile_money_number,
-        payout_method: profileData.payout_method,
-        bank_account_details: profileData.bank_account_details as any,
-        updated_at: new Date().toISOString(),
+        username: profile.username,
+        full_name: profile.full_name,
+        bio: profile.bio,
+        is_creator: profile.is_creator,
+        payout_method: profile.payout_method,
+        mobile_money_number: profile.mobile_money_number,
+        bank_account_details: bankDetails as any,
+        updated_at: new Date().toISOString()
       };
 
       const { error } = await supabase
         .from('profiles')
-        .upsert({ id: user.id, ...updateData });
+        .update(updateData)
+        .eq('id', user.id);
 
       if (error) throw error;
 
-      toast.success('Profile updated successfully');
+      toast.success('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('Failed to update profile');
     } finally {
-      setSaving(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleAvatarUpload = (url: string) => {
-    setProfileData(prev => ({ ...prev, avatar_url: url }));
-    toast.success('Avatar updated successfully');
+  const handleAvatarUpload = async (newAvatarUrl: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: newAvatarUrl })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, avatar_url: newAvatarUrl } : null);
+      toast.success('Profile picture updated successfully!');
+    } catch (error) {
+      console.error('Error updating avatar:', error);
+      toast.error('Failed to update profile picture');
+    }
   };
 
-  if (loading) {
+  if (!profile) {
     return (
       <CreatorLayout title="Settings">
-        <div className="flex justify-center my-12">
+        <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </CreatorLayout>
     );
   }
 
-  const bankDetails = profileData.bank_account_details as BankAccountDetails;
-
   return (
     <CreatorLayout title="Settings">
       <div className="space-y-6">
-        {/* Tab Navigation */}
-        <div className="flex space-x-1 bg-muted p-1 rounded-lg w-fit">
-          <Button 
-            variant={activeTab === 'profile' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('profile')}
-          >
-            <User className="mr-2 h-4 w-4" />
-            Profile
-          </Button>
-          <Button 
-            variant={activeTab === 'payout' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('payout')}
-          >
-            <CreditCard className="mr-2 h-4 w-4" />
-            Payout Settings
-          </Button>
-          <Button 
-            variant={activeTab === 'preferences' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('preferences')}
-          >
-            <Settings className="mr-2 h-4 w-4" />
-            Preferences
-          </Button>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Settings</CardTitle>
+            <CardDescription>Update your profile information and preferences.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <Label htmlFor="avatar">Profile Picture</Label>
+              <ProfilePictureUpload
+                existingUrl={profile.avatar_url || ''}
+                onUploadComplete={handleAvatarUpload}
+              />
+            </div>
 
-        {/* Profile Tab */}
-        {activeTab === 'profile' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal information and profile picture</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center space-x-4">
-                <ProfilePictureUpload
-                  id={user?.id || ''}
-                  existingUrl={profileData.avatar_url || ''}
-                  onUploadComplete={handleAvatarUpload}
-                />
-                <div>
-                  <h3 className="font-medium">Profile Picture</h3>
-                  <p className="text-sm text-muted-foreground">Upload a new profile picture</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="username">Username</Label>
                   <Input
+                    type="text"
                     id="username"
-                    value={profileData.username || ''}
-                    onChange={(e) => handleInputChange('username', e.target.value)}
+                    name="username"
+                    value={profile.username || ''}
+                    onChange={handleChange}
                     placeholder="Enter username"
                   />
                 </div>
@@ -211,9 +190,11 @@ const CreatorSettings = () => {
                 <div>
                   <Label htmlFor="full_name">Full Name</Label>
                   <Input
+                    type="text"
                     id="full_name"
-                    value={profileData.full_name || ''}
-                    onChange={(e) => handleInputChange('full_name', e.target.value)}
+                    name="full_name"
+                    value={profile.full_name || ''}
+                    onChange={handleChange}
                     placeholder="Enter full name"
                   />
                 </div>
@@ -223,142 +204,106 @@ const CreatorSettings = () => {
                 <Label htmlFor="bio">Bio</Label>
                 <Textarea
                   id="bio"
-                  value={profileData.bio || ''}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  name="bio"
+                  value={profile.bio || ''}
+                  onChange={handleChange}
                   placeholder="Tell us about yourself"
-                  className="min-h-[100px]"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="is_creator">Creator Status</Label>
-                  <p className="text-sm text-muted-foreground">Enable creator features</p>
-                </div>
-                <Switch
-                  id="is_creator"
-                  checked={profileData.is_creator || false}
-                  onCheckedChange={(checked) => handleInputChange('is_creator', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              <Separator />
 
-        {/* Payout Settings Tab */}
-        {activeTab === 'payout' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Payout Settings</CardTitle>
-              <CardDescription>Configure how you receive payments</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
               <div>
-                <Label htmlFor="payout_method">Payout Method</Label>
-                <Select 
-                  value={profileData.payout_method || 'stripe'} 
-                  onValueChange={(value) => handleInputChange('payout_method', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select payout method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="stripe">Stripe Connect</SelectItem>
-                    <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                    <SelectItem value="bank">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {profileData.payout_method === 'mobile_money' && (
-                <div>
-                  <Label htmlFor="mobile_money_number">Mobile Money Number</Label>
-                  <Input
-                    id="mobile_money_number"
-                    value={profileData.mobile_money_number || ''}
-                    onChange={(e) => handleInputChange('mobile_money_number', e.target.value)}
-                    placeholder="Enter mobile money number"
-                  />
-                </div>
-              )}
-
-              {profileData.payout_method === 'bank' && (
+                <h3 className="text-lg font-semibold mb-4">Payout Settings</h3>
                 <div className="space-y-4">
-                  <h4 className="font-medium">Bank Account Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="account_name">Account Name</Label>
-                      <Input
-                        id="account_name"
-                        value={bankDetails?.account_name || ''}
-                        onChange={(e) => handleBankDetailsChange('account_name', e.target.value)}
-                        placeholder="Account holder name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="account_number">Account Number</Label>
-                      <Input
-                        id="account_number"
-                        value={bankDetails?.account_number || ''}
-                        onChange={(e) => handleBankDetailsChange('account_number', e.target.value)}
-                        placeholder="Account number"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="bank_name">Bank Name</Label>
-                      <Input
-                        id="bank_name"
-                        value={bankDetails?.bank_name || ''}
-                        onChange={(e) => handleBankDetailsChange('bank_name', e.target.value)}
-                        placeholder="Bank name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="branch_code">Branch Code</Label>
-                      <Input
-                        id="branch_code"
-                        value={bankDetails?.branch_code || ''}
-                        onChange={(e) => handleBankDetailsChange('branch_code', e.target.value)}
-                        placeholder="Branch code"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="payout_method">Payout Method</Label>
+                    <Select 
+                      value={profile.payout_method || 'stripe'} 
+                      onValueChange={handlePayoutMethodChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payout method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stripe">Stripe</SelectItem>
+                        <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                        <SelectItem value="bank">Bank Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-              )}
 
-              {profileData.payout_method === 'stripe' && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Stripe Connect integration will be set up during your first payout request.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                  {profile.payout_method === 'mobile_money' && (
+                    <div>
+                      <Label htmlFor="mobile_money_number">Mobile Money Number</Label>
+                      <Input
+                        type="text"
+                        id="mobile_money_number"
+                        name="mobile_money_number"
+                        value={profile.mobile_money_number || ''}
+                        onChange={handleChange}
+                        placeholder="Enter mobile money number"
+                      />
+                    </div>
+                  )}
 
-        {/* Preferences Tab */}
-        {activeTab === 'preferences' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferences</CardTitle>
-              <CardDescription>Customize your creator experience</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">More preference options coming soon...</p>
+                  {profile.payout_method === 'bank' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="account_name">Account Name</Label>
+                        <Input
+                          type="text"
+                          id="account_name"
+                          name="account_name"
+                          value={bankDetails.account_name}
+                          onChange={handleBankDetailsChange}
+                          placeholder="Account holder name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="account_number">Account Number</Label>
+                        <Input
+                          type="text"
+                          id="account_number"
+                          name="account_number"
+                          value={bankDetails.account_number}
+                          onChange={handleBankDetailsChange}
+                          placeholder="Account number"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bank_name">Bank Name</Label>
+                        <Input
+                          type="text"
+                          id="bank_name"
+                          name="bank_name"
+                          value={bankDetails.bank_name}
+                          onChange={handleBankDetailsChange}
+                          placeholder="Bank name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="branch_code">Branch Code</Label>
+                        <Input
+                          type="text"
+                          id="branch_code"
+                          name="branch_code"
+                          value={bankDetails.branch_code}
+                          onChange={handleBankDetailsChange}
+                          placeholder="Branch code"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <Button onClick={handleSaveProfile} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </div>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Updating...' : 'Update Profile'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </CreatorLayout>
   );

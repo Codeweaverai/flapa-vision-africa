@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Compass, Menu, DollarSign } from 'lucide-react';
+import { Bell, Compass, Menu } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
 
@@ -72,6 +73,7 @@ const Navbar = () => {
     { name: 'Community', path: '/community' },
     { name: 'Media', path: '/media' },
     { name: 'Consult', path: '/consult' },
+    { name: 'Help', path: '/help' },
   ];
 
   const exploreLinks = [

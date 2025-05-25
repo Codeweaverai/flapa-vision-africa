@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -5,14 +6,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import Layout from '@/components/layout/Layout';
-import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle } from 'lucide-react';
+import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Course, CourseModule, checkEnrollmentStatus, enrollInCourse, fetchCourseWithModulesAndLessons } from '@/services/courseService';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
+import ReactPlayer from 'react-player';
 
 const CourseDetailPage = () => {
-  const { courseId } = useParams<{ courseId: string }>();
+  const { id: courseId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
@@ -20,7 +22,6 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [checkingEnrollment, setCheckingEnrollment] = useState(true);
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -30,11 +31,9 @@ const CourseDetailPage = () => {
       const courseData = await fetchCourseWithModulesAndLessons(courseId);
       setCourse(courseData);
       
-      if (user) {
-        checkEnrollmentStatus(user.id, courseId).then(status => {
-          setIsEnrolled(status);
-          setCheckingEnrollment(false);
-        });
+      if (user && courseData) {
+        const status = await checkEnrollmentStatus(user.id, courseId);
+        setIsEnrolled(status);
       }
       
       setLoading(false);
@@ -43,18 +42,10 @@ const CourseDetailPage = () => {
     loadCourse();
   }, [courseId, user]);
 
-  const checkEnrollment = async () => {
-    if (user && course && courseId) {
-      // Pass user.id instead of user object
-      const isEnrolled = await checkEnrollmentStatus(courseId, user.id);
-      setIsEnrolled(isEnrolled);
-    }
-  };
-
   const handleEnroll = async () => {
     if (!user) {
       toast.error('Please log in to enroll in courses');
-      navigate('/auth', { state: { from: `/learning/course/${courseId}` } });
+      navigate('/auth', { state: { from: `/courses/${courseId}` } });
       return;
     }
     
@@ -63,7 +54,6 @@ const CourseDetailPage = () => {
     setEnrolling(true);
     
     try {
-      // Pass user.id instead of user object
       const success = await enrollInCourse(course.id, user.id);
       
       if (success) {
@@ -79,15 +69,17 @@ const CourseDetailPage = () => {
   };
 
   const startCourse = () => {
-    navigate(`/learning/player/${courseId}`);
+    navigate(`/course/${courseId}/learn`);
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="flex justify-center items-center min-h-screen">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+          <div className="container mx-auto px-4 py-16">
+            <div className="flex justify-center items-center min-h-[400px]">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            </div>
           </div>
         </div>
       </Layout>
@@ -97,13 +89,15 @@ const CourseDetailPage = () => {
   if (!course) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
-            <p className="mb-6">The course you are looking for might have been removed or doesn't exist.</p>
-            <Button asChild>
-              <Link to="/learning">Browse Courses</Link>
-            </Button>
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+          <div className="container mx-auto px-4 py-16">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
+              <p className="mb-6 text-gray-600">The course you are looking for might have been removed or doesn't exist.</p>
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600">
+                <Link to="/explore/courses">Browse Courses</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </Layout>
@@ -112,195 +106,233 @@ const CourseDetailPage = () => {
 
   return (
     <Layout>
-      <div className="bg-light-purple">
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-2">
-              <div className="bg-card rounded-lg shadow-lg overflow-hidden">
-                {course.thumbnail_url ? (
-                  <img 
-                    src={course.thumbnail_url} 
-                    alt={course.title} 
-                    className="w-full h-64 object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-64 bg-muted flex items-center justify-center">
-                    <BookOpen className="h-16 w-16 text-muted-foreground/40" />
-                  </div>
-                )}
-                
-                <div className="p-6">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge>{course.category}</Badge>
-                    <Badge variant="outline">{course.difficulty_level}</Badge>
-                    {course.is_free ? (
-                      <Badge variant="secondary">Free</Badge>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+        <div className="container mx-auto px-4 py-16">
+          {/* Hero Section */}
+          <div className="mb-12">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
+                  {/* Course Video/Thumbnail */}
+                  <div className="relative h-64 md:h-80 bg-gradient-to-r from-purple-600 to-orange-500">
+                    {course.thumbnail_url ? (
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={course.thumbnail_url} 
+                          alt={course.title} 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                          <Button 
+                            size="lg" 
+                            className="bg-white/90 text-purple-600 hover:bg-white rounded-full h-16 w-16 p-0"
+                          >
+                            <Play className="h-8 w-8" />
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
-                      <Badge variant="secondary">${course.price}</Badge>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-white text-center">
+                          <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-80" />
+                          <h3 className="text-xl font-semibold">Course Preview</h3>
+                        </div>
+                      </div>
                     )}
                   </div>
                   
-                  <h1 className="text-3xl font-bold mb-4">{course.title}</h1>
-                  
-                  <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mt-6">
-                    <TabsList className="grid w-full grid-cols-3 mb-8">
-                      <TabsTrigger value="overview">Overview</TabsTrigger>
-                      <TabsTrigger value="content">Course Content</TabsTrigger>
-                      <TabsTrigger value="discussion">Discussion</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="overview" className="space-y-6">
-                      <p className="text-lg">{course.summary}</p>
-                      <div className="mt-4">{course.description}</div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <Clock className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Duration</div>
-                          <div>{Math.round(course.duration_minutes / 60)} hours</div>
-                        </div>
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <BookOpen className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Modules</div>
-                          <div>{course.modules?.length || 0}</div>
-                        </div>
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <Award className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Certificate</div>
-                          <div>{course.certificate_enabled ? 'Yes' : 'No'}</div>
-                        </div>
-                        <div className="bg-muted/50 p-4 rounded-lg text-center">
-                          <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
-                          <div className="text-sm font-medium">Community</div>
-                          <div>Active</div>
-                        </div>
+                  <div className="p-8">
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <Badge className="bg-purple-100 text-purple-800 border-purple-200">{course.category}</Badge>
+                      <Badge variant="outline" className="border-orange-200 text-orange-600">{course.difficulty_level}</Badge>
+                      {course.is_free ? (
+                        <Badge className="bg-green-100 text-green-800 border-green-200">Free</Badge>
+                      ) : (
+                        <Badge className="bg-blue-100 text-blue-800 border-blue-200">${course.price}</Badge>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                        <span className="text-sm font-medium">4.8</span>
                       </div>
-                    </TabsContent>
+                    </div>
                     
-                    <TabsContent value="content">
-                      <div className="space-y-6">
-                        {course.modules && course.modules.length > 0 ? (
-                          course.modules.map((module: CourseModule, index) => (
-                            <div key={module.id} className="border rounded-lg overflow-hidden">
-                              <div className="bg-muted p-4 font-medium flex justify-between">
-                                <div>Module {index + 1}: {module.title}</div>
-                                <div className="text-muted-foreground">
-                                  {module.lessons?.length || 0} lessons
-                                </div>
-                              </div>
-                              <div className="divide-y">
-                                {module.lessons?.map((lesson, lessonIndex) => (
-                                  <div key={lesson.id} className="p-4 flex items-center justify-between">
-                                    <div>
-                                      <div className="font-medium">
-                                        {lessonIndex + 1}. {lesson.title}
-                                      </div>
-                                      {lesson.description && (
-                                        <div className="text-sm text-muted-foreground">
-                                          {lesson.description}
-                                        </div>
-                                      )}
-                                    </div>
-                                    {lesson.video_url ? (
-                                      <Badge variant="outline">
-                                        <Play className="h-3 w-3 mr-1" />
-                                        Video
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline">Text</Badge>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center p-12">
-                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
-                            <h3 className="text-lg font-medium mb-2">No content available yet</h3>
-                            <p className="text-muted-foreground">
-                              This course is still being developed. Check back soon!
-                            </p>
-                          </div>
-                        )}
+                    <h1 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
+                      {course.title}
+                    </h1>
+                    
+                    <p className="text-lg text-gray-600 mb-6">{course.summary}</p>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
+                        <Clock className="h-6 w-6 mx-auto mb-2 text-purple-600" />
+                        <div className="text-sm font-medium text-purple-800">Duration</div>
+                        <div className="text-purple-600">{Math.round(course.duration_minutes / 60)} hours</div>
                       </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="discussion">
-                      {/* Course Discussion Section */}
-                      <section className="mt-16">
-                        <CourseDiscussionSection courseId={course.id} />
-                      </section>
-                    </TabsContent>
-                  </Tabs>
+                      <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
+                        <BookOpen className="h-6 w-6 mx-auto mb-2 text-orange-600" />
+                        <div className="text-sm font-medium text-orange-800">Modules</div>
+                        <div className="text-orange-600">{course.modules?.length || 0}</div>
+                      </div>
+                      <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
+                        <Award className="h-6 w-6 mx-auto mb-2 text-purple-600" />
+                        <div className="text-sm font-medium text-purple-800">Certificate</div>
+                        <div className="text-purple-600">{course.certificate_enabled ? 'Yes' : 'No'}</div>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
+                        <Users className="h-6 w-6 mx-auto mb-2 text-orange-600" />
+                        <div className="text-sm font-medium text-orange-800">Students</div>
+                        <div className="text-orange-600">1,234</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="md:col-span-1">
-              <Card className="sticky top-24">
-                <CardContent className="p-6">
-                  {course.is_free ? (
-                    <div className="text-2xl font-bold mb-2">Free</div>
-                  ) : (
-                    <div className="text-2xl font-bold mb-2">${course.price}</div>
-                  )}
-                  
-                  {isEnrolled ? (
-                    <>
-                      <Button className="w-full mb-4" onClick={startCourse}>
-                        <Play className="h-4 w-4 mr-2" />
-                        Continue Learning
-                      </Button>
-                      <div className="flex items-center text-sm text-primary mb-4">
-                        <Check className="h-4 w-4 mr-1" />
-                        <span>You are enrolled in this course</span>
-                      </div>
-                    </>
-                  ) : (
-                    <Button
-                      className="w-full mb-4"
-                      onClick={handleEnroll}
-                      disabled={enrolling}
-                    >
-                      {enrolling ? 'Enrolling...' : 'Enroll Now'}
-                    </Button>
-                  )}
-                  
-                  <Button variant="outline" className="w-full mb-6" asChild>
-                    <Link to={`/community/courses?course=${courseId}`}>
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Join Discussion
-                    </Link>
-                  </Button>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>{Math.round(course.duration_minutes / 60)} hours of content</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>{course.modules?.length || 0} modules</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>Full lifetime access</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-primary mr-3" />
-                      <span>Access on mobile and desktop</span>
-                    </div>
-                    {course.certificate_enabled && (
-                      <div className="flex items-center">
-                        <Check className="h-5 w-5 text-primary mr-3" />
-                        <span>Certificate of completion</span>
-                      </div>
+              
+              {/* Enrollment Card */}
+              <div className="lg:col-span-1">
+                <Card className="sticky top-24 bg-white/80 backdrop-blur-sm border-purple-200 shadow-xl">
+                  <CardContent className="p-6">
+                    {course.is_free ? (
+                      <div className="text-3xl font-bold mb-4 text-green-600">Free</div>
+                    ) : (
+                      <div className="text-3xl font-bold mb-4 text-purple-600">${course.price}</div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+                    
+                    {isEnrolled ? (
+                      <>
+                        <Button 
+                          className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" 
+                          onClick={startCourse}
+                          size="lg"
+                        >
+                          <Play className="h-5 w-5 mr-2" />
+                          Continue Learning
+                        </Button>
+                        <div className="flex items-center text-sm text-green-600 mb-4 bg-green-50 p-3 rounded-lg border border-green-200">
+                          <Check className="h-4 w-4 mr-2" />
+                          <span>You are enrolled in this course</span>
+                        </div>
+                      </>
+                    ) : (
+                      <Button
+                        className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        onClick={handleEnroll}
+                        disabled={enrolling}
+                        size="lg"
+                      >
+                        {enrolling ? 'Enrolling...' : 'Enroll Now'}
+                      </Button>
+                    )}
+                    
+                    <Button variant="outline" className="w-full mb-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
+                      <Link to={`/community/courses?course=${courseId}`}>
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Join Discussion
+                      </Link>
+                    </Button>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center text-green-600">
+                        <Check className="h-5 w-5 mr-3" />
+                        <span className="text-sm">{Math.round(course.duration_minutes / 60)} hours of content</span>
+                      </div>
+                      <div className="flex items-center text-green-600">
+                        <Check className="h-5 w-5 mr-3" />
+                        <span className="text-sm">{course.modules?.length || 0} modules</span>
+                      </div>
+                      <div className="flex items-center text-green-600">
+                        <Check className="h-5 w-5 mr-3" />
+                        <span className="text-sm">Full lifetime access</span>
+                      </div>
+                      <div className="flex items-center text-green-600">
+                        <Check className="h-5 w-5 mr-3" />
+                        <span className="text-sm">Access on mobile and desktop</span>
+                      </div>
+                      {course.certificate_enabled && (
+                        <div className="flex items-center text-green-600">
+                          <Check className="h-5 w-5 mr-3" />
+                          <span className="text-sm">Certificate of completion</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
+          </div>
+
+          {/* Course Content */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-purple-200 p-8">
+            <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3 mb-8 bg-purple-50 border border-purple-200">
+                <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Overview</TabsTrigger>
+                <TabsTrigger value="content" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Course Content</TabsTrigger>
+                <TabsTrigger value="discussion" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Discussion</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="overview" className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold mb-4 text-gray-800">About This Course</h2>
+                  <div className="prose max-w-none text-gray-600">
+                    {course.description}
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="content">
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold mb-6 text-gray-800">Course Content</h2>
+                  {course.modules && course.modules.length > 0 ? (
+                    course.modules.map((module: CourseModule, index) => (
+                      <div key={module.id} className="border border-purple-200 rounded-lg overflow-hidden bg-white/50">
+                        <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-4 font-medium flex justify-between border-b border-purple-200">
+                          <div className="text-gray-800">Module {index + 1}: {module.title}</div>
+                          <div className="text-purple-600">
+                            {module.lessons?.length || 0} lessons
+                          </div>
+                        </div>
+                        <div className="divide-y divide-purple-100">
+                          {module.lessons?.map((lesson, lessonIndex) => (
+                            <div key={lesson.id} className="p-4 flex items-center justify-between hover:bg-purple-25">
+                              <div>
+                                <div className="font-medium text-gray-800">
+                                  {lessonIndex + 1}. {lesson.title}
+                                </div>
+                                {lesson.description && (
+                                  <div className="text-sm text-gray-600 mt-1">
+                                    {lesson.description}
+                                  </div>
+                                )}
+                              </div>
+                              {lesson.video_url ? (
+                                <Badge variant="outline" className="border-purple-200 text-purple-600">
+                                  <Play className="h-3 w-3 mr-1" />
+                                  Video
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-orange-200 text-orange-600">Text</Badge>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center p-12 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg border-2 border-dashed border-purple-200">
+                      <BookOpen className="h-12 w-12 mx-auto mb-4 text-purple-400" />
+                      <h3 className="text-lg font-medium mb-2 text-gray-800">No content available yet</h3>
+                      <p className="text-gray-600">
+                        This course is still being developed. Check back soon!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="discussion">
+                <CourseDiscussionSection courseId={course.id} />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
