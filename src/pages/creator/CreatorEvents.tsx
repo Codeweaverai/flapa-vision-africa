@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, Users, Calendar, Plus, UserPlus, Clock } from 'lucide-react';
+import { Edit, Trash2, Eye, Users, Calendar, Plus, UserPlus, Clock, Mic, CalendarDays } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Event, fetchCreatorEvents, deleteEvent } from '@/services/eventService';
@@ -150,61 +150,57 @@ const CreatorEvents = () => {
                         {getEventTypeLabel(event.event_type)}
                       </Badge>
                       <Badge variant={event.is_free ? "secondary" : "outline"}>
-                        {event.is_free ? "Free" : `${event.currency?.toUpperCase()} ${event.price}`}
+                        {event.is_free ? "Free" : `${event.currency} ${event.price}`}
                       </Badge>
                     </div>
                     <CardTitle className="line-clamp-2">{event.title}</CardTitle>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {format(parseISO(event.start_time), 'MMM d, yyyy h:mm a')}
-                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {format(parseISO(event.start_time), "MMM d, yyyy 'at' h:mm a")}
+                    </p>
                   </CardHeader>
                   
-                  <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/edit/${event.id}`}>
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Link>
-                    </Button>
+                  <CardFooter className="border-t pt-4 space-y-2">
+                    <div className="flex flex-wrap gap-2 w-full">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/creator/events/edit/${event.id}`}>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Link>
+                      </Button>
+                      
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/creator/events/${event.id}/speakers`}>
+                          <Mic className="h-4 w-4 mr-1" />
+                          Speakers
+                        </Link>
+                      </Button>
+                      
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/creator/events/${event.id}/agenda`}>
+                          <CalendarDays className="h-4 w-4 mr-1" />
+                          Agenda
+                        </Link>
+                      </Button>
+                    </div>
                     
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/${event.id}/speakers`}>
-                        <UserPlus className="h-4 w-4 mr-1" />
-                        Speakers
-                      </Link>
-                    </Button>
-                    
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/${event.id}/agenda`}>
-                        <Clock className="h-4 w-4 mr-1" />
-                        Agenda
-                      </Link>
-                    </Button>
-                    
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/registrations/${event.id}`}>
-                        <Users className="h-4 w-4 mr-1" />
-                        Registrations
-                      </Link>
-                    </Button>
-                    
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/events/${event.id}`} target="_blank">
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Link>
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteEvent(event.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
+                    <div className="flex flex-wrap gap-2 w-full">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/events/${event.id}`} target="_blank">
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Link>
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteEvent(event.id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </CardFooter>
                 </Card>
               );
