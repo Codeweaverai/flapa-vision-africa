@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import { 
   EventAgenda, 
   KeynoteSpeaker, 
+  CreateAgendaInput,
   fetchEventAgenda, 
   fetchEventSpeakers,
   createAgendaItem, 
@@ -94,17 +94,19 @@ const CreatorEventAgenda = () => {
     e.preventDefault();
     if (!eventId) return;
 
-    const agendaData = {
-      ...formData,
-      event_id: eventId,
-      order_index: editingItem?.order_index || agenda.length,
-      speaker_id: formData.speaker_id || null
-    };
-
     let result;
     if (editingItem) {
-      result = await updateAgendaItem(editingItem.id, agendaData);
+      result = await updateAgendaItem(editingItem.id, {
+        ...formData,
+        speaker_id: formData.speaker_id || null
+      });
     } else {
+      const agendaData: CreateAgendaInput = {
+        ...formData,
+        event_id: eventId,
+        order_index: agenda.length,
+        speaker_id: formData.speaker_id || undefined
+      };
       result = await createAgendaItem(agendaData);
     }
 

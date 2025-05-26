@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Plus, Edit, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { KeynoteSpeaker, fetchEventSpeakers, createSpeaker, updateSpeaker, deleteSpeaker } from '@/services/eventManagementService';
+import { 
+  KeynoteSpeaker, 
+  CreateSpeakerInput,
+  fetchEventSpeakers, 
+  createSpeaker, 
+  updateSpeaker, 
+  deleteSpeaker 
+} from '@/services/eventManagementService';
 
 const CreatorEventSpeakers = () => {
   const { id: eventId } = useParams<{ id: string }>();
@@ -82,16 +88,15 @@ const CreatorEventSpeakers = () => {
     e.preventDefault();
     if (!eventId) return;
 
-    const speakerData = {
-      ...formData,
-      event_id: eventId,
-      order_index: editingSpeaker?.order_index || speakers.length
-    };
-
     let result;
     if (editingSpeaker) {
-      result = await updateSpeaker(editingSpeaker.id, speakerData);
+      result = await updateSpeaker(editingSpeaker.id, formData);
     } else {
+      const speakerData: CreateSpeakerInput = {
+        ...formData,
+        event_id: eventId,
+        order_index: speakers.length
+      };
       result = await createSpeaker(speakerData);
     }
 

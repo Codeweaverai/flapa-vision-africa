@@ -33,7 +33,38 @@ export interface EventAgenda {
   order_index: number;
   created_at?: string;
   updated_at?: string;
-  keynote_speakers?: KeynoteSpeaker;
+  keynote_speakers?: {
+    id: string;
+    name: string;
+    title?: string;
+  };
+}
+
+// Create speaker input type
+export interface CreateSpeakerInput {
+  event_id: string;
+  name: string;
+  title?: string;
+  bio?: string;
+  image_url?: string;
+  linkedin_url?: string;
+  twitter_url?: string;
+  website_url?: string;
+  speaking_topic?: string;
+  order_index?: number;
+}
+
+// Create agenda input type
+export interface CreateAgendaInput {
+  event_id: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  speaker_id?: string;
+  location?: string;
+  session_type?: string;
+  order_index?: number;
 }
 
 // Keynote Speaker Functions
@@ -54,11 +85,14 @@ export const fetchEventSpeakers = async (eventId: string): Promise<KeynoteSpeake
   }
 };
 
-export const createSpeaker = async (speakerData: Partial<KeynoteSpeaker>): Promise<KeynoteSpeaker | null> => {
+export const createSpeaker = async (speakerData: CreateSpeakerInput): Promise<KeynoteSpeaker | null> => {
   try {
     const { data, error } = await supabase
       .from('keynote_speakers')
-      .insert(speakerData)
+      .insert({
+        ...speakerData,
+        order_index: speakerData.order_index ?? 0
+      })
       .select()
       .single();
 
@@ -125,7 +159,7 @@ export const fetchEventAgenda = async (eventId: string): Promise<EventAgenda[]> 
       .order('start_time', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as EventAgenda[];
   } catch (error) {
     console.error('Error fetching event agenda:', error);
     toast.error('Failed to load agenda');
@@ -133,11 +167,15 @@ export const fetchEventAgenda = async (eventId: string): Promise<EventAgenda[]> 
   }
 };
 
-export const createAgendaItem = async (agendaData: Partial<EventAgenda>): Promise<EventAgenda | null> => {
+export const createAgendaItem = async (agendaData: CreateAgendaInput): Promise<EventAgenda | null> => {
   try {
     const { data, error } = await supabase
       .from('event_agenda')
-      .insert(agendaData)
+      .insert({
+        ...agendaData,
+        order_index: agendaData.order_index ?? 0,
+        session_type: agendaData.session_type ?? 'presentation'
+      })
       .select()
       .single();
 
