@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import HomePage from '@/pages/HomePage';
@@ -69,7 +69,7 @@ const App = () => {
   }
 
   return (
-    <Router>
+    <>
       <ScrollToTop />
       <Routes>
         {/* Public routes */}
@@ -210,7 +210,7 @@ const App = () => {
         {/* Not found route */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </Router>
+    </>
   );
 };
 
