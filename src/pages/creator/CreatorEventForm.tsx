@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
+import { Upload, X } from 'lucide-react';
 import { 
   Form, 
   FormControl, 
@@ -50,6 +51,8 @@ const CreatorEventForm = () => {
   const isEditing = !!id;
   const [loading, setLoading] = useState(false);
   const [initialEvent, setInitialEvent] = useState<Event | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const { user } = useAuth();
 
   // Initialize form
@@ -101,6 +104,10 @@ const CreatorEventForm = () => {
               setValue(key as any, value);
             }
           });
+
+          if (data.image_url) {
+            setImagePreview(data.image_url);
+          }
         } catch (error) {
           console.error('Error fetching event:', error);
           toast.error('Failed to load event data');
@@ -113,6 +120,50 @@ const CreatorEventForm = () => {
     }
   }, [id, isEditing, setValue]);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setValue('image_url', '');
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return form.getValues('image_url') || null;
+
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `event-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('event-images')
+        .upload(filePath, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('event-images')
+        .getPublicUrl(filePath);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+      return null;
+    }
+  };
+
   const onSubmit = async (values: EventFormValues) => {
     if (!user) {
       toast.error('You must be logged in to create or edit an event');
@@ -121,6 +172,9 @@ const CreatorEventForm = () => {
     
     setLoading(true);
     try {
+      // Upload image if provided
+      const imageUrl = await uploadImage();
+
       // Prepare event data
       const eventData = {
         ...values,
@@ -129,6 +183,7 @@ const CreatorEventForm = () => {
         end_time: values.end_time.toISOString(),
         price: values.is_free ? null : values.price,
         currency: values.is_free ? null : values.currency,
+        image_url: imageUrl,
       };
 
       if (isEditing && id) {
@@ -211,6 +266,58 @@ const CreatorEventForm = () => {
                   </FormItem>
                 )}
               />
+
+              {/* Event Image Upload */}
+              <div>
+                <Label htmlFor="image">Event Image</Label>
+                <div className="space-y-4">
+                  {imagePreview ? (
+                    <div className="relative inline-block">
+                      <img 
+                        src={imagePreview} 
+                        alt="Event image preview" 
+                        className="max-h-48 rounded-md border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6"
+                        onClick={removeImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="mt-4">
+                        <Label htmlFor="image" className="cursor-pointer">
+                          <span className="text-sm text-gray-600">Click to upload event image</span>
+                          <Input
+                            id="image"
+                            name="image"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="hidden"
+                          />
+                        </Label>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!imagePreview && (
+                    <Input
+                      id="image"
+                      name="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                    />
+                  )}
+                </div>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
@@ -330,20 +437,6 @@ const CreatorEventForm = () => {
                   )}
                 />
               </div>
-              
-              <FormField
-                control={form.control}
-                name="image_url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Image URL (optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Event image URL" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               
               <div className="space-y-4">
                 <FormField

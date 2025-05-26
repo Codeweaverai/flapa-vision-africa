@@ -9,6 +9,7 @@ import LearningSection from '@/components/home/LearningSection';
 import EventsSection from '@/components/home/EventsSection';
 import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
+import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
 
 const Index = () => {
@@ -18,6 +19,7 @@ const Index = () => {
       <AboutSection />
       <VenturesSection />
       <CoursesSection />
+      <CommunityAISection />
       <MediaSection />
       <AnimationsSection />
       <SpeakingSection />

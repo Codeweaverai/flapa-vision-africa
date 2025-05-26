@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -35,6 +35,8 @@ const CreatorCourseForm = () => {
   const { id: courseId } = useParams<{ id?: string }>();
   const [formData, setFormData] = useState<CourseFormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -64,6 +66,10 @@ const CreatorCourseForm = () => {
         thumbnail_url: data.thumbnail_url,
         summary: data.summary,
       });
+
+      if (data.thumbnail_url) {
+        setThumbnailPreview(data.thumbnail_url);
+      }
     } catch (error) {
       console.error('Error fetching course:', error);
       toast.error('Failed to load course data');
@@ -89,6 +95,50 @@ const CreatorCourseForm = () => {
       ...prev,
       [name]: value ? parseInt(value, 10) : undefined,
     }));
+  };
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnailFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setThumbnailPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeThumbnail = () => {
+    setThumbnailFile(null);
+    setThumbnailPreview(null);
+    setFormData(prev => ({ ...prev, thumbnail_url: undefined }));
+  };
+
+  const uploadThumbnail = async (): Promise<string | null> => {
+    if (!thumbnailFile) return formData.thumbnail_url || null;
+
+    try {
+      const fileExt = thumbnailFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `thumbnails/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('courses')
+        .upload(filePath, thumbnailFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('courses')
+        .getPublicUrl(filePath);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading thumbnail:', error);
+      toast.error('Failed to upload thumbnail');
+      return null;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,6 +183,9 @@ const CreatorCourseForm = () => {
         return;
       }
 
+      // Upload thumbnail if provided
+      const thumbnailUrl = await uploadThumbnail();
+
       const courseData = {
         title: formData.title,
         description: formData.description,
@@ -143,7 +196,7 @@ const CreatorCourseForm = () => {
         summary: formData.summary,
         price: formData.is_free ? 0 : formData.price ?? 0,
         certificate_enabled: formData.certificate_enabled ?? false,
-        thumbnail_url: formData.thumbnail_url,
+        thumbnail_url: thumbnailUrl,
         creator_id: user?.id
       };
 
@@ -242,6 +295,58 @@ const CreatorCourseForm = () => {
               />
             </div>
 
+            {/* Thumbnail Upload */}
+            <div>
+              <Label htmlFor="thumbnail">Course Thumbnail</Label>
+              <div className="space-y-4">
+                {thumbnailPreview ? (
+                  <div className="relative inline-block">
+                    <img 
+                      src={thumbnailPreview} 
+                      alt="Thumbnail preview" 
+                      className="max-h-40 rounded-md border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6"
+                      onClick={removeThumbnail}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                    <div className="mt-4">
+                      <Label htmlFor="thumbnail" className="cursor-pointer">
+                        <span className="text-sm text-gray-600">Click to upload thumbnail</span>
+                        <Input
+                          id="thumbnail"
+                          name="thumbnail"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleThumbnailChange}
+                          className="hidden"
+                        />
+                      </Label>
+                    </div>
+                  </div>
+                )}
+                
+                {!thumbnailPreview && (
+                  <Input
+                    id="thumbnail"
+                    name="thumbnail"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailChange}
+                  />
+                )}
+              </div>
+            </div>
+
             {/* Difficulty Level */}
             <div>
               <Label htmlFor="difficulty_level">Difficulty Level</Label>
@@ -285,19 +390,6 @@ const CreatorCourseForm = () => {
                 onChange={handleNumberChange}
                 placeholder="Enter duration in minutes"
                 required
-              />
-            </div>
-
-            {/* Thumbnail URL */}
-            <div>
-              <Label htmlFor="thumbnail_url">Thumbnail URL</Label>
-              <Input
-                type="text"
-                id="thumbnail_url"
-                name="thumbnail_url"
-                value={formData.thumbnail_url || ''}
-                onChange={handleChange}
-                placeholder="Enter thumbnail URL"
               />
             </div>
 
@@ -351,7 +443,7 @@ const CreatorCourseForm = () => {
                   variant="outline"
                   onClick={() => navigate(`/creator/courses/${courseId}/content`)}
                 >
-                  Course Content
+                  Manage Content
                 </Button>
               )}
             </div>
