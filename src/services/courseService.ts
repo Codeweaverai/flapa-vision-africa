@@ -45,6 +45,7 @@ export interface Lesson {
   created_at?: string;
   updated_at?: string;
   quizzes?: Quiz[];
+  is_completed?: boolean;
 }
 
 export interface Quiz {
@@ -218,11 +219,11 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
   }
 };
 
-export const createCourse = async (courseData: Partial<Course>): Promise<Course | null> => {
+export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<Course | null> => {
   try {
     const { data, error } = await supabase
       .from('courses')
-      .insert([courseData])
+      .insert(courseData)
       .select()
       .single();
       
@@ -243,7 +244,7 @@ export const createCourseWithCreator = async (
   try {
     const { data, error } = await supabase
       .from('courses')
-      .insert([{ ...courseData, creator_id: creatorId }])
+      .insert({ ...courseData, creator_id: creatorId })
       .select()
       .single();
       
@@ -294,11 +295,11 @@ export const deleteCourse = async (id: string): Promise<boolean> => {
 };
 
 // Module functions
-export const createModule = async (moduleData: Partial<CourseModule>): Promise<CourseModule | null> => {
+export const createModule = async (moduleData: Omit<CourseModule, 'id' | 'created_at' | 'updated_at' | 'lessons'>): Promise<CourseModule | null> => {
   try {
     const { data, error } = await supabase
       .from('course_modules')
-      .insert([moduleData])
+      .insert(moduleData)
       .select()
       .single();
       
@@ -310,7 +311,7 @@ export const createModule = async (moduleData: Partial<CourseModule>): Promise<C
   }
 };
 
-export const updateModule = async (id: string, moduleData: Partial<CourseModule>): Promise<CourseModule | null> => {
+export const updateModule = async (id: string, moduleData: Partial<Omit<CourseModule, 'lessons'>>): Promise<CourseModule | null> => {
   try {
     const { data, error } = await supabase
       .from('course_modules')
@@ -358,7 +359,7 @@ export const updateModuleOrder = async (id: string, orderIndex: number): Promise
 };
 
 // Lesson functions
-export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson | null> => {
+export const createLesson = async (lessonData: Omit<Lesson, 'id' | 'created_at' | 'updated_at' | 'quizzes' | 'is_completed'>): Promise<Lesson | null> => {
   try {
     // Get the next order index
     const { data: existingLessons, error: countError } = await supabase
@@ -376,7 +377,7 @@ export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson 
 
     const { data, error } = await supabase
       .from('lessons')
-      .insert([{ ...lessonData, order_index: nextOrderIndex }])
+      .insert({ ...lessonData, order_index: nextOrderIndex })
       .select()
       .single();
       
@@ -388,7 +389,7 @@ export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson 
   }
 };
 
-export const updateLesson = async (id: string, lessonData: Partial<Lesson>): Promise<Lesson | null> => {
+export const updateLesson = async (id: string, lessonData: Partial<Omit<Lesson, 'quizzes' | 'is_completed'>>): Promise<Lesson | null> => {
   try {
     const { data, error } = await supabase
       .from('lessons')
@@ -420,16 +421,26 @@ export const deleteLesson = async (id: string): Promise<boolean> => {
   }
 };
 
-export const fetchModuleLessons = async (moduleId: string): Promise<Lesson[]> => {
+export const fetchModuleLessons = async (courseId: string): Promise<CourseModule[]> => {
   try {
-    const { data, error } = await supabase
-      .from('lessons')
-      .select('*')
-      .eq('module_id', moduleId)
+    const { data: modules, error } = await supabase
+      .from('course_modules')
+      .select(`
+        *,
+        lessons (*)
+      `)
+      .eq('course_id', courseId)
       .order('order_index', { ascending: true });
       
     if (error) throw error;
-    return data || [];
+    
+    // Sort lessons within each module
+    const sortedModules = modules?.map(module => ({
+      ...module,
+      lessons: module.lessons?.sort((a: any, b: any) => a.order_index - b.order_index) || []
+    })) || [];
+
+    return sortedModules;
   } catch (error) {
     console.error('Error fetching module lessons:', error);
     return [];
@@ -437,11 +448,11 @@ export const fetchModuleLessons = async (moduleId: string): Promise<Lesson[]> =>
 };
 
 // Quiz functions
-export const createQuiz = async (quizData: Partial<Quiz>): Promise<Quiz | null> => {
+export const createQuiz = async (quizData: Omit<Quiz, 'id' | 'created_at' | 'updated_at' | 'questions'>): Promise<Quiz | null> => {
   try {
     const { data, error } = await supabase
       .from('quizzes')
-      .insert([quizData])
+      .insert(quizData)
       .select()
       .single();
       
@@ -453,11 +464,11 @@ export const createQuiz = async (quizData: Partial<Quiz>): Promise<Quiz | null> 
   }
 };
 
-export const createQuizQuestion = async (questionData: Partial<QuizQuestion>): Promise<QuizQuestion | null> => {
+export const createQuizQuestion = async (questionData: Omit<QuizQuestion, 'id' | 'created_at' | 'updated_at' | 'answers'>): Promise<QuizQuestion | null> => {
   try {
     const { data, error } = await supabase
       .from('quiz_questions')
-      .insert([questionData])
+      .insert(questionData)
       .select()
       .single();
       
@@ -469,11 +480,11 @@ export const createQuizQuestion = async (questionData: Partial<QuizQuestion>): P
   }
 };
 
-export const createQuizAnswer = async (answerData: Partial<QuizAnswer>): Promise<QuizAnswer | null> => {
+export const createQuizAnswer = async (answerData: Omit<QuizAnswer, 'id' | 'created_at' | 'updated_at'>): Promise<QuizAnswer | null> => {
   try {
     const { data, error } = await supabase
       .from('quiz_answers')
-      .insert([answerData])
+      .insert(answerData)
       .select()
       .single();
       

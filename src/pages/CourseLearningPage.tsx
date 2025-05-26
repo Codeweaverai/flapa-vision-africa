@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -63,7 +62,7 @@ const CourseLearningPage = () => {
       }
       
       // Fetch modules and lessons with progress
-      const modulesData = await fetchModuleLessons(courseId, user.id);
+      const modulesData = await fetchModuleLessons(courseId);
       
       setCourse(courseData);
       setEnrollment(enrollmentData);
