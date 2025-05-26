@@ -4,10 +4,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, Plus, BookOpen } from 'lucide-react';
+import { Edit, Trash2, Eye, Plus, BookOpen, FileText, Lock, Unlock } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { Course, fetchCreatorCourses, deleteCourse } from '@/services/courseService';
+import { Course, fetchCreatorCourses, deleteCourse, updateCourse } from '@/services/courseService';
 import { useAuth } from '@/contexts/AuthContext';
 
 const CreatorCourses = () => {
@@ -59,6 +59,29 @@ const CreatorCourses = () => {
       toast({
         title: "Error",
         description: "Failed to delete course",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTogglePublish = async (course: Course) => {
+    try {
+      const updatedCourse = await updateCourse(course.id, {
+        is_published: !course.is_published
+      });
+      
+      if (updatedCourse) {
+        setCourses(courses.map(c => c.id === course.id ? updatedCourse : c));
+        toast({
+          title: updatedCourse.is_published ? "Course Published" : "Course Unpublished",
+          description: `${updatedCourse.title} has been ${updatedCourse.is_published ? 'published' : 'unpublished'}.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error updating course:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update course",
         variant: "destructive"
       });
     }
@@ -148,6 +171,31 @@ const CreatorCourses = () => {
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Link>
+                  </Button>
+                  
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/creator/courses/${course.id}/content`}>
+                      <FileText className="h-4 w-4 mr-1" />
+                      Content
+                    </Link>
+                  </Button>
+
+                  <Button
+                    variant={course.is_published ? "destructive" : "default"}
+                    size="sm"
+                    onClick={() => handleTogglePublish(course)}
+                  >
+                    {course.is_published ? (
+                      <>
+                        <Lock className="h-4 w-4 mr-1" />
+                        Unpublish
+                      </>
+                    ) : (
+                      <>
+                        <Unlock className="h-4 w-4 mr-1" />
+                        Publish
+                      </>
+                    )}
                   </Button>
                   
                   <Button variant="outline" size="sm" asChild>

@@ -404,6 +404,66 @@ export type Database = {
         }
         Relationships: []
       }
+      event_agenda: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_time: string
+          event_id: string
+          id: string
+          location: string | null
+          order_index: number
+          session_type: string
+          speaker_id: string | null
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_time: string
+          event_id: string
+          id?: string
+          location?: string | null
+          order_index?: number
+          session_type?: string
+          speaker_id?: string | null
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_time?: string
+          event_id?: string
+          id?: string
+          location?: string | null
+          order_index?: number
+          session_type?: string
+          speaker_id?: string | null
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_agenda_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_agenda_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "keynote_speakers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_bookings: {
         Row: {
           booking_date: string | null
@@ -549,6 +609,62 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      keynote_speakers: {
+        Row: {
+          bio: string | null
+          created_at: string
+          event_id: string
+          id: string
+          image_url: string | null
+          linkedin_url: string | null
+          name: string
+          order_index: number
+          speaking_topic: string | null
+          title: string | null
+          twitter_url: string | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          image_url?: string | null
+          linkedin_url?: string | null
+          name: string
+          order_index?: number
+          speaking_topic?: string | null
+          title?: string | null
+          twitter_url?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          image_url?: string | null
+          linkedin_url?: string | null
+          name?: string
+          order_index?: number
+          speaking_topic?: string | null
+          title?: string | null
+          twitter_url?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keynote_speakers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lesson_progress: {
         Row: {

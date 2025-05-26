@@ -4,13 +4,12 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, Users, Calendar, Plus } from 'lucide-react';
+import { Edit, Trash2, Eye, Users, Calendar, Plus, UserPlus, Clock } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Event, fetchCreatorEvents, deleteEvent } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, isPast } from 'date-fns';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const CreatorEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -166,6 +165,20 @@ const CreatorEvents = () => {
                       <Link to={`/creator/events/edit/${event.id}`}>
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
+                      </Link>
+                    </Button>
+                    
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/creator/events/${event.id}/speakers`}>
+                        <UserPlus className="h-4 w-4 mr-1" />
+                        Speakers
+                      </Link>
+                    </Button>
+                    
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/creator/events/${event.id}/agenda`}>
+                        <Clock className="h-4 w-4 mr-1" />
+                        Agenda
                       </Link>
                     </Button>
                     
