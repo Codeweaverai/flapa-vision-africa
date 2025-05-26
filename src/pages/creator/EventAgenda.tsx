@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { 
-  EventAgenda, 
+  type EventAgenda as EventAgendaType, 
   KeynoteSpeaker,
   CreateAgendaInput,
   fetchEventAgenda, 
@@ -37,11 +36,11 @@ interface AgendaFormData {
 
 const EventAgenda = () => {
   const { id } = useParams<{ id: string }>();
-  const [agenda, setAgenda] = useState<EventAgenda[]>([]);
+  const [agenda, setAgenda] = useState<EventAgendaType[]>([]);
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingAgenda, setEditingAgenda] = useState<EventAgenda | null>(null);
+  const [editingAgenda, setEditingAgenda] = useState<EventAgendaType | null>(null);
   
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<AgendaFormData>();
 
@@ -78,7 +77,7 @@ const EventAgenda = () => {
     setDialogOpen(true);
   };
 
-  const handleEditAgenda = (agendaItem: EventAgenda) => {
+  const handleEditAgenda = (agendaItem: EventAgendaType) => {
     setEditingAgenda(agendaItem);
     reset({
       title: agendaItem.title,

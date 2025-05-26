@@ -1,5 +1,5 @@
 
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from 'sonner';
@@ -59,75 +59,73 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <AuthProvider>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/events/:id" element={<EventDetailPage />} />
-            <Route path="/courses" element={<CoursesPage />} />
-            <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
-            <Route path="/learning/course/:id" element={<CourseLearningPage />} />
-            <Route path="/pricing" element={<PricingPage />} />
-            <Route path="/blog" element={<BlogPage />} />
-            <Route path="/blog/:id" element={<BlogPostPage />} />
-            <Route path="/media" element={<MediaPage />} />
-            <Route path="/community" element={<CommunityPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+      <AuthProvider>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/events/:id" element={<EventDetailPage />} />
+          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
+          <Route path="/learning/course/:id" element={<CourseLearningPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:id" element={<BlogPostPage />} />
+          <Route path="/media" element={<MediaPage />} />
+          <Route path="/community" element={<CommunityPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
 
-            {/* Admin Routes */}
-            <Route path="/admin/*" element={
-              <AdminRoute>
-                <Routes>
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="users" element={<AdminUsers />} />
-                  <Route path="courses" element={<AdminCourses />} />
-                  <Route path="courses/create" element={<AdminCourseCreate />} />
-                  <Route path="courses/edit/:id" element={<AdminCourseEdit />} />
-                  <Route path="courses/content/:id" element={<AdminCourseContent />} />
-                  <Route path="courses/:courseId" element={<CourseContentPage />} />
-                  <Route path="events" element={<AdminEvents />} />
-                  <Route path="events/create" element={<AdminEventCreate />} />
-                  <Route path="events/edit/:id" element={<AdminEventEdit />} />
-                  <Route path="events/registrations/:id" element={<EventRegistrations />} />
-                </Routes>
-              </AdminRoute>
-            } />
+          {/* Admin Routes */}
+          <Route path="/admin/*" element={
+            <AdminRoute>
+              <Routes>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="courses" element={<AdminCourses />} />
+                <Route path="courses/create" element={<AdminCourseCreate />} />
+                <Route path="courses/edit/:id" element={<AdminCourseEdit />} />
+                <Route path="courses/content/:id" element={<AdminCourseContent />} />
+                <Route path="courses/:courseId" element={<CourseContentPage />} />
+                <Route path="events" element={<AdminEvents />} />
+                <Route path="events/create" element={<AdminEventCreate />} />
+                <Route path="events/edit/:id" element={<AdminEventEdit />} />
+                <Route path="events/registrations/:id" element={<EventRegistrations />} />
+              </Routes>
+            </AdminRoute>
+          } />
 
-            {/* Creator Routes */}
-            <Route path="/creator/*" element={
-              <ProtectedRoute>
-                <Routes>
-                  <Route path="dashboard" element={<CreatorDashboard />} />
-                  <Route path="courses" element={<CreatorCourses />} />
-                  <Route path="courses/create" element={<CreatorCourseCreate />} />
-                  <Route path="courses/edit/:id" element={<CreatorCourseEdit />} />
-                  <Route path="courses/:id/content" element={<CreatorCourseContent />} />
-                  <Route path="events" element={<CreatorEvents />} />
-                  <Route path="events/create" element={<CreatorEventCreate />} />
-                  <Route path="events/edit/:id" element={<CreatorEventEdit />} />
-                  <Route path="events/:id/speakers" element={<EventSpeakers />} />
-                  <Route path="events/:id/agenda" element={<EventAgenda />} />
-                  <Route path="events/registrations/:id" element={<EventRegistrations />} />
-                  <Route path="students" element={<CreatorStudents />} />
-                  <Route path="payments" element={<CreatorPayments />} />
-                  <Route path="analytics" element={<CreatorAnalytics />} />
-                  <Route path="settings" element={<CreatorSettings />} />
-                </Routes>
-              </ProtectedRoute>
-            } />
-          </Routes>
-          <Toaster position="top-right" />
-        </AuthProvider>
-      </Router>
+          {/* Creator Routes */}
+          <Route path="/creator/*" element={
+            <ProtectedRoute>
+              <Routes>
+                <Route path="dashboard" element={<CreatorDashboard />} />
+                <Route path="courses" element={<CreatorCourses />} />
+                <Route path="courses/create" element={<CreatorCourseCreate />} />
+                <Route path="courses/edit/:id" element={<CreatorCourseEdit />} />
+                <Route path="courses/:id/content" element={<CreatorCourseContent />} />
+                <Route path="events" element={<CreatorEvents />} />
+                <Route path="events/create" element={<CreatorEventCreate />} />
+                <Route path="events/edit/:id" element={<CreatorEventEdit />} />
+                <Route path="events/:id/speakers" element={<EventSpeakers />} />
+                <Route path="events/:id/agenda" element={<EventAgenda />} />
+                <Route path="events/registrations/:id" element={<EventRegistrations />} />
+                <Route path="students" element={<CreatorStudents />} />
+                <Route path="payments" element={<CreatorPayments />} />
+                <Route path="analytics" element={<CreatorAnalytics />} />
+                <Route path="settings" element={<CreatorSettings />} />
+              </Routes>
+            </ProtectedRoute>
+          } />
+        </Routes>
+        <Toaster position="top-right" />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
