@@ -2,12 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Calendar, MapPin, Users, Clock, ArrowLeft, User, PlayCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,38 +29,9 @@ interface Event {
   online_meeting_link: string;
 }
 
-interface KeynoteSpeaker {
-  id: string;
-  name: string;
-  title?: string;
-  bio?: string;
-  image_url?: string;
-  speaking_topic?: string;
-  linkedin_url?: string;
-  twitter_url?: string;
-  website_url?: string;
-}
-
-interface EventAgenda {
-  id: string;
-  title: string;
-  description?: string;
-  start_time: string;
-  end_time: string;
-  location?: string;
-  session_type: string;
-  keynote_speakers?: {
-    id: string;
-    name: string;
-    title?: string;
-  };
-}
-
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [event, setEvent] = useState<Event | null>(null);
-  const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
-  const [agenda, setAgenda] = useState<EventAgenda[]>([]);
   const [loading, setLoading] = useState(true);
   const [registeredCount, setRegisteredCount] = useState(0);
   const [isUserRegistered, setIsUserRegistered] = useState(false);
@@ -71,8 +41,6 @@ const EventDetailPage = () => {
     if (!id) return;
     
     fetchEventDetails();
-    fetchSpeakers();
-    fetchAgenda();
     fetchRegistrationsCount();
     
     if (user) {
@@ -95,43 +63,6 @@ const EventDetailPage = () => {
       toast.error('Failed to load event details');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchSpeakers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('keynote_speakers')
-        .select('*')
-        .eq('event_id', id)
-        .order('order_index', { ascending: true });
-      
-      if (error) throw error;
-      setSpeakers(data || []);
-    } catch (error) {
-      console.error('Error fetching speakers:', error);
-    }
-  };
-
-  const fetchAgenda = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('event_agenda')
-        .select(`
-          *,
-          keynote_speakers (
-            id,
-            name,
-            title
-          )
-        `)
-        .eq('event_id', id)
-        .order('start_time', { ascending: true });
-      
-      if (error) throw error;
-      setAgenda(data || []);
-    } catch (error) {
-      console.error('Error fetching agenda:', error);
     }
   };
 
@@ -171,7 +102,7 @@ const EventDetailPage = () => {
     return (
       <Layout>
         <div className="section-container min-h-[50vh] flex justify-center items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p>Loading event details...</p>
         </div>
       </Layout>
     );
@@ -244,85 +175,6 @@ const EventDetailPage = () => {
               <h2 className="text-xl font-semibold mb-4">About This Event</h2>
               <p className="whitespace-pre-line">{event.description}</p>
             </div>
-
-            {/* Keynote Speakers */}
-            {speakers.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Keynote Speakers</h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {speakers.map((speaker) => (
-                    <Card key={speaker.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
-                          {speaker.image_url ? (
-                            <img
-                              src={speaker.image_url}
-                              alt={speaker.name}
-                              className="w-16 h-16 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-                              <User className="h-8 w-8 text-gray-400" />
-                            </div>
-                          )}
-                          <div className="flex-1">
-                            <h3 className="font-semibold">{speaker.name}</h3>
-                            {speaker.title && (
-                              <p className="text-sm text-gray-600">{speaker.title}</p>
-                            )}
-                            {speaker.speaking_topic && (
-                              <p className="text-sm text-primary mt-1">
-                                Topic: {speaker.speaking_topic}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Event Agenda */}
-            {agenda.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Event Agenda</h2>
-                <Accordion type="single" collapsible className="w-full">
-                  {agenda.map((item, index) => (
-                    <AccordionItem key={item.id} value={`item-${index}`}>
-                      <AccordionTrigger>
-                        <div className="flex items-center justify-between w-full mr-4">
-                          <div className="text-left">
-                            <h3 className="font-semibold">{item.title}</h3>
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                              <span>
-                                {format(new Date(item.start_time), 'h:mm a')} - {format(new Date(item.end_time), 'h:mm a')}
-                              </span>
-                              {item.location && <span>📍 {item.location}</span>}
-                              <Badge variant="outline" className="capitalize">{item.session_type}</Badge>
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="pl-4">
-                          {item.keynote_speakers && (
-                            <p className="text-sm font-medium text-primary mb-2">
-                              Speaker: {item.keynote_speakers.name}
-                              {item.keynote_speakers.title && ` - ${item.keynote_speakers.title}`}
-                            </p>
-                          )}
-                          {item.description && (
-                            <p className="text-gray-700">{item.description}</p>
-                          )}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-            )}
             
             {event.online_meeting_link && isUserRegistered && (
               <div className="bg-muted p-4 rounded-lg">

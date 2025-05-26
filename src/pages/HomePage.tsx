@@ -6,6 +6,7 @@ import AboutSection from '@/components/home/AboutSection';
 import EventsSection from '@/components/home/EventsSection';
 import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
+import AnimationsSection from '@/components/home/AnimationsSection';
 import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
 
@@ -16,6 +17,7 @@ const HomePage = () => {
       <AboutSection />
       <CoursesSection />
       <CommunityAISection />
+      <AnimationsSection />
       <EventsSection />
       <MediaSection />
       <CallToAction />
