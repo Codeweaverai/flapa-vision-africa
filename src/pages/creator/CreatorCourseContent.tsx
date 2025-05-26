@@ -39,7 +39,6 @@ const CreatorCourseContent = () => {
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
-  // Fetch course data with modules and lessons
   useEffect(() => {
     if (!id) {
       navigate('/creator/courses');
@@ -81,12 +80,10 @@ const CreatorCourseContent = () => {
 
   const handleModuleSaved = (moduleData: CourseModule) => {
     if (editingModule) {
-      // Update existing module in the list
       setModules(prevModules =>
         prevModules.map(m => (m.id === moduleData.id ? moduleData : m))
       );
     } else {
-      // Add new module to the list
       setModules(prevModules => [...prevModules, moduleData]);
     }
     setModuleDialogOpen(false);
@@ -129,12 +126,10 @@ const CreatorCourseContent = () => {
           );
 
           if (existingLessonIndex >= 0) {
-            // Update existing lesson
             const updatedLessons = [...module.lessons];
             updatedLessons[existingLessonIndex] = lessonData;
             return { ...module, lessons: updatedLessons };
           } else {
-            // Add new lesson
             return { ...module, lessons: [...module.lessons, lessonData] };
           }
         }
@@ -172,7 +167,6 @@ const CreatorCourseContent = () => {
   };
 
   const handleQuizSaved = () => {
-    // Refresh course content to update quizzes
     if (id) {
       fetchCourseWithModulesAndLessons(id).then(courseData => {
         if (courseData) {
@@ -191,7 +185,6 @@ const CreatorCourseContent = () => {
     [newModules[index - 1], newModules[index]] = [newModules[index], newModules[index - 1]];
     setModules(newModules);
     
-    // Update order_index in database
     newModules.forEach((module, idx) => {
       updateModuleOrder(module.id, idx);
     });
@@ -203,7 +196,6 @@ const CreatorCourseContent = () => {
     [newModules[index], newModules[index + 1]] = [newModules[index + 1], newModules[index]];
     setModules(newModules);
     
-    // Update order_index in database
     newModules.forEach((module, idx) => {
       updateModuleOrder(module.id, idx);
     });
@@ -246,7 +238,7 @@ const CreatorCourseContent = () => {
                 {course.is_free ? (
                   <Badge variant="secondary">Free</Badge>
                 ) : (
-                  <Badge variant="outline">{course.currency} {course.price}</Badge>
+                  <Badge variant="outline">${course.price}</Badge>
                 )}
               </div>
             </div>

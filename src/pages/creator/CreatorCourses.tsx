@@ -1,21 +1,21 @@
 
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, Plus, BookOpen, FileText, Lock, Unlock } from 'lucide-react';
+import { Edit, Trash2, Eye, Users, Calendar, Plus, UserPlus, Clock, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Course, fetchCreatorCourses, deleteCourse, updateCourse } from '@/services/courseService';
 import { useAuth } from '@/contexts/AuthContext';
+import { format, parseISO, isPast } from 'date-fns';
 
 const CreatorCourses = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const { toast } = useToast();
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -112,12 +112,12 @@ const CreatorCourses = () => {
               <Card className="border-dashed">
                 <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
                   <div className="mb-4 rounded-full bg-primary/10 p-6">
-                    <BookOpen className="h-8 w-8 text-primary" />
+                    <Calendar className="h-8 w-8 text-primary" />
                   </div>
                   <CardTitle className="mb-2">No courses yet</CardTitle>
-                  <CardDescription className="mb-6">
+                  <p className="text-muted-foreground mb-6">
                     Get started by creating your first course
-                  </CardDescription>
+                  </p>
                   <Button asChild>
                     <Link to="/creator/courses/create">
                       <Plus className="mr-2 h-4 w-4" />
@@ -139,7 +139,7 @@ const CreatorCourses = () => {
                     />
                   ) : (
                     <div className="w-full h-48 bg-muted flex items-center justify-center rounded-t-lg">
-                      <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
+                      <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
                     </div>
                   )}
                   <div className="absolute top-2 right-2">
@@ -150,20 +150,20 @@ const CreatorCourses = () => {
                 </div>
                 
                 <CardHeader>
-                  <div className="flex justify-between">
-                    <Badge variant="outline">{course.category}</Badge>
-                    <Badge variant="outline">{course.difficulty_level}</Badge>
+                  <div className="flex justify-between items-center mb-2">
+                    <Badge variant="outline">
+                      {course.category}
+                    </Badge>
+                    <Badge variant={course.is_free ? "secondary" : "outline"}>
+                      {course.is_free ? "Free" : `$${course.price}`}
+                    </Badge>
                   </div>
                   <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                  <CardDescription className="line-clamp-2">{course.summary}</CardDescription>
-                </CardHeader>
-                
-                <CardContent className="flex-grow">
-                  <div className="flex text-sm text-muted-foreground mb-2">
-                    <div className="mr-4">{Math.ceil((course.duration_minutes || 0) / 60)} hours</div>
-                    <div>{course.price && course.price > 0 ? `$${course.price}` : "Free"}</div>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4 mr-2" />
+                    {Math.ceil((course.duration_minutes || 0) / 60)} hours
                   </div>
-                </CardContent>
+                </CardHeader>
                 
                 <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" asChild>
@@ -181,27 +181,17 @@ const CreatorCourses = () => {
                   </Button>
 
                   <Button
-                    variant={course.is_published ? "destructive" : "default"}
+                    variant={course.is_published ? "secondary" : "default"}
                     size="sm"
                     onClick={() => handleTogglePublish(course)}
                   >
-                    {course.is_published ? (
-                      <>
-                        <Lock className="h-4 w-4 mr-1" />
-                        Unpublish
-                      </>
-                    ) : (
-                      <>
-                        <Unlock className="h-4 w-4 mr-1" />
-                        Publish
-                      </>
-                    )}
+                    {course.is_published ? "Unpublish" : "Publish"}
                   </Button>
                   
                   <Button variant="outline" size="sm" asChild>
-                    <Link to={`/learning/course/${course.id}`} target="_blank">
+                    <Link to={`/learning/course-detail/${course.id}`} target="_blank">
                       <Eye className="h-4 w-4 mr-1" />
-                      Preview
+                      View
                     </Link>
                   </Button>
                   
