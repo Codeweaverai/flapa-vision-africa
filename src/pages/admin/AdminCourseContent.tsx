@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -245,7 +246,7 @@ const AdminCourseContent = () => {
                 {course.is_free ? (
                   <Badge variant="secondary">Free</Badge>
                 ) : (
-                  <Badge variant="outline">{course.currency} {course.price}</Badge>
+                  <Badge variant="outline">${course.price}</Badge>
                 )}
               </div>
             </div>
