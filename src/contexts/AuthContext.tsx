@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
@@ -8,6 +9,7 @@ interface AuthContextProps {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  authInitialized: boolean;
   signUp: (email: string, password: string, userData: { full_name: string; username: string }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -20,6 +22,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const navigate = useNavigate();
 
   // Clean up auth state helper
@@ -65,6 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      setAuthInitialized(true);
     });
 
     return () => subscription.unsubscribe();
@@ -180,6 +184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     session,
     loading,
+    authInitialized,
     signUp,
     signIn,
     signOut,
