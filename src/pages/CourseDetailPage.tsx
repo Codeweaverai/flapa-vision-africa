@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -32,7 +31,7 @@ const CourseDetailPage = () => {
       setCourse(courseData);
       
       if (user && courseData) {
-        const status = await checkEnrollmentStatus(user.id, courseId);
+        const status = await checkEnrollmentStatus(courseId);
         setIsEnrolled(status);
       }
       
@@ -54,7 +53,7 @@ const CourseDetailPage = () => {
     setEnrolling(true);
     
     try {
-      const success = await enrollInCourse(course.id, user.id);
+      const success = await enrollInCourse(course.id);
       
       if (success) {
         setIsEnrolled(true);

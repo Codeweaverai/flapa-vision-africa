@@ -81,20 +81,7 @@ export const VALID_DIFFICULTY_LEVELS = [
 ];
 
 // Create course with proper type handling
-export const createCourse = async (courseData: {
-  title: string;
-  description: string;
-  summary: string;
-  category: string;
-  difficulty_level: string;
-  duration_minutes: number;
-  price: number;
-  currency?: string;
-  is_free: boolean;
-  certificate_enabled: boolean;
-  thumbnail_url?: string;
-  tags?: string[];
-}): Promise<Course | null> => {
+export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' | 'updated_at' | 'modules'>): Promise<Course | null> => {
   try {
     const { data: user } = await supabase.auth.getUser();
     if (!user.user) {
@@ -119,6 +106,9 @@ export const createCourse = async (courseData: {
     return null;
   }
 };
+
+// Create course with creator - alias for createCourse
+export const createCourseWithCreator = createCourse;
 
 // Update course
 export const updateCourse = async (id: string, updates: Partial<Course>): Promise<Course | null> => {
@@ -152,6 +142,64 @@ export const fetchCourses = async (): Promise<Course[]> => {
   } catch (error) {
     console.error('Error fetching courses:', error);
     return [];
+  }
+};
+
+// Alias for fetchCourses
+export const fetchAllCourses = fetchCourses;
+
+// Fetch creator courses
+export const fetchCreatorCourses = async (): Promise<Course[]> => {
+  try {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) return [];
+
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('creator_id', user.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching creator courses:', error);
+    return [];
+  }
+};
+
+// Fetch course details - alias for fetchCourseById
+export const fetchCourseDetails = async (id: string): Promise<Course | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching course:', error);
+    return null;
+  }
+};
+
+// Fetch course enrollment
+export const fetchCourseEnrollment = async (courseId: string, userId: string): Promise<any> => {
+  try {
+    const { data, error } = await supabase
+      .from('course_enrollments')
+      .select('*')
+      .eq('course_id', courseId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching enrollment:', error);
+    return null;
   }
 };
 
@@ -207,12 +255,7 @@ export const fetchCourseById = async (id: string): Promise<Course | null> => {
 };
 
 // Create module
-export const createModule = async (moduleData: {
-  course_id: string;
-  title: string;
-  description?: string;
-  order_index: number;
-}): Promise<CourseModule | null> => {
+export const createModule = async (moduleData: Omit<CourseModule, 'id' | 'created_at' | 'updated_at' | 'lessons'>): Promise<CourseModule | null> => {
   try {
     const { data, error } = await supabase
       .from('course_modules')
@@ -221,7 +264,7 @@ export const createModule = async (moduleData: {
       .single();
 
     if (error) throw error;
-    return data;
+    return { ...data, lessons: [] };
   } catch (error) {
     console.error('Error creating module:', error);
     toast.error('Failed to create module');
@@ -240,11 +283,27 @@ export const updateModule = async (id: string, updates: Partial<CourseModule>): 
       .single();
 
     if (error) throw error;
-    return data;
+    return { ...data, lessons: [] };
   } catch (error) {
     console.error('Error updating module:', error);
     toast.error('Failed to update module');
     return null;
+  }
+};
+
+// Update module order
+export const updateModuleOrder = async (moduleId: string, newOrder: number): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('course_modules')
+      .update({ order_index: newOrder })
+      .eq('id', moduleId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating module order:', error);
+    return false;
   }
 };
 
@@ -266,15 +325,7 @@ export const deleteModule = async (id: string): Promise<boolean> => {
 };
 
 // Create lesson
-export const createLesson = async (lessonData: {
-  module_id: string;
-  title: string;
-  description?: string;
-  content_type: string;
-  video_url?: string;
-  content?: any;
-  order_index: number;
-}): Promise<Lesson | null> => {
+export const createLesson = async (lessonData: Omit<Lesson, 'id' | 'created_at' | 'updated_at' | 'is_completed' | 'quizzes'>): Promise<Lesson | null> => {
   try {
     const { data, error } = await supabase
       .from('lessons')
@@ -327,6 +378,27 @@ export const deleteLesson = async (id: string): Promise<boolean> => {
   }
 };
 
+// Fetch module lessons
+export const fetchModuleLessons = async (courseId: string, userId: string): Promise<CourseModule[]> => {
+  try {
+    const { data: modules, error: modulesError } = await supabase
+      .from('course_modules')
+      .select(`
+        *,
+        lessons (*)
+      `)
+      .eq('course_id', courseId)
+      .order('order_index');
+
+    if (modulesError) throw modulesError;
+
+    return modules || [];
+  } catch (error) {
+    console.error('Error fetching module lessons:', error);
+    return [];
+  }
+};
+
 // Fetch course with modules and lessons
 export const fetchCourseWithModulesAndLessons = async (courseId: string): Promise<Course | null> => {
   try {
@@ -360,13 +432,7 @@ export const fetchCourseWithModulesAndLessons = async (courseId: string): Promis
 };
 
 // Create quiz
-export const createQuiz = async (quizData: {
-  lesson_id?: string;
-  module_id?: string;
-  title: string;
-  description?: string;
-  passing_score: number;
-}): Promise<Quiz | null> => {
+export const createQuiz = async (quizData: Omit<Quiz, 'id' | 'created_at' | 'updated_at'>): Promise<Quiz | null> => {
   try {
     const { data, error } = await supabase
       .from('quizzes')
