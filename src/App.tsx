@@ -19,6 +19,10 @@ import MediaPage from '@/pages/MediaPage';
 import CommunityPage from '@/pages/CommunityPage';
 import ProfilePage from '@/pages/ProfilePage';
 import SettingsPage from '@/pages/SettingsPage';
+import LearningPage from '@/pages/LearningPage';
+import HelpCenterPage from '@/pages/HelpCenterPage';
+import ExploreCoursesPage from '@/pages/ExploreCoursesPage';
+import ExploreEventsPage from '@/pages/ExploreEventsPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
@@ -67,8 +71,12 @@ function App() {
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:id" element={<EventDetailPage />} />
           <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/learning" element={<LearningPage />} />
           <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
           <Route path="/learning/course/:id" element={<CourseLearningPage />} />
+          <Route path="/explore/courses" element={<ExploreCoursesPage />} />
+          <Route path="/explore/events" element={<ExploreEventsPage />} />
+          <Route path="/help" element={<HelpCenterPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:id" element={<BlogPostPage />} />

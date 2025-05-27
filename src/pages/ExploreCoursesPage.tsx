@@ -1,484 +1,211 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
-} from '@/components/ui/pagination';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Link, useNavigate } from 'react-router-dom';
-import { Book, Clock, Search, Users, Compass, DollarSign } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BookOpen, Clock, Search, Filter, Star } from 'lucide-react';
+import { Course, fetchPublishedCourses, VALID_CATEGORIES } from '@/services/courseService';
 
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail_url: string;
-  duration_minutes: number;
-  price: number;
-  is_free: boolean;
-  category: string;
-  difficulty_level: string;
-  enrollmentCount: number;
-  creator_id: string;
-}
-
-const ExploreCoursesPage: React.FC = () => {
+const ExploreCoursesPage = () => {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [difficulties, setDifficulties] = useState<string[]>([]);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [processingPayment, setProcessingPayment] = useState<string | null>(null);
-  const coursesPerPage = 9;
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all');
 
   useEffect(() => {
-    fetchCourses();
-  }, [currentPage, selectedCategory, selectedDifficulty, searchTerm]);
+    loadCourses();
+  }, []);
 
-  const fetchCourses = async () => {
+  useEffect(() => {
+    filterCourses();
+  }, [courses, searchTerm, selectedCategory, selectedDifficulty, priceFilter]);
+
+  const loadCourses = async () => {
     try {
-      setLoading(true);
-      
-      // Base query
-      let query = supabase
-        .from('courses')
-        .select(`
-          *,
-          enrollments:course_enrollments(count)
-        `)
-        .eq('is_published', true);
-        
-      // Apply filters
-      if (selectedCategory !== 'all') {
-        query = query.eq('category', selectedCategory);
-      }
-      
-      if (selectedDifficulty !== 'all') {
-        query = query.eq('difficulty_level', selectedDifficulty);
-      }
-      
-      if (searchTerm) {
-        query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
-      }
-      
-      // Calculate pagination
-      const from = (currentPage - 1) * coursesPerPage;
-      const to = from + coursesPerPage - 1;
-      
-      // Get counts for pagination - create a new query instead of clone
-      const countQuery = supabase
-        .from('courses')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_published', true);
-
-      // Apply the same filters to the count query
-      if (selectedCategory !== 'all') {
-        countQuery.eq('category', selectedCategory);
-      }
-      
-      if (selectedDifficulty !== 'all') {
-        countQuery.eq('difficulty_level', selectedDifficulty);
-      }
-      
-      if (searchTerm) {
-        countQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
-      }
-      
-      const { count, error: countError } = await countQuery;
-      
-      if (countError) {
-        console.error("Error getting count:", countError);
-        return;
-      }
-      
-      // Calculate total pages
-      setTotalPages(Math.ceil((count || 0) / coursesPerPage));
-      
-      // Apply pagination to original query
-      const { data, error } = await query
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (error) throw error;
-
-      // Format data
-      const formattedCourses = data.map(course => ({
-        ...course,
-        enrollmentCount: course?.enrollments?.length || 0
-      }));
-      
-      setCourses(formattedCourses);
-      
-      // Fetch unique categories and difficulties
-      if (categories.length === 0) {
-        const { data: categoriesData } = await supabase
-          .from('courses')
-          .select('category')
-          .eq('is_published', true)
-          .not('category', 'is', null);
-        
-        if (categoriesData) {
-          const uniqueCategories = [...new Set(categoriesData.map(item => item.category))];
-          setCategories(uniqueCategories);
-        }
-      }
-      
-      if (difficulties.length === 0) {
-        const { data: difficultiesData } = await supabase
-          .from('courses')
-          .select('difficulty_level')
-          .eq('is_published', true)
-          .not('difficulty_level', 'is', null);
-        
-        if (difficultiesData) {
-          const uniqueDifficulties = [...new Set(difficultiesData.map(item => item.difficulty_level))];
-          setDifficulties(uniqueDifficulties);
-        }
-      }
+      const coursesData = await fetchPublishedCourses();
+      setCourses(coursesData);
     } catch (error) {
-      console.error('Error fetching courses:', error);
+      console.error('Error loading courses:', error);
     } finally {
       setLoading(false);
     }
   };
-  
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentPage(1); // Reset to first page on new search
-  };
-  
-  const handleCategoryChange = (value: string) => {
-    setSelectedCategory(value);
-    setCurrentPage(1); // Reset to first page on filter change
-  };
-  
-  const handleDifficultyChange = (value: string) => {
-    setSelectedDifficulty(value);
-    setCurrentPage(1); // Reset to first page on filter change
-  };
-  
-  const handlePurchaseCourse = async (course: Course) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to purchase this course",
-        variant: "destructive"
-      });
-      navigate('/auth');
-      return;
+
+  const filterCourses = () => {
+    let filtered = courses;
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(course =>
+        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-    
-    try {
-      setProcessingPayment(course.id);
-      
-      // Create a Stripe checkout session
-      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: {
-          amount: course.price,
-          currency: 'usd',
-          referenceType: 'course',
-          referenceId: course.id,
-          userId: user.id,
-          eventTitle: course.title
-        }
-      });
-      
-      if (error) {
-        console.error('Error creating checkout session:', error);
-        toast({
-          title: "Payment Error",
-          description: "Failed to initialize payment process",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      if (data?.url) {
-        // Open Stripe checkout in a new tab
-        window.open(data.url, '_blank');
-        
-        // Check payment status after a delay
-        setTimeout(async () => {
-          const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-stripe-payment', {
-            body: { sessionId: data.sessionId }
-          });
-          
-          if (!verificationError && verificationData?.status === 'completed') {
-            toast({
-              title: "Payment Successful",
-              description: "Your course purchase was successful"
-            });
-          }
-        }, 5000);
-      }
-    } catch (error) {
-      console.error('Error purchasing course:', error);
-      toast({
-        title: "Payment Error",
-        description: "An error occurred during the payment process",
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingPayment(null);
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(course => course.category === selectedCategory);
     }
+
+    // Difficulty filter
+    if (selectedDifficulty !== 'all') {
+      filtered = filtered.filter(course => course.difficulty_level === selectedDifficulty);
+    }
+
+    // Price filter
+    if (priceFilter === 'free') {
+      filtered = filtered.filter(course => course.is_free);
+    } else if (priceFilter === 'paid') {
+      filtered = filtered.filter(course => !course.is_free);
+    }
+
+    setFilteredCourses(filtered);
   };
-  
+
   return (
     <Layout>
-      <div className="bg-light-purple min-h-screen">
-        <div className="container mx-auto py-12">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4">Explore Courses</h1>
-            <p className="text-xl text-muted-foreground">
-              Browse our collection of high-quality courses to accelerate your learning journey
-            </p>
-            <div className="flex justify-center gap-4 mt-6">
-              <Button variant="outline" asChild>
-                <Link to="/explore/courses" className="flex items-center gap-2">
-                  <Book className="h-4 w-4" /> All Courses
-                </Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link to="/explore/events" className="flex items-center gap-2">
-                  <Compass className="h-4 w-4" /> Explore Events
-                </Link>
-              </Button>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Filters</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Category</h3>
-                    <Select 
-                      value={selectedCategory} 
-                      onValueChange={handleCategoryChange}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {categories.map(category => (
-                          <SelectItem key={category} value={category}>{category}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Difficulty</h3>
-                    <Select 
-                      value={selectedDifficulty} 
-                      onValueChange={handleDifficultyChange}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select difficulty" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Levels</SelectItem>
-                        {difficulties.map(difficulty => (
-                          <SelectItem key={difficulty} value={difficulty}>{difficulty}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-4">Explore Courses</h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Discover a wide range of courses to enhance your skills and advance your career.
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-muted/50 p-6 rounded-lg mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search courses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
             
-            <div className="space-y-6">
-              <form onSubmit={handleSearch} className="flex gap-2">
-                <div className="relative flex-grow">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search courses..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Button type="submit">Search</Button>
-              </form>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                  // Loading skeletons
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <Card key={i} className="overflow-hidden">
-                      <div className="aspect-video w-full">
-                        <Skeleton className="h-full w-full" />
-                      </div>
-                      <CardHeader>
-                        <Skeleton className="h-6 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-1/4" />
-                      </CardHeader>
-                      <CardContent>
-                        <Skeleton className="h-4 w-full mb-2" />
-                        <Skeleton className="h-4 w-3/4" />
-                      </CardContent>
-                      <CardFooter>
-                        <Skeleton className="h-9 w-full" />
-                      </CardFooter>
-                    </Card>
-                  ))
-                ) : courses.length === 0 ? (
-                  <div className="col-span-3 text-center py-12">
-                    <h3 className="text-lg font-medium mb-2">No courses found</h3>
-                    <p className="text-muted-foreground">
-                      Try adjusting your search or filter criteria
-                    </p>
-                  </div>
-                ) : (
-                  courses.map((course) => (
-                    <Card key={course.id} className="overflow-hidden flex flex-col">
-                      <div className="aspect-video w-full bg-muted relative">
-                        {course.thumbnail_url ? (
-                          <img 
-                            src={course.thumbnail_url} 
-                            alt={course.title} 
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Book className="h-12 w-12 text-muted-foreground opacity-50" />
-                          </div>
-                        )}
-                      </div>
-                      <CardHeader>
-                        <div className="flex justify-between items-start gap-2">
-                          <CardTitle className="line-clamp-1">{course.title}</CardTitle>
-                          <Badge variant="outline">{course.difficulty_level}</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Badge variant="secondary">{course.category}</Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="flex-grow">
-                        <p className="line-clamp-2 text-sm text-muted-foreground mb-4">
-                          {course.description}
-                        </p>
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-1" />
-                            {course.duration_minutes} min
-                          </div>
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 mr-1" />
-                            {course.enrollmentCount} enrolled
-                          </div>
-                        </div>
-                      </CardContent>
-                      <CardFooter>
-                        <div className="flex items-center justify-between w-full">
-                          <div>
-                            {course.is_free ? (
-                              <Badge variant="secondary">Free</Badge>
-                            ) : (
-                              <span className="font-medium flex items-center">
-                                <DollarSign className="h-4 w-4 mr-1" />{course.price}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" asChild>
-                              <Link to={`/learning/course/${course.id}`}>Details</Link>
-                            </Button>
-                            {course.is_free ? (
-                              <Button>Enroll Now</Button>
-                            ) : (
-                              <Button 
-                                onClick={() => handlePurchaseCourse(course)}
-                                disabled={processingPayment === course.id}
-                              >
-                                {processingPayment === course.id ? 'Processing...' : 'Buy Now'}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardFooter>
-                    </Card>
-                  ))
-                )}
-              </div>
-              
-              {totalPages > 1 && (
-                <Pagination className="mt-8">
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious 
-                        href="#" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (currentPage > 1) setCurrentPage(currentPage - 1);
-                        }}
-                        className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
-                    
-                    {[...Array(totalPages)].map((_, i) => (
-                      <PaginationItem key={i}>
-                        <PaginationLink 
-                          href="#" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setCurrentPage(i + 1);
-                          }}
-                          isActive={currentPage === i + 1}
-                        >
-                          {i + 1}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
-                    
-                    <PaginationItem>
-                      <PaginationNext 
-                        href="#" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                        }}
-                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              )}
-            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {VALID_CATEGORIES.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
+              <SelectTrigger>
+                <SelectValue placeholder="Difficulty" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Levels</SelectItem>
+                <SelectItem value="Beginner">Beginner</SelectItem>
+                <SelectItem value="Intermediate">Intermediate</SelectItem>
+                <SelectItem value="Advanced">Advanced</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={priceFilter} onValueChange={setPriceFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Price" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Prices</SelectItem>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
+
+        {/* Results count */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-muted-foreground">
+            {loading ? 'Loading...' : `${filteredCourses.length} course${filteredCourses.length !== 1 ? 's' : ''} found`}
+          </p>
+        </div>
+
+        {/* Courses Grid */}
+        {loading ? (
+          <div className="flex justify-center my-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCourses.map((course) => (
+              <Card key={course.id} className="hover:shadow-lg transition-shadow">
+                <div className="relative">
+                  {course.thumbnail_url ? (
+                    <img
+                      src={course.thumbnail_url}
+                      alt={course.title}
+                      className="w-full h-48 object-cover rounded-t-lg"
+                    />
+                  ) : (
+                    <div className="w-full h-48 bg-muted flex items-center justify-center rounded-t-lg">
+                      <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <Badge variant={course.is_free ? "secondary" : "default"}>
+                      {course.is_free ? "Free" : `$${course.price}`}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <CardHeader>
+                  <div className="flex justify-between items-center mb-2">
+                    <Badge variant="outline">{course.category}</Badge>
+                    <Badge variant="outline">{course.difficulty_level}</Badge>
+                  </div>
+                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                  <p className="text-sm text-muted-foreground line-clamp-3">
+                    {course.description}
+                  </p>
+                </CardHeader>
+                
+                <CardContent>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-2" />
+                      {Math.ceil((course.duration_minutes || 0) / 60)} hours
+                    </div>
+                    <div className="flex items-center">
+                      <Star className="h-4 w-4 mr-1 fill-current text-yellow-500" />
+                      4.8
+                    </div>
+                  </div>
+                  <Button asChild className="w-full">
+                    <Link to={`/learning/course-detail/${course.id}`}>
+                      View Course
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {filteredCourses.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <BookOpen className="h-16 w-16 mx-auto text-muted-foreground opacity-50 mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No courses found</h3>
+            <p className="text-muted-foreground">Try adjusting your filters or search terms.</p>
+          </div>
+        )}
       </div>
     </Layout>
   );
