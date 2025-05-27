@@ -17,7 +17,7 @@ interface EventRegistration {
   event_id: string;
   status: string;
   created_at: string;
-  event: {
+  events: {
     id: string;
     title: string;
     description: string;
@@ -102,15 +102,15 @@ const MyEventsPage = () => {
   };
 
   const upcomingEvents = registrations.filter(reg => 
-    getEventStatus(reg.event.start_time, reg.event.end_time) === 'upcoming'
+    getEventStatus(reg.events.start_time, reg.events.end_time) === 'upcoming'
   );
   
   const pastEvents = registrations.filter(reg => 
-    getEventStatus(reg.event.start_time, reg.event.end_time) === 'past'
+    getEventStatus(reg.events.start_time, reg.events.end_time) === 'past'
   );
   
   const ongoingEvents = registrations.filter(reg => 
-    getEventStatus(reg.event.start_time, reg.event.end_time) === 'ongoing'
+    getEventStatus(reg.events.start_time, reg.events.end_time) === 'ongoing'
   );
 
   if (loading) {
@@ -258,15 +258,15 @@ const EventGrid = ({ events }: EventGridProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {events.map((registration) => {
-        const status = getEventStatus(registration.event.start_time, registration.event.end_time);
+        const status = getEventStatus(registration.events.start_time, registration.events.end_time);
         
         return (
           <Card key={registration.id} className="hover:shadow-lg transition-shadow">
             <div className="relative">
-              {registration.event.image_url ? (
+              {registration.events.image_url ? (
                 <img
-                  src={registration.event.image_url}
-                  alt={registration.event.title}
+                  src={registration.events.image_url}
+                  alt={registration.events.title}
                   className="w-full h-48 object-cover rounded-t-lg"
                 />
               ) : (
@@ -294,15 +294,15 @@ const EventGrid = ({ events }: EventGridProps) => {
               </div>
               <div className="absolute top-2 left-2">
                 <Badge variant="outline" className="bg-background/80">
-                  {registration.event.event_type.charAt(0).toUpperCase() + registration.event.event_type.slice(1)}
+                  {registration.events.event_type.charAt(0).toUpperCase() + registration.events.event_type.slice(1)}
                 </Badge>
               </div>
             </div>
             
             <CardHeader>
-              <CardTitle className="line-clamp-2">{registration.event.title}</CardTitle>
+              <CardTitle className="line-clamp-2">{registration.events.title}</CardTitle>
               <p className="text-sm text-muted-foreground line-clamp-3">
-                {registration.event.description}
+                {registration.events.description}
               </p>
             </CardHeader>
             
@@ -310,14 +310,14 @@ const EventGrid = ({ events }: EventGridProps) => {
               <div className="space-y-2 text-sm text-muted-foreground mb-4">
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-2" />
-                  {format(parseISO(registration.event.start_time), 'PPP')}
+                  {format(parseISO(registration.events.start_time), 'PPP')}
                 </div>
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-2" />
-                  {format(parseISO(registration.event.start_time), 'p')} - {format(parseISO(registration.event.end_time), 'p')}
+                  {format(parseISO(registration.events.start_time), 'p')} - {format(parseISO(registration.events.end_time), 'p')}
                 </div>
                 <div className="flex items-center">
-                  {registration.event.online_meeting_link ? (
+                  {registration.events.online_meeting_link ? (
                     <>
                       <Video className="h-4 w-4 mr-2" />
                       Online Event
@@ -325,7 +325,7 @@ const EventGrid = ({ events }: EventGridProps) => {
                   ) : (
                     <>
                       <MapPin className="h-4 w-4 mr-2" />
-                      {registration.event.location || 'Location TBA'}
+                      {registration.events.location || 'Location TBA'}
                     </>
                   )}
                 </div>
@@ -333,14 +333,14 @@ const EventGrid = ({ events }: EventGridProps) => {
               
               <div className="flex gap-2">
                 <Button asChild className="flex-1" variant="outline">
-                  <Link to={`/events/${registration.event.id}`}>
+                  <Link to={`/events/${registration.events.id}`}>
                     View Details
                   </Link>
                 </Button>
                 
-                {status === 'ongoing' && registration.event.online_meeting_link && (
+                {status === 'ongoing' && registration.events.online_meeting_link && (
                   <Button asChild className="flex-1">
-                    <a href={registration.event.online_meeting_link} target="_blank" rel="noopener noreferrer">
+                    <a href={registration.events.online_meeting_link} target="_blank" rel="noopener noreferrer">
                       Join Live
                     </a>
                   </Button>

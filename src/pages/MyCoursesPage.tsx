@@ -17,7 +17,7 @@ interface EnrolledCourse {
   course_id: string;
   enrollment_date: string;
   is_completed: boolean;
-  course: {
+  courses: {
     id: string;
     title: string;
     description: string;
@@ -165,7 +165,7 @@ const MyCoursesPage = () => {
                   <div>
                     <p className="text-2xl font-bold">
                       {Math.round(enrolledCourses.reduce((sum, course) => 
-                        sum + (course.course.duration_minutes || 0), 0) / 60)}h
+                        sum + (course.courses.duration_minutes || 0), 0) / 60)}h
                     </p>
                     <p className="text-sm text-muted-foreground">Total Hours</p>
                   </div>
@@ -231,10 +231,10 @@ const CourseGrid = ({ courses, onContinue }: CourseGridProps) => {
       {courses.map((enrollment) => (
         <Card key={enrollment.id} className="hover:shadow-lg transition-shadow">
           <div className="relative">
-            {enrollment.course.thumbnail_url ? (
+            {enrollment.courses.thumbnail_url ? (
               <img
-                src={enrollment.course.thumbnail_url}
-                alt={enrollment.course.title}
+                src={enrollment.courses.thumbnail_url}
+                alt={enrollment.courses.title}
                 className="w-full h-48 object-cover rounded-t-lg"
               />
             ) : (
@@ -259,12 +259,12 @@ const CourseGrid = ({ courses, onContinue }: CourseGridProps) => {
           
           <CardHeader>
             <div className="flex justify-between items-center mb-2">
-              <Badge variant="outline">{enrollment.course.category}</Badge>
-              <Badge variant="outline">{enrollment.course.difficulty_level}</Badge>
+              <Badge variant="outline">{enrollment.courses.category}</Badge>
+              <Badge variant="outline">{enrollment.courses.difficulty_level}</Badge>
             </div>
-            <CardTitle className="line-clamp-2">{enrollment.course.title}</CardTitle>
+            <CardTitle className="line-clamp-2">{enrollment.courses.title}</CardTitle>
             <p className="text-sm text-muted-foreground line-clamp-3">
-              {enrollment.course.description}
+              {enrollment.courses.description}
             </p>
           </CardHeader>
           
@@ -273,7 +273,7 @@ const CourseGrid = ({ courses, onContinue }: CourseGridProps) => {
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-2" />
-                  {Math.ceil((enrollment.course.duration_minutes || 0) / 60)} hours
+                  {Math.ceil((enrollment.courses.duration_minutes || 0) / 60)} hours
                 </div>
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-2" />
@@ -285,7 +285,7 @@ const CourseGrid = ({ courses, onContinue }: CourseGridProps) => {
               </div>
               
               <Button 
-                onClick={() => onContinue(enrollment.course.id)} 
+                onClick={() => onContinue(enrollment.courses.id)} 
                 className="w-full"
                 variant={enrollment.is_completed ? "outline" : "default"}
               >
