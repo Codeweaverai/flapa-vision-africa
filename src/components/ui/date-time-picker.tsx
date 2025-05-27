@@ -1,83 +1,129 @@
 
-import React from 'react';
-import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import * as React from "react";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DateTimePickerProps {
-  value?: Date;
-  onChange: (date: Date | undefined) => void;
-  placeholder?: string;
+  value: Date;
+  onChange: (date: Date) => void;
 }
 
-export function DateTimePicker({ value, onChange, placeholder = "Pick a date and time" }: DateTimePickerProps) {
-  const [timeValue, setTimeValue] = React.useState(
-    value ? format(value, 'HH:mm') : '09:00'
-  );
-
-  const handleDateSelect = (selectedDate: Date | undefined) => {
-    if (!selectedDate) {
-      onChange(undefined);
-      return;
-    }
-
-    const [hours, minutes] = timeValue.split(':').map(Number);
-    const newDate = new Date(selectedDate);
-    newDate.setHours(hours, minutes);
-    onChange(newDate);
-  };
-
-  const handleTimeChange = (time: string) => {
-    setTimeValue(time);
-    if (value) {
-      const [hours, minutes] = time.split(':').map(Number);
-      const newDate = new Date(value);
-      newDate.setHours(hours, minutes);
-      onChange(newDate);
+export function DateTimePicker({ value, onChange }: DateTimePickerProps) {
+  // Handle date change from the calendar
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      const newDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        value.getHours(),
+        value.getMinutes()
+      );
+      onChange(newDateTime);
     }
   };
+
+  // Handle hour change
+  const handleHourChange = (hour: string) => {
+    const newDateTime = new Date(value);
+    newDateTime.setHours(parseInt(hour, 10));
+    onChange(newDateTime);
+  };
+
+  // Handle minute change
+  const handleMinuteChange = (minute: string) => {
+    const newDateTime = new Date(value);
+    newDateTime.setMinutes(parseInt(minute, 10));
+    onChange(newDateTime);
+  };
+
+  // Generate hours for select
+  const hours = Array.from({ length: 24 }, (_, i) => ({
+    value: String(i),
+    label: String(i).padStart(2, "0"),
+  }));
+
+  // Generate minutes for select (0, 15, 30, 45)
+  const minutes = Array.from({ length: 4 }, (_, i) => ({
+    value: String(i * 15),
+    label: String(i * 15).padStart(2, "0"),
+  }));
 
   return (
-    <div className="flex gap-2">
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "flex-1 justify-start text-left font-normal",
-              !value && "text-muted-foreground"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {value ? format(value, 'PPP') : placeholder}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={value}
-            onSelect={handleDateSelect}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="time" className="sr-only">
-          Time
-        </Label>
-        <Input
-          id="time"
-          type="time"
-          value={timeValue}
-          onChange={(e) => handleTimeChange(e.target.value)}
-          className="w-24"
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant={"outline"}
+          className={cn(
+            "w-full justify-start text-left font-normal",
+            !value && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {value ? format(value, "PPP HH:mm") : <span>Pick a date</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={value}
+          onSelect={handleDateChange}
+          initialFocus
         />
-      </div>
-    </div>
+        <div className="p-3 border-t border-border flex items-center gap-2">
+          <div className="grid gap-1">
+            <div className="text-xs font-medium">Hour</div>
+            <Select
+              value={String(value.getHours())}
+              onValueChange={handleHourChange}
+            >
+              <SelectTrigger className="w-[70px]">
+                <SelectValue placeholder="Hour" />
+              </SelectTrigger>
+              <SelectContent>
+                {hours.map((hour) => (
+                  <SelectItem key={hour.value} value={hour.value}>
+                    {hour.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1">
+            <div className="text-xs font-medium">Minute</div>
+            <Select
+              value={String(Math.floor(value.getMinutes() / 15) * 15)}
+              onValueChange={handleMinuteChange}
+            >
+              <SelectTrigger className="w-[75px]">
+                <SelectValue placeholder="Minute" />
+              </SelectTrigger>
+              <SelectContent>
+                {minutes.map((minute) => (
+                  <SelectItem key={minute.value} value={minute.value}>
+                    {minute.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

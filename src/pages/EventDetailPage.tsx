@@ -1,83 +1,125 @@
 
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { format } from 'date-fns';
+import { Calendar, MapPin, Users, Clock, ArrowLeft, User, Globe, Linkedin, Twitter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Users, Clock, Globe, User } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
-import { Event } from '@/services/eventService';
-import { KeynoteSpeaker, EventAgenda } from '@/services/eventManagementService';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import EventRegistrationButton from '@/components/payment/EventRegistrationButton';
+import { fetchEventSpeakers, fetchEventAgenda, KeynoteSpeaker, EventAgenda } from '@/services/eventManagementService';
+
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  event_type: string;
+  location: string;
+  is_free: boolean;
+  price: number;
+  currency: string;
+  capacity: number;
+  image_url: string;
+  online_meeting_link: string;
+}
 
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [event, setEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [registeredCount, setRegisteredCount] = useState(0);
+  const [isUserRegistered, setIsUserRegistered] = useState(false);
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [agenda, setAgenda] = useState<EventAgenda[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (id) {
-      loadEventDetails();
+    if (!id) return;
+    
+    fetchEventDetails();
+    fetchRegistrationsCount();
+    fetchEventSpeakers(id).then(setSpeakers);
+    fetchEventAgenda(id).then(setAgenda);
+    
+    if (user) {
+      checkUserRegistration();
     }
-  }, [id]);
+  }, [id, user]);
 
-  const loadEventDetails = async () => {
+  const fetchEventDetails = async () => {
     try {
-      // Fetch event details
-      const { data: eventData, error: eventError } = await supabase
+      const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('id', id)
         .single();
-
-      if (eventError) throw eventError;
-      setEvent(eventData);
-
-      // Fetch speakers
-      const { data: speakersData, error: speakersError } = await supabase
-        .from('keynote_speakers')
-        .select('*')
-        .eq('event_id', id)
-        .order('order_index', { ascending: true });
-
-      if (!speakersError) {
-        setSpeakers(speakersData || []);
-      }
-
-      // Fetch agenda
-      const { data: agendaData, error: agendaError } = await supabase
-        .from('event_agenda')
-        .select(`
-          *,
-          keynote_speakers (
-            id,
-            name,
-            title
-          )
-        `)
-        .eq('event_id', id)
-        .order('start_time', { ascending: true });
-
-      if (!agendaError) {
-        setAgenda(agendaData || []);
-      }
+      
+      if (error) throw error;
+      setEvent(data as Event);
     } catch (error) {
-      console.error('Error loading event details:', error);
+      console.error('Error fetching event:', error);
+      toast.error('Failed to load event details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRegistrationsCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', id);
+      
+      if (error) throw error;
+      setRegisteredCount(data?.length || 0);
+    } catch (error) {
+      console.error('Error fetching registrations count:', error);
+    }
+  };
+
+  const checkUserRegistration = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select()
+        .eq('event_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      setIsUserRegistered(!!data);
+    } catch (error) {
+      console.error('Error checking registration:', error);
+    }
+  };
+
+  const getSessionTypeColor = (type: string) => {
+    switch (type) {
+      case 'keynote': return 'bg-purple-100 text-purple-800';
+      case 'presentation': return 'bg-blue-100 text-blue-800';
+      case 'workshop': return 'bg-green-100 text-green-800';
+      case 'break': return 'bg-gray-100 text-gray-800';
+      case 'networking': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          </div>
+        <div className="section-container min-h-[50vh] flex justify-center items-center">
+          <p>Loading event details...</p>
         </div>
       </Layout>
     );
@@ -86,13 +128,11 @@ const EventDetailPage = () => {
   if (!event) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="py-8 text-center">
-              <h2 className="text-2xl font-bold mb-2">Event Not Found</h2>
-              <p className="text-muted-foreground">The event you're looking for doesn't exist.</p>
-            </CardContent>
-          </Card>
+        <div className="section-container min-h-[50vh] flex flex-col justify-center items-center gap-4">
+          <p>Event not found</p>
+          <Button asChild>
+            <Link to="/events">Back to Events</Link>
+          </Button>
         </div>
       </Layout>
     );
@@ -100,174 +140,245 @@ const EventDetailPage = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        {/* Event Header */}
-        <div className="mb-8">
-          {event.image_url && (
-            <div className="w-full h-64 mb-6 rounded-lg overflow-hidden">
-              <img
-                src={event.image_url}
-                alt={event.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <div className="mb-4">
-                <Badge variant="outline" className="mb-2">
-                  {event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1)}
-                </Badge>
-                <h1 className="text-4xl font-bold mb-4">{event.title}</h1>
-                <p className="text-lg text-muted-foreground">{event.description}</p>
+      <div className="section-container">
+        <Button variant="ghost" className="mb-4" asChild>
+          <Link to="/events" className="flex items-center gap-1">
+            <ArrowLeft className="h-4 w-4" /> Back to Events
+          </Link>
+        </Button>
+        
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Main content */}
+          <div className="md:col-span-2 space-y-6">
+            <div>
+              <Badge className="mb-2">{event.event_type}</Badge>
+              <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
+              
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-6">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {format(new Date(event.start_time), "MMM d, yyyy")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {format(new Date(event.start_time), "h:mm a")} - {format(new Date(event.end_time), "h:mm a")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  <span>{event.location || 'Online'}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  <span>{registeredCount} registered</span>
+                </div>
               </div>
             </div>
             
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Event Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center">
-                    <Calendar className="h-5 w-5 mr-3 text-primary" />
-                    <div>
-                      <p className="font-medium">
-                        {format(parseISO(event.start_time), 'EEEE, MMMM d, yyyy')}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(parseISO(event.start_time), 'h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}
-                      </p>
-                    </div>
+            {event.image_url && (
+              <div className="aspect-video rounded-lg overflow-hidden bg-muted mb-8">
+                <img 
+                  src={event.image_url} 
+                  alt={event.title} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            
+            <Tabs defaultValue="about" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="about">About</TabsTrigger>
+                <TabsTrigger value="speakers">Speakers</TabsTrigger>
+                <TabsTrigger value="agenda">Agenda</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="about" className="space-y-4">
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">About This Event</h2>
+                  <p className="whitespace-pre-line">{event.description}</p>
+                </div>
+                
+                {event.online_meeting_link && isUserRegistered && (
+                  <div className="bg-muted p-4 rounded-lg">
+                    <h3 className="font-semibold mb-2">Meeting Link</h3>
+                    <a 
+                      href={event.online_meeting_link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline break-all"
+                    >
+                      {event.online_meeting_link}
+                    </a>
                   </div>
-                  
-                  {event.location && (
-                    <div className="flex items-center">
-                      <MapPin className="h-5 w-5 mr-3 text-primary" />
-                      <p>{event.location}</p>
-                    </div>
-                  )}
-                  
-                  {event.online_meeting_link && (
-                    <div className="flex items-center">
-                      <Globe className="h-5 w-5 mr-3 text-primary" />
-                      <p>Online Event</p>
-                    </div>
-                  )}
-                  
-                  {event.capacity && (
-                    <div className="flex items-center">
-                      <Users className="h-5 w-5 mr-3 text-primary" />
-                      <p>Max {event.capacity} attendees</p>
-                    </div>
-                  )}
-                  
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-lg font-semibold">
-                        {event.is_free ? 'Free' : `${event.currency} ${event.price}`}
-                      </span>
-                    </div>
-                    <Button className="w-full" size="lg">
-                      Register for Event
-                    </Button>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="speakers" className="space-y-4">
+                {speakers.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Speaker lineup will be announced soon.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {speakers.map((speaker) => (
+                      <Card key={speaker.id}>
+                        <CardContent className="p-6">
+                          <div className="flex items-start gap-4">
+                            {speaker.image_url ? (
+                              <img
+                                src={speaker.image_url}
+                                alt={speaker.name}
+                                className="w-16 h-16 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                <User className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            )}
+                            
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg">{speaker.name}</h3>
+                              {speaker.title && (
+                                <p className="text-muted-foreground text-sm">{speaker.title}</p>
+                              )}
+                              {speaker.speaking_topic && (
+                                <Badge variant="outline" className="mt-2">
+                                  {speaker.speaking_topic}
+                                </Badge>
+                              )}
+                              
+                              {speaker.bio && (
+                                <p className="text-sm mt-3 text-muted-foreground line-clamp-3">
+                                  {speaker.bio}
+                                </p>
+                              )}
+                              
+                              <div className="flex gap-2 mt-3">
+                                {speaker.linkedin_url && (
+                                  <Button variant="outline" size="sm" asChild>
+                                    <a href={speaker.linkedin_url} target="_blank" rel="noopener noreferrer">
+                                      <Linkedin className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                )}
+                                {speaker.twitter_url && (
+                                  <Button variant="outline" size="sm" asChild>
+                                    <a href={speaker.twitter_url} target="_blank" rel="noopener noreferrer">
+                                      <Twitter className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                )}
+                                {speaker.website_url && (
+                                  <Button variant="outline" size="sm" asChild>
+                                    <a href={speaker.website_url} target="_blank" rel="noopener noreferrer">
+                                      <Globe className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="agenda" className="space-y-4">
+                {agenda.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Event agenda will be published soon.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {agenda
+                      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+                      .map((item) => (
+                        <Card key={item.id}>
+                          <CardContent className="p-6">
+                            <div className="flex items-start gap-4">
+                              <div className="text-center">
+                                <div className="text-sm font-medium">
+                                  {format(new Date(item.start_time), 'HH:mm')}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {format(new Date(item.end_time), 'HH:mm')}
+                                </div>
+                              </div>
+                              
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge className={getSessionTypeColor(item.session_type)}>
+                                    {item.session_type}
+                                  </Badge>
+                                  {item.location && (
+                                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                      <MapPin className="h-3 w-3" />
+                                      <span>{item.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <h3 className="font-semibold mb-1">{item.title}</h3>
+                                
+                                {item.description && (
+                                  <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
+                                )}
+                                
+                                {item.keynote_speakers && (
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <User className="h-3 w-3" />
+                                    <span>{item.keynote_speakers.name}</span>
+                                    {item.keynote_speakers.title && (
+                                      <span>• {item.keynote_speakers.title}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold">
+                    {event.is_free ? 'Free' : `${event.currency} ${event.price?.toFixed(2)}`}
+                  </p>
+                  
+                  {event.capacity > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {event.capacity - registeredCount} spots left
+                    </p>
+                  )}
+                </div>
+                
+                <Separator />
+                
+                <EventRegistrationButton
+                  eventId={event.id}
+                  eventName={event.title}
+                  isFree={event.is_free}
+                  price={event.price}
+                  currency={event.currency}
+                  isUserRegistered={isUserRegistered}
+                />
+              </CardContent>
+            </Card>
           </div>
         </div>
-
-        {/* Speakers Section */}
-        {speakers.length > 0 && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Keynote Speakers
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {speakers.map((speaker) => (
-                  <div key={speaker.id} className="text-center">
-                    {speaker.image_url ? (
-                      <img
-                        src={speaker.image_url}
-                        alt={speaker.name}
-                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-muted flex items-center justify-center">
-                        <User className="h-12 w-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    <h3 className="font-semibold text-lg">{speaker.name}</h3>
-                    {speaker.title && (
-                      <p className="text-muted-foreground mb-2">{speaker.title}</p>
-                    )}
-                    {speaker.speaking_topic && (
-                      <p className="text-sm text-primary">{speaker.speaking_topic}</p>
-                    )}
-                    {speaker.bio && (
-                      <p className="text-sm text-muted-foreground mt-2 line-clamp-3">{speaker.bio}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Agenda Section */}
-        {agenda.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Clock className="h-5 w-5 mr-2" />
-                Event Agenda
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {agenda.map((item) => (
-                  <div key={item.id} className="flex gap-4 p-4 border rounded-lg">
-                    <div className="flex-shrink-0 text-center">
-                      <div className="font-semibold">
-                        {format(parseISO(item.start_time), 'h:mm a')}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(parseISO(item.end_time), 'h:mm a')}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold">{item.title}</h4>
-                      {item.description && (
-                        <p className="text-muted-foreground mb-2">{item.description}</p>
-                      )}
-                      <div className="flex items-center gap-4 text-sm">
-                        <Badge variant="outline">{item.session_type}</Badge>
-                        {item.location && (
-                          <span className="flex items-center text-muted-foreground">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {item.location}
-                          </span>
-                        )}
-                        {item.keynote_speakers && (
-                          <span className="flex items-center text-muted-foreground">
-                            <User className="h-3 w-3 mr-1" />
-                            {item.keynote_speakers.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </Layout>
   );
