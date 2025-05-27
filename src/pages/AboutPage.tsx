@@ -1,215 +1,182 @@
 
+import React from 'react';
 import Layout from '@/components/layout/Layout';
-import { User, Award, BookOpen, Map, Briefcase, Globe, Layers, Heart, Star } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Users, Target, Award, Heart, Lightbulb, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AboutPage = () => {
+  const values = [
+    {
+      icon: Target,
+      title: "Mission-Driven",
+      description: "We're committed to bridging the gap between expertise and opportunity, driving professional growth across Africa."
+    },
+    {
+      icon: Lightbulb,
+      title: "Innovation",
+      description: "We leverage cutting-edge technology to create accessible learning experiences for everyone."
+    },
+    {
+      icon: Heart,
+      title: "Community-Focused",
+      description: "Building strong communities where knowledge sharing and collaboration thrive."
+    },
+    {
+      icon: Globe,
+      title: "Global Impact",
+      description: "Creating sustainable learning pathways that reach millions across the continent."
+    }
+  ];
+
+  const team = [
+    {
+      name: "Mbolela Pule",
+      role: "Founder & CEO",
+      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=80",
+      description: "Technology leader and entrepreneur passionate about African development."
+    },
+    {
+      name: "Sarah Johnson",
+      role: "Head of Learning",
+      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?auto=format&fit=crop&w=400&q=80",
+      description: "Educational expert with 15+ years in curriculum development."
+    },
+    {
+      name: "David Kimani",
+      role: "Technical Director",
+      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
+      description: "Full-stack developer building scalable learning platforms."
+    }
+  ];
+
   return (
-    <Layout>
-      <div className="section-container bg-light-purple">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-16">
-          <div>
-            <h1 className="heading-lg mb-6 text-gradient">About SkillPulse</h1>
-            <p className="text-lg mb-6">
-              Skills and Event Booking Platform Marketplace | Connecting Expertise with Opportunity | Based on innovative technology and professional growth.
-              An innovative platform dedicated to transforming the professional development and event booking landscape.
-            </p>
-            <div className="space-y-4 mb-8">
-              <div className="flex items-start gap-3">
-                <Map className="h-6 w-6 text-primary mt-1" />
-                <div>
-                  <h3 className="font-semibold text-lg">Vision</h3>
-                  <p>Bridging the gap between expertise and opportunity, creating sustainable growth and professional advancement for all users.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Briefcase className="h-6 w-6 text-primary mt-1" />
-                <div>
-                  <h3 className="font-semibold text-lg">Industry Focus</h3>
-                  <p>Specialized in professional development, skill enhancement, event management, and educational technology innovation.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <BookOpen className="h-6 w-6 text-primary mt-1" />
-                <div>
-                  <h3 className="font-semibold text-lg">Platform Features</h3>
-                  <p>Comprehensive event booking system, expert-led courses, professional networking opportunities, and skill certification programs.</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-4">
-              <Button asChild>
-                <Link to="/ventures">Explore Platform</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/speaking">Expert Sessions</Link>
-              </Button>
-            </div>
-          </div>
-          <div className="rounded-lg overflow-hidden shadow-xl">
-            <img 
-              src="https://images.unsplash.com/photo-1605810230434-7631ac76ec81" 
-              alt="SkillPulse Platform" 
-              className="w-full h-auto object-cover"
-            />
-          </div>
-        </div>
-
-        <div className="mb-16">
-          <h2 className="heading-md mb-8">Platform Evolution</h2>
-          <div className="space-y-6">
-            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <div className="flex flex-col md:flex-row md:justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-semibold">Launch & Expansion</h3>
-                  <p className="text-primary font-medium">SkillPulse Marketplace</p>
-                </div>
-                <div className="text-muted-foreground mt-1">December 2020 - Present</div>
-              </div>
-              <p>
-                Since launch, SkillPulse has grown into a comprehensive skills and event booking platform, 
-                connecting professionals with opportunities for growth and development. The platform continues 
-                to expand its offerings and reach, serving a diverse community of learners and experts.
-              </p>
-            </div>
-
-            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <div className="flex flex-col md:flex-row md:justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-semibold">Educational Partnership Phase</h3>
-                  <p className="text-primary font-medium">Professional Development Focus</p>
-                </div>
-                <div className="text-muted-foreground mt-1">January 2020 - December 2020</div>
-              </div>
-              <p>
-                Established key partnerships with educational institutions and professional organizations to enhance platform offerings.
-              </p>
-            </div>
-
-            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <div className="flex flex-col md:flex-row md:justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-semibold">Platform Development</h3>
-                  <p className="text-primary font-medium">Technology Foundation</p>
-                </div>
-                <div className="text-muted-foreground mt-1">January 2015 - December 2019</div>
-              </div>
-              <p>
-                Development of core platform infrastructure, focusing on creating a robust, scalable system 
-                to support educational content delivery, event management, and professional networking capabilities.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-16">
-          <h2 className="heading-md mb-8">Key Platform Features</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <Layers className="h-10 w-10 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Event Booking System</h3>
-              <p>
-                Comprehensive event management and booking capabilities, allowing users to discover, 
-                register for, and participate in professional development events.
-              </p>
-            </div>
-            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <Star className="h-10 w-10 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Skills Marketplace</h3>
-              <p>
-                Platform for experts to share knowledge and skills through courses, 
-                workshops, and one-on-one sessions with integrated booking and payment systems.
-              </p>
-            </div>
-            <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
-              <Heart className="h-10 w-10 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Professional Growth</h3>
-              <p>
-                Focused on facilitating career advancement through skill acquisition, 
-                professional networking, and certification opportunities.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-16">
-          <h2 className="heading-md mb-8">Technical Platform & Features</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-card rounded-lg p-6 shadow-md">
-              <h3 className="text-xl font-semibold mb-4">Technology Stack</h3>
-              <ul className="space-y-4">
-                <li className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-1" />
-                  <div>
-                    <p className="font-medium">React Frontend</p>
-                    <p className="text-sm text-muted-foreground">Modern, responsive user interface for optimal experience</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-1" />
-                  <div>
-                    <p className="font-medium">Secure Authentication</p>
-                    <p className="text-sm text-muted-foreground">Enterprise-grade security for user data and transactions</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-1" />
-                  <div>
-                    <p className="font-medium">Cloud Infrastructure</p>
-                    <p className="text-sm text-muted-foreground">Scalable architecture supporting thousands of concurrent users</p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-            <div className="bg-card rounded-lg p-6 shadow-md">
-              <h3 className="text-xl font-semibold mb-4">Core Platform Features</h3>
-              <ul className="space-y-4">
-                <li className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-1" />
-                  <div>
-                    <p className="font-medium">Integrated Payment Processing</p>
-                    <p className="text-sm text-muted-foreground">Secure transaction handling for course and event bookings</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-1" />
-                  <div>
-                    <p className="font-medium">Analytics Dashboard</p>
-                    <p className="text-sm text-muted-foreground">Comprehensive tracking of user engagement and progress</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-1" />
-                  <div>
-                    <p className="font-medium">Content Management System</p>
-                    <p className="text-sm text-muted-foreground">Robust tools for creating and delivering educational content</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-1" />
-                  <div>
-                    <p className="font-medium">Event Management Tools</p>
-                    <p className="text-sm text-muted-foreground">Comprehensive system for organizing and promoting professional events</p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h2 className="heading-md mb-8">Platform Mission</h2>
-          <div className="bg-muted rounded-lg p-8">
-            <p className="text-xl italic text-center">
-              "Our mission is to connect expertise with opportunity across industries. 
-              Through technological innovation and educational excellence, we're dedicated to 
-              facilitating professional growth, skill development, and community building."
+    <div className="min-h-screen bg-light-purple">
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          {/* Hero Section */}
+          <div className="text-center mb-16">
+            <h1 className="text-5xl font-bold mb-6">About SkillPulse</h1>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              We're transforming how people learn and grow professionally across Africa through 
+              innovative technology and community-driven education.
             </p>
           </div>
+
+          {/* Mission Section */}
+          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
+            <div>
+              <h2 className="text-3xl font-bold mb-6">Our Mission</h2>
+              <p className="text-lg mb-4">
+                SkillPulse is a pioneering skills and event booking platform transforming how people 
+                learn and grow professionally. With a unique blend of technical innovation and 
+                educational expertise, we've built SkillPulse to harness collective knowledge 
+                for professional advancement.
+              </p>
+              <p className="text-lg mb-6">
+                Our mission is to bridge the gap between expertise and opportunity, driving 
+                professional growth, and fostering community development throughout the industry, creating 
+                sustainable learning pathways for millions.
+              </p>
+              <Button asChild size="lg">
+                <Link to="/learning">Start Learning</Link>
+              </Button>
+            </div>
+            <div className="relative">
+              <img 
+                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80" 
+                alt="Team collaboration" 
+                className="w-full h-96 object-cover rounded-xl shadow-lg" 
+              />
+            </div>
+          </div>
+
+          {/* Values Section */}
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold text-center mb-12">Our Values</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {values.map((value, index) => (
+                <Card key={index} className="text-center">
+                  <CardHeader>
+                    <value.icon className="h-12 w-12 mx-auto mb-4 text-primary" />
+                    <CardTitle className="text-lg">{value.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {value.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Team Section */}
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold text-center mb-12">Meet Our Team</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {team.map((member, index) => (
+                <Card key={index} className="text-center">
+                  <CardHeader>
+                    <img 
+                      src={member.image} 
+                      alt={member.name}
+                      className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                    />
+                    <CardTitle>{member.name}</CardTitle>
+                    <p className="text-primary font-semibold">{member.role}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {member.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Stats Section */}
+          <div className="bg-white/80 rounded-xl p-8 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
+              <div>
+                <div className="text-4xl font-bold text-primary mb-2">10,000+</div>
+                <div className="text-muted-foreground">Students Enrolled</div>
+              </div>
+              <div>
+                <div className="text-4xl font-bold text-primary mb-2">500+</div>
+                <div className="text-muted-foreground">Courses Available</div>
+              </div>
+              <div>
+                <div className="text-4xl font-bold text-primary mb-2">50+</div>
+                <div className="text-muted-foreground">Expert Instructors</div>
+              </div>
+              <div>
+                <div className="text-4xl font-bold text-primary mb-2">95%</div>
+                <div className="text-muted-foreground">Completion Rate</div>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA Section */}
+          <div className="text-center">
+            <h2 className="text-3xl font-bold mb-6">Ready to Start Your Journey?</h2>
+            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+              Join thousands of learners who are advancing their careers with SkillPulse.
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Button asChild size="lg">
+                <Link to="/register">Get Started</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link to="/contact">Contact Us</Link>
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
-    </Layout>
+      </Layout>
+    </div>
   );
 };
 

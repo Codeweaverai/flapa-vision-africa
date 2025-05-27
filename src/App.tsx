@@ -6,6 +6,7 @@ import { Toaster } from 'sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminRoute from '@/components/admin/AdminRoute';
 import HomePage from '@/pages/HomePage';
+import AboutPage from '@/pages/AboutPage';
 import ContactPage from '@/pages/ContactPage';
 import EventsPage from '@/pages/EventsPage';
 import EventDetailPage from '@/pages/EventDetailPage';
@@ -24,6 +25,9 @@ import HelpCenterPage from '@/pages/HelpCenterPage';
 import ExploreCoursesPage from '@/pages/ExploreCoursesPage';
 import ExploreEventsPage from '@/pages/ExploreEventsPage';
 import LoginPage from '@/pages/LoginPage';
+import SigninPage from '@/pages/SigninPage';
+import MyCoursesPage from '@/pages/MyCoursesPage';
+import MyEventsPage from '@/pages/MyEventsPage';
 import RegisterPage from '@/pages/RegisterPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
@@ -67,6 +71,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:id" element={<EventDetailPage />} />
@@ -85,10 +90,13 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signin" element={<SigninPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+          <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
+          <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={
