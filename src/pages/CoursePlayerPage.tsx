@@ -5,12 +5,73 @@ import { supabase } from '@/lib/supabaseClient';
 import { SimplifiedCourse, SimplifiedModule, SimplifiedLesson } from '@/types/eventTypes';
 import VideoPlayer from '@/components/course/VideoPlayer';
 import Layout from '@/components/layout/Layout';
-import CourseModuleList from '@/components/course/CourseModuleList';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, BookOpen, CheckCircle, Clock, FileText } from 'lucide-react';
+
+// Create a simplified CourseModuleList component to avoid type conflicts
+const SimplifiedCourseModuleList: React.FC<{
+  modules: SimplifiedModule[];
+  currentLessonId?: string;
+  onSelectLesson: (lesson: SimplifiedLesson) => void;
+  isEnrolled: boolean;
+}> = ({ modules, currentLessonId, onSelectLesson, isEnrolled }) => {
+  return (
+    <div className="space-y-4">
+      {modules.map((module, moduleIndex) => (
+        <div key={module.id} className="bg-card rounded-lg border">
+          <div className="p-4 border-b">
+            <h4 className="font-medium text-sm text-muted-foreground">
+              Module {moduleIndex + 1}
+            </h4>
+            <h3 className="font-semibold">{module.title}</h3>
+            {module.description && (
+              <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
+            )}
+          </div>
+          <div className="p-4 space-y-2">
+            {module.lessons.map((lesson, lessonIndex) => (
+              <button
+                key={lesson.id}
+                onClick={() => onSelectLesson(lesson)}
+                disabled={!isEnrolled}
+                className={`w-full text-left p-3 rounded-md border transition-colors ${
+                  currentLessonId === lesson.id
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'hover:bg-muted border-border'
+                } ${!isEnrolled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium opacity-60">
+                      {moduleIndex + 1}.{lessonIndex + 1}
+                    </span>
+                    <div>
+                      <p className="font-medium text-sm">{lesson.title}</p>
+                      {lesson.description && (
+                        <p className="text-xs opacity-60 mt-1">{lesson.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {lesson.is_completed && (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    )}
+                    {lesson.content_type === 'video' && (
+                      <Clock className="h-4 w-4 opacity-60" />
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 interface LessonProgress {
   position: number;
@@ -183,7 +244,7 @@ const CoursePlayerPage: React.FC = () => {
             const lesson: SimplifiedLesson = {
               id: lessonItem.id,
               title: lessonItem.title,
-              description: lessonItem.description,
+              description: lessonItem.description || '',
               video_url: lessonItem.video_url,
               module_id: lessonItem.module_id,
               order_index: lessonItem.order_index,
@@ -198,7 +259,7 @@ const CoursePlayerPage: React.FC = () => {
         const moduleObj: SimplifiedModule = {
           id: moduleItem.id,
           title: moduleItem.title,
-          description: moduleItem.description,
+          description: moduleItem.description || '',
           course_id: moduleItem.course_id,
           order_index: moduleItem.order_index,
           lessons: moduleLessons
@@ -211,7 +272,7 @@ const CoursePlayerPage: React.FC = () => {
       const course: SimplifiedCourse = {
         id: courseData.id,
         title: courseData.title,
-        description: courseData.description,
+        description: courseData.description || '',
         modules: modules
       };
       
@@ -311,7 +372,7 @@ const CoursePlayerPage: React.FC = () => {
           <div className="hidden lg:block">
             <div className="sticky top-24">
               <h3 className="text-lg font-semibold mb-4">Course Content</h3>
-              <CourseModuleList
+              <SimplifiedCourseModuleList
                 modules={course.modules}
                 currentLessonId={currentLesson?.id}
                 onSelectLesson={handleLessonChange}
@@ -349,7 +410,7 @@ const CoursePlayerPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold">{currentLesson.title}</h2>
                     {currentLesson.is_completed && (
-                      <Badge variant="success" className="flex items-center gap-1">
+                      <Badge variant="secondary" className="flex items-center gap-1">
                         <CheckCircle className="h-3 w-3" />
                         <span>Completed</span>
                       </Badge>
@@ -458,7 +519,7 @@ const CoursePlayerPage: React.FC = () => {
             {/* Mobile course navigation */}
             <div className="lg:hidden mt-12">
               <h3 className="text-lg font-semibold mb-4">Course Content</h3>
-              <CourseModuleList
+              <SimplifiedCourseModuleList
                 modules={course.modules}
                 currentLessonId={currentLesson?.id}
                 onSelectLesson={handleLessonChange}

@@ -15,7 +15,7 @@ export interface LessonFormDialogProps {
   moduleId: string;
   onLessonSaved: (lesson: Lesson) => void;
   editingLesson?: Lesson | null;
-  courseId?: string; // Add courseId prop
+  courseId?: string;
 }
 
 const LessonFormDialog = ({
@@ -24,7 +24,7 @@ const LessonFormDialog = ({
   moduleId,
   onLessonSaved,
   editingLesson,
-  courseId // Add courseId to the props destructuring
+  courseId
 }: LessonFormDialogProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -77,7 +77,7 @@ const LessonFormDialog = ({
         
         toast.success("Lesson updated successfully");
       } else {
-        // Create new lesson
+        // Create new lesson - need to get the next order index
         lessonData = await createLesson({
           module_id: moduleId,
           title,
@@ -85,7 +85,7 @@ const LessonFormDialog = ({
           content_type: contentType,
           video_url: videoUrl || null,
           content: lessonContent,
-          // Order will be set automatically on the server
+          order_index: 0, // This will be set properly on the server
         });
         
         toast.success("Lesson created successfully");

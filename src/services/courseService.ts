@@ -52,7 +52,7 @@ export interface Lesson {
   video_url: string | null;
   module_id: string;
   order_index: number;
-  content_type?: string;
+  content_type: string;
   content?: any;
   is_completed?: boolean;
   last_position_seconds?: number;
@@ -259,7 +259,31 @@ export const deleteCourse = async (courseId: string): Promise<boolean> => {
 };
 
 // Function to create a new course
-export const createNewCourse = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
+export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<Course | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .insert(courseData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating course:', error);
+      toast.error('Failed to create course');
+      return null;
+    }
+
+    toast.success('Course created successfully');
+    return data;
+  } catch (error) {
+    console.error('Error in createCourse:', error);
+    toast.error('Failed to create course');
+    return null;
+  }
+};
+
+// Function to create a course with a creator
+export const createCourseWithCreator = async (courseData: Omit<Course, 'id' | 'created_at' | 'updated_at'>, creatorId: string): Promise<Course | null> => {
   try {
     // Ensure all required fields are present
     if (!courseData.title || !courseData.description || !courseData.category || 
@@ -271,15 +295,10 @@ export const createNewCourse = async (courseData: Partial<Course>, creatorId: st
     
     // Create the complete course object with required fields
     const courseWithCreator = {
-      title: courseData.title,
-      description: courseData.description,
-      summary: courseData.summary || courseData.title, // Provide a default summary if not provided
-      category: courseData.category,
-      difficulty_level: courseData.difficulty_level,
-      duration_minutes: courseData.duration_minutes,
+      ...courseData,
       creator_id: creatorId,
       is_published: courseData.is_published || false,
-      published: courseData.is_published || false, // To handle both property names
+      published: courseData.is_published || false,
       is_free: courseData.is_free !== undefined ? courseData.is_free : true,
       price: courseData.is_free ? 0 : (courseData.price || 0),
       currency: courseData.is_free ? null : (courseData.currency || 'USD'),
@@ -288,7 +307,6 @@ export const createNewCourse = async (courseData: Partial<Course>, creatorId: st
       certificate_enabled: courseData.certificate_enabled || false
     };
 
-    // Log the course data for debugging
     console.log('Sending course data to Supabase:', courseWithCreator);
 
     const { data, error } = await supabase
@@ -306,15 +324,10 @@ export const createNewCourse = async (courseData: Partial<Course>, creatorId: st
     toast.success('Course created successfully!');
     return data as Course;
   } catch (error: any) {
-    console.error('Error in createNewCourse:', error);
+    console.error('Error in createCourseWithCreator:', error);
     toast.error(`Failed to create course: ${error.message || 'Unknown error'}`);
     return null;
   }
-};
-
-// Function to create a course with a creator
-export const createCourseWithCreator = async (courseData: Partial<Course>, creatorId: string): Promise<Course | null> => {
-  return createNewCourse(courseData, creatorId);
 };
 
 // Function to update an existing course
@@ -606,24 +619,16 @@ export const fetchCourseEnrollments = async (courseId: string): Promise<Enrollme
 };
 
 // Module functions
-export const createModule = async (moduleData: Partial<CourseModule>): Promise<CourseModule | null> => {
+export const createModule = async (moduleData: Omit<CourseModule, 'id' | 'created_at' | 'updated_at' | 'lessons'>): Promise<CourseModule | null> => {
   try {
     if (!moduleData.course_id || !moduleData.title) {
       toast.error('Course ID and module title are required');
       return null;
     }
 
-    // Ensure required fields exist
-    const module = {
-      course_id: moduleData.course_id,
-      title: moduleData.title,
-      order_index: moduleData.order_index || 0,
-      description: moduleData.description
-    };
-
     const { data, error } = await supabase
       .from('course_modules')
-      .insert(module)
+      .insert(moduleData)
       .select()
       .single();
 
@@ -644,20 +649,9 @@ export const createModule = async (moduleData: Partial<CourseModule>): Promise<C
 
 export const updateModule = async (moduleId: string, moduleData: Partial<CourseModule>): Promise<CourseModule | null> => {
   try {
-    // Ensure we're not passing partial data that's missing required fields
-    if (!moduleData.title || moduleData.order_index === undefined || !moduleData.course_id) {
-      throw new Error('Missing required fields for module update');
-    }
-
     const { data, error } = await supabase
       .from('course_modules')
-      .update({
-        title: moduleData.title,
-        description: moduleData.description,
-        order_index: moduleData.order_index,
-        course_id: moduleData.course_id,
-        updated_at: new Date().toISOString()
-      })
+      .update(moduleData)
       .eq('id', moduleId)
       .select()
       .single();
@@ -705,25 +699,32 @@ export const deleteModule = async (moduleId: string): Promise<boolean> => {
 };
 
 // Lesson functions
-export const createLesson = async (lessonData: Partial<Lesson>): Promise<Lesson | null> => {
+export const createLesson = async (lessonData: Omit<Lesson, 'id' | 'created_at' | 'updated_at' | 'quizzes' | 'is_completed'>): Promise<Lesson | null> => {
   try {
-    // Validate required fields
-    if (!lessonData.title || !lessonData.module_id || lessonData.order_index === undefined) {
-      throw new Error('Missing required fields for lesson creation');
+    // Get the next order index for this module
+    const { data: existingLessons, error: orderError } = await supabase
+      .from('lessons')
+      .select('order_index')
+      .eq('module_id', lessonData.module_id)
+      .order('order_index', { ascending: false })
+      .limit(1);
+
+    if (orderError) {
+      console.error('Error getting lesson order:', orderError);
     }
+
+    const nextOrderIndex = existingLessons && existingLessons.length > 0 
+      ? existingLessons[0].order_index + 1 
+      : 1;
+
+    const lessonToCreate = {
+      ...lessonData,
+      order_index: nextOrderIndex
+    };
 
     const { data, error } = await supabase
       .from('lessons')
-      .insert({
-        title: lessonData.title,
-        description: lessonData.description || '',
-        module_id: lessonData.module_id,
-        order_index: lessonData.order_index,
-        video_url: lessonData.video_url || null,
-        content_type: lessonData.content_type || 'video',
-        materials_urls: lessonData.materials_urls || [],
-        content: lessonData.content || {}
-      })
+      .insert(lessonToCreate)
       .select()
       .single();
 
