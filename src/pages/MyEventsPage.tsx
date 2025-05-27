@@ -7,17 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, MapPin, Users, Video, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, Video, CheckCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { format, parseISO, isAfter, isBefore, isToday } from 'date-fns';
+import { format, parseISO, isAfter, isBefore } from 'date-fns';
 
 interface EventRegistration {
   id: string;
   event_id: string;
   status: string;
-  registered_at: string;
-  attended: boolean;
+  created_at: string;
   event: {
     id: string;
     title: string;
@@ -53,13 +52,12 @@ const MyEventsPage = () => {
 
     try {
       const { data, error } = await supabase
-        .from('event_registrations')
+        .from('registrations')
         .select(`
           id,
           event_id,
           status,
-          registered_at,
-          attended,
+          created_at,
           events:event_id (
             id,
             title,
@@ -76,7 +74,7 @@ const MyEventsPage = () => {
           )
         `)
         .eq('user_id', user.id)
-        .order('registered_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching event registrations:', error);

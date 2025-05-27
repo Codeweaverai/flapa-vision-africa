@@ -15,9 +15,8 @@ import { toast } from 'sonner';
 interface EnrolledCourse {
   id: string;
   course_id: string;
-  progress: number;
-  completed: boolean;
-  last_accessed: string;
+  enrollment_date: string;
+  is_completed: boolean;
   course: {
     id: string;
     title: string;
@@ -26,7 +25,7 @@ interface EnrolledCourse {
     category: string;
     difficulty_level: string;
     duration_minutes: number;
-    instructor_name: string;
+    creator_id: string;
   };
 }
 
@@ -53,9 +52,8 @@ const MyCoursesPage = () => {
         .select(`
           id,
           course_id,
-          progress,
-          completed,
-          last_accessed,
+          enrollment_date,
+          is_completed,
           courses:course_id (
             id,
             title,
@@ -64,11 +62,11 @@ const MyCoursesPage = () => {
             category,
             difficulty_level,
             duration_minutes,
-            instructor_name
+            creator_id
           )
         `)
         .eq('user_id', user.id)
-        .order('last_accessed', { ascending: false });
+        .order('enrollment_date', { ascending: false });
 
       if (error) {
         console.error('Error fetching enrolled courses:', error);
@@ -89,16 +87,12 @@ const MyCoursesPage = () => {
     navigate(`/learning/course/${courseId}`);
   };
 
-  const inProgressCourses = enrolledCourses.filter(enrollment => 
-    !enrollment.completed && enrollment.progress > 0
-  );
-  
   const completedCourses = enrolledCourses.filter(enrollment => 
-    enrollment.completed
+    enrollment.is_completed
   );
   
-  const notStartedCourses = enrolledCourses.filter(enrollment => 
-    !enrollment.completed && enrollment.progress === 0
+  const inProgressCourses = enrolledCourses.filter(enrollment => 
+    !enrollment.is_completed
   );
 
   if (loading) {
@@ -181,11 +175,10 @@ const MyCoursesPage = () => {
           </div>
 
           <Tabs defaultValue="all" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="all">All Courses ({enrolledCourses.length})</TabsTrigger>
               <TabsTrigger value="in-progress">In Progress ({inProgressCourses.length})</TabsTrigger>
               <TabsTrigger value="completed">Completed ({completedCourses.length})</TabsTrigger>
-              <TabsTrigger value="not-started">Not Started ({notStartedCourses.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="mt-6">
@@ -198,10 +191,6 @@ const MyCoursesPage = () => {
 
             <TabsContent value="completed" className="mt-6">
               <CourseGrid courses={completedCourses} onContinue={continueCourse} />
-            </TabsContent>
-
-            <TabsContent value="not-started" className="mt-6">
-              <CourseGrid courses={notStartedCourses} onContinue={continueCourse} />
             </TabsContent>
           </Tabs>
 
@@ -254,19 +243,15 @@ const CourseGrid = ({ courses, onContinue }: CourseGridProps) => {
               </div>
             )}
             <div className="absolute top-2 right-2">
-              {enrollment.completed ? (
+              {enrollment.is_completed ? (
                 <Badge variant="default" className="bg-green-500">
                   <Award className="h-3 w-3 mr-1" />
                   Completed
                 </Badge>
-              ) : enrollment.progress > 0 ? (
+              ) : (
                 <Badge variant="default" className="bg-blue-500">
                   <Play className="h-3 w-3 mr-1" />
                   In Progress
-                </Badge>
-              ) : (
-                <Badge variant="outline">
-                  Not Started
                 </Badge>
               )}
             </div>
@@ -292,28 +277,19 @@ const CourseGrid = ({ courses, onContinue }: CourseGridProps) => {
                 </div>
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-2" />
-                  {enrollment.last_accessed ? 
-                    new Date(enrollment.last_accessed).toLocaleDateString() : 
-                    'Not started'
+                  {enrollment.enrollment_date ? 
+                    new Date(enrollment.enrollment_date).toLocaleDateString() : 
+                    'Recently enrolled'
                   }
                 </div>
-              </div>
-              
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Progress</span>
-                  <span>{enrollment.progress}%</span>
-                </div>
-                <Progress value={enrollment.progress} className="h-2" />
               </div>
               
               <Button 
                 onClick={() => onContinue(enrollment.course.id)} 
                 className="w-full"
-                variant={enrollment.completed ? "outline" : "default"}
+                variant={enrollment.is_completed ? "outline" : "default"}
               >
-                {enrollment.completed ? 'Review Course' : 
-                 enrollment.progress > 0 ? 'Continue Learning' : 'Start Course'}
+                {enrollment.is_completed ? 'Review Course' : 'Continue Learning'}
               </Button>
             </div>
           </CardContent>
