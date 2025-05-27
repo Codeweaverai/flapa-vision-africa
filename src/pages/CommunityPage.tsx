@@ -24,7 +24,7 @@ interface CommunityPost {
     full_name: string;
     username: string;
     avatar_url: string;
-  };
+  } | null;
 }
 
 interface CommunityMessage {
@@ -37,7 +37,7 @@ interface CommunityMessage {
     full_name: string;
     username: string;
     avatar_url: string;
-  };
+  } | null;
 }
 
 const CommunityPage = () => {
@@ -93,20 +93,31 @@ const CommunityPage = () => {
 
   const fetchPosts = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: postsData, error: postsError } = await supabase
         .from('community_posts')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            username,
-            avatar_url
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setPosts(data || []);
+      if (postsError) throw postsError;
+
+      // Fetch profiles separately to avoid join issues
+      const userIds = postsData?.map(post => post.user_id) || [];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      }
+
+      // Combine posts with profile data
+      const postsWithProfiles = postsData?.map(post => ({
+        ...post,
+        profiles: profilesData?.find(profile => profile.id === post.user_id) || null
+      })) || [];
+
+      setPosts(postsWithProfiles);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast.error('Failed to load community posts');
@@ -117,22 +128,33 @@ const CommunityPage = () => {
 
   const fetchMessages = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: messagesData, error: messagesError } = await supabase
         .from('community_messages')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            username,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('channel', activeChannel)
         .order('created_at', { ascending: true })
         .limit(100);
 
-      if (error) throw error;
-      setMessages(data || []);
+      if (messagesError) throw messagesError;
+
+      // Fetch profiles separately to avoid join issues
+      const userIds = messagesData?.map(message => message.user_id) || [];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      }
+
+      // Combine messages with profile data
+      const messagesWithProfiles = messagesData?.map(message => ({
+        ...message,
+        profiles: profilesData?.find(profile => profile.id === message.user_id) || null
+      })) || [];
+
+      setMessages(messagesWithProfiles);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast.error('Failed to load messages');
@@ -231,7 +253,7 @@ const CommunityPage = () => {
                 <div>
                   <p className="font-semibold">{post.profiles?.full_name || 'Anonymous'}</p>
                   <p className="text-sm text-muted-foreground">
-                    @{post.profiles?.username} • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                    @{post.profiles?.username || 'user'} • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                   </p>
                 </div>
               </div>
