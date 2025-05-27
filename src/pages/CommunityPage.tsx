@@ -1,318 +1,390 @@
 
-import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import CommunityLayout from '@/components/community/CommunityLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { format } from 'date-fns';
-import { MessageCircle, Send, Plus, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { 
-  CommunityPost, 
-  fetchCommunityPosts, 
-  createCommunityPost,
-  createCommunityComment 
-} from '@/services/communityService';
-import { supabase } from '@/lib/supabaseClient';
+import { MessageCircle, Heart, Share2, Send, Users } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
-interface CommentFormProps {
-  postId: string;
-  onCommentSubmit: () => void;
+interface CommunityPost {
+  id: string;
+  title: string;
+  content: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  profiles?: {
+    full_name: string;
+    username: string;
+    avatar_url: string;
+  };
 }
 
-const CommentForm: React.FC<CommentFormProps> = ({ postId, onCommentSubmit }) => {
-  const { user } = useAuth();
-  const [content, setContent] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!content.trim()) {
-      toast.error("Comment cannot be empty");
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      await createCommunityComment(user?.id || '', postId, content);
-      setContent('');
-      onCommentSubmit();
-    } catch (error) {
-      console.error("Error submitting comment:", error);
-      toast.error("Failed to submit comment");
-    } finally {
-      setIsSubmitting(false);
-    }
+interface CommunityMessage {
+  id: string;
+  content: string;
+  user_id: string;
+  channel: string;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+    username: string;
+    avatar_url: string;
   };
-
-  return (
-    <form onSubmit={handleSubmit} className="mt-2 flex gap-2">
-      <Input 
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Write a reply..."
-        className="flex-1"
-      />
-      <Button type="submit" size="sm" disabled={isSubmitting}>
-        {isSubmitting ? 'Posting...' : <Send className="h-4 w-4" />}
-      </Button>
-    </form>
-  );
-};
+}
 
 const CommunityPage = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [newPostTitle, setNewPostTitle] = useState('');
-  const [newPostContent, setNewPostContent] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showNewPostForm, setShowNewPostForm] = useState(false);
   const [activeTab, setActiveTab] = useState('feed');
-  const [activeReplyPostId, setActiveReplyPostId] = useState<string | null>(null);
-
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
-  }
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [messages, setMessages] = useState<CommunityMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newPost, setNewPost] = useState({ title: '', content: '' });
+  const [newMessage, setNewMessage] = useState('');
+  const [activeChannel, setActiveChannel] = useState('general');
 
   useEffect(() => {
-    loadPosts();
-    
-    // Set up realtime subscription for new posts
-    const channel = supabase
-      .channel('public:community_posts')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'community_posts' 
-        }, 
-        (payload) => {
-          console.log('Post change received!', payload);
-          loadPosts(); // Reload all posts when there's a change
-        }
-      )
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'post_comments' 
-        }, 
-        (payload) => {
-          console.log('Comment change received!', payload);
-          loadPosts(); // Reload posts when comments change
-        }
-      )
+    if (user) {
+      fetchPosts();
+      fetchMessages();
+      subscribeToRealtime();
+    }
+  }, [user]);
+
+  const subscribeToRealtime = () => {
+    // Subscribe to community posts
+    const postsChannel = supabase
+      .channel('community-posts')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'community_posts'
+      }, (payload) => {
+        console.log('New post:', payload);
+        fetchPosts(); // Refresh posts when new one is added
+      })
       .subscribe();
-      
+
+    // Subscribe to community messages
+    const messagesChannel = supabase
+      .channel('community-messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'community_messages'
+      }, (payload) => {
+        console.log('New message:', payload);
+        fetchMessages(); // Refresh messages when new one is added
+      })
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(postsChannel);
+      supabase.removeChannel(messagesChannel);
     };
-  }, []);
-
-  const loadPosts = async () => {
-    const data = await fetchCommunityPosts();
-    setPosts(data);
   };
 
-  const handleNewPost = async (e: React.FormEvent) => {
+  const fetchPosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('community_posts')
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            username,
+            avatar_url
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPosts(data || []);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      toast.error('Failed to load community posts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('community_messages')
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            username,
+            avatar_url
+          )
+        `)
+        .eq('channel', activeChannel)
+        .order('created_at', { ascending: true })
+        .limit(100);
+
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      toast.error('Failed to load messages');
+    }
+  };
+
+  const createPost = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newPostTitle.trim() || !newPostContent.trim()) {
-      toast.error('Please provide both a title and content for your post');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    const post = await createCommunityPost(user?.id, newPostTitle, newPostContent);
-    if (post) {
-      setNewPostTitle('');
-      setNewPostContent('');
-      setShowNewPostForm(false);
-      // No need to manually update the posts array as the realtime subscription will handle it
-    }
-    
-    setIsSubmitting(false);
-  };
+    if (!user || !newPost.title.trim() || !newPost.content.trim()) return;
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    
-    switch (value) {
-      case 'feed':
-        navigate('/community');
-        break;
-      case 'chat':
-        navigate('/community/chat');
-        break;
-      case 'courses':
-        navigate('/community/courses');
-        break;
-      case 'notifications':
-        navigate('/community/notifications');
-        break;
+    try {
+      const { error } = await supabase
+        .from('community_posts')
+        .insert({
+          title: newPost.title,
+          content: newPost.content,
+          user_id: user.id
+        });
+
+      if (error) throw error;
+      
+      setNewPost({ title: '', content: '' });
+      toast.success('Post created successfully!');
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast.error('Failed to create post');
     }
   };
 
-  const toggleReplyForm = (postId: string) => {
-    setActiveReplyPostId(activeReplyPostId === postId ? null : postId);
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !newMessage.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('community_messages')
+        .insert({
+          content: newMessage,
+          user_id: user.id,
+          channel: activeChannel
+        });
+
+      if (error) throw error;
+      
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
+    }
   };
 
-  return (
-    <CommunityLayout activeTab={activeTab} onTabChange={handleTabChange}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Community Feed</h2>
-          <Button onClick={() => setShowNewPostForm(!showNewPostForm)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Post
-          </Button>
-        </div>
-        
-        {showNewPostForm && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Create a New Post</CardTitle>
-              <CardDescription>Share your thoughts with the community</CardDescription>
-            </CardHeader>
-            <form onSubmit={handleNewPost}>
-              <CardContent className="space-y-4">
-                <div>
-                  <Input
-                    placeholder="Post title"
-                    value={newPostTitle}
-                    onChange={(e) => setNewPostTitle(e.target.value)}
-                    className="mb-2"
-                  />
-                </div>
-                <div>
-                  <Textarea
-                    placeholder="What's on your mind?"
-                    value={newPostContent}
-                    onChange={(e) => setNewPostContent(e.target.value)}
-                    rows={4}
-                  />
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  type="button" 
-                  onClick={() => setShowNewPostForm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Posting...' : 'Post'}
-                </Button>
-              </CardFooter>
+  const renderFeed = () => (
+    <div className="space-y-6">
+      {/* Create Post Form */}
+      {user && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Share with the Community</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={createPost} className="space-y-4">
+              <Input
+                placeholder="Post title"
+                value={newPost.title}
+                onChange={(e) => setNewPost(prev => ({ ...prev, title: e.target.value }))}
+                required
+              />
+              <Textarea
+                placeholder="What's on your mind?"
+                value={newPost.content}
+                onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
+                rows={4}
+                required
+              />
+              <Button type="submit" className="w-full">
+                <Share2 className="h-4 w-4 mr-2" />
+                Share Post
+              </Button>
             </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Posts List */}
+      <div className="space-y-4">
+        {posts.map((post) => (
+          <Card key={post.id}>
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <Avatar>
+                  <AvatarImage src={post.profiles?.avatar_url} />
+                  <AvatarFallback>
+                    {post.profiles?.full_name?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-semibold">{post.profiles?.full_name || 'Anonymous'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    @{post.profiles?.username} • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+              <CardTitle className="mt-4">{post.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="whitespace-pre-wrap">{post.content}</p>
+              <div className="flex items-center space-x-4 mt-4 pt-4 border-t">
+                <Button variant="ghost" size="sm">
+                  <Heart className="h-4 w-4 mr-2" />
+                  Like
+                </Button>
+                <Button variant="ghost" size="sm">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Comment
+                </Button>
+                <Button variant="ghost" size="sm">
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </Button>
+              </div>
+            </CardContent>
           </Card>
-        )}
-        
-        {posts.length === 0 ? (
-          <Card className="p-8 text-center">
-            <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary/40" />
-            <h3 className="text-xl font-semibold mb-2">No posts yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Be the first to start a conversation in the community!
-            </p>
-            <Button onClick={() => setShowNewPostForm(true)}>Create a Post</Button>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            {posts.map((post) => (
-              <Card key={post.id} className="overflow-hidden">
-                <CardHeader>
-                  <div className="flex items-start gap-4">
-                    <Avatar>
-                      {post.profiles?.avatar_url ? (
-                        <AvatarImage src={post.profiles.avatar_url} alt={post.profiles.username || 'User'} />
-                      ) : (
-                        <AvatarFallback>
-                          <User className="h-4 w-4" />
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="flex-1">
-                      <CardTitle className="text-xl">{post.title}</CardTitle>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{post.profiles?.full_name || post.profiles?.username || 'Anonymous'}</span>
-                        <span>•</span>
-                        <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
-                      </div>
-                    </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderChat = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[600px]">
+      {/* Channel List */}
+      <div className="lg:col-span-1">
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              Channels
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {['general', 'courses', 'events', 'help'].map((channel) => (
+              <Button
+                key={channel}
+                variant={activeChannel === channel ? "default" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => {
+                  setActiveChannel(channel);
+                  fetchMessages();
+                }}
+              >
+                # {channel}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Chat Area */}
+      <div className="lg:col-span-3">
+        <Card className="h-full flex flex-col">
+          <CardHeader className="border-b">
+            <CardTitle># {activeChannel}</CardTitle>
+          </CardHeader>
+          
+          {/* Messages */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-4">
+            {messages.map((message) => (
+              <div key={message.id} className="flex space-x-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={message.profiles?.avatar_url} />
+                  <AvatarFallback>
+                    {message.profiles?.full_name?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <p className="font-semibold text-sm">
+                      {message.profiles?.full_name || 'Anonymous'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                    </p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="whitespace-pre-line">{post.content}</p>
-                  
-                  {/* Comments section */}
-                  {post.comments && post.comments.length > 0 && (
-                    <div className="mt-6">
-                      <Separator className="my-4" />
-                      <h4 className="text-sm font-medium mb-3">Replies</h4>
-                      <div className="space-y-4">
-                        {post.comments.map((comment) => (
-                          <div key={comment.id} className="flex gap-3 items-start">
-                            <Avatar className="h-8 w-8">
-                              {comment.profiles?.avatar_url ? (
-                                <AvatarImage src={comment.profiles.avatar_url} alt={comment.profiles.username || 'User'} />
-                              ) : (
-                                <AvatarFallback>
-                                  <User className="h-3 w-3" />
-                                </AvatarFallback>
-                              )}
-                            </Avatar>
-                            <div className="flex-1">
-                              <div className="bg-muted p-3 rounded-md">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-sm font-medium">{comment.profiles?.full_name || comment.profiles?.username || 'Anonymous'}</span>
-                                  <span className="text-xs text-muted-foreground">{format(new Date(comment.created_at), 'MMM d, yyyy')}</span>
-                                </div>
-                                <p className="text-sm">{comment.content}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-                <CardFooter className="bg-muted/20 py-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-muted-foreground"
-                    onClick={() => toggleReplyForm(post.id)}
-                  >
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    Reply
-                  </Button>
-                </CardFooter>
-                
-                {/* Reply form */}
-                {activeReplyPostId === post.id && (
-                  <div className="px-4 pb-4">
-                    <CommentForm postId={post.id} onCommentSubmit={loadPosts} />
-                  </div>
-                )}
-              </Card>
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                </div>
+              </div>
             ))}
           </div>
-        )}
+
+          {/* Message Input */}
+          {user && (
+            <div className="p-4 border-t">
+              <form onSubmit={sendMessage} className="flex space-x-2">
+                <Input
+                  placeholder={`Message #${activeChannel}`}
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  className="flex-1"
+                />
+                <Button type="submit" size="sm">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          )}
+        </Card>
       </div>
-    </CommunityLayout>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-light-purple">
+      <CommunityLayout activeTab={activeTab} onTabChange={setActiveTab}>
+        {!user ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <h3 className="text-xl font-semibold mb-4">Join the Community</h3>
+              <p className="text-muted-foreground mb-6">
+                Sign in to connect with fellow learners and share your experiences.
+              </p>
+              <Button onClick={() => window.location.href = '/auth'}>
+                Sign In to Continue
+              </Button>
+            </CardContent>
+          </Card>
+        ) : loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'feed' && renderFeed()}
+            {activeTab === 'chat' && renderChat()}
+            {activeTab === 'courses' && (
+              <div className="text-center py-12">
+                <h3 className="text-xl font-semibold mb-4">Course Discussions</h3>
+                <p className="text-muted-foreground">
+                  Course-specific discussions will appear here.
+                </p>
+              </div>
+            )}
+            {activeTab === 'notifications' && (
+              <div className="text-center py-12">
+                <h3 className="text-xl font-semibold mb-4">Notifications</h3>
+                <p className="text-muted-foreground">
+                  Your community notifications will appear here.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </CommunityLayout>
+    </div>
   );
 };
 

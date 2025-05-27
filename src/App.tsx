@@ -26,6 +26,7 @@ import ExploreCoursesPage from '@/pages/ExploreCoursesPage';
 import ExploreEventsPage from '@/pages/ExploreEventsPage';
 import LoginPage from '@/pages/LoginPage';
 import SigninPage from '@/pages/SigninPage';
+import AuthPage from '@/pages/AuthPage';
 import MyCoursesPage from '@/pages/MyCoursesPage';
 import MyEventsPage from '@/pages/MyEventsPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -89,11 +90,16 @@ function App() {
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          
+          {/* Auth Routes - Multiple paths for same component */}
+          <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signin" element={<SigninPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          
+          {/* Protected Routes */}
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
           <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
