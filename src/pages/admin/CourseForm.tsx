@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import Layout from '@/components/layout/Layout';
-import { Course, updateCourse, createCourseWithCreator } from '@/services/courseService';
+import { Course, updateCourse, createCourse } from '@/services/courseService';
 import { VALID_DIFFICULTY_LEVELS } from '@/services/courseService';
 
 interface CourseFormProps {
@@ -139,21 +139,19 @@ const CourseForm = ({ creatorId, isCreator = false }: CourseFormProps) => {
           navigate(isCreator ? '/creator/courses' : '/admin/courses');
         }
       } else {
-        const effectiveCreatorId = creatorId || userData.user.id;
-        
-        const result = await createCourseWithCreator({
+        const result = await createCourse({
           title: course.title!,
           summary: course.summary!,
           description: course.description!,
           duration_minutes: course.duration_minutes!,
           category: course.category!,
           difficulty_level: course.difficulty_level!,
-          is_free: course.is_free,
-          price: course.price,
-          is_published: course.is_published,
-          certificate_enabled: course.certificate_enabled,
-          thumbnail_url: thumbnailUrl
-        }, effectiveCreatorId);
+          is_free: course.is_free!,
+          price: course.price!,
+          is_published: course.is_published!,
+          certificate_enabled: course.certificate_enabled!,
+          thumbnail_url: thumbnailUrl || ''
+        });
 
         if (result) {
           toast.success('Course created successfully!');

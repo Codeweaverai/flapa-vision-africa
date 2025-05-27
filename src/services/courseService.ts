@@ -93,7 +93,7 @@ export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' 
       .insert([{
         ...courseData,
         creator_id: user.user.id,
-        is_published: false
+        is_published: courseData.is_published || false
       }])
       .select()
       .single();
@@ -107,7 +107,7 @@ export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' 
   }
 };
 
-// Create course with creator - alias for createCourse
+// Create course with creator - now uses the same signature as createCourse
 export const createCourseWithCreator = createCourse;
 
 // Update course
@@ -148,7 +148,7 @@ export const fetchCourses = async (): Promise<Course[]> => {
 // Alias for fetchCourses
 export const fetchAllCourses = fetchCourses;
 
-// Fetch creator courses
+// Fetch creator courses - no parameters needed
 export const fetchCreatorCourses = async (): Promise<Course[]> => {
   try {
     const { data: user } = await supabase.auth.getUser();

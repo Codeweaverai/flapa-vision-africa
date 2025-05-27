@@ -33,6 +33,7 @@ const CreatorCourseCreate = () => {
     price: 0,
     currency: 'USD',
     is_free: true,
+    is_published: false,
     certificate_enabled: false,
     thumbnail_url: '',
     tags: [] as string[]
@@ -62,6 +63,7 @@ const CreatorCourseCreate = () => {
         price: formData.is_free ? 0 : formData.price,
         currency: formData.currency,
         is_free: formData.is_free,
+        is_published: formData.is_published,
         certificate_enabled: formData.certificate_enabled,
         thumbnail_url: formData.thumbnail_url,
         tags: formData.tags

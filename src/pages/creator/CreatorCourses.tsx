@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -28,7 +27,7 @@ const CreatorCourses = () => {
     
     setLoading(true);
     try {
-      const coursesData = await fetchCreatorCourses(user.id);
+      const coursesData = await fetchCreatorCourses();
       setCourses(coursesData);
     } catch (error) {
       console.error('Error loading courses:', error);
