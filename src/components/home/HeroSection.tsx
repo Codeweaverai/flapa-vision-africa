@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 const HeroSection = () => {
   return (
     <section className="relative bg-gradient-to-br from-flapabay-dark to-secondary min-h-[90vh] flex items-center">
-      <div className="absolute inset-0 z-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1466442929976-97f336a657be?auto=format&fit=crop&w=2834&q=80')] bg-cover bg-center"></div>
+      <div className="absolute inset-0 z-0 opacity-20 bg-[url('https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//40357%20(1).jpg')] bg-cover bg-center"></div>
       <div className="section-container relative z-10 grid md:grid-cols-2 gap-8 items-center">
         <div className="text-white animate-fade-in">
           <h1 className="heading-xl mb-6">
