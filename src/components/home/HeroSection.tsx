@@ -18,13 +18,13 @@ const HeroSection = () => {
           </p>
           <div className="flex flex-wrap gap-4">
             <Button asChild size="lg" className="text-lg">
-              <Link to="/ventures">
+              <Link to="/about">
                 Discover SkillPulse
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="text-lg bg-white/10 backdrop-blur-sm hover:bg-white/20">
-              <Link to="/consult">Book a Consultation</Link>
+              <Link to="/community">Connect with Community</Link>
             </Button>
           </div>
         </div>
