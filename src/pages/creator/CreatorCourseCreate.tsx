@@ -11,15 +11,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { X, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { 
-  createCourse, 
-  VALID_CATEGORIES, 
-  VALID_DIFFICULTY_LEVELS 
-} from '@/services/courseService';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+
+const VALID_CATEGORIES = [
+  'Technology',
+  'Business',
+  'Marketing',
+  'Design',
+  'Development',
+  'Data Science',
+  'Health & Fitness',
+  'Lifestyle',
+  'Language',
+  'Music',
+  'Photography'
+];
+
+const VALID_DIFFICULTY_LEVELS = [
+  'Beginner',
+  'Intermediate', 
+  'Advanced',
+  'Expert'
+];
 
 const CreatorCourseCreate = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   
@@ -43,6 +61,11 @@ const CreatorCourseCreate = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) {
+      toast.error('You must be logged in to create a course');
+      return;
+    }
+    
     // Validate required fields
     if (!formData.title || !formData.description || !formData.summary || 
         !formData.category || !formData.difficulty_level) {
@@ -61,20 +84,24 @@ const CreatorCourseCreate = () => {
         difficulty_level: formData.difficulty_level,
         duration_minutes: formData.duration_minutes,
         price: formData.is_free ? 0 : formData.price,
-        currency: formData.currency,
         is_free: formData.is_free,
         is_published: formData.is_published,
         certificate_enabled: formData.certificate_enabled,
         thumbnail_url: formData.thumbnail_url,
-        tags: formData.tags
+        tags: formData.tags,
+        creator_id: user.id
       };
 
-      const result = await createCourse(courseData);
+      const { data, error } = await supabase
+        .from('courses')
+        .insert([courseData])
+        .select()
+        .single();
 
-      if (result) {
-        toast.success('Course created successfully');
-        navigate('/creator/courses');
-      }
+      if (error) throw error;
+
+      toast.success('Course created successfully');
+      navigate('/creator/courses');
     } catch (error) {
       console.error('Error creating course:', error);
       toast.error('Failed to create course');
@@ -127,13 +154,13 @@ const CreatorCourseCreate = () => {
       const fileName = `course-thumbnail-${Date.now()}.${fileExt}`;
       
       const { data, error } = await supabase.storage
-        .from('course-images')
+        .from('course-thumbnails')
         .upload(fileName, file);
 
       if (error) throw error;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('course-images')
+        .from('course-thumbnails')
         .getPublicUrl(fileName);
 
       handleInputChange('thumbnail_url', publicUrl);

@@ -10,14 +10,44 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { X, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { 
-  Course,
-  updateCourse, 
-  fetchCourseById,
-  VALID_CATEGORIES, 
-  VALID_DIFFICULTY_LEVELS 
-} from '@/services/courseService';
 import { supabase } from '@/integrations/supabase/client';
+
+const VALID_CATEGORIES = [
+  'Technology',
+  'Business',
+  'Marketing',
+  'Design',
+  'Development',
+  'Data Science',
+  'Health & Fitness',
+  'Lifestyle',
+  'Language',
+  'Music',
+  'Photography'
+];
+
+const VALID_DIFFICULTY_LEVELS = [
+  'Beginner',
+  'Intermediate', 
+  'Advanced',
+  'Expert'
+];
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  summary: string;
+  category: string;
+  difficulty_level: string;
+  duration_minutes: number;
+  price: number;
+  is_free: boolean;
+  certificate_enabled: boolean;
+  thumbnail_url?: string;
+  tags?: string[];
+  is_published: boolean;
+}
 
 const CreatorCourseEdit = () => {
   const navigate = useNavigate();
@@ -54,23 +84,30 @@ const CreatorCourseEdit = () => {
     
     setLoading(true);
     try {
-      const courseData = await fetchCourseById(id);
-      if (courseData) {
-        setCourse(courseData);
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setCourse(data);
         setFormData({
-          title: courseData.title,
-          description: courseData.description,
-          summary: courseData.summary,
-          category: courseData.category,
-          difficulty_level: courseData.difficulty_level,
-          duration_minutes: courseData.duration_minutes,
-          price: courseData.price,
-          currency: courseData.currency || 'USD',
-          is_free: courseData.is_free,
-          certificate_enabled: courseData.certificate_enabled,
-          thumbnail_url: courseData.thumbnail_url || '',
-          tags: courseData.tags || [],
-          is_published: courseData.is_published
+          title: data.title,
+          description: data.description,
+          summary: data.summary,
+          category: data.category,
+          difficulty_level: data.difficulty_level,
+          duration_minutes: data.duration_minutes,
+          price: data.price,
+          currency: 'USD',
+          is_free: data.is_free,
+          certificate_enabled: data.certificate_enabled,
+          thumbnail_url: data.thumbnail_url || '',
+          tags: data.tags || [],
+          is_published: data.is_published
         });
       }
     } catch (error) {
@@ -96,12 +133,29 @@ const CreatorCourseEdit = () => {
     setLoading(true);
     
     try {
-      const result = await updateCourse(id, formData);
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          title: formData.title,
+          description: formData.description,
+          summary: formData.summary,
+          category: formData.category,
+          difficulty_level: formData.difficulty_level,
+          duration_minutes: formData.duration_minutes,
+          price: formData.is_free ? 0 : formData.price,
+          is_free: formData.is_free,
+          certificate_enabled: formData.certificate_enabled,
+          thumbnail_url: formData.thumbnail_url,
+          tags: formData.tags,
+          is_published: formData.is_published,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
 
-      if (result) {
-        toast.success('Course updated successfully');
-        navigate('/creator/courses');
-      }
+      if (error) throw error;
+
+      toast.success('Course updated successfully');
+      navigate('/creator/courses');
     } catch (error) {
       console.error('Error updating course:', error);
       toast.error('Failed to update course');
@@ -154,13 +208,13 @@ const CreatorCourseEdit = () => {
       const fileName = `course-thumbnail-${Date.now()}.${fileExt}`;
       
       const { data, error } = await supabase.storage
-        .from('course-images')
+        .from('course-thumbnails')
         .upload(fileName, file);
 
       if (error) throw error;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('course-images')
+        .from('course-thumbnails')
         .getPublicUrl(fileName);
 
       handleInputChange('thumbnail_url', publicUrl);
@@ -177,11 +231,18 @@ const CreatorCourseEdit = () => {
     if (!id) return;
     
     try {
-      const result = await updateCourse(id, { is_published: !formData.is_published });
-      if (result) {
-        setFormData(prev => ({ ...prev, is_published: !prev.is_published }));
-        toast.success(`Course ${!formData.is_published ? 'published' : 'unpublished'} successfully`);
-      }
+      const { error } = await supabase
+        .from('courses')
+        .update({ 
+          is_published: !formData.is_published,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setFormData(prev => ({ ...prev, is_published: !prev.is_published }));
+      toast.success(`Course ${!formData.is_published ? 'published' : 'unpublished'} successfully`);
     } catch (error) {
       console.error('Error updating course:', error);
       toast.error('Failed to update course status');

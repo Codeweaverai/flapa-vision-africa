@@ -88,7 +88,6 @@ function App() {
           <Route path="/blog/:id" element={<BlogPostPage />} />
           <Route path="/media" element={<MediaPage />} />
           <Route path="/community" element={<CommunityPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           
           {/* Auth Routes - Multiple paths for same component */}
@@ -99,7 +98,8 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           
-          {/* Protected Routes */}
+          {/* Protected Routes - Updated routing */}
+          <Route path="/profile" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
           <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
