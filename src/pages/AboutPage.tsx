@@ -39,13 +39,13 @@ const AboutPage = () => {
     },
     {
       name: "Sarah Johnson",
-      role: "Head of Learning",
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?auto=format&fit=crop&w=400&q=80",
+      role: "Head of Technology",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg",
       description: "Educational expert with 15+ years in curriculum development."
     },
     {
       name: "David Kimani",
-      role: "Technical Director",
+      role: "Head of Learning",
       image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
       description: "Full-stack developer building scalable learning platforms."
     }
