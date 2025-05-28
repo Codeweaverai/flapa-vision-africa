@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -11,6 +10,11 @@ const NotFoundPage = () => {
       <div className="section-container py-16 flex flex-col items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <div className="mb-6">
+            <img
+              src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//pexels-olly-3769021.jpg"
+              alt="404 Not Found"
+              className="w-full max-w-md mx-auto mb-6"
+            />
             <span className="text-8xl font-bold text-primary">404</span>
           </div>
           <h1 className="text-3xl font-bold mb-4">Page Not Found</h1>
@@ -37,3 +41,4 @@ const NotFoundPage = () => {
 };
 
 export default NotFoundPage;
+
