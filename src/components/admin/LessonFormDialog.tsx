@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Upload, File, X } from "lucide-react";
+import { supabase } from '@/integrations/supabase/client';
 import { Lesson, createLesson, updateLesson } from "@/services/courseService";
 
 export interface LessonFormDialogProps {
@@ -32,8 +34,10 @@ const LessonFormDialog = ({
   const [videoUrl, setVideoUrl] = useState("");
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingMaterials, setUploadingMaterials] = useState(false);
+  const [materialUrls, setMaterialUrls] = useState<string[]>([]);
 
-  // Initialize form with lesson data if editing
   useEffect(() => {
     if (editingLesson) {
       setTitle(editingLesson.title || "");
@@ -41,15 +45,99 @@ const LessonFormDialog = ({
       setContentType(editingLesson.content_type || "video");
       setVideoUrl(editingLesson.video_url || "");
       setContent(JSON.stringify(editingLesson.content) !== '{}' ? JSON.stringify(editingLesson.content) : "");
+      setMaterialUrls(editingLesson.materials_urls || []);
     } else {
-      // Reset form when creating new lesson
-      setTitle("");
-      setDescription("");
-      setContentType("video");
-      setVideoUrl("");
-      setContent("");
+      resetForm();
     }
   }, [editingLesson, open]);
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setContentType("video");
+    setVideoUrl("");
+    setContent("");
+    setMaterialUrls([]);
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please select a video file');
+      return;
+    }
+
+    if (file.size > 500 * 1024 * 1024) { // 500MB limit
+      toast.error('Video file size must be less than 500MB');
+      return;
+    }
+
+    setUploadingVideo(true);
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `lesson-video-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('course-videos')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-videos')
+        .getPublicUrl(fileName);
+
+      setVideoUrl(publicUrl);
+      toast.success('Video uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      toast.error('Failed to upload video');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  const handleMaterialUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingMaterials(true);
+    
+    try {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `lesson-material-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('course-materials')
+          .upload(fileName, file);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('course-materials')
+          .getPublicUrl(fileName);
+
+        return publicUrl;
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+      setMaterialUrls(prev => [...prev, ...uploadedUrls]);
+      toast.success(`${uploadedUrls.length} material(s) uploaded successfully`);
+    } catch (error) {
+      console.error('Error uploading materials:', error);
+      toast.error('Failed to upload materials');
+    } finally {
+      setUploadingMaterials(false);
+    }
+  };
+
+  const removeMaterial = (urlToRemove: string) => {
+    setMaterialUrls(prev => prev.filter(url => url !== urlToRemove));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,18 +154,17 @@ const LessonFormDialog = ({
       const lessonContent = content ? JSON.parse(content) : {};
       
       if (editingLesson) {
-        // Update existing lesson
         lessonData = await updateLesson(editingLesson.id, {
           title,
           description: description || null,
           content_type: contentType,
           video_url: videoUrl || null,
-          content: lessonContent
+          content: lessonContent,
+          materials_urls: materialUrls
         });
         
         toast.success("Lesson updated successfully");
       } else {
-        // Create new lesson - need to get the next order index
         lessonData = await createLesson({
           module_id: moduleId,
           title,
@@ -85,7 +172,8 @@ const LessonFormDialog = ({
           content_type: contentType,
           video_url: videoUrl || null,
           content: lessonContent,
-          order_index: 0, // This will be set properly on the server
+          materials_urls: materialUrls,
+          order_index: 0,
         });
         
         toast.success("Lesson created successfully");
@@ -94,6 +182,7 @@ const LessonFormDialog = ({
       if (lessonData) {
         onLessonSaved(lessonData);
         onOpenChange(false);
+        resetForm();
       }
     } catch (error) {
       console.error("Error saving lesson:", error);
@@ -105,7 +194,7 @@ const LessonFormDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingLesson ? "Edit Lesson" : "Create New Lesson"}
@@ -160,13 +249,32 @@ const LessonFormDialog = ({
           
           {(contentType === "video" || contentType === "mixed") && (
             <div className="space-y-2">
-              <Label htmlFor="videoUrl">Video URL (YouTube, Vimeo, etc.)</Label>
-              <Input
-                id="videoUrl"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=..."
-              />
+              <Label>Course Video</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  disabled={uploadingVideo}
+                  className="hidden"
+                  id="video-upload"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => document.getElementById('video-upload')?.click()}
+                  disabled={uploadingVideo}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {uploadingVideo ? 'Uploading Video...' : 'Upload Video'}
+                </Button>
+                {videoUrl && (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <File className="h-4 w-4" />
+                    Video uploaded
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
@@ -185,8 +293,53 @@ const LessonFormDialog = ({
               </p>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Course Materials & Assignments</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.zip"
+                onChange={handleMaterialUpload}
+                disabled={uploadingMaterials}
+                className="hidden"
+                id="materials-upload"
+              />
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => document.getElementById('materials-upload')?.click()}
+                disabled={uploadingMaterials}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {uploadingMaterials ? 'Uploading Materials...' : 'Upload Materials'}
+              </Button>
+            </div>
+            
+            {materialUrls.length > 0 && (
+              <div className="space-y-2 mt-2">
+                <Label className="text-sm font-medium">Uploaded Materials:</Label>
+                {materialUrls.map((url, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <span className="text-sm text-gray-600">
+                      Material {index + 1}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeMaterial(url)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-6">
             <Button 
               type="button" 
               variant="outline" 
@@ -195,7 +348,7 @@ const LessonFormDialog = ({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || uploadingVideo || uploadingMaterials}>
               {isSubmitting ? 'Saving...' : editingLesson ? 'Update Lesson' : 'Create Lesson'}
             </Button>
           </DialogFooter>

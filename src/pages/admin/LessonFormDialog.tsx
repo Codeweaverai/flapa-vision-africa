@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, File, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
-import VideoUpload from '@/components/creator/VideoUpload';
 
 interface LessonFormProps {
   isOpen: boolean;
@@ -22,6 +22,7 @@ interface LessonFormProps {
     content_type: string;
     video_url: string;
     order_index: number;
+    materials_urls?: string[];
   };
 }
 
@@ -34,7 +35,9 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
   const [videoUrl, setVideoUrl] = useState('');
   const [orderIndex, setOrderIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const [videoMetadata, setVideoMetadata] = useState<any | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingMaterials, setUploadingMaterials] = useState(false);
+  const [materialUrls, setMaterialUrls] = useState<string[]>([]);
 
   useEffect(() => {
     if (lesson) {
@@ -43,34 +46,11 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
       setContentType(lesson.content_type || 'video');
       setVideoUrl(lesson.video_url || '');
       setOrderIndex(lesson.order_index);
+      setMaterialUrls(lesson.materials_urls || []);
     } else {
       resetForm();
     }
   }, [lesson, isOpen]);
-
-  useEffect(() => {
-    // If there's a lesson ID, try to load video metadata
-    const fetchVideoMetadata = async () => {
-      if (lesson?.id) {
-        try {
-          const { data, error } = await supabase
-            .from('video_metadata')
-            .select('*')
-            .eq('lesson_id', lesson.id)
-            .single();
-          
-          if (data && !error) {
-            setVideoMetadata(data);
-            setVideoUrl(data.wasabi_url);
-          }
-        } catch (error) {
-          console.error('Error fetching video metadata:', error);
-        }
-      }
-    };
-    
-    fetchVideoMetadata();
-  }, [lesson?.id]);
 
   const resetForm = () => {
     setTitle('');
@@ -78,7 +58,86 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
     setContentType('video');
     setVideoUrl('');
     setOrderIndex(0);
-    setVideoMetadata(null);
+    setMaterialUrls([]);
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please select a video file');
+      return;
+    }
+
+    if (file.size > 500 * 1024 * 1024) { // 500MB limit
+      toast.error('Video file size must be less than 500MB');
+      return;
+    }
+
+    setUploadingVideo(true);
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `lesson-video-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('course-videos')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-videos')
+        .getPublicUrl(fileName);
+
+      setVideoUrl(publicUrl);
+      toast.success('Video uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      toast.error('Failed to upload video');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  const handleMaterialUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingMaterials(true);
+    
+    try {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `lesson-material-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('course-materials')
+          .upload(fileName, file);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('course-materials')
+          .getPublicUrl(fileName);
+
+        return publicUrl;
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+      setMaterialUrls(prev => [...prev, ...uploadedUrls]);
+      toast.success(`${uploadedUrls.length} material(s) uploaded successfully`);
+    } catch (error) {
+      console.error('Error uploading materials:', error);
+      toast.error('Failed to upload materials');
+    } finally {
+      setUploadingMaterials(false);
+    }
+  };
+
+  const removeMaterial = (urlToRemove: string) => {
+    setMaterialUrls(prev => prev.filter(url => url !== urlToRemove));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,6 +154,7 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
             description,
             content_type: contentType,
             video_url: videoUrl,
+            materials_urls: materialUrls,
             updated_at: new Date().toISOString()
           })
           .eq('id', lesson.id);
@@ -117,7 +177,7 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
         }
 
         // Create new lesson
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('lessons')
           .insert({
             module_id: moduleId,
@@ -125,20 +185,11 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
             description,
             content_type: contentType,
             video_url: videoUrl,
+            materials_urls: materialUrls,
             order_index: nextOrderIndex
-          })
-          .select();
+          });
 
         if (error) throw error;
-        
-        // Update video metadata with lesson ID if we have it
-        if (videoMetadata && data && data.length > 0) {
-          await supabase
-            .from('video_metadata')
-            .update({ lesson_id: data[0].id })
-            .eq('id', videoMetadata.id);
-        }
-        
         toast.success('Lesson created successfully');
       }
 
@@ -153,18 +204,9 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
     }
   };
 
-  const handleVideoUpload = (videoData: {
-    url: string;
-    path: string;
-    metadata: any;
-  }) => {
-    setVideoUrl(videoData.url);
-    setVideoMetadata(videoData.metadata);
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{lesson ? 'Edit Lesson' : 'Create New Lesson'}</DialogTitle>
@@ -214,31 +256,86 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
             
             {contentType === 'video' && (
               <div className="grid gap-2">
-                <Label>Video Upload</Label>
-                <VideoUpload 
-                  lessonId={lesson?.id || 'temp-' + new Date().getTime()}
-                  currentVideoUrl={videoUrl}
-                  onUploadComplete={handleVideoUpload}
-                />
+                <Label>Course Video</Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoUpload}
+                    disabled={uploadingVideo}
+                    className="hidden"
+                    id="video-upload"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => document.getElementById('video-upload')?.click()}
+                    disabled={uploadingVideo}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {uploadingVideo ? 'Uploading Video...' : 'Upload Video'}
+                  </Button>
+                  {videoUrl && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <File className="h-4 w-4" />
+                      Video uploaded
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-            
-            {contentType === 'text' && (
-              <div className="grid gap-2">
-                <Label htmlFor="content">Content</Label>
-                <Textarea
-                  id="content"
-                  rows={10}
+
+            <div className="grid gap-2">
+              <Label>Course Materials & Assignments</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.zip"
+                  onChange={handleMaterialUpload}
+                  disabled={uploadingMaterials}
+                  className="hidden"
+                  id="materials-upload"
                 />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => document.getElementById('materials-upload')?.click()}
+                  disabled={uploadingMaterials}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {uploadingMaterials ? 'Uploading Materials...' : 'Upload Materials'}
+                </Button>
               </div>
-            )}
+              
+              {materialUrls.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  <Label className="text-sm font-medium">Uploaded Materials:</Label>
+                  {materialUrls.map((url, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-600">
+                        Material {index + 1}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeMaterial(url)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" disabled={isSaving || uploadingVideo || uploadingMaterials}>
               {isSaving ? 'Saving...' : lesson ? 'Update Lesson' : 'Create Lesson'}
             </Button>
           </DialogFooter>
