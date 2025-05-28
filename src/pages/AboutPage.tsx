@@ -38,16 +38,16 @@ const AboutPage = () => {
       description: "Technology leader and entrepreneur passionate about African development."
     },
     {
-      name: "Sarah Johnson",
+      name: "George Munganga",
       role: "Head of Technology",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg",
-      description: "Educational expert with 15+ years in curriculum development."
+      description: "Full-stack developer building scalable learning platforms."
     },
     {
       name: "David Kimani",
       role: "Head of Learning",
       image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
-      description: "Full-stack developer building scalable learning platforms."
+      description: "Educational expert with 15+ years in curriculum development."
     }
   ];
 
