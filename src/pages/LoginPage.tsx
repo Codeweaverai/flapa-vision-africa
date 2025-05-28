@@ -70,7 +70,7 @@ const LoginPage = () => {
     <Layout>
       <div className="container max-w-md mx-auto py-20">
         <div className="mb-8 text-center">
-          <Link to="/" className="text-2xl font-bold text-gradient inline-block mb-4">Mbolela Pule</Link>
+          <Link to="/" className="text-2xl font-bold text-gradient inline-block mb-4">SkillPulse Events & Professional Skills Marketplace</Link>
           <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
           <p className="text-muted-foreground">Sign in to your account</p>
         </div>
