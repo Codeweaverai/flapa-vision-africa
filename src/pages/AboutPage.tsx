@@ -34,7 +34,7 @@ const AboutPage = () => {
     {
       name: "Mbolela Pule",
       role: "Founder & CEO",
-      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=80",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg",
       description: "Technology leader and entrepreneur passionate about African development."
     },
     {
