@@ -112,8 +112,8 @@ const AuthPage = () => {
     <div className="flex min-h-screen bg-light-purple">
       <div className="container max-w-md mx-auto py-20 bg-light-purple">
         <div className="mb-8 text-center">
-          <Link to="/" className="text-2xl font-bold text-gradient inline-block mb-4">Mbolela Pule</Link>
-          <h1 className="text-3xl font-bold mb-2">Welcome</h1>
+          <Link to="/" className="text-2xl font-bold text-gradient inline-block mb-4">SkillPulse Events & Professional Skills Marketplace</Link>
+          <h1 className="text-3xl font-bold mb-2">Welcome to SkillPulse Marketplace</h1>
           <p className="text-muted-foreground">Sign in to your account or create a new one</p>
         </div>
         
