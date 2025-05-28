@@ -85,7 +85,7 @@ const AboutPage = () => {
             </div>
             <div className="relative">
               <img 
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80" 
+                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//40357%20(1).jpg" 
                 alt="Team collaboration" 
                 className="w-full h-96 object-cover rounded-xl shadow-lg" 
               />
