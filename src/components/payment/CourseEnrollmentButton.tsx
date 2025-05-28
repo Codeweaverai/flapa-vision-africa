@@ -7,23 +7,23 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import EnhancedPaymentButton from './EnhancedPaymentButton';
 
-interface EventRegistrationButtonProps {
-  eventId: string;
-  eventName: string;
+interface CourseEnrollmentButtonProps {
+  courseId: string;
+  courseName: string;
   isFree: boolean;
   price: number;
-  currency: string;
-  isUserRegistered: boolean;
+  currency?: string;
+  isUserEnrolled: boolean;
   creatorId?: string;
 }
 
-const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
-  eventId,
-  eventName,
+const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
+  courseId,
+  courseName,
   isFree,
   price,
-  currency,
-  isUserRegistered,
+  currency = 'USD',
+  isUserEnrolled,
   creatorId
 }) => {
   const { user } = useAuth();
@@ -31,7 +31,7 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const handleFreeRegistration = async () => {
+  const handleFreeEnrollment = async () => {
     if (!user) {
       navigate('/auth', { state: { redirectTo: window.location.pathname } });
       return;
@@ -40,29 +40,26 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
     setLoading(true);
     try {
       const { error } = await supabase
-        .from('event_bookings')
+        .from('course_enrollments')
         .insert({
           user_id: user.id,
-          event_id: eventId,
-          payment_status: 'completed',
-          status: 'confirmed',
-          payment_amount: 0,
-          payment_currency: currency
+          course_id: courseId,
+          payment_status: 'completed'
         });
 
       if (error) throw error;
 
       toast({
-        title: "Registration Successful",
-        description: `You've successfully registered for ${eventName}`,
+        title: "Enrollment Successful",
+        description: `You've successfully enrolled in ${courseName}`,
       });
 
       window.location.reload();
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Enrollment error:', error);
       toast({
-        title: "Registration Failed",
-        description: "Failed to register for the event. Please try again.",
+        title: "Enrollment Failed",
+        description: "Failed to enroll in the course. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -70,10 +67,10 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
     }
   };
 
-  if (isUserRegistered) {
+  if (isUserEnrolled) {
     return (
       <Button disabled className="w-full">
-        Already Registered
+        Already Enrolled
       </Button>
     );
   }
@@ -81,28 +78,28 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
   if (isFree) {
     return (
       <Button 
-        onClick={handleFreeRegistration} 
+        onClick={handleFreeEnrollment} 
         disabled={loading}
         className="w-full"
       >
-        {loading ? "Registering..." : "Register for Free"}
+        {loading ? "Enrolling..." : "Enroll for Free"}
       </Button>
     );
   }
 
   return (
     <EnhancedPaymentButton
-      referenceType="event"
-      referenceId={eventId}
+      referenceType="course"
+      referenceId={courseId}
       amount={price}
       currency={currency}
-      title={eventName}
+      title={courseName}
       creatorId={creatorId}
       className="w-full"
     >
-      Register - {currency} {price.toFixed(2)}
+      Enroll Now - {currency} {price.toFixed(2)}
     </EnhancedPaymentButton>
   );
 };
 
-export default EventRegistrationButton;
+export default CourseEnrollmentButton;

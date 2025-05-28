@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -41,11 +42,15 @@ import {
 import { 
   fetchCreatorPayments, 
   fetchCreatorPayouts, 
-  calculateCreatorBalance,
-  requestPayout,
   connectStripeAccount,
   getStripeAccountStatus
 } from '@/services/paymentService';
+import { 
+  fetchEnhancedCreatorBalance,
+  fetchPaymentBreakdown,
+  PaymentBreakdown
+} from '@/services/enhancedPaymentService';
+import WithdrawDialog from '@/components/creator/WithdrawDialog';
 
 const CreatorPayments: React.FC = () => {
   const [payments, setPayments] = useState<PaymentTransaction[]>([]);
@@ -54,6 +59,18 @@ const CreatorPayments: React.FC = () => {
     available: 0,
     pending: 0,
     currency: 'USD'
+  });
+  const [enhancedBalance, setEnhancedBalance] = useState({
+    available_balance: 0,
+    pending_balance: 0,
+    total_earnings: 0,
+    total_platform_fees: 0
+  });
+  const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown>({
+    course_revenue: 0,
+    event_revenue: 0,
+    platform_fees: 0,
+    net_earnings: 0
   });
   const [loadingPayments, setLoadingPayments] = useState(true);
   const [loadingPayouts, setLoadingPayouts] = useState(true);
@@ -82,14 +99,12 @@ const CreatorPayments: React.FC = () => {
           title: "Stripe Account Connected",
           description: "Your Stripe Connect account has been set up successfully!",
         });
-        // Remove the query parameters
         setSearchParams({});
       } else if (refresh === 'true') {
         toast({
           title: "Account Setup Incomplete",
           description: "Please complete your Stripe Connect account setup to receive payments.",
         });
-        // Remove the query parameters
         setSearchParams({});
       }
     }
@@ -103,15 +118,17 @@ const CreatorPayments: React.FC = () => {
       setLoadingPayouts(true);
       setLoadingBalance(true);
       
-      const [paymentsData, payoutsData, balanceData] = await Promise.all([
+      const [paymentsData, payoutsData, enhancedBalanceData, breakdownData] = await Promise.all([
         fetchCreatorPayments(user.id),
         fetchCreatorPayouts(user.id),
-        calculateCreatorBalance(user.id)
+        fetchEnhancedCreatorBalance(user.id),
+        fetchPaymentBreakdown(user.id)
       ]);
       
       setPayments(paymentsData);
       setPayouts(payoutsData);
-      setBalance(balanceData);
+      setEnhancedBalance(enhancedBalanceData);
+      setPaymentBreakdown(breakdownData);
     } catch (error) {
       console.error('Error loading payment data:', error);
       toast({
@@ -142,38 +159,6 @@ const CreatorPayments: React.FC = () => {
     setPayoutMethod(value);
   };
   
-  const handleRequestPayout = async () => {
-    if (!user) return;
-    
-    if (balance.available <= 0) {
-      toast({
-        title: "Withdrawal Error",
-        description: "You don't have any available balance to withdraw",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const destination = payoutMethod === 'stripe' 
-      ? 'Stripe Connect Account' 
-      : payoutMethod === 'mobile_money' 
-        ? 'Mobile Money Account' 
-        : 'Bank Account';
-    
-    const success = await requestPayout(
-      user.id, 
-      balance.available, 
-      balance.currency, 
-      payoutMethod,
-      destination
-    );
-    
-    if (success) {
-      await loadPaymentData();
-      setIsWithdrawDialogOpen(false);
-    }
-  };
-  
   const handleConnectStripe = async () => {
     if (!user) return;
     
@@ -189,7 +174,7 @@ const CreatorPayments: React.FC = () => {
       console.error('Failed to connect Stripe:', error);
       toast({
         title: 'Connection Error',
-        description: 'Failed to initialize Stripe Connect account. Please try again later.',
+        description: 'Failed to initialize Stripe Connect account setup. Please try again later.',
         variant: 'destructive'
       });
     } finally {
@@ -250,7 +235,7 @@ const CreatorPayments: React.FC = () => {
           </Alert>
         )}
         
-        {/* Balance Cards */}
+        {/* Enhanced Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -262,17 +247,17 @@ const CreatorPayments: React.FC = () => {
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  {balance.currency} {balance.available.toFixed(2)}
+                  USD {enhancedBalance.available_balance.toFixed(2)}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Available for withdrawal
+                Available for withdrawal (minimum $5.00)
               </p>
             </CardContent>
             <CardFooter>
               <Button 
                 onClick={() => setIsWithdrawDialogOpen(true)}
-                disabled={loadingBalance || balance.available <= 0 || !isStripeConnected}
+                disabled={loadingBalance || enhancedBalance.available_balance < 5 || !isStripeConnected}
                 className="w-full"
               >
                 Withdraw Funds
@@ -290,76 +275,78 @@ const CreatorPayments: React.FC = () => {
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  {balance.currency} {balance.pending.toFixed(2)}
+                  USD {enhancedBalance.pending_balance.toFixed(2)}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Pending clearance
+                Funds in 7-day hold period
               </p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <BarChart className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               {loadingPayments ? (
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  {balance.currency} {payments
-                    .filter(payment => payment.status === 'completed')
-                    .reduce((sum, payment) => sum + payment.amount, 0)
-                    .toFixed(2)}
+                  USD {enhancedBalance.total_earnings.toFixed(2)}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Total earnings
+                Your share (92% of sales)
               </p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">Payout Method</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Platform Fees</CardTitle>
+              <Minus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <Select value={payoutMethod} onValueChange={handleMethodChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select payout method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="stripe">Stripe Connect</SelectItem>
-                  <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                </SelectContent>
-              </Select>
+              {loadingPayments ? (
+                <Skeleton className="h-7 w-24" />
+              ) : (
+                <div className="text-2xl font-bold">
+                  USD {enhancedBalance.total_platform_fees.toFixed(2)}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Platform fee (8% of sales)
+              </p>
             </CardContent>
-            <CardFooter>
-              {payoutMethod === 'stripe' && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleConnectStripe} 
-                  className="w-full"
-                  disabled={isConnectingStripe}
-                >
-                  {isStripeConnected ? 'Update Stripe Account' : 'Connect Stripe Account'}
-                </Button>
-              )}
-              {payoutMethod === 'mobile_money' && (
-                <Button variant="outline" onClick={() => {}} className="w-full">
-                  Setup Mobile Money
-                </Button>
-              )}
-              {payoutMethod === 'bank_transfer' && (
-                <Button variant="outline" onClick={() => {}} className="w-full">
-                  Setup Bank Account
-                </Button>
-              )}
-            </CardFooter>
+          </Card>
+        </div>
+
+        {/* Revenue Breakdown */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Course Revenue</CardTitle>
+              <CardDescription>Earnings from course sales</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                USD {paymentBreakdown.course_revenue.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Event Revenue</CardTitle>
+              <CardDescription>Earnings from event registrations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                USD {paymentBreakdown.event_revenue.toFixed(2)}
+              </div>
+            </CardContent>
           </Card>
         </div>
         
@@ -429,13 +416,15 @@ const CreatorPayments: React.FC = () => {
                           <TableHead>User</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Amount</TableHead>
+                          <TableHead>Your Earning</TableHead>
+                          <TableHead>Platform Fee</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {payments.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                            <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
                               No payment transactions found
                             </TableCell>
                           </TableRow>
@@ -449,6 +438,12 @@ const CreatorPayments: React.FC = () => {
                               <TableCell>{getPaymentTypeLabel(payment.reference_type)}</TableCell>
                               <TableCell>
                                 {payment.currency.toUpperCase()} {payment.amount.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-green-600 font-medium">
+                                USD {(payment.amount * 0.92).toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-gray-500">
+                                USD {(payment.amount * 0.08).toFixed(2)}
                               </TableCell>
                               <TableCell>{getStatusBadge(payment.status)}</TableCell>
                             </TableRow>
@@ -491,13 +486,12 @@ const CreatorPayments: React.FC = () => {
                           <TableHead>Destination</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {payouts.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                               No payout transactions found
                             </TableCell>
                           </TableRow>
@@ -507,20 +501,12 @@ const CreatorPayments: React.FC = () => {
                               <TableCell>
                                 {format(new Date(payout.created_at), 'MMM dd, yyyy')}
                               </TableCell>
-                              <TableCell>{payout.method}</TableCell>
+                              <TableCell className="capitalize">{payout.method}</TableCell>
                               <TableCell>{payout.destination}</TableCell>
                               <TableCell>
                                 {payout.currency.toUpperCase()} {payout.amount.toFixed(2)}
                               </TableCell>
                               <TableCell>{getStatusBadge(payout.status)}</TableCell>
-                              <TableCell>
-                                {payout.status === 'completed' && (
-                                  <Button variant="ghost" size="sm">
-                                    <Download className="h-4 w-4 mr-1" />
-                                    Receipt
-                                  </Button>
-                                )}
-                              </TableCell>
                             </TableRow>
                           ))
                         )}
@@ -529,56 +515,19 @@ const CreatorPayments: React.FC = () => {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline">Export CSV</Button>
-                <Button variant="outline" onClick={loadPaymentData}>Refresh</Button>
-              </CardFooter>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
-      
-      {/* Withdraw Funds Dialog */}
-      <AlertDialog open={isWithdrawDialogOpen} onOpenChange={setIsWithdrawDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Withdraw Funds</AlertDialogTitle>
-            <AlertDialogDescription>
-              You are about to withdraw {balance.currency} {balance.available.toFixed(2)} to your {
-                payoutMethod === 'stripe' ? 'Stripe Connect account' : 
-                payoutMethod === 'mobile_money' ? 'Mobile Money account' : 'Bank account'
-              }.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Available balance:</span>
-              <span className="font-medium">{balance.currency} {balance.available.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Withdrawal amount:</span>
-              <span className="font-medium">{balance.currency} {balance.available.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Payout method:</span>
-              <span className="font-medium">
-                {payoutMethod === 'stripe' ? 'Stripe Connect' : 
-                 payoutMethod === 'mobile_money' ? 'Mobile Money' : 'Bank Transfer'}
-              </span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-muted-foreground">Processing time:</span>
-              <span className="font-medium">1-3 business days</span>
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRequestPayout}>
-              Confirm Withdrawal
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
+      {/* Withdraw Dialog */}
+      <WithdrawDialog
+        open={isWithdrawDialogOpen}
+        onOpenChange={setIsWithdrawDialogOpen}
+        availableBalance={enhancedBalance.available_balance}
+        currency="USD"
+        onSuccess={loadPaymentData}
+      />
     </CreatorLayout>
   );
 };

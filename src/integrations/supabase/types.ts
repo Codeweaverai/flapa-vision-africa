@@ -374,7 +374,10 @@ export type Database = {
           destination: string
           id: string
           method: string
+          minimum_threshold_met: boolean | null
+          provider_payout_id: string | null
           status: string
+          stripe_payout_id: string | null
           transaction_id: string | null
           updated_at: string
         }
@@ -386,7 +389,10 @@ export type Database = {
           destination: string
           id?: string
           method: string
+          minimum_threshold_met?: boolean | null
+          provider_payout_id?: string | null
           status?: string
+          stripe_payout_id?: string | null
           transaction_id?: string | null
           updated_at?: string
         }
@@ -398,7 +404,10 @@ export type Database = {
           destination?: string
           id?: string
           method?: string
+          minimum_threshold_met?: boolean | null
+          provider_payout_id?: string | null
           status?: string
+          stripe_payout_id?: string | null
           transaction_id?: string | null
           updated_at?: string
         }
@@ -922,6 +931,7 @@ export type Database = {
           amount: number
           correspondent: string | null
           created_at: string | null
+          creator_earning: number | null
           creator_id: string | null
           currency: string
           customer_timestamp: string | null
@@ -930,13 +940,17 @@ export type Database = {
           metadata: Json | null
           payer_address: string | null
           payer_type: string | null
+          payout_eligible_date: string | null
           phone_number: string | null
+          platform_fee_amount: number | null
           provider: string
           provider_transaction_id: string | null
           reference_id: string
           reference_type: string
           statement_description: string | null
           status: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -944,6 +958,7 @@ export type Database = {
           amount: number
           correspondent?: string | null
           created_at?: string | null
+          creator_earning?: number | null
           creator_id?: string | null
           currency: string
           customer_timestamp?: string | null
@@ -952,13 +967,17 @@ export type Database = {
           metadata?: Json | null
           payer_address?: string | null
           payer_type?: string | null
+          payout_eligible_date?: string | null
           phone_number?: string | null
+          platform_fee_amount?: number | null
           provider?: string
           provider_transaction_id?: string | null
           reference_id: string
           reference_type: string
           statement_description?: string | null
           status: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -966,6 +985,7 @@ export type Database = {
           amount?: number
           correspondent?: string | null
           created_at?: string | null
+          creator_earning?: number | null
           creator_id?: string | null
           currency?: string
           customer_timestamp?: string | null
@@ -974,13 +994,17 @@ export type Database = {
           metadata?: Json | null
           payer_address?: string | null
           payer_type?: string | null
+          payout_eligible_date?: string | null
           phone_number?: string | null
+          platform_fee_amount?: number | null
           provider?: string
           provider_transaction_id?: string | null
           reference_id?: string
           reference_type?: string
           statement_description?: string | null
           status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -1357,6 +1381,33 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_webhook_events: {
+        Row: {
+          created_at: string | null
+          data: Json | null
+          event_type: string
+          id: string
+          processed_at: string | null
+          stripe_event_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data?: Json | null
+          event_type: string
+          id?: string
+          processed_at?: string | null
+          stripe_event_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json | null
+          event_type?: string
+          id?: string
+          processed_at?: string | null
+          stripe_event_id?: string
+        }
+        Relationships: []
+      }
       video_metadata: {
         Row: {
           content_type: string
@@ -1412,6 +1463,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_creator_balance: {
+        Args: { creator_user_id: string }
+        Returns: {
+          available_balance: number
+          pending_balance: number
+          total_earnings: number
+          total_platform_fees: number
+        }[]
+      }
       count_bookings_by_event: {
         Args: Record<PropertyKey, never>
         Returns: {
