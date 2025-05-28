@@ -10,7 +10,7 @@ const AboutSection = () => {
           <div className="relative">
             <div className="w-full h-[400px] rounded-xl overflow-hidden animate-fade-in">
               <img 
-                src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80" 
+                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//african-american-blogger-reviewing-studio-light-camera%20(1).jpg" 
                 alt="SkillPulse Team" 
                 className="w-full h-full object-cover" 
               />
