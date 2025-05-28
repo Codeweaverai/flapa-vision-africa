@@ -24,7 +24,7 @@ const HeroSection = () => {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="text-lg bg-white/10 backdrop-blur-sm hover:bg-white/20">
-              <Link to="/community">Connect with Community</Link>
+              <Link to="/community">Connect with Our Community</Link>
             </Button>
           </div>
         </div>
