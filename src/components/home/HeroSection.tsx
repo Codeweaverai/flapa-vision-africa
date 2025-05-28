@@ -32,7 +32,7 @@ const HeroSection = () => {
           <div className="relative">
             <div className="w-full h-[500px] rounded-xl overflow-hidden shadow-2xl animate-zoom-in">
               <img 
-                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//11661747.jpg" 
+                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//pexels-olly-3769021.jpg" 
                 alt="SkillPulse Platform" 
                 className="w-full h-full object-cover" 
               />
