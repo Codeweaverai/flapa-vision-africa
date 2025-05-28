@@ -17,7 +17,6 @@ const HomePage = () => {
       <AboutSection />
       <CoursesSection />
       <CommunityAISection />
-      <AnimationsSection />
       <EventsSection />
       <MediaSection />
       <CallToAction />
