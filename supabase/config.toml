@@ -1,8 +1,45 @@
 
-# A string used to distinguish different Supabase projects on the same host. Defaults to the working
-# directory name when running `supabase init`.
-project_id = "flapa-vision-africa"
-# Config specific to the Deno runtime
+project_id = "rxqoczksnddbxcdwobnw"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://preview--flapa-vision-africa.lovable.app"]
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
 [functions]
+enabled = true
+
+[functions.create-stripe-checkout]
+verify_jwt = true
+
 [functions.stripe-webhook-handler]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[db]
+port = 54322
+
+[realtime]
+enabled = true
+port = 54323
+
+[studio]
+enabled = true
+port = 54324
+
+[inbucket]
+enabled = true
+port = 54325
