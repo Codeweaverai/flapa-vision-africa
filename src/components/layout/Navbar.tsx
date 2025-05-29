@@ -135,7 +135,7 @@ const Navbar = () => {
                 variant="ghost" 
                 size="icon" 
                 className="relative"
-                onClick={() => navigate('/community/notifications')}
+                onClick={() => navigate('/notifications')}
               >
                 <Bell className="h-5 w-5" />
                 {unreadNotifications > 0 && (

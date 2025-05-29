@@ -39,7 +39,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/help-center" className="hover:text-primary transition-colors">
+                <Link to="/help" className="hover:text-primary transition-colors">
                   Help Center
                 </Link>
               </li>
@@ -77,10 +77,10 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p>© {currentYear} SkillPulse. All rights reserved.</p>
             <div className="mt-4 md:mt-0 flex space-x-4">
-              <Link to="/privacy" className="hover:text-primary transition-colors">
+              <Link to="/privacy-policy" className="hover:text-primary transition-colors">
                 Privacy Policy
               </Link>
-              <Link to="/terms" className="hover:text-primary transition-colors">
+              <Link to="/terms-of-service" className="hover:text-primary transition-colors">
                 Terms of Service
               </Link>
             </div>

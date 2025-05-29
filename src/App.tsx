@@ -17,6 +17,7 @@ import PricingPage from '@/pages/PricingPage';
 import BlogPage from '@/pages/BlogPage';
 import BlogPostPage from '@/pages/BlogPostPage';
 import MediaPage from '@/pages/MediaPage';
+import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
 import CommunityPage from '@/pages/CommunityPage';
 import ProfilePage from '@/pages/ProfilePage';
 import SettingsPage from '@/pages/SettingsPage';
@@ -34,6 +35,9 @@ import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AccountPage from '@/pages/AccountPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
+import NotificationsPage from '@/pages/NotificationsPage';
+import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
+import TermsOfServicePage from '@/pages/TermsOfServicePage';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -88,8 +92,11 @@ function App() {
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:id" element={<BlogPostPage />} />
           <Route path="/media" element={<MediaPage />} />
+          <Route path="/media/:id" element={<MediaPostDetailPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
@@ -107,6 +114,7 @@ function App() {
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
           <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={
