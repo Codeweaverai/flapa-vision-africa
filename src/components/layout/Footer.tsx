@@ -20,7 +20,7 @@ const Footer = () => {
             <div className="mt-6 flex items-center">
               <Mail size={16} className="mr-2" />
               <a href="mailto:contact@skillpulse.com" className="hover:text-primary transition-colors">
-                contact@skillpulse.com
+                help@skillpulse.com
               </a>
             </div>
           </div>
