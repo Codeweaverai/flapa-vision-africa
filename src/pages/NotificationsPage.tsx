@@ -84,6 +84,7 @@ const NotificationsPage = () => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
+    <div className="min-h-screen bg-light-purple">
     <Layout>
       <div className="section-container py-8">
         <div className="max-w-4xl mx-auto">
