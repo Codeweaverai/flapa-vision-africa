@@ -46,6 +46,7 @@ export interface Lesson {
   created_at: string;
   updated_at: string;
   quizzes?: Quiz[];
+  is_completed?: boolean;
 }
 
 export interface Quiz {
@@ -80,11 +81,57 @@ export interface QuizAnswer {
   updated_at: string;
 }
 
+// Constants
+export const VALID_CATEGORIES = [
+  'Technology',
+  'Business',
+  'Design',
+  'Marketing',
+  'Health',
+  'Fitness',
+  'Music',
+  'Education',
+  'Language',
+  'Other'
+];
+
+export const VALID_DIFFICULTY_LEVELS = [
+  'Beginner',
+  'Intermediate',
+  'Advanced'
+];
+
 // Course operations
 export async function fetchCourses(): Promise<Course[]> {
   const { data, error } = await supabase
     .from('courses')
     .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchPublishedCourses(): Promise<Course[]> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('is_published', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchAllCourses(): Promise<Course[]> {
+  return fetchCourses();
+}
+
+export async function fetchCreatorCourses(creatorId: string): Promise<Course[]> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('creator_id', creatorId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -100,6 +147,10 @@ export async function fetchCourseById(id: string): Promise<Course | null> {
 
   if (error) throw error;
   return data;
+}
+
+export async function fetchCourseDetails(id: string): Promise<Course | null> {
+  return fetchCourseById(id);
 }
 
 export async function fetchCourseWithModulesAndLessons(courseId: string): Promise<Course | null> {
@@ -145,10 +196,86 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
   };
 }
 
-export async function createCourse(courseData: Partial<Course>): Promise<Course> {
+export async function fetchCourseEnrollment(courseId: string, userId: string): Promise<any> {
+  const { data, error } = await supabase
+    .from('course_enrollments')
+    .select('*')
+    .eq('course_id', courseId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data;
+}
+
+export async function fetchModuleLessons(courseId: string, userId: string): Promise<CourseModule[]> {
+  const { data: modulesData, error: modulesError } = await supabase
+    .from('course_modules')
+    .select(`
+      *,
+      lessons (*)
+    `)
+    .eq('course_id', courseId)
+    .order('order_index', { ascending: true });
+
+  if (modulesError) throw modulesError;
+
+  // Sort lessons within each module and add completion status
+  const sortedModules = (modulesData || []).map(module => ({
+    ...module,
+    lessons: (module.lessons || []).sort((a: any, b: any) => a.order_index - b.order_index).map((lesson: any) => ({
+      ...lesson,
+      is_completed: false // This would be fetched from lesson_progress table in real implementation
+    }))
+  }));
+
+  return sortedModules;
+}
+
+export async function checkEnrollmentStatus(courseId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data, error } = await supabase
+    .from('course_enrollments')
+    .select('id')
+    .eq('course_id', courseId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return !!data;
+}
+
+export async function enrollInCourse(courseId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data, error } = await supabase
+    .from('course_enrollments')
+    .insert({
+      course_id: courseId,
+      user_id: user.id,
+      payment_status: 'completed',
+      enrollment_date: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return !!data;
+}
+
+export async function createCourse(courseData: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<Course> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
   const { data, error } = await supabase
     .from('courses')
-    .insert(courseData)
+    .insert({
+      ...courseData,
+      creator_id: user.id
+    })
     .select()
     .single();
 
@@ -156,7 +283,7 @@ export async function createCourse(courseData: Partial<Course>): Promise<Course>
   return data;
 }
 
-export async function updateCourse(id: string, courseData: Partial<Course>): Promise<Course> {
+export async function updateCourse(id: string, courseData: Partial<Omit<Course, 'id' | 'created_at' | 'updated_at'>>): Promise<Course> {
   const { data, error } = await supabase
     .from('courses')
     .update(courseData)
@@ -261,6 +388,28 @@ export async function createQuiz(quizData: Partial<Quiz>): Promise<Quiz> {
   const { data, error } = await supabase
     .from('quizzes')
     .insert(quizData)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createQuizQuestion(questionData: Partial<QuizQuestion>): Promise<QuizQuestion> {
+  const { data, error } = await supabase
+    .from('quiz_questions')
+    .insert(questionData)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createQuizAnswer(answerData: Partial<QuizAnswer>): Promise<QuizAnswer> {
+  const { data, error } = await supabase
+    .from('quiz_answers')
+    .insert(answerData)
     .select()
     .single();
 

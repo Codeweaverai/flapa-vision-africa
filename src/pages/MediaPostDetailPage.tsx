@@ -21,10 +21,6 @@ interface MediaPost {
   duration_minutes?: number;
   published_at: string;
   author_id?: string;
-  profiles?: {
-    full_name?: string;
-    username?: string;
-  };
 }
 
 const MediaPostDetailPage = () => {
@@ -40,11 +36,17 @@ const MediaPostDetailPage = () => {
         const { data, error } = await supabase
           .from('media_posts')
           .select(`
-            *,
-            profiles (
-              full_name,
-              username
-            )
+            id,
+            title,
+            content,
+            summary,
+            category,
+            post_type,
+            media_url,
+            image_url,
+            duration_minutes,
+            published_at,
+            author_id
           `)
           .eq('id', id)
           .eq('is_published', true)
@@ -108,10 +110,6 @@ const MediaPostDetailPage = () => {
     });
   };
 
-  const getAuthorName = () => {
-    return post.profiles?.full_name || post.profiles?.username || 'Anonymous';
-  };
-
   return (
     <Layout>
       <div className="section-container py-8">
@@ -135,10 +133,6 @@ const MediaPostDetailPage = () => {
                   <div className="flex items-center">
                     <Calendar className="mr-1 h-4 w-4" />
                     {formatDate(post.published_at)}
-                  </div>
-                  <div className="flex items-center">
-                    <User className="mr-1 h-4 w-4" />
-                    {getAuthorName()}
                   </div>
                   {post.duration_minutes && (
                     <div className="flex items-center">
