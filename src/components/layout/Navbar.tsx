@@ -67,13 +67,13 @@ const Navbar = () => {
   };
 
   const navLinks = [
-    { name: 'Home', path: '/' },
-    { name: 'About', path: '/about' },
+    { name: 'Explore', path: '/' },
+    { name: 'About Us', path: '/about' },
     { name: 'Learning', path: '/learning' },
     { name: 'Community', path: '/community' },
     { name: 'Media', path: '/media' },
-    { name: 'Consult', path: '/consult' },
-    { name: 'Help', path: '/help' },
+    { name: 'Contact', path: '/contact' },
+    { name: 'Help Center', path: '/help' },
   ];
 
   const exploreLinks = [
@@ -160,13 +160,13 @@ const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate('/account/profile')}>
+                  <DropdownMenuItem onClick={() => navigate('/account')}>
                     My Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/account/courses')}>
+                  <DropdownMenuItem onClick={() => navigate('/account/my-courses')}>
                     My Courses
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/account/events')}>
+                  <DropdownMenuItem onClick={() => navigate('/account/my-events')}>
                     My Events
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
