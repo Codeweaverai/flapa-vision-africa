@@ -1,63 +1,80 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient';
 import Layout from '@/components/layout/Layout';
-import { getMediaPostById, MediaPost } from '@/services/mediaService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileText, Calendar, Mic, Clock, FileDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { ArrowLeft, Calendar, User, Clock, Play } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface MediaPost {
+  id: string;
+  title: string;
+  content: string;
+  summary?: string;
+  category?: string;
+  post_type: string;
+  media_url?: string;
+  image_url?: string;
+  duration_minutes?: number;
+  published_at: string;
+  author_id?: string;
+  profiles?: {
+    full_name?: string;
+    username?: string;
+  };
+}
 
 const MediaPostDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [post, setPost] = useState<MediaPost | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadPost = async () => {
+    const fetchPost = async () => {
+      if (!id) return;
+
       try {
-        if (!id) {
-          navigate('/media');
-          return;
-        }
+        const { data, error } = await supabase
+          .from('media_posts')
+          .select(`
+            *,
+            profiles (
+              full_name,
+              username
+            )
+          `)
+          .eq('id', id)
+          .eq('is_published', true)
+          .single();
 
-        setLoading(true);
-        const data = await getMediaPostById(id);
-        
-        if (!data) {
-          toast.error('Post not found');
-          navigate('/media');
-          return;
-        }
-
-        if (!data.is_published) {
-          toast.error('This post is not currently published');
-          navigate('/media');
-          return;
-        }
+        if (error) throw error;
 
         setPost(data);
       } catch (error) {
-        console.error('Error loading post:', error);
+        console.error('Error fetching media post:', error);
         toast.error('Failed to load media post');
-        navigate('/media');
       } finally {
         setLoading(false);
       }
     };
 
-    loadPost();
-  }, [id, navigate]);
+    fetchPost();
+  }, [id]);
 
   if (loading) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="section-container py-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+            <div className="h-64 bg-gray-200 rounded"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded"></div>
+              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+            </div>
           </div>
         </div>
       </Layout>
@@ -67,114 +84,154 @@ const MediaPostDetailPage = () => {
   if (!post) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="text-center py-20">
-            <h2 className="heading-md">Post not found</h2>
-            <Button onClick={() => navigate('/media')} className="mt-4">
+        <div className="section-container py-8 text-center">
+          <h2 className="text-2xl font-bold mb-4">Media Post Not Found</h2>
+          <p className="text-muted-foreground mb-6">
+            The media post you're looking for doesn't exist or has been removed.
+          </p>
+          <Button asChild>
+            <Link to="/media">
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Media
-            </Button>
-          </div>
+            </Link>
+          </Button>
         </div>
       </Layout>
     );
   }
 
-  const formattedDate = post.published_at 
-    ? format(new Date(post.published_at), 'MMMM dd, yyyy')
-    : '';
-    
-  const formatCategoryName = (category: string | undefined): string => {
-    if (!category) return '';
-    return category.split('-').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getAuthorName = () => {
+    return post.profiles?.full_name || post.profiles?.username || 'Anonymous';
   };
 
   return (
     <Layout>
-      <div className="section-container bg-light-purple">
-        <Button variant="outline" onClick={() => navigate('/media')} className="mb-6 flex items-center">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Media
-        </Button>
-
-        <div className="mb-8">
-          <h1 className="heading-lg mb-4">{post.title}</h1>
-          <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
-            {post.post_type === 'news' && <FileText className="h-4 w-4" />}
-            {post.post_type === 'podcast' && <Mic className="h-4 w-4" />}
-            {post.post_type === 'resource' && <FileDown className="h-4 w-4" />}
-            <span className="capitalize">{post.post_type}</span>
-            
-            <span className="flex items-center">
-              <Calendar className="h-4 w-4 mr-1" />
-              {formattedDate}
-            </span>
-
-            {post.duration_minutes && (
-              <span className="flex items-center">
-                <Clock className="h-4 w-4 mr-1" />
-                {post.duration_minutes} minutes
-              </span>
-            )}
+      <div className="section-container py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Back Button */}
+          <div className="mb-6">
+            <Button variant="outline" asChild>
+              <Link to="/media">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Media
+              </Link>
+            </Button>
           </div>
-        </div>
 
-        {post.image_url && (
-          <div className="mb-8">
-            <img 
-              src={post.image_url} 
-              alt={post.title} 
-              className="w-full max-h-96 object-cover rounded-lg" 
-            />
-          </div>
-        )}
-
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            {/* Render content with proper formatting */}
-            <div className="prose prose-lg max-w-none">
-              {post.content.split('\n').map((paragraph, index) => (
-                paragraph ? <p key={index}>{paragraph}</p> : <br key={index} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {post.post_type === 'podcast' && post.media_url && (
-          <Card className="mb-8">
+          {/* Main Content */}
+          <Card>
             <CardHeader>
-              <CardTitle>Listen to the Podcast</CardTitle>
+              <div className="space-y-4">
+                {/* Meta Information */}
+                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center">
+                    <Calendar className="mr-1 h-4 w-4" />
+                    {formatDate(post.published_at)}
+                  </div>
+                  <div className="flex items-center">
+                    <User className="mr-1 h-4 w-4" />
+                    {getAuthorName()}
+                  </div>
+                  {post.duration_minutes && (
+                    <div className="flex items-center">
+                      <Clock className="mr-1 h-4 w-4" />
+                      {post.duration_minutes} min
+                    </div>
+                  )}
+                </div>
+
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">{post.post_type}</Badge>
+                  {post.category && (
+                    <Badge variant="outline">{post.category}</Badge>
+                  )}
+                </div>
+
+                {/* Title */}
+                <CardTitle className="text-3xl">{post.title}</CardTitle>
+
+                {/* Summary */}
+                {post.summary && (
+                  <p className="text-lg text-muted-foreground">{post.summary}</p>
+                )}
+              </div>
             </CardHeader>
-            <CardContent>
-              <audio controls className="w-full">
-                <source src={post.media_url} type="audio/mpeg" />
-                Your browser does not support the audio element.
-              </audio>
+
+            <CardContent className="space-y-6">
+              {/* Featured Image */}
+              {post.image_url && (
+                <div className="relative">
+                  <img
+                    src={post.image_url}
+                    alt={post.title}
+                    className="w-full h-64 md:h-96 object-cover rounded-lg"
+                  />
+                  {post.media_url && post.post_type === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Button
+                        size="lg"
+                        className="rounded-full w-16 h-16"
+                        onClick={() => {
+                          if (post.media_url) {
+                            window.open(post.media_url, '_blank');
+                          }
+                        }}
+                      >
+                        <Play className="h-8 w-8" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Audio Player */}
+              {post.media_url && post.post_type === 'audio' && (
+                <div className="bg-muted p-4 rounded-lg">
+                  <audio controls className="w-full">
+                    <source src={post.media_url} type="audio/mpeg" />
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="prose prose-lg max-w-none">
+                <div dangerouslySetInnerHTML={{ __html: post.content }} />
+              </div>
+
+              {/* Media Link for External Content */}
+              {post.media_url && post.post_type !== 'audio' && (
+                <div className="border-t pt-6">
+                  <Button asChild className="w-full sm:w-auto">
+                    <a 
+                      href={post.media_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      {post.post_type === 'video' ? (
+                        <>
+                          <Play className="mr-2 h-4 w-4" />
+                          Watch Video
+                        </>
+                      ) : (
+                        'View Content'
+                      )}
+                    </a>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
-        )}
-
-        {post.post_type === 'resource' && post.media_url && (
-          <Card className="mb-8">
-            <CardContent className="p-6">
-              <Button asChild className="w-full md:w-auto flex items-center">
-                <a href={post.media_url} target="_blank" rel="noopener noreferrer" download>
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Download Resource
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {post.category && (
-          <div className="flex flex-wrap gap-2 mt-8">
-            <span className="text-muted-foreground mr-2">Category:</span>
-            <Badge variant="secondary">
-              {formatCategoryName(post.category)}
-            </Badge>
-          </div>
-        )}
+        </div>
       </div>
     </Layout>
   );

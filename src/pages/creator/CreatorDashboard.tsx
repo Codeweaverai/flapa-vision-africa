@@ -135,7 +135,6 @@ const CreatorDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        // Explicitly type the auth response to avoid deep recursion
         const authResponse: SupabaseResponse<{user?: {id: string}|null}> = await supabase.auth.getUser();
         
         if (authResponse.error) throw authResponse.error;
@@ -145,7 +144,7 @@ const CreatorDashboard: React.FC = () => {
           throw new Error('User not authenticated');
         }
         
-        // Fetch courses created by this creator with explicit typing
+        // Fetch courses created by this creator
         const coursesResponse: SupabaseResponse<CourseType[]> = await supabase
           .from('courses')
           .select('*')
@@ -153,10 +152,9 @@ const CreatorDashboard: React.FC = () => {
         
         if (coursesResponse.error) throw coursesResponse.error;
         
-        // Fetch enrollments for the creator's courses with explicit typing
+        // Fetch course enrollments with payment transactions
         const courseIds = coursesResponse.data?.map(course => course.id) || [];
         
-        // Only fetch if we have course IDs
         let enrollmentsData: EnrollmentType[] = [];
         if (courseIds.length > 0) {
           const enrollmentsResponse: SupabaseResponse<EnrollmentType[]> = await supabase
@@ -171,7 +169,7 @@ const CreatorDashboard: React.FC = () => {
           enrollmentsData = enrollmentsResponse.data || [];
         }
         
-        // Fixed: Using creator_id instead of organizer_id for events
+        // Fetch events created by this creator
         const eventsResponse: SupabaseResponse<EventType[]> = await supabase
           .from('events')
           .select('*')
@@ -179,14 +177,13 @@ const CreatorDashboard: React.FC = () => {
         
         if (eventsResponse.error) throw eventsResponse.error;
         
-        // Fetch registrations for the creator's events with explicit typing
+        // Fetch event bookings
         const eventIds = eventsResponse.data?.map(event => event.id) || [];
         
-        // Only fetch if we have event IDs
         let registrationsData: RegistrationType[] = [];
         if (eventIds.length > 0) {
           const registrationsResponse: SupabaseResponse<RegistrationType[]> = await supabase
-            .from('registrations')
+            .from('event_bookings')
             .select(`
               *,
               event:events(*)
@@ -196,14 +193,23 @@ const CreatorDashboard: React.FC = () => {
           if (registrationsResponse.error) throw registrationsResponse.error;
           registrationsData = registrationsResponse.data || [];
         }
-        
+
+        // Fetch payment transactions for earnings calculation
+        const { data: paymentData, error: paymentError } = await supabase
+          .from('payment_transactions')
+          .select('*')
+          .eq('creator_id', creatorId)
+          .eq('status', 'completed');
+
+        if (paymentError) throw paymentError;
+
         setCourses(coursesResponse.data || []);
         setEnrollments(enrollmentsData);
         setEvents(eventsResponse.data || []);
         setRegistrations(registrationsData);
         
-        // Calculate revenue metrics
-        calculateRevenueMetrics(enrollmentsData, registrationsData);
+        // Calculate revenue metrics with actual payment data
+        calculateRevenueMetrics(enrollmentsData, registrationsData, paymentData || []);
         
         // Calculate engagement metrics
         calculateEngagementMetrics(enrollmentsData, coursesResponse.data || []);
@@ -219,30 +225,39 @@ const CreatorDashboard: React.FC = () => {
     fetchCreatorData();
   }, []);
 
-  const calculateRevenueMetrics = (enrollments: EnrollmentType[], registrations: RegistrationType[]) => {
-    // Calculate total course revenue
-    const courseRevenue = enrollments.reduce((total, enrollment) => {
-      if (enrollment.payment_status === 'completed' && enrollment.course) {
-        return total + (Number(enrollment.course.price) || 0);
-      }
-      return total;
-    }, 0);
+  const calculateRevenueMetrics = (
+    enrollments: EnrollmentType[], 
+    registrations: RegistrationType[], 
+    paymentTransactions: any[]
+  ) => {
+    // Calculate revenue from actual payment transactions
+    const courseRevenue = paymentTransactions
+      .filter(pt => pt.reference_type === 'course')
+      .reduce((total, pt) => total + (Number(pt.creator_earning) || 0), 0);
     
-    // Calculate total event revenue
-    const eventRevenue = registrations.reduce((total, registration) => {
-      if (registration.payment_status === 'completed' && registration.event) {
-        return total + (Number(registration.event.price) || 0);
-      }
-      return total;
-    }, 0);
+    const eventRevenue = paymentTransactions
+      .filter(pt => pt.reference_type === 'event')
+      .reduce((total, pt) => total + (Number(pt.creator_earning) || 0), 0);
     
-    // Calculate total revenue
     const totalRevenue = courseRevenue + eventRevenue;
     
-    // Calculate monthly revenue
-    const monthlyRevenue = calculateMonthlyRevenue(enrollments);
+    // Calculate monthly revenue from payment transactions
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyRevenue = monthNames.map(name => ({ name, revenue: 0 }));
     
-    // Calculate revenue by source
+    paymentTransactions.forEach(transaction => {
+      const transactionDate = new Date(transaction.created_at);
+      const monthIndex = transactionDate.getMonth();
+      const earning = Number(transaction.creator_earning) || 0;
+      
+      if (monthIndex >= 0 && monthIndex < 12) {
+        monthlyRevenue[monthIndex] = {
+          name: monthlyRevenue[monthIndex].name,
+          revenue: Number(monthlyRevenue[monthIndex].revenue) + earning
+        };
+      }
+    });
+    
     const revenueBySource = [
       { name: 'Courses', value: courseRevenue },
       { name: 'Events', value: eventRevenue }
