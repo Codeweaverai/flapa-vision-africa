@@ -60,13 +60,13 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/events" className="hover:text-primary transition-colors">
+                <Link to="/explore/events" className="hover:text-primary transition-colors">
                   Events
                 </Link>
               </li>
               <li>
-                <Link to="/consult" className="hover:text-primary transition-colors">
-                  Book a Consultation
+                <Link to="/community" className="hover:text-primary transition-colors">
+                  Connect With Our Community
                 </Link>
               </li>
             </ul>
