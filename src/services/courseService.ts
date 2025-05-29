@@ -127,12 +127,22 @@ export async function fetchAllCourses(): Promise<Course[]> {
   return fetchCourses();
 }
 
-export async function fetchCreatorCourses(creatorId: string): Promise<Course[]> {
-  const { data, error } = await supabase
+export async function fetchCreatorCourses(creatorId?: string): Promise<Course[]> {
+  let query = supabase
     .from('courses')
     .select('*')
-    .eq('creator_id', creatorId)
     .order('created_at', { ascending: false });
+
+  if (creatorId) {
+    query = query.eq('creator_id', creatorId);
+  } else {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      query = query.eq('creator_id', user.id);
+    }
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data || [];
@@ -266,7 +276,21 @@ export async function enrollInCourse(courseId: string): Promise<boolean> {
   return !!data;
 }
 
-export async function createCourse(courseData: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<Course> {
+export async function createCourse(courseData: {
+  title: string;
+  description: string;
+  summary: string;
+  category: string;
+  difficulty_level: string;
+  duration_minutes: number;
+  price: number;
+  currency?: string;
+  is_free: boolean;
+  is_published: boolean;
+  certificate_enabled: boolean;
+  thumbnail_url?: string;
+  tags?: string[];
+}): Promise<Course> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
@@ -283,10 +307,10 @@ export async function createCourse(courseData: Omit<Course, 'id' | 'created_at' 
   return data;
 }
 
-export async function updateCourse(id: string, courseData: Partial<Omit<Course, 'id' | 'created_at' | 'updated_at'>>): Promise<Course> {
+export async function updateCourse(id: string, courseData: Partial<Course>): Promise<Course> {
   const { data, error } = await supabase
     .from('courses')
-    .update(courseData)
+    .update(courseData as any)
     .eq('id', id)
     .select()
     .single();
@@ -306,7 +330,12 @@ export async function deleteCourse(id: string): Promise<boolean> {
 }
 
 // Module operations
-export async function createModule(moduleData: Partial<CourseModule>): Promise<CourseModule> {
+export async function createModule(moduleData: {
+  course_id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+}): Promise<CourseModule> {
   const { data, error } = await supabase
     .from('course_modules')
     .insert(moduleData)
@@ -314,19 +343,19 @@ export async function createModule(moduleData: Partial<CourseModule>): Promise<C
     .single();
 
   if (error) throw error;
-  return data;
+  return { ...data, lessons: [] };
 }
 
 export async function updateModule(id: string, moduleData: Partial<CourseModule>): Promise<CourseModule> {
   const { data, error } = await supabase
     .from('course_modules')
-    .update(moduleData)
+    .update(moduleData as any)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return { ...data, lessons: [] };
 }
 
 export async function deleteModule(id: string): Promise<boolean> {
@@ -350,7 +379,16 @@ export async function updateModuleOrder(id: string, orderIndex: number): Promise
 }
 
 // Lesson operations
-export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson> {
+export async function createLesson(lessonData: {
+  module_id: string;
+  title: string;
+  description?: string;
+  content_type?: string;
+  video_url?: string;
+  content?: any;
+  materials_urls?: string[];
+  order_index: number;
+}): Promise<Lesson> {
   const { data, error } = await supabase
     .from('lessons')
     .insert(lessonData)
@@ -364,7 +402,7 @@ export async function createLesson(lessonData: Partial<Lesson>): Promise<Lesson>
 export async function updateLesson(id: string, lessonData: Partial<Lesson>): Promise<Lesson> {
   const { data, error } = await supabase
     .from('lessons')
-    .update(lessonData)
+    .update(lessonData as any)
     .eq('id', id)
     .select()
     .single();
@@ -384,7 +422,13 @@ export async function deleteLesson(id: string): Promise<boolean> {
 }
 
 // Quiz operations
-export async function createQuiz(quizData: Partial<Quiz>): Promise<Quiz> {
+export async function createQuiz(quizData: {
+  title: string;
+  description?: string;
+  lesson_id?: string;
+  module_id?: string;
+  passing_score?: number;
+}): Promise<Quiz> {
   const { data, error } = await supabase
     .from('quizzes')
     .insert(quizData)
@@ -395,7 +439,11 @@ export async function createQuiz(quizData: Partial<Quiz>): Promise<Quiz> {
   return data;
 }
 
-export async function createQuizQuestion(questionData: Partial<QuizQuestion>): Promise<QuizQuestion> {
+export async function createQuizQuestion(questionData: {
+  quiz_id: string;
+  question: string;
+  order_index: number;
+}): Promise<QuizQuestion> {
   const { data, error } = await supabase
     .from('quiz_questions')
     .insert(questionData)
@@ -406,7 +454,12 @@ export async function createQuizQuestion(questionData: Partial<QuizQuestion>): P
   return data;
 }
 
-export async function createQuizAnswer(answerData: Partial<QuizAnswer>): Promise<QuizAnswer> {
+export async function createQuizAnswer(answerData: {
+  question_id: string;
+  answer: string;
+  is_correct: boolean;
+  order_index: number;
+}): Promise<QuizAnswer> {
   const { data, error } = await supabase
     .from('quiz_answers')
     .insert(answerData)
