@@ -317,6 +317,7 @@ const CreatorEventCreate = () => {
                         <SelectItem value="USD">USD</SelectItem>
                         <SelectItem value="ZMW">ZMW</SelectItem>
                         <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="ZAR">ZAR</SelectItem>
                         <SelectItem value="GBP">GBP</SelectItem>
                       </SelectContent>
                     </Select>
