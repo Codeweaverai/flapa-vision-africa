@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -9,7 +10,7 @@ import CommunityPage from '@/pages/CommunityPage';
 import MediaPage from '@/pages/MediaPage';
 import ContactPage from '@/pages/ContactPage';
 import HelpCenterPage from '@/pages/HelpCenterPage';
-import AuthenticationPage from '@/pages/AuthenticationPage';
+import AuthPage from '@/pages/AuthPage';
 import AccountPage from '@/pages/AccountPage';
 import CourseLearningPage from '@/pages/CourseLearningPage';
 import CourseDetailPage from '@/pages/learning/CourseDetailPage';
@@ -27,9 +28,8 @@ import AdminEvents from '@/pages/admin/AdminEvents';
 import PaymentResultPage from '@/pages/PaymentResultPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import CreatorPayments from '@/pages/creator/CreatorPayments';
-import CommunityCoursePage from '@/pages/community/CommunityCoursePage';
-import CommunityEventPage from '@/pages/community/CommunityEventPage';
-import CommunityNotificationsPage from '@/pages/community/CommunityNotificationsPage';
+import CommunityCoursesPage from '@/pages/CommunityCoursesPage';
+import CommunityNotificationsPage from '@/pages/CommunityNotificationsPage';
 import MyCoursesPage from '@/pages/MyCoursesPage';
 import MyEventsPage from '@/pages/MyEventsPage';
 
@@ -48,7 +48,7 @@ function App() {
             <Route path="/media" element={<MediaPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/help" element={<HelpCenterPage />} />
-            <Route path="/auth" element={<AuthenticationPage />} />
+            <Route path="/auth" element={<AuthPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/events/:id" element={<EventDetailPage />} />
             <Route path="/payment/success" element={<PaymentSuccessPage />} />
@@ -60,8 +60,7 @@ function App() {
             <Route path="/my-events" element={<MyEventsPage />} />
 
             {/* Community Routes */}
-            <Route path="/community/courses" element={<CommunityCoursePage />} />
-            <Route path="/community/events" element={<CommunityEventPage />} />
+            <Route path="/community/courses" element={<CommunityCoursesPage />} />
             <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
 
             {/* Learning Routes */}
