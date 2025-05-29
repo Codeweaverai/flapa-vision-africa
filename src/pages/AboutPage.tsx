@@ -2,181 +2,182 @@
 import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Users, Target, Award, Heart, Lightbulb, Globe } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Users, Target, Globe, Award, Calendar, MapPin } from 'lucide-react';
 
 const AboutPage = () => {
-  const values = [
-    {
-      icon: Target,
-      title: "Mission-Driven",
-      description: "We're committed to bridging the gap between expertise and opportunity, driving professional growth across Africa."
-    },
-    {
-      icon: Lightbulb,
-      title: "Innovation",
-      description: "We leverage cutting-edge technology to create accessible learning experiences for everyone."
-    },
-    {
-      icon: Heart,
-      title: "Community-Focused",
-      description: "Building strong communities where knowledge sharing and collaboration thrive."
-    },
-    {
-      icon: Globe,
-      title: "Global Impact",
-      description: "Creating sustainable learning pathways that reach millions across the continent."
-    }
-  ];
-
-  const team = [
-    {
-      name: "Mbolela Pule",
-      role: "Founder & CEO",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg",
-      description: "Technology leader and entrepreneur passionate about African development."
-    },
-    {
-      name: "George Munganga",
-      role: "Head of Technology",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg",
-      description: "Full-stack developer building scalable learning platforms."
-    },
-    {
-      name: "David Kimani",
-      role: "Head of Learning",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
-      description: "Educational expert with 15+ years in curriculum development."
-    }
-  ];
-
   return (
-    <div className="min-h-screen bg-light-purple">
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+        <div className="container mx-auto px-4 py-16">
           {/* Hero Section */}
           <div className="text-center mb-16">
-            <h1 className="text-5xl font-bold mb-6">About SkillPulse</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+              About SkillPulse
+            </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              We're transforming how people learn and grow professionally across Africa through 
-              innovative technology and community-driven education.
+              Empowering professionals across Africa through expert-led learning, networking, and growth opportunities.
             </p>
           </div>
 
-          {/* Mission Section */}
-          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
-            <div>
-              <h2 className="text-3xl font-bold mb-6">Our Mission</h2>
-              <p className="text-lg mb-4">
-                SkillPulse is a pioneering skills and event booking platform transforming how people 
-                learn and grow professionally. With a unique blend of technical innovation and 
-                educational expertise, we've built SkillPulse to harness collective knowledge 
-                for professional advancement.
-              </p>
-              <p className="text-lg mb-6">
-                Our mission is to bridge the gap between expertise and opportunity, driving 
-                professional growth, and fostering community development throughout the industry, creating 
-                sustainable learning pathways for millions.
-              </p>
-              <Button asChild size="lg">
-                <Link to="/learning">Start Learning</Link>
-              </Button>
-            </div>
-            <div className="relative">
-              <img 
-                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//40357%20(1).jpg" 
-                alt="Team collaboration" 
-                className="w-full h-96 object-cover rounded-xl shadow-lg" 
-              />
-            </div>
-          </div>
-
-          {/* Values Section */}
+          {/* Where We Started Section */}
           <div className="mb-16">
-            <h2 className="text-3xl font-bold text-center mb-12">Our Values</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {values.map((value, index) => (
-                <Card key={index} className="text-center">
-                  <CardHeader>
-                    <value.icon className="h-12 w-12 mx-auto mb-4 text-primary" />
-                    <CardTitle className="text-lg">{value.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {value.description}
+            <Card className="border-purple-200 shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl text-center mb-4">Where We Started</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-8 items-center">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-4 text-purple-600">Our Origin Story</h3>
+                    <p className="text-muted-foreground mb-4">
+                      SkillPulse was founded in 2023 with a simple yet powerful vision: to bridge the skills gap across Africa 
+                      by connecting professionals with world-class learning opportunities and industry experts.
                     </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    <p className="text-muted-foreground mb-4">
+                      Starting from Johannesburg, South Africa, our platform began as a response to the growing need for 
+                      accessible, high-quality professional development in emerging markets.
+                    </p>
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span>Founded in Johannesburg, South Africa</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>Established in 2023</span>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-100 to-orange-100 p-6 rounded-lg">
+                    <h4 className="font-semibold mb-3 text-center">Founding Principles</h4>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span>Accessible quality education for all</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <span>Practical, industry-relevant skills</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span>Building communities of practice</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <span>Empowering local expertise</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Team Section */}
+          {/* Fact Sheet Section */}
           <div className="mb-16">
-            <h2 className="text-3xl font-bold text-center mb-12">Meet Our Team</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {team.map((member, index) => (
-                <Card key={index} className="text-center">
-                  <CardHeader>
-                    <img 
-                      src={member.image} 
-                      alt={member.name}
-                      className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                    />
-                    <CardTitle>{member.name}</CardTitle>
-                    <p className="text-primary font-semibold">{member.role}</p>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {member.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+            <h2 className="text-3xl font-bold text-center mb-8">SkillPulse by the Numbers</h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="text-center border-orange-200">
+                <CardContent className="pt-6">
+                  <div className="text-3xl font-bold text-orange-600 mb-2">2,500+</div>
+                  <p className="text-muted-foreground">Active Learners</p>
+                </CardContent>
+              </Card>
+              <Card className="text-center border-purple-200">
+                <CardContent className="pt-6">
+                  <div className="text-3xl font-bold text-purple-600 mb-2">150+</div>
+                  <p className="text-muted-foreground">Expert Instructors</p>
+                </CardContent>
+              </Card>
+              <Card className="text-center border-orange-200">
+                <CardContent className="pt-6">
+                  <div className="text-3xl font-bold text-orange-600 mb-2">50+</div>
+                  <p className="text-muted-foreground">Countries Reached</p>
+                </CardContent>
+              </Card>
+              <Card className="text-center border-purple-200">
+                <CardContent className="pt-6">
+                  <div className="text-3xl font-bold text-purple-600 mb-2">95%</div>
+                  <p className="text-muted-foreground">Completion Rate</p>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          {/* Stats Section */}
-          <div className="bg-white/80 rounded-xl p-8 mb-16">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">10,000+</div>
-                <div className="text-muted-foreground">Students Enrolled</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">500+</div>
-                <div className="text-muted-foreground">Courses Available</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">50+</div>
-                <div className="text-muted-foreground">Expert Instructors</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">95%</div>
-                <div className="text-muted-foreground">Completion Rate</div>
-              </div>
-            </div>
+          {/* Mission & Vision */}
+          <div className="grid md:grid-cols-2 gap-8 mb-16">
+            <Card className="border-purple-200 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Target className="h-6 w-6 mr-2 text-purple-600" />
+                  Our Mission
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  To democratize access to high-quality professional development across Africa, 
+                  fostering a community of skilled professionals who drive economic growth and innovation.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-orange-200 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Globe className="h-6 w-6 mr-2 text-orange-600" />
+                  Our Vision
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  To become Africa's leading platform for professional learning and networking, 
+                  empowering every professional to reach their full potential.
+                </p>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* CTA Section */}
-          <div className="text-center">
-            <h2 className="text-3xl font-bold mb-6">Ready to Start Your Journey?</h2>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Join thousands of learners who are advancing their careers with SkillPulse.
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Button asChild size="lg">
-                <Link to="/register">Get Started</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/contact">Contact Us</Link>
-              </Button>
-            </div>
-          </div>
+          {/* What Sets Us Apart */}
+          <Card className="border-purple-200 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl text-center">What Sets Us Apart</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="text-center">
+                  <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="h-8 w-8 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold mb-2">Expert Network</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Learn from industry leaders and successful entrepreneurs across various sectors.
+                  </p>
+                </div>
+                <div className="text-center">
+                  <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Award className="h-8 w-8 text-orange-600" />
+                  </div>
+                  <h3 className="font-semibold mb-2">Practical Learning</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Hands-on courses designed for immediate application in real-world scenarios.
+                  </p>
+                </div>
+                <div className="text-center">
+                  <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Globe className="h-8 w-8 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold mb-2">African Focus</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Content tailored specifically for African markets and business environments.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </Layout>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

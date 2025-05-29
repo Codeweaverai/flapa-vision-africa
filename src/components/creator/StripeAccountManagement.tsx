@@ -5,11 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { CheckCircle } from 'lucide-react';
 
 const StripeAccountManagement = () => {
   const { user } = useAuth();
   const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     const fetchStripeAccountId = async () => {
@@ -27,6 +29,7 @@ const StripeAccountManagement = () => {
             toast.error('Failed to fetch Stripe Account ID.');
           } else if (data) {
             setStripeAccountId(data.stripe_connect_id);
+            setIsConnected(!!data.stripe_connect_id);
           }
         } catch (error) {
           console.error('Unexpected error:', error);
@@ -52,6 +55,7 @@ const StripeAccountManagement = () => {
         toast.error('Failed to create Stripe account.');
       } else if (data && data.account_id) {
         setStripeAccountId(data.account_id);
+        setIsConnected(true);
         toast.success('Stripe account created successfully!');
       }
     } catch (error) {
@@ -97,13 +101,17 @@ const StripeAccountManagement = () => {
       <CardContent>
         {loading ? (
           <div>Loading...</div>
-        ) : stripeAccountId ? (
-          <>
+        ) : isConnected ? (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">Connected</span>
+            </div>
             <p>Your Stripe Account ID: {stripeAccountId}</p>
             <Button onClick={handleCreateAccountLink} disabled={loading}>
               Update Account Details
             </Button>
-          </>
+          </div>
         ) : (
           <Button onClick={handleCreateAccount} disabled={loading}>
             Create Stripe Account
