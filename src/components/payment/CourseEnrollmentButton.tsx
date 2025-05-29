@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
-import { useToast } from '@/components/ui/use-toast';
-import EnhancedPaymentButton from './EnhancedPaymentButton';
+import { toast } from 'sonner';
 
 interface CourseEnrollmentButtonProps {
   courseId: string;
@@ -28,7 +27,6 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
   const handleFreeEnrollment = async () => {
@@ -49,19 +47,45 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
 
       if (error) throw error;
 
-      toast({
-        title: "Enrollment Successful",
-        description: `You've successfully enrolled in ${courseName}`,
-      });
-
+      toast.success(`You've successfully enrolled in ${courseName}`);
       window.location.reload();
     } catch (error) {
       console.error('Enrollment error:', error);
-      toast({
-        title: "Enrollment Failed",
-        description: "Failed to enroll in the course. Please try again.",
-        variant: "destructive"
+      toast.error('Failed to enroll in the course. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaidEnrollment = async () => {
+    if (!user) {
+      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
+        body: {
+          referenceType: 'course',
+          referenceId: courseId,
+          amount: Math.round(price * 100), // Convert to cents
+          currency: currency.toLowerCase(),
+          title: courseName,
+          creatorId,
+          successUrl: `${window.location.origin}/payment/success?type=course&id=${courseId}&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/learning/course-detail/${courseId}`
+        }
       });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error('Failed to initiate payment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -88,17 +112,13 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
   }
 
   return (
-    <EnhancedPaymentButton
-      referenceType="course"
-      referenceId={courseId}
-      amount={price}
-      currency={currency}
-      title={courseName}
-      creatorId={creatorId}
+    <Button 
+      onClick={handlePaidEnrollment} 
+      disabled={loading}
       className="w-full"
     >
-      Enroll Now - {currency} {price.toFixed(2)}
-    </EnhancedPaymentButton>
+      {loading ? "Processing..." : `Enroll Now - ${currency} ${price.toFixed(2)}`}
+    </Button>
   );
 };
 

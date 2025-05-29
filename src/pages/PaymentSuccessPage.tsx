@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Layout from '@/components/layout/Layout';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
 
 const PaymentSuccessPage = () => {
   const [searchParams] = useSearchParams();
@@ -15,37 +17,84 @@ const PaymentSuccessPage = () => {
   
   // Get payment data from URL parameters
   const paymentType = searchParams.get('type');
-  const referenceId = searchParams.get('reference_id');
+  const referenceId = searchParams.get('id');
+  const sessionId = searchParams.get('session_id');
   
   useEffect(() => {
-    const fetchPaymentDetails = async () => {
-      if (!referenceId) {
+    const processPayment = async () => {
+      if (!user || !sessionId || !paymentType || !referenceId) {
         setLoading(false);
         return;
       }
       
       try {
-        // This would typically fetch payment details from your backend
-        // For now, we'll just create mock data based on URL parameters
-        const mockData = {
-          type: paymentType,
-          id: referenceId,
-          amount: searchParams.get('amount') || '0',
-          currency: searchParams.get('currency') || 'USD',
-          date: new Date().toISOString(),
-          title: searchParams.get('title') || 'Purchase'
-        };
+        console.log('Processing payment success for:', { paymentType, referenceId, sessionId });
         
-        setPaymentData(mockData);
+        // Verify payment with Stripe and update database
+        const { data, error } = await supabase.functions.invoke('verify-stripe-payment', {
+          body: {
+            sessionId,
+            userId: user.id,
+            referenceType: paymentType,
+            referenceId
+          }
+        });
+
+        if (error) {
+          console.error('Payment verification error:', error);
+          throw error;
+        }
+
+        if (data?.success) {
+          console.log('Payment verified successfully:', data);
+          
+          // Update enrollment or booking status locally
+          if (paymentType === 'course') {
+            await supabase
+              .from('course_enrollments')
+              .upsert({
+                user_id: user.id,
+                course_id: referenceId,
+                enrollment_date: new Date().toISOString(),
+                payment_status: 'completed',
+                payment_id: sessionId
+              }, { onConflict: 'user_id,course_id' });
+          } else if (paymentType === 'event') {
+            await supabase
+              .from('event_bookings')
+              .upsert({
+                user_id: user.id,
+                event_id: referenceId,
+                status: 'confirmed',
+                payment_status: 'completed',
+                payment_id: sessionId,
+                booking_date: new Date().toISOString()
+              }, { onConflict: 'user_id,event_id' });
+          }
+
+          setPaymentData({
+            type: paymentType,
+            id: referenceId,
+            amount: data.amount || '0',
+            currency: data.currency || 'USD',
+            date: new Date().toISOString(),
+            title: data.title || 'Purchase'
+          });
+          
+          toast.success('Payment successful!');
+        } else {
+          throw new Error(data?.message || 'Payment verification failed');
+        }
       } catch (error) {
-        console.error('Error fetching payment details:', error);
+        console.error('Error processing payment:', error);
+        toast.error('Failed to verify payment');
       } finally {
         setLoading(false);
       }
     };
     
-    fetchPaymentDetails();
-  }, [paymentType, referenceId, searchParams]);
+    processPayment();
+  }, [user, sessionId, paymentType, referenceId]);
 
   if (loading) {
     return (
@@ -102,7 +151,7 @@ const PaymentSuccessPage = () => {
                   <div className="flex justify-center space-x-4">
                     {paymentType === 'event' && (
                       <Button asChild>
-                        <Link to="/account">
+                        <Link to="/my-events">
                           <Calendar className="mr-2 h-4 w-4" />
                           View Your Events
                         </Link>
@@ -111,7 +160,7 @@ const PaymentSuccessPage = () => {
                     
                     {paymentType === 'course' && (
                       <Button asChild>
-                        <Link to="/account">
+                        <Link to={`/learning/course/${referenceId}`}>
                           <BookOpen className="mr-2 h-4 w-4" />
                           Start Learning
                         </Link>

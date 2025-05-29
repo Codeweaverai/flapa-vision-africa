@@ -33,6 +33,7 @@ import RegisterPage from '@/pages/RegisterPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AccountPage from '@/pages/AccountPage';
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -89,6 +90,9 @@ function App() {
           <Route path="/media" element={<MediaPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          
+          {/* Payment Routes */}
+          <Route path="/payment/success" element={<PaymentSuccessPage />} />
           
           {/* Auth Routes - Multiple paths for same component */}
           <Route path="/auth" element={<AuthPage />} />

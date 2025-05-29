@@ -3,7 +3,7 @@ import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Target, Award, Heart, Lightbulb, Globe } from 'lucide-react';
+import { Users, Target, Award, Heart, Lightbulb, Globe, Calendar, MapPin, Briefcase } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AboutPage = () => {
@@ -51,6 +51,61 @@ const AboutPage = () => {
     }
   ];
 
+  const milestones = [
+    {
+      year: "2020",
+      title: "Founded SkillPulse",
+      description: "Started with a vision to transform African education through technology"
+    },
+    {
+      year: "2021",
+      title: "First 1,000 Students",
+      description: "Reached our first milestone of serving 1,000 learners across the continent"
+    },
+    {
+      year: "2022",
+      title: "Platform Launch",
+      description: "Officially launched our comprehensive learning and event booking platform"
+    },
+    {
+      year: "2023",
+      title: "Global Expansion",
+      description: "Expanded our reach to serve learners across multiple African countries"
+    },
+    {
+      year: "2024",
+      title: "10,000+ Students",
+      description: "Celebrating over 10,000 students and 500+ courses on our platform"
+    }
+  ];
+
+  const facts = [
+    {
+      icon: Users,
+      number: "10,000+",
+      label: "Students Enrolled",
+      description: "Learners from across Africa and beyond"
+    },
+    {
+      icon: Award,
+      number: "500+",
+      label: "Courses Available",
+      description: "Covering technology, business, and innovation"
+    },
+    {
+      icon: Globe,
+      number: "15+",
+      label: "Countries Served",
+      description: "Expanding across the African continent"
+    },
+    {
+      icon: Briefcase,
+      number: "95%",
+      label: "Job Placement Rate",
+      description: "Of our certified graduates find employment"
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-light-purple">
       <Layout>
@@ -89,6 +144,45 @@ const AboutPage = () => {
                 alt="Team collaboration" 
                 className="w-full h-96 object-cover rounded-xl shadow-lg" 
               />
+            </div>
+          </div>
+
+          {/* Where We Started Section */}
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold text-center mb-12">Our Journey</h2>
+            <div className="space-y-8">
+              {milestones.map((milestone, index) => (
+                <div key={index} className="flex items-start space-x-4">
+                  <div className="flex-shrink-0 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white font-bold">
+                    {milestone.year}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">{milestone.title}</h3>
+                    <p className="text-muted-foreground">{milestone.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Fact Sheet Section */}
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold text-center mb-12">By The Numbers</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {facts.map((fact, index) => (
+                <Card key={index} className="text-center">
+                  <CardHeader>
+                    <fact.icon className="h-12 w-12 mx-auto mb-4 text-primary" />
+                    <div className="text-4xl font-bold text-primary mb-2">{fact.number}</div>
+                    <CardTitle className="text-lg">{fact.label}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {fact.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
 
@@ -134,28 +228,6 @@ const AboutPage = () => {
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          </div>
-
-          {/* Stats Section */}
-          <div className="bg-white/80 rounded-xl p-8 mb-16">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">10,000+</div>
-                <div className="text-muted-foreground">Students Enrolled</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">500+</div>
-                <div className="text-muted-foreground">Courses Available</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">50+</div>
-                <div className="text-muted-foreground">Expert Instructors</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-primary mb-2">95%</div>
-                <div className="text-muted-foreground">Completion Rate</div>
-              </div>
             </div>
           </div>
 

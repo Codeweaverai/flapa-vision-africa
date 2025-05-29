@@ -5,11 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { CheckCircle } from 'lucide-react';
 
 const StripeAccountManagement = () => {
   const { user } = useAuth();
   const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     const fetchStripeAccountId = async () => {
@@ -25,8 +27,9 @@ const StripeAccountManagement = () => {
           if (error) {
             console.error('Error fetching Stripe Account ID:', error);
             toast.error('Failed to fetch Stripe Account ID.');
-          } else if (data) {
+          } else if (data && data.stripe_connect_id) {
             setStripeAccountId(data.stripe_connect_id);
+            setIsConnected(true);
           }
         } catch (error) {
           console.error('Unexpected error:', error);
@@ -52,6 +55,7 @@ const StripeAccountManagement = () => {
         toast.error('Failed to create Stripe account.');
       } else if (data && data.account_id) {
         setStripeAccountId(data.account_id);
+        setIsConnected(true);
         toast.success('Stripe account created successfully!');
       }
     } catch (error) {
@@ -97,13 +101,17 @@ const StripeAccountManagement = () => {
       <CardContent>
         {loading ? (
           <div>Loading...</div>
-        ) : stripeAccountId ? (
-          <>
-            <p>Your Stripe Account ID: {stripeAccountId}</p>
+        ) : isConnected ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <span className="text-green-800 font-medium">Connected to Stripe</span>
+            </div>
+            <p className="text-sm text-gray-600">Your Stripe Account ID: {stripeAccountId}</p>
             <Button onClick={handleCreateAccountLink} disabled={loading}>
               Update Account Details
             </Button>
-          </>
+          </div>
         ) : (
           <Button onClick={handleCreateAccount} disabled={loading}>
             Create Stripe Account
