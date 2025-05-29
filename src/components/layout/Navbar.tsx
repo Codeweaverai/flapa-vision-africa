@@ -163,10 +163,10 @@ const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate('/account')}>
                     My Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/account/my-courses')}>
+                  <DropdownMenuItem onClick={() => navigate('/my-courses')}>
                     My Courses
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/account/my-events')}>
+                  <DropdownMenuItem onClick={() => navigate('/my-events')}>
                     My Events
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
