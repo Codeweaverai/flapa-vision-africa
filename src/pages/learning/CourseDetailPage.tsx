@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -12,7 +13,6 @@ import { Course, CourseModule, fetchCourseWithModulesAndLessons } from '@/servic
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import CourseEnrollmentButton from '@/components/payment/CourseEnrollmentButton';
 
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -81,6 +81,32 @@ const CourseDetailPage = () => {
     }
   };
 
+  const handleEnroll = async () => {
+    if (!user) {
+      toast.error('Please sign in to enroll in this course');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('course_enrollments')
+        .insert({
+          user_id: user.id,
+          course_id: id!,
+          payment_status: course?.is_free ? 'completed' : 'pending'
+        });
+
+      if (error) throw error;
+      
+      setIsEnrolled(true);
+      setEnrollmentCount(prev => prev + 1);
+      toast.success('Successfully enrolled in course!');
+    } catch (error) {
+      console.error('Error enrolling:', error);
+      toast.error('Failed to enroll in course');
+    }
+  };
+
   const getTotalLessons = () => {
     return modules.reduce((total, module) => total + (module.lessons?.length || 0), 0);
   };
@@ -108,7 +134,7 @@ const CourseDetailPage = () => {
           <div className="section-container py-8 flex flex-col justify-center items-center gap-4">
             <p>Course not found</p>
             <Button asChild>
-              <Link to="/learning">Back to Learning</Link>
+              <Link to="/courses">Back to Courses</Link>
             </Button>
           </div>
         </div>
@@ -300,15 +326,13 @@ const CourseDetailPage = () => {
                         </p>
                       </div>
                     ) : (
-                      <CourseEnrollmentButton
-                        courseId={course.id}
-                        courseName={course.title}
-                        isFree={course.is_free}
-                        price={course.price || 0}
-                        currency="USD"
-                        isUserEnrolled={isEnrolled}
-                        creatorId={course.creator_id}
-                      />
+                      <Button 
+                        className="w-full bg-purple-600 hover:bg-purple-700" 
+                        size="lg"
+                        onClick={handleEnroll}
+                      >
+                        {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
+                      </Button>
                     )}
 
                     <div className="text-center text-sm text-gray-500">

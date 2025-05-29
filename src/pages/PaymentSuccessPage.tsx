@@ -1,85 +1,57 @@
 
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, Calendar, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Layout from '@/components/layout/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
-import { toast } from 'sonner';
 
 const PaymentSuccessPage = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [paymentData, setPaymentData] = useState<any>(null);
   
-  const sessionId = searchParams.get('session_id');
-  const type = searchParams.get('type');
+  // Get payment data from URL parameters
+  const paymentType = searchParams.get('type');
   const referenceId = searchParams.get('reference_id');
   
   useEffect(() => {
-    const verifyAndUpdatePayment = async () => {
-      if (!sessionId || !user) {
+    const fetchPaymentDetails = async () => {
+      if (!referenceId) {
         setLoading(false);
         return;
       }
-
+      
       try {
-        // Verify payment with Stripe
-        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
-          body: {
-            sessionId,
-            userId: user.id,
-            type: type || 'event',
-            itemId: referenceId
-          }
-        });
-
-        if (verifyError) throw verifyError;
-
-        if (verifyData?.success) {
-          setPaymentData({
-            type: type || 'event',
-            id: referenceId,
-            title: verifyData.title,
-            amount: verifyData.amount || '0',
-            currency: 'USD',
-            date: new Date().toISOString()
-          });
-          
-          toast.success('Payment verified successfully!');
-        } else {
-          toast.error('Payment verification failed');
-        }
+        // This would typically fetch payment details from your backend
+        // For now, we'll just create mock data based on URL parameters
+        const mockData = {
+          type: paymentType,
+          id: referenceId,
+          amount: searchParams.get('amount') || '0',
+          currency: searchParams.get('currency') || 'USD',
+          date: new Date().toISOString(),
+          title: searchParams.get('title') || 'Purchase'
+        };
+        
+        setPaymentData(mockData);
       } catch (error) {
-        console.error('Error verifying payment:', error);
-        toast.error('Failed to verify payment');
+        console.error('Error fetching payment details:', error);
       } finally {
         setLoading(false);
       }
     };
     
-    verifyAndUpdatePayment();
-  }, [sessionId, user, type, referenceId]);
-
-  const handleRedirect = () => {
-    if (paymentData?.type === 'event') {
-      navigate('/my-events');
-    } else if (paymentData?.type === 'course') {
-      navigate('/my-courses');
-    } else {
-      navigate('/account');
-    }
-  };
+    fetchPaymentDetails();
+  }, [paymentType, referenceId, searchParams]);
 
   if (loading) {
     return (
       <Layout>
         <div className="section-container min-h-[60vh] flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <div className="animate-pulse text-xl">Processing payment...</div>
         </div>
       </Layout>
     );
@@ -109,8 +81,10 @@ const PaymentSuccessPage = () => {
                         <span className="font-medium">{paymentData.title}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Type:</span>
-                        <span className="font-medium capitalize">{paymentData.type}</span>
+                        <span className="text-muted-foreground">Amount:</span>
+                        <span className="font-medium">
+                          {paymentData.currency} {paymentData.amount}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Date:</span>
@@ -118,30 +92,46 @@ const PaymentSuccessPage = () => {
                           {new Date(paymentData.date).toLocaleDateString()}
                         </span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Transaction ID:</span>
+                        <span className="font-medium">{paymentData.id.substring(0, 8)}</span>
+                      </div>
                     </div>
                   </div>
                   
                   <div className="flex justify-center space-x-4">
-                    <Button onClick={handleRedirect}>
-                      {paymentData.type === 'event' ? (
-                        <>
+                    {paymentType === 'event' && (
+                      <Button asChild>
+                        <Link to="/account">
                           <Calendar className="mr-2 h-4 w-4" />
-                          View My Events
-                        </>
-                      ) : (
-                        <>
+                          View Your Events
+                        </Link>
+                      </Button>
+                    )}
+                    
+                    {paymentType === 'course' && (
+                      <Button asChild>
+                        <Link to="/account">
                           <BookOpen className="mr-2 h-4 w-4" />
-                          View My Courses
-                        </>
-                      )}
-                    </Button>
+                          Start Learning
+                        </Link>
+                      </Button>
+                    )}
+                    
+                    {!paymentType && (
+                      <Button asChild>
+                        <Link to="/account">
+                          Go to My Account
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
               
               {!paymentData && (
                 <div className="text-center py-8">
-                  <p className="mb-6">Your purchase has been confirmed.</p>
+                  <p className="mb-6">We couldn't find details for this payment, but your purchase has been confirmed.</p>
                   <Button asChild>
                     <Link to="/account">Go to My Account</Link>
                   </Button>
