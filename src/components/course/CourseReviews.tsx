@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ interface Review {
   rating: number;
   review_text: string;
   created_at: string;
-  profiles: {
+  user_profile?: {
     full_name: string;
     avatar_url: string;
     username: string;
@@ -61,36 +62,45 @@ const CourseReviews: React.FC<CourseReviewsProps> = ({ courseId }) => {
 
   const loadReviews = async () => {
     try {
-      const { data, error } = await supabase
+      // First get all reviews for the course
+      const { data: reviewsData, error: reviewsError } = await supabase
         .from('course_reviews')
-        .select(`
-          *,
-          profiles (
-            full_name,
-            avatar_url,
-            username
-          )
-        `)
+        .select('*')
         .eq('course_id', courseId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (reviewsError) throw reviewsError;
 
-      const reviewsData = (data || []) as unknown as Review[];
-      setReviews(reviewsData);
-      setTotalReviews(reviewsData.length);
+      // Then get user profiles for each review
+      const reviewsWithProfiles = await Promise.all(
+        (reviewsData || []).map(async (review) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url, username')
+            .eq('id', review.user_id)
+            .single();
+
+          return {
+            ...review,
+            user_profile: profile
+          };
+        })
+      );
+
+      setReviews(reviewsWithProfiles);
+      setTotalReviews(reviewsWithProfiles.length);
 
       // Calculate average rating
-      if (reviewsData.length > 0) {
-        const sum = reviewsData.reduce((acc, review) => acc + review.rating, 0);
-        setAverageRating(sum / reviewsData.length);
+      if (reviewsWithProfiles.length > 0) {
+        const sum = reviewsWithProfiles.reduce((acc, review) => acc + review.rating, 0);
+        setAverageRating(sum / reviewsWithProfiles.length);
       } else {
         setAverageRating(0);
       }
 
       // Find user's review if logged in
       if (user) {
-        const currentUserReview = reviewsData.find(review => review.user_id === user.id);
+        const currentUserReview = reviewsWithProfiles.find(review => review.user_id === user.id);
         setUserReview(currentUserReview || null);
         if (currentUserReview) {
           setRating(currentUserReview.rating);
@@ -288,9 +298,9 @@ const CourseReviews: React.FC<CourseReviewsProps> = ({ courseId }) => {
               <div key={review.id} className="border-b last:border-b-0 pb-4 last:pb-0">
                 <div className="flex items-start space-x-4">
                   <Avatar>
-                    <AvatarImage src={review.profiles?.avatar_url} />
+                    <AvatarImage src={review.user_profile?.avatar_url} />
                     <AvatarFallback>
-                      {review.profiles?.full_name?.[0] || review.profiles?.username?.[0] || 'U'}
+                      {review.user_profile?.full_name?.[0] || review.user_profile?.username?.[0] || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   
@@ -298,7 +308,7 @@ const CourseReviews: React.FC<CourseReviewsProps> = ({ courseId }) => {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h4 className="font-medium">
-                          {review.profiles?.full_name || review.profiles?.username || 'Anonymous'}
+                          {review.user_profile?.full_name || review.user_profile?.username || 'Anonymous'}
                         </h4>
                         <div className="flex items-center space-x-2">
                           {renderStars(review.rating)}

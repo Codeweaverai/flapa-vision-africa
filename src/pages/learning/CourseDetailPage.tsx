@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Course, fetchCourseDetails, fetchModuleLessons } from '@/services/courseService';
+import { Course, fetchCourseDetails, fetchModuleLessons, enrollInCourse, checkEnrollmentStatus } from '@/services/courseService';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import CreatorProfile from '@/components/creator/CreatorProfile';
@@ -12,9 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Star, Clock, Users, BookOpen, Play, Check, ChevronRight } from 'lucide-react';
-import ReactPlayer from 'react-player';
 import { toast } from 'sonner';
 import CourseReviews from '@/components/course/CourseReviews';
+import VideoPlayer from '@/components/video/VideoPlayer';
+import { supabase } from '@/lib/supabaseClient';
 
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,11 +24,18 @@ const CourseDetailPage = () => {
   const [modules, setModules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [courseStats, setCourseStats] = useState({
+    averageRating: 0,
+    totalReviews: 0,
+    totalStudents: 0
+  });
 
   useEffect(() => {
     if (id) {
       loadCourseData();
+      loadCourseStats();
     }
   }, [id, user]);
 
@@ -51,13 +58,106 @@ const CourseDetailPage = () => {
       
       // Check if user is enrolled
       if (user) {
-        // Check enrollment logic here
+        const enrollmentStatus = await checkEnrollmentStatus(id);
+        setIsEnrolled(enrollmentStatus);
       }
     } catch (error) {
       console.error('Error loading course:', error);
       toast.error('Failed to load course');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCourseStats = async () => {
+    if (!id) return;
+    
+    try {
+      // Get reviews stats
+      const { data: reviews, error: reviewsError } = await supabase
+        .from('course_reviews')
+        .select('rating')
+        .eq('course_id', id);
+
+      if (reviewsError) {
+        console.error('Error loading reviews stats:', reviewsError);
+      } else {
+        const totalReviews = reviews?.length || 0;
+        const averageRating = totalReviews > 0 
+          ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+          : 0;
+        
+        setCourseStats(prev => ({
+          ...prev,
+          averageRating,
+          totalReviews
+        }));
+      }
+
+      // Get enrollment count
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('course_id', id);
+
+      if (enrollmentsError) {
+        console.error('Error loading enrollment stats:', enrollmentsError);
+      } else {
+        setCourseStats(prev => ({
+          ...prev,
+          totalStudents: enrollments?.length || 0
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading course stats:', error);
+    }
+  };
+
+  const handleEnroll = async () => {
+    if (!user) {
+      toast.error('Please log in to enroll');
+      navigate('/auth');
+      return;
+    }
+
+    if (!course) return;
+
+    setEnrolling(true);
+    try {
+      if (course.is_free) {
+        // Free course enrollment
+        const success = await enrollInCourse(course.id);
+        if (success) {
+          setIsEnrolled(true);
+          toast.success(`Successfully enrolled in ${course.title}!`);
+          loadCourseStats(); // Refresh stats
+        }
+      } else {
+        // Paid course - redirect to Stripe checkout
+        const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
+          body: {
+            referenceType: 'course',
+            referenceId: course.id,
+            amount: Math.round(course.price * 100), // Convert to cents
+            currency: 'usd',
+            title: course.title,
+            creatorId: course.creator_id,
+            successUrl: `${window.location.origin}/payment/success?type=course&id=${course.id}&session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: window.location.href
+          }
+        });
+
+        if (error) throw error;
+
+        if (data?.url) {
+          window.location.href = data.url;
+        }
+      }
+    } catch (error) {
+      console.error('Enrollment error:', error);
+      toast.error('Failed to enroll in course');
+    } finally {
+      setEnrolling(false);
     }
   };
 
@@ -136,12 +236,12 @@ const CourseDetailPage = () => {
                 <div className="flex items-center space-x-6 text-sm mb-6">
                   <div className="flex items-center space-x-1">
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-medium">4.8</span>
-                    <span className="text-muted-foreground">(1,234 reviews)</span>
+                    <span className="font-medium">{courseStats.averageRating.toFixed(1)}</span>
+                    <span className="text-muted-foreground">({courseStats.totalReviews} reviews)</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Users className="w-4 h-4 text-primary" />
-                    <span>5,678 students</span>
+                    <span>{courseStats.totalStudents} students</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Clock className="w-4 h-4 text-primary" />
@@ -155,14 +255,14 @@ const CourseDetailPage = () => {
                 <CardContent className="p-0">
                   <div className="aspect-video bg-black rounded-lg overflow-hidden">
                     {course?.course_preview?.preview_video_url ? (
-                      <div className="relative w-full h-full">
-                        <video 
-                          src={course.course_preview.preview_video_url} 
-                          controls
-                          className="w-full h-full object-contain"
-                          poster={course.thumbnail_url}
-                        />
-                      </div>
+                      <VideoPlayer
+                        src={course.course_preview.preview_video_url}
+                        poster={course.thumbnail_url}
+                        controls={true}
+                        fluid={true}
+                        responsive={true}
+                        className="w-full h-full"
+                      />
                     ) : course?.thumbnail_url ? (
                       <div className="relative w-full h-full">
                         <img 
@@ -211,8 +311,12 @@ const CourseDetailPage = () => {
                       </Link>
                     </Button>
                   ) : (
-                    <Button className="w-full">
-                      {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
+                    <Button 
+                      className="w-full" 
+                      onClick={handleEnroll}
+                      disabled={enrolling}
+                    >
+                      {enrolling ? 'Processing...' : (course.is_free ? 'Enroll for Free' : 'Enroll Now')}
                     </Button>
                   )}
                   

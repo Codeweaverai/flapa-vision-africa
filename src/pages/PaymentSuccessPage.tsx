@@ -1,106 +1,69 @@
 
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, BookOpen } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Check, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
 const PaymentSuccessPage = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [paymentData, setPaymentData] = useState<any>(null);
+  const [courseInfo, setCourseInfo] = useState<any>(null);
   
-  // Get payment data from URL parameters
-  const paymentType = searchParams.get('type');
-  const referenceId = searchParams.get('id');
   const sessionId = searchParams.get('session_id');
-  
+  const type = searchParams.get('type');
+  const id = searchParams.get('id');
+
   useEffect(() => {
-    const processPayment = async () => {
-      if (!user || !sessionId || !paymentType || !referenceId) {
-        setLoading(false);
+    if (sessionId && type === 'course' && id) {
+      verifyPaymentAndEnrollment();
+    } else {
+      setLoading(false);
+    }
+  }, [sessionId, type, id]);
+
+  const verifyPaymentAndEnrollment = async () => {
+    try {
+      // Get course information
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .select('title, description')
+        .eq('id', id)
+        .single();
+
+      if (courseError) {
+        console.error('Error fetching course:', courseError);
+        toast.error('Error verifying enrollment');
         return;
       }
-      
-      try {
-        console.log('Processing payment success for:', { paymentType, referenceId, sessionId });
-        
-        // Verify payment with Stripe and update database
-        const { data, error } = await supabase.functions.invoke('verify-stripe-payment', {
-          body: {
-            sessionId,
-            userId: user.id,
-            referenceType: paymentType,
-            referenceId
-          }
-        });
 
-        if (error) {
-          console.error('Payment verification error:', error);
-          throw error;
-        }
+      setCourseInfo(course);
+      toast.success('Payment successful! You are now enrolled in the course.');
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+      toast.error('Error verifying payment');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        if (data?.success) {
-          console.log('Payment verified successfully:', data);
-          
-          // Update enrollment or booking status locally
-          if (paymentType === 'course') {
-            await supabase
-              .from('course_enrollments')
-              .upsert({
-                user_id: user.id,
-                course_id: referenceId,
-                enrollment_date: new Date().toISOString(),
-                payment_status: 'completed',
-                payment_id: sessionId
-              }, { onConflict: 'user_id,course_id' });
-          } else if (paymentType === 'event') {
-            await supabase
-              .from('event_bookings')
-              .upsert({
-                user_id: user.id,
-                event_id: referenceId,
-                status: 'confirmed',
-                payment_status: 'completed',
-                payment_id: sessionId,
-                booking_date: new Date().toISOString()
-              }, { onConflict: 'user_id,event_id' });
-          }
-
-          setPaymentData({
-            type: paymentType,
-            id: referenceId,
-            amount: data.amount || '0',
-            currency: data.currency || 'USD',
-            date: new Date().toISOString(),
-            title: data.title || 'Purchase'
-          });
-          
-          toast.success('Payment successful!');
-        } else {
-          throw new Error(data?.message || 'Payment verification failed');
-        }
-      } catch (error) {
-        console.error('Error processing payment:', error);
-        toast.error('Failed to verify payment');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    processPayment();
-  }, [user, sessionId, paymentType, referenceId]);
+  const handleContinue = () => {
+    if (type === 'course' && id) {
+      navigate(`/learning/course/${id}`);
+    } else {
+      navigate('/learning');
+    }
+  };
 
   if (loading) {
     return (
       <Layout>
-        <div className="section-container min-h-[60vh] flex items-center justify-center">
-          <div className="animate-pulse text-xl">Processing payment...</div>
+        <div className="min-h-screen bg-light-purple flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </Layout>
     );
@@ -108,86 +71,55 @@ const PaymentSuccessPage = () => {
 
   return (
     <Layout>
-      <div className="section-container py-12 flex flex-col items-center">
-        <div className="w-full max-w-3xl">
-          <Card className="border-green-200 shadow-lg">
-            <CardContent className="pt-6">
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
+      <div className="min-h-screen bg-light-purple">
+        <div className="container mx-auto px-4 py-16">
+          <div className="max-w-2xl mx-auto">
+            <Card className="text-center">
+              <CardHeader>
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <Check className="w-8 h-8 text-green-600" />
                 </div>
-                <h1 className="text-2xl font-bold text-green-700 mb-2">Payment Successful!</h1>
-                <p className="text-muted-foreground">Thank you for your purchase</p>
-              </div>
-              
-              {paymentData && (
-                <div className="space-y-6">
-                  <div className="p-4 bg-muted rounded-lg">
-                    <h2 className="font-medium mb-2">Purchase Details</h2>
-                    <div className="grid gap-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Item:</span>
-                        <span className="font-medium">{paymentData.title}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Amount:</span>
-                        <span className="font-medium">
-                          {paymentData.currency} {paymentData.amount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Date:</span>
-                        <span className="font-medium">
-                          {new Date(paymentData.date).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Transaction ID:</span>
-                        <span className="font-medium">{paymentData.id.substring(0, 8)}</span>
-                      </div>
-                    </div>
+                <CardTitle className="text-2xl text-green-600">Payment Successful!</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {courseInfo && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Welcome to</h3>
+                    <h2 className="text-xl font-bold text-primary">{courseInfo.title}</h2>
                   </div>
-                  
-                  <div className="flex justify-center space-x-4">
-                    {paymentType === 'event' && (
-                      <Button asChild>
-                        <Link to="/my-events">
-                          <Calendar className="mr-2 h-4 w-4" />
-                          View Your Events
-                        </Link>
-                      </Button>
-                    )}
-                    
-                    {paymentType === 'course' && (
-                      <Button asChild>
-                        <Link to={`/learning/course/${referenceId}`}>
-                          <BookOpen className="mr-2 h-4 w-4" />
-                          Start Learning
-                        </Link>
-                      </Button>
-                    )}
-                    
-                    {!paymentType && (
-                      <Button asChild>
-                        <Link to="/account">
-                          Go to My Account
-                        </Link>
-                      </Button>
-                    )}
+                )}
+                
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-center space-x-2 text-green-800">
+                    <Check className="w-5 h-5" />
+                    <span className="font-medium">You have been successfully enrolled!</span>
                   </div>
                 </div>
-              )}
-              
-              {!paymentData && (
-                <div className="text-center py-8">
-                  <p className="mb-6">We couldn't find details for this payment, but your purchase has been confirmed.</p>
-                  <Button asChild>
-                    <Link to="/account">Go to My Account</Link>
+
+                <div className="space-y-3 text-sm text-gray-600">
+                  <div className="flex items-center justify-center space-x-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    <span>Lifetime access to course materials</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    <span>Access on mobile and desktop</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    <span>Certificate upon completion</span>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <Button onClick={handleContinue} className="w-full" size="lg">
+                    Start Learning
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </Layout>
