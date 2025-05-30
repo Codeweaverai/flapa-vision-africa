@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Course, fetchCourseDetails, fetchModuleLessons } from '@/services/courseService';
@@ -153,10 +154,10 @@ const CourseDetailPage = () => {
               <Card className="mb-8">
                 <CardContent className="p-0">
                   <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                    {course?.course_previews?.[0]?.preview_video_url ? (
+                    {course?.course_preview?.preview_video_url ? (
                       <div className="relative w-full h-full">
                         <video 
-                          src={course.course_previews[0].preview_video_url} 
+                          src={course.course_preview.preview_video_url} 
                           controls
                           className="w-full h-full object-contain"
                           poster={course.thumbnail_url}
