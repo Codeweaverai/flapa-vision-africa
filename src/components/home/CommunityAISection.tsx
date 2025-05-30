@@ -186,7 +186,7 @@ const CommunityAISection = () => {
                   <Link to="/community">Explore Community</Link>
                 </Button>
                 <Button asChild variant="outline" size="lg" className="animate-fade-in">
-                  <Link to="/explore-courses">Browse AI-Curated Courses</Link>
+                  <Link to="/explore/courses">Browse AI-Curated Courses</Link>
                 </Button>
               </div>
             </CardContent>
