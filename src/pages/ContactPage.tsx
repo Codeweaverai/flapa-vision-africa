@@ -76,16 +76,15 @@ const ContactPage = () => {
                       <Mail className="h-6 w-6 text-primary mt-1" />
                       <div>
                         <h3 className="font-semibold">Email</h3>
-                        <p className="text-muted-foreground">hello@learningplatform.com</p>
-                        <p className="text-muted-foreground">support@learningplatform.com</p>
+                        <p className="text-muted-foreground">hello@skillpulse.cloud</p>
+                        <p className="text-muted-foreground">support@skillpulse.cloud</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4">
                       <Phone className="h-6 w-6 text-primary mt-1" />
                       <div>
                         <h3 className="font-semibold">Phone</h3>
-                        <p className="text-muted-foreground">+1 (555) 123-4567</p>
-                        <p className="text-muted-foreground">+1 (555) 987-6543</p>
+                        <p className="text-muted-foreground">+260 (968) 554225 </p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4">
@@ -93,9 +92,9 @@ const ContactPage = () => {
                       <div>
                         <h3 className="font-semibold">Address</h3>
                         <p className="text-muted-foreground">
-                          123 Learning Street<br />
-                          Education City, EC 12345<br />
-                          United States
+                          Plot 55 Munali Road<br />
+                          Chudeleigh, Lusaka<br />
+                          Zambia
                         </p>
                       </div>
                     </div>
