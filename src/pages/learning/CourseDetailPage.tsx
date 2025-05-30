@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Course, fetchCourseDetails, fetchCourseModules } from '@/services/courseService';
+import { Course, fetchCourseDetails, fetchModuleLessons } from '@/services/courseService';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import CreatorProfile from '@/components/creator/CreatorProfile';
@@ -43,7 +42,7 @@ const CourseDetailPage = () => {
         return;
       }
       
-      const modulesData = await fetchCourseModules(id);
+      const modulesData = await fetchModuleLessons(id, user?.id || '');
       
       setCourse(courseData);
       setModules(modulesData);
