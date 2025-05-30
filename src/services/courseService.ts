@@ -205,7 +205,7 @@ export async function fetchCourseDetails(id: string): Promise<Course | null> {
     .single();
 
   if (error) throw error;
-  return data;
+  return data as Course;
 }
 
 export async function fetchCourseWithModulesAndLessons(courseId: string): Promise<Course | null> {
@@ -252,7 +252,7 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
   return {
     ...courseData,
     modules: sortedModules
-  };
+  } as Course;
 }
 
 export async function fetchCourseEnrollment(courseId: string, userId: string): Promise<any> {
@@ -541,7 +541,7 @@ export async function fetchCourseReviews(courseId: string): Promise<CourseReview
     .from('course_reviews')
     .select(`
       *,
-      profiles!course_reviews_user_id_fkey (
+      profiles (
         full_name,
         avatar_url,
         username
@@ -551,7 +551,7 @@ export async function fetchCourseReviews(courseId: string): Promise<CourseReview
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return (data || []) as CourseReview[];
+  return (data || []) as unknown as CourseReview[];
 }
 
 export async function createCourseReview(reviewData: {

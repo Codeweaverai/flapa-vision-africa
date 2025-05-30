@@ -65,7 +65,7 @@ const CourseReviews: React.FC<CourseReviewsProps> = ({ courseId }) => {
         .from('course_reviews')
         .select(`
           *,
-          profiles!course_reviews_user_id_fkey (
+          profiles (
             full_name,
             avatar_url,
             username
@@ -76,7 +76,7 @@ const CourseReviews: React.FC<CourseReviewsProps> = ({ courseId }) => {
 
       if (error) throw error;
 
-      const reviewsData = (data || []) as Review[];
+      const reviewsData = (data || []) as unknown as Review[];
       setReviews(reviewsData);
       setTotalReviews(reviewsData.length);
 
