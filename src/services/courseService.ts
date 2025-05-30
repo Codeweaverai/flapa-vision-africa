@@ -19,7 +19,7 @@ export interface Course {
   updated_at: string;
   tags?: string[];
   modules?: CourseModule[];
-  course_previews?: CoursePreview[];
+  course_preview?: CoursePreview;
   course_learning_outcomes?: LearningOutcome[];
 }
 
@@ -205,7 +205,17 @@ export async function fetchCourseDetails(id: string): Promise<Course | null> {
     .single();
 
   if (error) throw error;
-  return data as Course;
+  
+  // Transform the result to match our interface
+  if (data) {
+    return {
+      ...data,
+      course_preview: data.course_previews?.[0] || null,
+      course_previews: undefined // Remove the array version
+    } as Course;
+  }
+  
+  return null;
 }
 
 export async function fetchCourseWithModulesAndLessons(courseId: string): Promise<Course | null> {
@@ -251,7 +261,9 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
 
   return {
     ...courseData,
-    modules: sortedModules
+    modules: sortedModules,
+    course_preview: courseData.course_previews?.[0] || null,
+    course_previews: undefined // Remove the array version
   } as Course;
 }
 

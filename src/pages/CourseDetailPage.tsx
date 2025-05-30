@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Course, CourseModule, checkEnrollmentStatus, enrollInCourse, fetchCourseWithModulesAndLessons } from '@/services/courseService';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
+import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
 
 const CourseDetailPage = () => {
@@ -114,7 +115,17 @@ const CourseDetailPage = () => {
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
                   {/* Course Video/Thumbnail */}
                   <div className="relative h-64 md:h-80 bg-gradient-to-r from-purple-600 to-orange-500">
-                    {course.thumbnail_url ? (
+                    {course.course_preview?.preview_video_url ? (
+                      <div className="relative w-full h-full">
+                        <ReactPlayer
+                          url={course.course_preview.preview_video_url}
+                          width="100%"
+                          height="100%"
+                          controls
+                          className="absolute inset-0"
+                        />
+                      </div>
+                    ) : course.thumbnail_url ? (
                       <div className="relative w-full h-full">
                         <img 
                           src={course.thumbnail_url} 
@@ -263,9 +274,10 @@ const CourseDetailPage = () => {
           {/* Course Content */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-purple-200 p-8">
             <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3 mb-8 bg-purple-50 border border-purple-200">
+              <TabsList className="grid w-full grid-cols-4 mb-8 bg-purple-50 border border-purple-200">
                 <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Overview</TabsTrigger>
                 <TabsTrigger value="content" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Course Content</TabsTrigger>
+                <TabsTrigger value="reviews" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Reviews</TabsTrigger>
                 <TabsTrigger value="discussion" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Discussion</TabsTrigger>
               </TabsList>
               
@@ -276,6 +288,21 @@ const CourseDetailPage = () => {
                     {course.description}
                   </div>
                 </div>
+                
+                {/* Learning Outcomes */}
+                {course.course_learning_outcomes && course.course_learning_outcomes.length > 0 && (
+                  <div>
+                    <h2 className="text-2xl font-bold mb-4 text-gray-800">What You'll Learn</h2>
+                    <div className="grid gap-3">
+                      {course.course_learning_outcomes.map((outcome, index) => (
+                        <div key={outcome.id || index} className="flex items-center text-green-600">
+                          <Check className="h-5 w-5 mr-3 flex-shrink-0" />
+                          <span>{outcome.outcome}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="content">
@@ -326,6 +353,10 @@ const CourseDetailPage = () => {
                     </div>
                   )}
                 </div>
+              </TabsContent>
+              
+              <TabsContent value="reviews">
+                <CourseReviews courseId={course.id} />
               </TabsContent>
               
               <TabsContent value="discussion">
