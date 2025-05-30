@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,7 @@ interface Review {
     full_name: string;
     avatar_url: string;
     username: string;
-  };
+  } | null;
 }
 
 interface CourseReviewsProps {
@@ -66,7 +65,7 @@ const CourseReviews: React.FC<CourseReviewsProps> = ({ courseId }) => {
         .from('course_reviews')
         .select(`
           *,
-          profiles:user_id (
+          profiles!course_reviews_user_id_fkey (
             full_name,
             avatar_url,
             username
@@ -77,7 +76,7 @@ const CourseReviews: React.FC<CourseReviewsProps> = ({ courseId }) => {
 
       if (error) throw error;
 
-      const reviewsData = data || [];
+      const reviewsData = (data || []) as Review[];
       setReviews(reviewsData);
       setTotalReviews(reviewsData.length);
 

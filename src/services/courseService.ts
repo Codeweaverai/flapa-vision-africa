@@ -19,6 +19,8 @@ export interface Course {
   updated_at: string;
   tags?: string[];
   modules?: CourseModule[];
+  course_previews?: CoursePreview[];
+  course_learning_outcomes?: LearningOutcome[];
 }
 
 export interface CourseModule {
@@ -539,7 +541,7 @@ export async function fetchCourseReviews(courseId: string): Promise<CourseReview
     .from('course_reviews')
     .select(`
       *,
-      profiles:user_id (
+      profiles!course_reviews_user_id_fkey (
         full_name,
         avatar_url,
         username
@@ -549,7 +551,7 @@ export async function fetchCourseReviews(courseId: string): Promise<CourseReview
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as CourseReview[];
 }
 
 export async function createCourseReview(reviewData: {
