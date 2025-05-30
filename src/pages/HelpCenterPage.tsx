@@ -48,7 +48,7 @@ const HelpCenterPage = () => {
     {
       icon: CreditCard,
       title: "Billing & Payments",
-      description: "Questions about payments and subscriptions"
+      description: "Questions about payments and payouts"
     },
     {
       icon: Shield,
