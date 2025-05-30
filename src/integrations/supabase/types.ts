@@ -270,6 +270,41 @@ export type Database = {
           },
         ]
       }
+      course_learning_outcomes: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          id: string
+          order_index: number
+          outcome: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          id?: string
+          order_index?: number
+          outcome: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          order_index?: number
+          outcome?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_learning_outcomes_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_modules: {
         Row: {
           course_id: string
@@ -301,6 +336,79 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "course_modules_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_previews: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          id: string
+          preview_video_path: string | null
+          preview_video_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          id?: string
+          preview_video_path?: string | null
+          preview_video_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          preview_video_path?: string | null
+          preview_video_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_previews_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: true
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_reviews: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          id: string
+          rating: number
+          review_text: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          id?: string
+          rating: number
+          review_text?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          rating?: number
+          review_text?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_reviews_course_id_fkey"
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"

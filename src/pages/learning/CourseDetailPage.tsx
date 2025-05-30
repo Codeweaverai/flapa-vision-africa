@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Star, Clock, Users, BookOpen, Play, Check, ChevronRight } from 'lucide-react';
 import ReactPlayer from 'react-player';
 import { toast } from 'sonner';
+import CourseReviews from '@/components/course/CourseReviews';
 
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -88,7 +89,8 @@ const CourseDetailPage = () => {
     );
   }
 
-  const learningOutcomes = [
+  // Get dynamic learning outcomes from course data
+  const learningOutcomes = course?.course_learning_outcomes?.map(outcome => outcome.outcome) || [
     "Master the fundamentals of the subject",
     "Apply practical skills in real-world scenarios",
     "Build portfolio-worthy projects",
@@ -151,7 +153,16 @@ const CourseDetailPage = () => {
               <Card className="mb-8">
                 <CardContent className="p-0">
                   <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                    {course.thumbnail_url ? (
+                    {course?.course_previews?.[0]?.preview_video_url ? (
+                      <div className="relative w-full h-full">
+                        <video 
+                          src={course.course_previews[0].preview_video_url} 
+                          controls
+                          className="w-full h-full object-contain"
+                          poster={course.thumbnail_url}
+                        />
+                      </div>
+                    ) : course?.thumbnail_url ? (
                       <div className="relative w-full h-full">
                         <img 
                           src={course.thumbnail_url} 
@@ -316,16 +327,7 @@ const CourseDetailPage = () => {
             </TabsContent>
             
             <TabsContent value="reviews">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Student Reviews</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">Reviews coming soon...</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <CourseReviews courseId={course.id} />
             </TabsContent>
             
             <TabsContent value="faq">

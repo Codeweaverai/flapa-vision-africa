@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 
 export interface Course {
@@ -81,6 +80,39 @@ export interface QuizAnswer {
   updated_at: string;
 }
 
+export interface CoursePreview {
+  id: string;
+  course_id: string;
+  preview_video_url?: string;
+  preview_video_path?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LearningOutcome {
+  id: string;
+  course_id: string;
+  outcome: string;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CourseReview {
+  id: string;
+  course_id: string;
+  user_id: string;
+  rating: number;
+  review_text?: string;
+  created_at: string;
+  updated_at: string;
+  profiles?: {
+    full_name: string;
+    avatar_url: string;
+    username: string;
+  };
+}
+
 // Constants
 export const VALID_CATEGORIES = [
   'Technology',
@@ -160,13 +192,28 @@ export async function fetchCourseById(id: string): Promise<Course | null> {
 }
 
 export async function fetchCourseDetails(id: string): Promise<Course | null> {
-  return fetchCourseById(id);
+  const { data, error } = await supabase
+    .from('courses')
+    .select(`
+      *,
+      course_previews (*),
+      course_learning_outcomes (*)
+    `)
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function fetchCourseWithModulesAndLessons(courseId: string): Promise<Course | null> {
   const { data: courseData, error: courseError } = await supabase
     .from('courses')
-    .select('*')
+    .select(`
+      *,
+      course_previews (*),
+      course_learning_outcomes (*)
+    `)
     .eq('id', courseId)
     .single();
 
@@ -485,4 +532,63 @@ export async function fetchQuizWithQuestions(quizId: string): Promise<Quiz | nul
 
   if (error) throw error;
   return data;
+}
+
+export async function fetchCourseReviews(courseId: string): Promise<CourseReview[]> {
+  const { data, error } = await supabase
+    .from('course_reviews')
+    .select(`
+      *,
+      profiles:user_id (
+        full_name,
+        avatar_url,
+        username
+      )
+    `)
+    .eq('course_id', courseId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createCourseReview(reviewData: {
+  course_id: string;
+  user_id: string;
+  rating: number;
+  review_text?: string;
+}): Promise<CourseReview> {
+  const { data, error } = await supabase
+    .from('course_reviews')
+    .insert(reviewData)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCourseReview(reviewId: string, reviewData: {
+  rating: number;
+  review_text?: string;
+}): Promise<CourseReview> {
+  const { data, error } = await supabase
+    .from('course_reviews')
+    .update(reviewData)
+    .eq('id', reviewId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCourseReview(reviewId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('course_reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) throw error;
+  return true;
 }
