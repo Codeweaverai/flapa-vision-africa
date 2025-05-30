@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -309,274 +308,280 @@ const CreatorDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <CreatorLayout title="Dashboard">
-        <div className="flex justify-center items-center h-64">
-          <p>Loading dashboard data...</p>
-        </div>
-      </CreatorLayout>
+      <div className="min-h-screen bg-light-purple">
+        <CreatorLayout title="Dashboard">
+          <div className="flex justify-center items-center h-64">
+            <p>Loading dashboard data...</p>
+          </div>
+        </CreatorLayout>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <CreatorLayout title="Dashboard">
-        <div className="flex justify-center items-center h-64">
-          <p className="text-red-500">{error}</p>
-        </div>
-      </CreatorLayout>
+      <div className="min-h-screen bg-light-purple">
+        <CreatorLayout title="Dashboard">
+          <div className="flex justify-center items-center h-64">
+            <p className="text-red-500">{error}</p>
+          </div>
+        </CreatorLayout>
+      </div>
     );
   }
 
   return (
-    <CreatorLayout title="Dashboard">
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-6">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-10 w-10 text-blue-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <h3 className="text-2xl font-bold">${revenueMetrics.totalRevenue.toFixed(2)}</h3>
+    <div className="min-h-screen bg-light-purple">
+      <CreatorLayout title="Dashboard">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="p-6">
+              <div className="flex items-center space-x-2">
+                <DollarSign className="h-10 w-10 text-blue-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  <h3 className="text-2xl font-bold">${revenueMetrics.totalRevenue.toFixed(2)}</h3>
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+            
+            <Card className="p-6">
+              <div className="flex items-center space-x-2">
+                <Users className="h-10 w-10 text-green-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Students</p>
+                  <h3 className="text-2xl font-bold">{engagementMetrics.totalStudents}</h3>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-6">
+              <div className="flex items-center space-x-2">
+                <BookOpen className="h-10 w-10 text-purple-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Courses</p>
+                  <h3 className="text-2xl font-bold">{engagementMetrics.activeCourses}</h3>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-6">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-10 w-10 text-amber-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Events</p>
+                  <h3 className="text-2xl font-bold">{events.length}</h3>
+                </div>
+              </div>
+            </Card>
+          </div>
           
-          <Card className="p-6">
-            <div className="flex items-center space-x-2">
-              <Users className="h-10 w-10 text-green-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Students</p>
-                <h3 className="text-2xl font-bold">{engagementMetrics.totalStudents}</h3>
+          <Tabs defaultValue="revenue" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="revenue">Revenue</TabsTrigger>
+              <TabsTrigger value="engagement">Engagement</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="revenue" className="space-y-4">
+              <Card className="p-6">
+                <h3 className="text-lg font-medium mb-4">Revenue Overview</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={revenueMetrics.monthlyRevenue}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => [`$${value}`, 'Revenue']}
+                      />
+                      <Bar dataKey="revenue" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="p-6">
+                  <h3 className="text-lg font-medium mb-4">Course Revenue</h3>
+                  <div className="flex flex-col items-center justify-center h-[200px]">
+                    <p className="text-3xl font-bold">${revenueMetrics.courseRevenue.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {
+                        revenueMetrics.totalRevenue > 0 
+                          ? `${((revenueMetrics.courseRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
+                          : '0% of total'
+                      }
+                    </p>
+                  </div>
+                </Card>
+                
+                <Card className="p-6">
+                  <h3 className="text-lg font-medium mb-4">Event Revenue</h3>
+                  <div className="flex flex-col items-center justify-center h-[200px]">
+                    <p className="text-3xl font-bold">${revenueMetrics.eventRevenue.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {
+                        revenueMetrics.totalRevenue > 0
+                          ? `${((revenueMetrics.eventRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
+                          : '0% of total'
+                      }
+                    </p>
+                  </div>
+                </Card>
               </div>
-            </div>
-          </Card>
-          
-          <Card className="p-6">
-            <div className="flex items-center space-x-2">
-              <BookOpen className="h-10 w-10 text-purple-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Active Courses</p>
-                <h3 className="text-2xl font-bold">{engagementMetrics.activeCourses}</h3>
+              
+              <Collapsible 
+                open={showRevenueBySource}
+                onOpenChange={setShowRevenueBySource}
+                className="w-full"
+              >
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-100 rounded">
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showRevenueBySource ? 'transform rotate-180' : ''}`} />
+                    <span className="font-medium">Revenue by Source</span>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <Card className="p-6">
+                    <h3 className="text-lg font-medium mb-4">Revenue by Source</h3>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={revenueMetrics.revenueBySource}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <Tooltip 
+                            formatter={(value) => [`$${value}`, 'Revenue']}
+                          />
+                          <Bar dataKey="value" fill="#82ca9d" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+            </TabsContent>
+            
+            <TabsContent value="engagement" className="space-y-4">
+              <Card className="p-6">
+                <h3 className="text-lg font-medium mb-4">Student Engagement</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={engagementMetrics.studentEngagement}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="engagement" stroke="#8884d8" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="p-6">
+                  <h3 className="text-lg font-medium mb-4">Course Completion Rate</h3>
+                  <div className="flex flex-col items-center justify-center h-[200px]">
+                    <p className="text-3xl font-bold">{engagementMetrics.completionRate.toFixed(1)}%</p>
+                    <p className="text-sm text-muted-foreground">Average completion rate</p>
+                  </div>
+                </Card>
+                
+                <Card className="p-6">
+                  <h3 className="text-lg font-medium mb-4">Course Popularity</h3>
+                  <div className="flex flex-col items-center justify-center h-[200px]">
+                    <p className="text-3xl font-bold">{courses.length > 0 ? (enrollments.length / courses.length).toFixed(1) : '0'}</p>
+                    <p className="text-sm text-muted-foreground">Avg. enrollments per course</p>
+                  </div>
+                </Card>
               </div>
-            </div>
-          </Card>
-          
-          <Card className="p-6">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-10 w-10 text-amber-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Active Events</p>
-                <h3 className="text-2xl font-bold">{events.length}</h3>
-              </div>
-            </div>
-          </Card>
+              
+              <Collapsible 
+                open={showDetailedAnalytics}
+                onOpenChange={setShowDetailedAnalytics}
+                className="w-full"
+              >
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-100 rounded">
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showDetailedAnalytics ? 'transform rotate-180' : ''}`} />
+                    <span className="font-medium">Detailed Analytics</span>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <Card className="p-6">
+                    <h3 className="text-lg font-medium mb-4">Analytics Controls</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Time Range</h4>
+                        <div className="flex space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="time-week"
+                              checked={selectedTimeRange === 'week'}
+                              onCheckedChange={() => setSelectedTimeRange('week')}
+                            />
+                            <label htmlFor="time-week">Week</label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="time-month"
+                              checked={selectedTimeRange === 'month'}
+                              onCheckedChange={() => setSelectedTimeRange('month')}
+                            />
+                            <label htmlFor="time-month">Month</label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="time-year"
+                              checked={selectedTimeRange === 'year'}
+                              onCheckedChange={() => setSelectedTimeRange('year')}
+                            />
+                            <label htmlFor="time-year">Year</label>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <Separator />
+                      
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Data Filters</h4>
+                        <div className="flex flex-wrap gap-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="filter-courses" />
+                            <label htmlFor="filter-courses">Courses Only</label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="filter-events" />
+                            <label htmlFor="filter-events">Events Only</label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="filter-paid" />
+                            <label htmlFor="filter-paid">Paid Content Only</label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="filter-free" />
+                            <label htmlFor="filter-free">Free Content Only</label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+            </TabsContent>
+          </Tabs>
         </div>
-        
-        <Tabs defaultValue="revenue" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="revenue">Revenue</TabsTrigger>
-            <TabsTrigger value="engagement">Engagement</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="revenue" className="space-y-4">
-            <Card className="p-6">
-              <h3 className="text-lg font-medium mb-4">Revenue Overview</h3>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={revenueMetrics.monthlyRevenue}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value) => [`$${value}`, 'Revenue']}
-                    />
-                    <Bar dataKey="revenue" fill="#8884d8" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="p-6">
-                <h3 className="text-lg font-medium mb-4">Course Revenue</h3>
-                <div className="flex flex-col items-center justify-center h-[200px]">
-                  <p className="text-3xl font-bold">${revenueMetrics.courseRevenue.toFixed(2)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {
-                      revenueMetrics.totalRevenue > 0 
-                        ? `${((revenueMetrics.courseRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
-                        : '0% of total'
-                    }
-                  </p>
-                </div>
-              </Card>
-              
-              <Card className="p-6">
-                <h3 className="text-lg font-medium mb-4">Event Revenue</h3>
-                <div className="flex flex-col items-center justify-center h-[200px]">
-                  <p className="text-3xl font-bold">${revenueMetrics.eventRevenue.toFixed(2)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {
-                      revenueMetrics.totalRevenue > 0
-                        ? `${((revenueMetrics.eventRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
-                        : '0% of total'
-                    }
-                  </p>
-                </div>
-              </Card>
-            </div>
-            
-            <Collapsible 
-              open={showRevenueBySource}
-              onOpenChange={setShowRevenueBySource}
-              className="w-full"
-            >
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-100 rounded">
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showRevenueBySource ? 'transform rotate-180' : ''}`} />
-                  <span className="font-medium">Revenue by Source</span>
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2">
-                <Card className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Revenue by Source</h3>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={revenueMetrics.revenueBySource}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip 
-                          formatter={(value) => [`$${value}`, 'Revenue']}
-                        />
-                        <Bar dataKey="value" fill="#82ca9d" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </Card>
-              </CollapsibleContent>
-            </Collapsible>
-          </TabsContent>
-          
-          <TabsContent value="engagement" className="space-y-4">
-            <Card className="p-6">
-              <h3 className="text-lg font-medium mb-4">Student Engagement</h3>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={engagementMetrics.studentEngagement}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="engagement" stroke="#8884d8" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="p-6">
-                <h3 className="text-lg font-medium mb-4">Course Completion Rate</h3>
-                <div className="flex flex-col items-center justify-center h-[200px]">
-                  <p className="text-3xl font-bold">{engagementMetrics.completionRate.toFixed(1)}%</p>
-                  <p className="text-sm text-muted-foreground">Average completion rate</p>
-                </div>
-              </Card>
-              
-              <Card className="p-6">
-                <h3 className="text-lg font-medium mb-4">Course Popularity</h3>
-                <div className="flex flex-col items-center justify-center h-[200px]">
-                  <p className="text-3xl font-bold">{courses.length > 0 ? (enrollments.length / courses.length).toFixed(1) : '0'}</p>
-                  <p className="text-sm text-muted-foreground">Avg. enrollments per course</p>
-                </div>
-              </Card>
-            </div>
-            
-            <Collapsible 
-              open={showDetailedAnalytics}
-              onOpenChange={setShowDetailedAnalytics}
-              className="w-full"
-            >
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-100 rounded">
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showDetailedAnalytics ? 'transform rotate-180' : ''}`} />
-                  <span className="font-medium">Detailed Analytics</span>
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2">
-                <Card className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Analytics Controls</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Time Range</h4>
-                      <div className="flex space-x-4">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="time-week"
-                            checked={selectedTimeRange === 'week'}
-                            onCheckedChange={() => setSelectedTimeRange('week')}
-                          />
-                          <label htmlFor="time-week">Week</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="time-month"
-                            checked={selectedTimeRange === 'month'}
-                            onCheckedChange={() => setSelectedTimeRange('month')}
-                          />
-                          <label htmlFor="time-month">Month</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="time-year"
-                            checked={selectedTimeRange === 'year'}
-                            onCheckedChange={() => setSelectedTimeRange('year')}
-                          />
-                          <label htmlFor="time-year">Year</label>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Data Filters</h4>
-                      <div className="flex flex-wrap gap-4">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="filter-courses" />
-                          <label htmlFor="filter-courses">Courses Only</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="filter-events" />
-                          <label htmlFor="filter-events">Events Only</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="filter-paid" />
-                          <label htmlFor="filter-paid">Paid Content Only</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="filter-free" />
-                          <label htmlFor="filter-free">Free Content Only</label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </CollapsibleContent>
-            </Collapsible>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </CreatorLayout>
+      </CreatorLayout>
+    </div>
   );
 };
 

@@ -48,27 +48,40 @@ const NotificationsPage = () => {
   const loadNotifications = async () => {
     if (!user) return;
     setLoading(true);
-    const data = await fetchUserNotifications(user.id);
-    setNotifications(data);
-    setLoading(false);
+    try {
+      const data = await fetchUserNotifications(user.id);
+      setNotifications(data);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleMarkAllAsRead = async () => {
     if (!user) return;
-    const success = await markAllNotificationsAsRead(user.id);
-    if (success) {
-      loadNotifications();
+    try {
+      const success = await markAllNotificationsAsRead(user.id);
+      if (success) {
+        await loadNotifications();
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
     }
   };
 
   const handleMarkAsRead = async (notificationId: string) => {
-    const success = await markNotificationAsRead(notificationId);
-    if (success) {
-      setNotifications(prevNotifications => 
-        prevNotifications.map(n => 
-          n.id === notificationId ? { ...n, is_read: true } : n
-        )
-      );
+    try {
+      const success = await markNotificationAsRead(notificationId);
+      if (success) {
+        setNotifications(prevNotifications => 
+          prevNotifications.map(n => 
+            n.id === notificationId ? { ...n, is_read: true } : n
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -76,6 +89,10 @@ const NotificationsPage = () => {
     switch (type) {
       case 'message':
         return <Bell className="h-5 w-5 text-blue-500" />;
+      case 'course':
+        return <Bell className="h-5 w-5 text-green-500" />;
+      case 'event':
+        return <Bell className="h-5 w-5 text-purple-500" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -85,78 +102,80 @@ const NotificationsPage = () => {
 
   return (
     <div className="min-h-screen bg-light-purple">
-    <Layout>
-      <div className="section-container py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Notifications</h1>
-              {unreadCount > 0 && (
-                <p className="text-muted-foreground">
-                  You have {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-                </p>
+      <Layout>
+        <div className="section-container py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">Notifications</h1>
+                {unreadCount > 0 && (
+                  <p className="text-muted-foreground">
+                    You have {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+              {notifications.length > 0 && unreadCount > 0 && (
+                <Button variant="outline" onClick={handleMarkAllAsRead}>
+                  <Check className="h-4 w-4 mr-2" />
+                  Mark All as Read
+                </Button>
               )}
             </div>
-            {notifications.length > 0 && (
-              <Button variant="outline" onClick={handleMarkAllAsRead}>
-                <Check className="h-4 w-4 mr-2" />
-                Mark All as Read
-              </Button>
+            
+            {loading ? (
+              <Card className="p-8 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Loading notifications...</p>
+              </Card>
+            ) : notifications.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Bell className="h-12 w-12 mx-auto mb-4 text-primary/40" />
+                <h3 className="text-xl font-semibold mb-2">No notifications</h3>
+                <p className="text-muted-foreground mb-4">
+                  You don't have any notifications at the moment
+                </p>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <ul className="divide-y">
+                    {notifications.map((notification) => (
+                      <li 
+                        key={notification.id} 
+                        className={`p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors ${!notification.is_read ? 'bg-muted/30 border-l-4 border-l-primary' : ''}`}
+                      >
+                        <div className="flex-shrink-0">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                        <div className="flex-1">
+                          <p className={`${!notification.is_read ? 'font-medium' : ''}`}>
+                            {notification.content}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(notification.created_at), 'MMM d, yyyy - h:mm a')}
+                          </p>
+                        </div>
+                        {!notification.is_read && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleMarkAsRead(notification.id)}
+                            className="opacity-70 hover:opacity-100"
+                          >
+                            <Check className="h-4 w-4" />
+                            <span className="sr-only">Mark as read</span>
+                          </Button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
             )}
           </div>
-          
-          {loading ? (
-            <Card className="p-8 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-4 text-muted-foreground">Loading notifications...</p>
-            </Card>
-          ) : notifications.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Bell className="h-12 w-12 mx-auto mb-4 text-primary/40" />
-              <h3 className="text-xl font-semibold mb-2">No notifications</h3>
-              <p className="text-muted-foreground mb-4">
-                You don't have any notifications at the moment
-              </p>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <ul className="divide-y">
-                  {notifications.map((notification) => (
-                    <li 
-                      key={notification.id} 
-                      className={`p-4 flex items-center gap-4 ${!notification.is_read ? 'bg-muted/30' : ''}`}
-                    >
-                      <div className="flex-shrink-0">
-                        {getNotificationIcon(notification.type)}
-                      </div>
-                      <div className="flex-1">
-                        <p className={`${!notification.is_read ? 'font-medium' : ''}`}>
-                          {notification.content}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(notification.created_at), 'MMM d, yyyy - h:mm a')}
-                        </p>
-                      </div>
-                      {!notification.is_read && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleMarkAsRead(notification.id)}
-                        >
-                          <Check className="h-4 w-4" />
-                          <span className="sr-only">Mark as read</span>
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
         </div>
-      </div>
-    </Layout>
+      </Layout>
+    </div>
   );
 };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -8,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
+import CreatorProfile from '@/components/creator/CreatorProfile';
 import { 
   fetchCourseDetails, 
   fetchCourseEnrollment, 
@@ -160,145 +162,155 @@ const CourseLearningPage = () => {
   
   if (loading) {
     return (
-      <Layout>
-        <div className="flex justify-center items-center h-[60vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
+      <div className="min-h-screen bg-light-purple">
+        <Layout>
+          <div className="flex justify-center items-center h-[60vh]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </Layout>
+      </div>
     );
   }
   
   return (
-    <Layout>
-      <div className="container max-w-7xl py-6">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold">{course?.title}</h1>
-            <Progress value={progress} className="h-2" />
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>{Math.round(progress)}% Complete</span>
-              {enrollment && <span>Enrolled on {new Date(enrollment.enrollment_date).toLocaleDateString()}</span>}
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              {currentLesson ? (
-                <Card className="border-0 shadow-lg overflow-hidden">
-                  <div className="aspect-video bg-black">
-                    {currentLesson.video_url ? (
-                      <ReactPlayer
-                        url={currentLesson.video_url}
-                        width="100%"
-                        height="100%"
-                        controls
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full bg-muted">
-                        <p className="text-muted-foreground">No video available for this lesson</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <CardHeader>
-                    <CardTitle>{currentLesson.title}</CardTitle>
-                    {currentLesson.description && (
-                      <CardDescription>{currentLesson.description}</CardDescription>
-                    )}
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <Tabs defaultValue="content">
-                      <TabsList className="mb-4">
-                        <TabsTrigger value="content">Lesson Content</TabsTrigger>
-                        <TabsTrigger value="materials">Additional Materials</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="content">
-                        <div className="prose max-w-none">
-                          {currentLesson.content ? (
-                            <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
-                          ) : (
-                            <p>No additional content for this lesson.</p>
-                          )}
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="materials">
-                        {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
-                          <ul className="space-y-2">
-                            {currentLesson.materials_urls.map((url: string, idx: number) => (
-                              <li key={idx}>
-                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                  Material {idx + 1}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p>No additional materials for this lesson.</p>
-                        )}
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                  
-                  <CardFooter>
-                    <Button onClick={handleLessonComplete} className="ml-auto">
-                      Mark as Completed
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ) : (
-                <Card className="border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Welcome to the Course</CardTitle>
-                    <CardDescription>Select a lesson from the course outline to begin</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p>{course?.description}</p>
-                  </CardContent>
-                </Card>
-              )}
+    <div className="min-h-screen bg-light-purple">
+      <Layout>
+        <div className="container max-w-7xl py-6">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <h1 className="text-3xl font-bold">{course?.title}</h1>
+              <Progress value={progress} className="h-2" />
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{Math.round(progress)}% Complete</span>
+                {enrollment && <span>Enrolled on {new Date(enrollment.enrollment_date).toLocaleDateString()}</span>}
+              </div>
             </div>
             
-            <div>
-              <Card className="border-0 shadow">
-                <CardHeader>
-                  <CardTitle>Course Outline</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {modules.map((module) => (
-                      <div key={module.id} className="space-y-2">
-                        <h3 className="font-medium text-lg">{module.title}</h3>
-                        <div className="space-y-1">
-                          {module.lessons.map((lesson) => (
-                            <button
-                              key={lesson.id}
-                              onClick={() => handleLessonSelect(lesson)}
-                              className={`flex items-center w-full p-2 rounded text-left ${
-                                currentLesson?.id === lesson.id
-                                  ? 'bg-primary/10 text-primary font-medium'
-                                  : 'hover:bg-muted'
-                              } ${lesson.is_completed ? 'text-green-600' : ''}`}
-                            >
-                              <span className="mr-2">
-                                {lesson.is_completed ? '✅' : '○'}
-                              </span>
-                              <span className="flex-1">{lesson.title}</span>
-                            </button>
-                          ))}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-3">
+                {currentLesson ? (
+                  <Card className="border-0 shadow-lg overflow-hidden">
+                    <div className="aspect-video bg-black">
+                      {currentLesson.video_url ? (
+                        <ReactPlayer
+                          url={currentLesson.video_url}
+                          width="100%"
+                          height="100%"
+                          controls
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full bg-muted">
+                          <p className="text-muted-foreground">No video available for this lesson</p>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      )}
+                    </div>
+                    
+                    <CardHeader>
+                      <CardTitle>{currentLesson.title}</CardTitle>
+                      {currentLesson.description && (
+                        <CardDescription>{currentLesson.description}</CardDescription>
+                      )}
+                    </CardHeader>
+                    
+                    <CardContent>
+                      <Tabs defaultValue="content">
+                        <TabsList className="mb-4">
+                          <TabsTrigger value="content">Lesson Content</TabsTrigger>
+                          <TabsTrigger value="materials">Additional Materials</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="content">
+                          <div className="prose max-w-none">
+                            {currentLesson.content ? (
+                              <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
+                            ) : (
+                              <p>No additional content for this lesson.</p>
+                            )}
+                          </div>
+                        </TabsContent>
+                        
+                        <TabsContent value="materials">
+                          {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
+                            <ul className="space-y-2">
+                              {currentLesson.materials_urls.map((url: string, idx: number) => (
+                                <li key={idx}>
+                                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                    Material {idx + 1}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>No additional materials for this lesson.</p>
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                    </CardContent>
+                    
+                    <CardFooter>
+                      <Button onClick={handleLessonComplete} className="ml-auto">
+                        Mark as Completed
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ) : (
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader>
+                      <CardTitle>Welcome to the Course</CardTitle>
+                      <CardDescription>Select a lesson from the course outline to begin</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p>{course?.description}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+              
+              <div className="space-y-6">
+                {/* Course Outline */}
+                <Card className="border-0 shadow">
+                  <CardHeader>
+                    <CardTitle>Course Outline</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      {modules.map((module) => (
+                        <div key={module.id} className="space-y-2">
+                          <h3 className="font-medium text-lg">{module.title}</h3>
+                          <div className="space-y-1">
+                            {module.lessons.map((lesson) => (
+                              <button
+                                key={lesson.id}
+                                onClick={() => handleLessonSelect(lesson)}
+                                className={`flex items-center w-full p-2 rounded text-left ${
+                                  currentLesson?.id === lesson.id
+                                    ? 'bg-primary/10 text-primary font-medium'
+                                    : 'hover:bg-muted'
+                                } ${lesson.is_completed ? 'text-green-600' : ''}`}
+                              >
+                                <span className="mr-2">
+                                  {lesson.is_completed ? '✅' : '○'}
+                                </span>
+                                <span className="flex-1">{lesson.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Creator Profile */}
+                {course?.creator_id && (
+                  <CreatorProfile creatorId={course.creator_id} />
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </Layout>
+      </Layout>
+    </div>
   );
 };
 
