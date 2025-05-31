@@ -27,8 +27,9 @@ import {
   Globe,
   Mail
 } from 'lucide-react';
-import VideoPlayer from '@/components/video/VideoPlayer';
+import VideoPlayer from '@/components/course/VideoPlayer';
 import CourseReviews from '@/components/course/CourseReviews';
+import { supabase } from '@/lib/supabaseClient';
 
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +39,13 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  const [instructorData, setInstructorData] = useState<any>(null);
+  const [courseStats, setCourseStats] = useState({
+    totalStudents: 0,
+    averageRating: 0,
+    totalReviews: 0,
+    totalModules: 0
+  });
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -46,9 +54,25 @@ const CourseDetailPage = () => {
       try {
         setLoading(true);
         
-        // Fetch course details
+        // Fetch course details with modules
         const courseData = await fetchCourseDetails(id);
         setCourse(courseData);
+        
+        if (courseData) {
+          // Fetch instructor data
+          if (courseData.creator_id) {
+            const { data: instructorProfile } = await supabase
+              .from('profiles')
+              .select('full_name, bio, avatar_url, username')
+              .eq('id', courseData.creator_id)
+              .single();
+            
+            setInstructorData(instructorProfile);
+          }
+
+          // Fetch course statistics
+          await loadCourseStats(id, courseData.creator_id);
+        }
         
         // Check enrollment status if user is logged in
         if (user) {
@@ -65,6 +89,44 @@ const CourseDetailPage = () => {
 
     loadCourseData();
   }, [id, user]);
+
+  const loadCourseStats = async (courseId: string, creatorId?: string) => {
+    try {
+      // Get enrollment count for this course
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('course_id', courseId);
+
+      // Get reviews for this course
+      const { data: reviews } = await supabase
+        .from('course_reviews')
+        .select('rating')
+        .eq('course_id', courseId);
+
+      // Get modules for this course
+      const { data: modules } = await supabase
+        .from('course_modules')
+        .select('id')
+        .eq('course_id', courseId);
+
+      const totalStudents = enrollments?.length || 0;
+      const totalReviews = reviews?.length || 0;
+      const totalModules = modules?.length || 0;
+      const averageRating = totalReviews > 0 
+        ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+        : 0;
+
+      setCourseStats({
+        totalStudents,
+        averageRating,
+        totalReviews,
+        totalModules
+      });
+    } catch (error) {
+      console.error('Error loading course stats:', error);
+    }
+  };
 
   const handleEnroll = async () => {
     if (!user) {
@@ -91,17 +153,11 @@ const CourseDetailPage = () => {
     navigate(`/learning/course/${id}`);
   };
 
-  // Mock instructor data - in a real app, this would come from the course data
-  const instructor = {
-    name: "John Doe",
-    title: "Senior Software Engineer",
-    bio: "John is a passionate educator with over 10 years of experience in software development. He has taught thousands of students and helped them launch successful careers in tech.",
-    avatar: "https://github.com/shadcn.png",
-    courses: 15,
-    students: 12500,
-    rating: 4.8,
-    website: "https://johndoe.dev",
-    email: "john@example.com"
+  // Format duration
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
   };
 
   // Mock FAQs data
@@ -197,19 +253,19 @@ const CourseDetailPage = () => {
                 <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    {Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m
+                    {formatDuration(course.duration_minutes)}
                   </div>
                   <div className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
-                    1,234 students
+                    {courseStats.totalStudents} students
                   </div>
                   <div className="flex items-center gap-1">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    4.5 (128 reviews)
+                    {courseStats.averageRating.toFixed(1)} ({courseStats.totalReviews} reviews)
                   </div>
                   <div className="flex items-center gap-1">
                     <BookOpen className="h-4 w-4" />
-                    {course.modules?.length || 0} modules
+                    {courseStats.totalModules} modules
                   </div>
                 </div>
               </div>
@@ -270,11 +326,11 @@ const CourseDetailPage = () => {
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m on-demand video</span>
+                          <span>{formatDuration(course.duration_minutes)} on-demand video</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <BookOpen className="h-4 w-4 text-muted-foreground" />
-                          <span>{course.modules?.length || 0} modules</span>
+                          <span>{courseStats.totalModules} modules</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-muted-foreground" />
@@ -345,7 +401,7 @@ const CourseDetailPage = () => {
                 <CardHeader>
                   <CardTitle>Course Curriculum</CardTitle>
                   <CardDescription>
-                    {course.modules?.length || 0} modules • {course.modules?.reduce((total, module) => total + (module.lessons?.length || 0), 0) || 0} lessons
+                    {courseStats.totalModules} modules • {course.modules?.reduce((total, module) => total + (module.lessons?.length || 0), 0) || 0} lessons
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -409,66 +465,66 @@ const CourseDetailPage = () => {
             </TabsContent>
             
             <TabsContent value="instructor" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Meet Your Instructor</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="md:w-1/3">
-                      <Avatar className="w-32 h-32 mx-auto md:mx-0">
-                        <AvatarImage src={instructor.avatar} />
-                        <AvatarFallback className="text-2xl">
-                          {instructor.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                    
-                    <div className="md:w-2/3">
-                      <h3 className="text-2xl font-bold mb-2">{instructor.name}</h3>
-                      <p className="text-lg text-muted-foreground mb-4">{instructor.title}</p>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold">{instructor.rating}</div>
-                          <div className="text-sm text-muted-foreground">Rating</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold">{instructor.courses}</div>
-                          <div className="text-sm text-muted-foreground">Courses</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold">{instructor.students.toLocaleString()}</div>
-                          <div className="text-sm text-muted-foreground">Students</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold">5+</div>
-                          <div className="text-sm text-muted-foreground">Years</div>
-                        </div>
+              <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-xl">
+                <Card className="bg-white">
+                  <CardHeader>
+                    <CardTitle>Meet Your Instructor</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col md:flex-row gap-6">
+                      <div className="md:w-1/3">
+                        <Avatar className="w-32 h-32 mx-auto md:mx-0">
+                          <AvatarImage src={instructorData?.avatar_url} />
+                          <AvatarFallback className="text-2xl">
+                            {instructorData?.full_name?.split(' ').map((n: string) => n[0]).join('') || 'I'}
+                          </AvatarFallback>
+                        </Avatar>
                       </div>
                       
-                      <p className="text-muted-foreground mb-6 leading-relaxed">
-                        {instructor.bio}
-                      </p>
-                      
-                      <div className="flex gap-4">
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={instructor.website} target="_blank" rel="noopener noreferrer">
+                      <div className="md:w-2/3">
+                        <h3 className="text-2xl font-bold mb-2">
+                          {instructorData?.full_name || 'Course Instructor'}
+                        </h3>
+                        <p className="text-lg text-muted-foreground mb-4">Expert Educator</p>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">{courseStats.averageRating.toFixed(1)}</div>
+                            <div className="text-sm text-muted-foreground">Rating</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">1</div>
+                            <div className="text-sm text-muted-foreground">Courses</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">{courseStats.totalStudents}</div>
+                            <div className="text-sm text-muted-foreground">Students</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">{courseStats.totalReviews}</div>
+                            <div className="text-sm text-muted-foreground">Reviews</div>
+                          </div>
+                        </div>
+                        
+                        <p className="text-muted-foreground mb-6 leading-relaxed">
+                          {instructorData?.bio || 'An experienced educator passionate about sharing knowledge and helping students achieve their learning goals.'}
+                        </p>
+                        
+                        <div className="flex gap-4">
+                          <Button variant="outline" size="sm">
                             <Globe className="h-4 w-4 mr-2" />
                             Website
-                          </a>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={`mailto:${instructor.email}`}>
+                          </Button>
+                          <Button variant="outline" size="sm">
                             <Mail className="h-4 w-4 mr-2" />
                             Contact
-                          </a>
-                        </Button>
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
             
             <TabsContent value="reviews" className="mt-6">
