@@ -119,7 +119,7 @@ const BecomeCreatorPage = () => {
                 <Badge className="mb-4" variant="secondary">
                   💡 Become a Creator
                 </Badge>
-                <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-purple to-orange-600 bg-clip-text text-transparent">
+                  <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
                   Share Your Knowledge, Build Your Empire
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
