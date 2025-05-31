@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
@@ -6,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Star } from 'lucide-react';
-import { fetchCourseDetail, fetchCoursePreview } from '@/services/courseService';
-import { CourseDetail, CoursePreview } from '@/types';
+import { fetchCourseDetails, fetchCourseWithModulesAndLessons, CourseDetail, CoursePreview } from '@/services/courseService';
 import VideoPlayer from '@/components/video/VideoPlayer';
 
 const CourseDetailPage = () => {
@@ -21,11 +21,13 @@ const CourseDetailPage = () => {
       if (!courseId) return;
       setLoading(true);
       try {
-        const detail = await fetchCourseDetail(courseId);
+        const detail = await fetchCourseDetails(courseId);
         setCourseDetail(detail);
 
-        const preview = await fetchCoursePreview(courseId);
-        setCoursePreview(preview);
+        // Extract preview from course details
+        if (detail?.course_preview) {
+          setCoursePreview(detail.course_preview);
+        }
       } catch (error) {
         console.error('Error fetching course details:', error);
       } finally {
@@ -83,8 +85,6 @@ const CourseDetailPage = () => {
                   <VideoPlayer
                     src={coursePreview.preview_video_url}
                     controls={true}
-                    fluid={true}
-                    responsive={true}
                     className="w-full h-full"
                   />
                 </div>
