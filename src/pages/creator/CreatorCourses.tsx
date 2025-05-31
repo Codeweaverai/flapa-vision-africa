@@ -111,7 +111,7 @@ const CreatorCourses = () => {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link to={`/course/${course.id}`}>
+                        <Link to={`/courses/${course.id}`}>
                           View Course
                         </Link>
                       </DropdownMenuItem>
