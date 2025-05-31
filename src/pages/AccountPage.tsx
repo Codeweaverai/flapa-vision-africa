@@ -31,6 +31,7 @@ const AccountPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [enablingCreator, setEnablingCreator] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({
     id: '',
     username: '',
@@ -138,13 +139,39 @@ const AccountPage = () => {
     }
   };
 
-  const handleCreatorDashboardClick = () => {
-    if (profile.is_creator) {
-      navigate('/creator/dashboard');
-    } else {
-      // Could navigate to creator application page
-      toast.info('Creator application feature coming soon!');
+  const handleEnableCreatorMode = async () => {
+    if (!user) return;
+    
+    setEnablingCreator(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_creator: true,
+          creator_enabled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      // Update local state
+      setProfile(prev => ({
+        ...prev,
+        is_creator: true
+      }));
+      
+      toast.success('Your Creator Dashboard has been Enabled');
+    } catch (error) {
+      console.error('Error enabling creator mode:', error);
+      toast.error('Failed to enable creator mode');
+    } finally {
+      setEnablingCreator(false);
     }
+  };
+
+  const handleCreatorDashboardClick = () => {
+    navigate('/creator/dashboard');
   };
 
   const getInitials = (name: string) => {
@@ -352,7 +379,8 @@ const AccountPage = () => {
                 <CardFooter>
                   <Button 
                     className="w-full" 
-                    onClick={handleCreatorDashboardClick}
+                    onClick={profile.is_creator ? handleCreatorDashboardClick : handleEnableCreatorMode}
+                    disabled={enablingCreator}
                   >
                     {profile.is_creator ? (
                       <>
@@ -361,7 +389,7 @@ const AccountPage = () => {
                       </>
                     ) : (
                       <>
-                        Enable Creator Mode
+                        {enablingCreator ? 'Enabling...' : 'Enable Creator Mode'}
                         <ChevronRight className="h-4 w-4 ml-1" />
                       </>
                     )}

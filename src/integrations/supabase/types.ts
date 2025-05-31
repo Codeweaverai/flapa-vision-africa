@@ -1160,6 +1160,7 @@ export type Database = {
           bank_account_details: Json | null
           bio: string | null
           created_at: string | null
+          creator_enabled_at: string | null
           full_name: string | null
           id: string
           is_creator: boolean | null
@@ -1176,6 +1177,7 @@ export type Database = {
           bank_account_details?: Json | null
           bio?: string | null
           created_at?: string | null
+          creator_enabled_at?: string | null
           full_name?: string | null
           id: string
           is_creator?: boolean | null
@@ -1192,6 +1194,7 @@ export type Database = {
           bank_account_details?: Json | null
           bio?: string | null
           created_at?: string | null
+          creator_enabled_at?: string | null
           full_name?: string | null
           id?: string
           is_creator?: boolean | null

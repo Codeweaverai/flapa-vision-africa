@@ -38,6 +38,7 @@ import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
+import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -97,6 +98,7 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/become-creator" element={<BecomeCreatorPage />} />
           
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
