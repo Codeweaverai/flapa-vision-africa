@@ -39,6 +39,7 @@ import NotificationsPage from '@/pages/NotificationsPage';
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
 import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
+import CareersPage from '@/pages/CareersPage';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
