@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -23,7 +24,6 @@ interface ProfileData {
   avatar_storage_path: string | null;
   is_creator: boolean;
   role: string;
-  creator_enabled_at: string | null;
 }
 
 const AccountPage = () => {
@@ -31,7 +31,6 @@ const AccountPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [enablingCreator, setEnablingCreator] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({
     id: '',
     username: '',
@@ -40,8 +39,7 @@ const AccountPage = () => {
     bio: '',
     avatar_storage_path: null,
     is_creator: false,
-    role: 'user',
-    creator_enabled_at: null
+    role: 'user'
   });
 
   useEffect(() => {
@@ -70,8 +68,7 @@ const AccountPage = () => {
             bio: data.bio || '',
             avatar_storage_path: data.avatar_storage_path || null,
             is_creator: data.is_creator || false,
-            role: data.role || 'user',
-            creator_enabled_at: data.creator_enabled_at || null
+            role: data.role || 'user'
           });
         }
       } catch (error) {
@@ -141,44 +138,12 @@ const AccountPage = () => {
     }
   };
 
-  const handleEnableCreatorMode = async () => {
-    if (!user) return;
-
-    setEnablingCreator(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          is_creator: true,
-          creator_enabled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-      
-      // Update local state
-      setProfile(prev => ({
-        ...prev,
-        is_creator: true,
-        creator_enabled_at: new Date().toISOString()
-      }));
-      
-      toast.success('Your Creator Dashboard has been Enabled');
-    } catch (error) {
-      console.error('Error enabling creator mode:', error);
-      toast.error('Failed to enable creator mode');
-    } finally {
-      setEnablingCreator(false);
-    }
-  };
-
   const handleCreatorDashboardClick = () => {
     if (profile.is_creator) {
       navigate('/creator/dashboard');
     } else {
-      // This shouldn't happen as button should be "Enable Creator Mode"
-      toast.info('Please enable creator mode first');
+      // Could navigate to creator application page
+      toast.info('Creator application feature coming soon!');
     }
   };
 
@@ -385,24 +350,22 @@ const AccountPage = () => {
                 </CardContent>
                 
                 <CardFooter>
-                  {profile.is_creator ? (
-                    <Button 
-                      className="w-full" 
-                      onClick={handleCreatorDashboardClick}
-                    >
-                      Go to Creator Dashboard
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  ) : (
-                    <Button 
-                      className="w-full" 
-                      onClick={handleEnableCreatorMode}
-                      disabled={enablingCreator}
-                    >
-                      {enablingCreator ? 'Enabling...' : 'Enable Creator Mode'}
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  )}
+                  <Button 
+                    className="w-full" 
+                    onClick={handleCreatorDashboardClick}
+                  >
+                    {profile.is_creator ? (
+                      <>
+                        Go to Creator Dashboard
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </>
+                    ) : (
+                      <>
+                        Enable Creator Mode
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </>
+                    )}
+                  </Button>
                 </CardFooter>
               </Card>
 

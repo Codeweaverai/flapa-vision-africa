@@ -115,30 +115,6 @@ export interface CourseReview {
   };
 }
 
-export interface CourseDetail {
-  id: string;
-  title: string;
-  description: string;
-  summary: string;
-  category: string;
-  difficulty_level: string;
-  duration_minutes: number;
-  price: number;
-  currency?: string;
-  is_free: boolean;
-  is_published: boolean;
-  certificate_enabled: boolean;
-  thumbnail_url?: string;
-  creator_id: string;
-  created_at: string;
-  updated_at: string;
-  tags?: string[];
-  rating?: number;
-  ratingCount?: number;
-  learning_outcomes?: string[];
-  course_preview?: CoursePreview;
-}
-
 // Constants
 export const VALID_CATEGORIES = [
   'Technology',
