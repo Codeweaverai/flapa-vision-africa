@@ -52,7 +52,7 @@ const CreatorCourses = () => {
             <p className="text-muted-foreground">Manage and edit your created courses here.</p>
           </div>
           <Button asChild>
-            <Link to="/creator/courses/new">Create New Course</Link>
+            <Link to="/creator/courses/create">Create New Course</Link>
           </Button>
         </div>
 
