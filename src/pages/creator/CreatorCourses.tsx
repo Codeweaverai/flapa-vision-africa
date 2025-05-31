@@ -129,7 +129,7 @@ const CreatorCourses = () => {
 
         {!loading && courses.length === 0 && (
           <div className="text-center">
-            No courses created yet. <Link to="/creator/courses/new">Create one now!</Link>
+            No courses created yet. <Link to="/creator/courses/create">Create one now!</Link>
           </div>
         )}
       </div>
