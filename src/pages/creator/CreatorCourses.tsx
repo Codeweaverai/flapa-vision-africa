@@ -78,7 +78,7 @@ const CreatorCourses = () => {
                 
                 <div className="flex flex-wrap gap-2 mt-4">
                   <Button asChild size="sm">
-                    <Link to={`/creator/courses/${course.id}/edit`}>
+                    <Link to={`/creator/courses/edit/${course.id}`}>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
                     </Link>
