@@ -155,6 +155,7 @@ const BecomeCreatorPage = () => {
             </button>
           </div>
            </div>
+          )}
                 <div className="mt-8 flex items-center gap-6">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-primary">10K+</div>
