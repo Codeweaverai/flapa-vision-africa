@@ -75,6 +75,7 @@ const Navbar = () => {
     { name: 'Contact', path: '/contact' },
     { name: 'Help Center', path: '/help' },
     { name: 'Become a Creator', path: '/become-creator' },
+    { name: 'Careers', path: '/careers' },
   ];
 
   const exploreLinks = [
