@@ -18,7 +18,7 @@ import {
   BarChart3
 } from 'lucide-react';
 
-const BecomeCreatorPage = () => {
+const CareersPage = () => {
   const features = [
     {
       icon: BookOpen,
