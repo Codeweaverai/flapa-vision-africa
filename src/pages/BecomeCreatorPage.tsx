@@ -152,7 +152,7 @@ const BecomeCreatorPage = () => {
               </div>
               <div className="relative">
                 <img 
-                  src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=400&fit=crop" 
+                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//pexels-olly-3769021.jpg?w=600&h=400&fit=crop" 
                   alt="Creator working on content"
                   className="rounded-2xl shadow-2xl"
                 />
