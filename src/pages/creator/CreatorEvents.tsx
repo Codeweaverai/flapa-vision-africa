@@ -183,7 +183,7 @@ const CreatorEvents = () => {
                     </Button>
                     
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/registrations/${event.id}`}>
+                      <Link to={`/creator/events/eventregistrations/${event.id}`}>
                         <Users className="h-4 w-4 mr-1" />
                         Registrations
                       </Link>
