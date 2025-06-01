@@ -60,7 +60,7 @@ const BecomeCreatorPage = () => {
       role: "Digital Marketing Expert",
       content: "SkillPulse has transformed my teaching career. I've reached over 10,000 students and built a sustainable income stream.",
       rating: 5,
-      avatar: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//16303.jpg?w=100&h=100&fit=crop&crop=face"
+      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face"
     },
     {
       name: "David Chen",
@@ -119,7 +119,7 @@ const BecomeCreatorPage = () => {
                 <Badge className="mb-4" variant="secondary">
                   💡 Become a Creator
                 </Badge>
-                  <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                   Share Your Knowledge, Build Your Empire
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
@@ -135,7 +135,6 @@ const BecomeCreatorPage = () => {
                     Watch Demo
                   </Button>
                 </div>
-           </div>
                 <div className="mt-8 flex items-center gap-6">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-primary">10K+</div>
