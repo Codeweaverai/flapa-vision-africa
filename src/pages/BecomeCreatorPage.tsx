@@ -135,25 +135,6 @@ const BecomeCreatorPage = () => {
                     Watch Demo
                   </Button>
                 </div>
-              
-                {showVideo && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-3xl aspect-video">
-            <iframe
-              className="w-full h-full"
-              src="https://www.youtube.com/embed/IJh6KbJznx8?autoplay=1"
-              title="YouTube video player"
-              frameBorder="0"
-              allow="autoplay; encrypted-media"
-              allowFullScreen
-            ></iframe>
-            <button
-              onClick={() => setShowVideo(false)}
-              className="absolute top-2 right-2 text-white text-2xl"
-            >
-              &times;
-            </button>
-          </div>
            </div>
                 <div className="mt-8 flex items-center gap-6">
                   <div className="text-center">
