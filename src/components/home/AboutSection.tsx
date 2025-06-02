@@ -24,8 +24,8 @@ const AboutSection = () => {
           </div>
           
           <div>
-            <h2 className="heading-lg mb-6">
-              Skills Marketplace <span className="text-gradient">Platform</span>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              Skills Marketplace <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Platform</span>
             </h2>
             <p className="mb-4 text-lg">
               SkillPulse is a pioneering skills and event booking platform transforming how people 

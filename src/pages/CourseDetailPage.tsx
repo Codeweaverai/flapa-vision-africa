@@ -190,9 +190,9 @@ const CourseDetailPage = () => {
               <div className="lg:col-span-2">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
                   {/* Course Video Preview - Centered */}
-                  <div className="relative h-64 md:h-80">
+                  <div className="relative h-64 md:h-80 flex items-center justify-center bg-black rounded-t-2xl">
                     {course.course_preview?.preview_video_url ? (
-                      <div className="w-full h-full bg-black rounded-t-2xl overflow-hidden">
+                      <div className="w-full h-full">
                         <VideoPlayer
                           src={course.course_preview.preview_video_url}
                           poster={course.thumbnail_url}
@@ -204,7 +204,7 @@ const CourseDetailPage = () => {
                         />
                       </div>
                     ) : course.thumbnail_url ? (
-                      <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-600 to-orange-500 rounded-t-2xl">
+                      <div className="relative w-full h-full flex items-center justify-center">
                         <img 
                           src={course.thumbnail_url} 
                           alt={course.title} 
@@ -220,7 +220,7 @@ const CourseDetailPage = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-600 to-orange-500 rounded-t-2xl">
+                      <div className="w-full h-full flex items-center justify-center">
                         <div className="text-white text-center">
                           <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-80" />
                           <h3 className="text-xl font-semibold">Course Preview</h3>
@@ -430,6 +430,33 @@ const CourseDetailPage = () => {
                                     </Badge>
                                   </div>
                                 ))}
+                              </div>
+                            )}
+                            
+                            {/* Show quizzes for this module */}
+                            {module.quizzes && module.quizzes.length > 0 && (
+                              <div className="mt-4">
+                                <h4 className="font-medium text-sm mb-2">Module Quizzes:</h4>
+                                <div className="space-y-2">
+                                  {module.quizzes.map((quiz, quizIndex) => (
+                                    <div key={quiz.id} className="flex items-center gap-3 p-2 rounded-lg bg-blue-50">
+                                      <Award className="h-4 w-4 text-blue-600" />
+                                      <div className="flex-1">
+                                        <div className="font-medium text-sm text-blue-800">
+                                          Quiz {quizIndex + 1}: {quiz.title}
+                                        </div>
+                                        {quiz.description && (
+                                          <div className="text-xs text-blue-600">
+                                            {quiz.description}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Badge variant="outline" className="text-xs border-blue-200 text-blue-600">
+                                        Passing: {quiz.passing_score}%
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </AccordionContent>

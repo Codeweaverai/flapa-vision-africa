@@ -25,8 +25,8 @@ const PastEventsSection = () => {
         setLoading(true);
         console.log('Loading past events...');
         
-        // Fetch past events (limit to 10)
-        const events = await fetchPastEvents(10);
+        // Fetch past events (limit to 12)
+        const events = await fetchPastEvents(12);
         console.log('Past events fetched:', events);
         
         // Fetch attendee counts for each event
@@ -94,7 +94,7 @@ const PastEventsSection = () => {
 
   return (
     <section className="py-20 px-4 bg-gradient-to-br from-purple-50 to-orange-50">
-      <div className="container mx-auto max-w-6xl">
+      <div className="container mx-auto max-w-7xl">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
             Past Events Highlights
@@ -104,7 +104,7 @@ const PastEventsSection = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
           {pastEvents.map((event) => (
             <Card key={event.id} className="group hover:shadow-xl transition-all duration-300 border-purple-100 overflow-hidden">
               <div className="relative">
