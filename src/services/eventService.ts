@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -224,14 +223,28 @@ export async function cancelRegistration(registrationId: string, user: User | nu
 
 export async function createEventWithCreator(eventData: Partial<Event>, creatorId: string): Promise<Event | null> {
   try {
+    // Ensure required fields are present and properly typed
+    const insertData = {
+      title: eventData.title || '',
+      description: eventData.description || '',
+      start_time: eventData.start_time || new Date().toISOString(),
+      end_time: eventData.end_time || new Date(Date.now() + 3600000).toISOString(), // Default 1 hour later
+      event_type: eventData.event_type || 'webinar',
+      location: eventData.location,
+      image_url: eventData.image_url,
+      price: eventData.price,
+      is_free: eventData.is_free ?? true,
+      currency: eventData.currency,
+      capacity: eventData.capacity,
+      online_meeting_link: eventData.online_meeting_link,
+      creator_id: creatorId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
     const { data, error } = await supabase
       .from('events')
-      .insert({
-        ...eventData,
-        creator_id: creatorId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .insert(insertData)
       .select()
       .single();
 
