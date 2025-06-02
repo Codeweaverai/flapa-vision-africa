@@ -187,7 +187,7 @@ const CareersPage = () => {
             {/* Hero Image */}
             <div className="mt-16 relative">
               <img
-                src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&h=600&fit=crop"
+                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//male-employee-getting-used-his-new-office-job-along-with-female-colleagues.jpg?w=1200&h=600&fit=crop"
                 alt="Team collaboration"
                 className="rounded-2xl shadow-2xl mx-auto max-w-4xl w-full"
               />
