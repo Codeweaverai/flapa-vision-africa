@@ -56,11 +56,11 @@ const BecomeCreatorPage = () => {
 
   const testimonials = [
     {
-      name: "Sarah Johnson",
+      name: "Sarah Mwaba",
       role: "Digital Marketing Expert",
       content: "SkillPulse has transformed my teaching career. I've reached over 10,000 students and built a sustainable income stream.",
       rating: 5,
-      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face"
+      avatar: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//16303.jpg?w=100&h=100&fit=crop&crop=face"
     },
     {
       name: "David Chen",
