@@ -68,27 +68,37 @@ const CourseDetailPage = () => {
       
       setLoading(true);
       try {
+        console.log('Loading course data for:', courseId);
+        
+        // Fetch course with modules and lessons
         const courseData = await fetchCourseWithModulesAndLessons(courseId);
+        console.log('Course data loaded:', courseData);
         setCourse(courseData);
         
         if (courseData) {
           // Fetch creator data
           if (courseData.creator_id) {
+            console.log('Fetching creator data for:', courseData.creator_id);
             const creator = await fetchCreatorData(courseData.creator_id);
+            console.log('Creator data:', creator);
             setCreatorData(creator);
             
             // Fetch creator stats
             const stats = await fetchCreatorCourseStats(courseData.creator_id);
+            console.log('Creator stats:', stats);
             setCreatorStats(stats);
           }
           
           // Fetch course-specific stats
           const courseStatsData = await fetchCourseStats(courseId);
+          console.log('Course stats:', courseStatsData);
           setCourseStats(courseStatsData);
         }
         
+        // Check enrollment status
         if (user && courseData) {
           const status = await checkEnrollmentStatus(courseId);
+          console.log('Enrollment status:', status);
           setIsEnrolled(status);
         }
       } catch (error) {
@@ -164,6 +174,12 @@ const CourseDetailPage = () => {
     );
   }
 
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
@@ -174,19 +190,21 @@ const CourseDetailPage = () => {
               <div className="lg:col-span-2">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
                   {/* Course Video Preview - Centered */}
-                  <div className="relative h-64 md:h-80 bg-gradient-to-r from-purple-600 to-orange-500 flex items-center justify-center">
+                  <div className="relative h-64 md:h-80">
                     {course.course_preview?.preview_video_url ? (
-                      <div className="w-full h-full">
+                      <div className="w-full h-full bg-black rounded-t-2xl overflow-hidden">
                         <VideoPlayer
                           src={course.course_preview.preview_video_url}
                           poster={course.thumbnail_url}
                           controls={true}
                           autoplay={false}
+                          fluid={true}
+                          responsive={true}
                           className="w-full h-full"
                         />
                       </div>
                     ) : course.thumbnail_url ? (
-                      <div className="relative w-full h-full flex items-center justify-center">
+                      <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-600 to-orange-500 rounded-t-2xl">
                         <img 
                           src={course.thumbnail_url} 
                           alt={course.title} 
@@ -202,7 +220,7 @@ const CourseDetailPage = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-600 to-orange-500 rounded-t-2xl">
                         <div className="text-white text-center">
                           <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-80" />
                           <h3 className="text-xl font-semibold">Course Preview</h3>
@@ -239,12 +257,12 @@ const CourseDetailPage = () => {
                       <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
                         <Clock className="h-6 w-6 mx-auto mb-2 text-purple-600" />
                         <div className="text-sm font-medium text-purple-800">Duration</div>
-                        <div className="text-purple-600">{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m</div>
+                        <div className="text-purple-600">{formatDuration(course.duration_minutes)}</div>
                       </div>
                       <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
                         <Users className="h-6 w-6 mx-auto mb-2 text-orange-600" />
                         <div className="text-sm font-medium text-orange-800">Students</div>
-                        <div className="text-orange-600">{courseStats?.totalStudents || 0}</div>
+                        <div className="text-orange-600">{courseStats?.totalStudents?.toLocaleString() || 0}</div>
                       </div>
                       <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
                         <Star className="h-6 w-6 mx-auto mb-2 text-purple-600" />
@@ -307,7 +325,7 @@ const CourseDetailPage = () => {
                     <div className="space-y-3">
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m of content</span>
+                        <span className="text-sm">{formatDuration(course.duration_minutes)} of content</span>
                       </div>
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />

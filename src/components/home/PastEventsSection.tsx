@@ -23,7 +23,11 @@ const PastEventsSection = () => {
     const loadPastEvents = async () => {
       try {
         setLoading(true);
+        console.log('Loading past events...');
+        
+        // Fetch past events (limit to 10)
         const events = await fetchPastEvents(10);
+        console.log('Past events fetched:', events);
         
         // Fetch attendee counts for each event
         const eventsWithAttendees = await Promise.all(
@@ -39,6 +43,7 @@ const PastEventsSection = () => {
           })
         );
         
+        console.log('Events with attendee data:', eventsWithAttendees);
         setPastEvents(eventsWithAttendees);
       } catch (error) {
         console.error('Error loading past events:', error);
