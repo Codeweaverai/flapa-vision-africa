@@ -325,7 +325,7 @@ const BecomeCreatorPage = () => {
                 <Link to="/account">Enable Creator Mode</Link>
               </Button>
               <Button size="lg" variant="outline" className="text-lg px-8 py-6 bg-transparent border-white text-white hover:bg-white hover:text-primary">
-                <link to="/contact">Learn More</link>  
+                Learn More 
               </Button>
             </div>
             <div className="mt-8 text-sm opacity-75">
