@@ -76,11 +76,11 @@ const CareersPage = () => {
 
   const testimonials = [
     {
-      name: "Sarah Johnson",
+      name: "Sarah Mwaba",
       role: "Tech Educator",
       content: "SkillPulse has transformed how I share my knowledge. I've reached over 5,000 students worldwide!",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1494790108755-2616c90c9c56?w=100&h=100&fit=crop&crop=face"
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//16303.jpg?w=100&h=100&fit=crop&crop=face"
     },
     {
       name: "Michael Chen",
