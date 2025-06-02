@@ -76,11 +76,11 @@ const CareersPage = () => {
 
   const testimonials = [
     {
-      name: "Sarah Mwaba",
+      name: "Sarah Johnson",
       role: "Tech Educator",
       content: "SkillPulse has transformed how I share my knowledge. I've reached over 5,000 students worldwide!",
       rating: 5,
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//16303.jpg?w=100&h=100&fit=crop&crop=face"
+      image: "https://images.unsplash.com/photo-1494790108755-2616c90c9c56?w=100&h=100&fit=crop&crop=face"
     },
     {
       name: "Michael Chen",
@@ -165,7 +165,7 @@ const CareersPage = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-orange-500/10" />
           <div className="container mx-auto text-center relative z-10">
             <div className="max-w-4xl mx-auto">
-              <Badge className="mb-6 text-4xl font-bold" variant="outline">
+              <Badge className="mb-6" variant="outline">
                 Join Our Mission
               </Badge>
               <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
@@ -356,7 +356,7 @@ const CareersPage = () => {
                 Browse All Positions
               </Button>
               <Button size="lg" variant="outline" className="text-lg px-8 py-6 bg-transparent border-white text-white hover:bg-white hover:text-purple-600">
-                Contact Us
+                Contact HR Team
               </Button>
             </div>
             <div className="mt-8 text-sm opacity-75">
