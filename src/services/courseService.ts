@@ -267,6 +267,99 @@ export async function fetchCourseWithModulesAndLessons(courseId: string): Promis
   } as Course;
 }
 
+// Add new functions for creator data and course statistics
+export async function fetchCreatorData(creatorId: string): Promise<any> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name, bio, avatar_url, username')
+    .eq('id', creatorId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchCreatorCourseStats(creatorId: string): Promise<any> {
+  // Get all published courses by creator
+  const { data: courses, error: coursesError } = await supabase
+    .from('courses')
+    .select('id')
+    .eq('creator_id', creatorId)
+    .eq('is_published', true);
+
+  if (coursesError) throw coursesError;
+
+  if (!courses || courses.length === 0) {
+    return {
+      totalCourses: 0,
+      totalStudents: 0,
+      averageRating: 0,
+      totalReviews: 0
+    };
+  }
+
+  const courseIds = courses.map(c => c.id);
+
+  // Get total enrollments (students)
+  const { data: enrollments, error: enrollmentsError } = await supabase
+    .from('course_enrollments')
+    .select('id')
+    .in('course_id', courseIds);
+
+  if (enrollmentsError) throw enrollmentsError;
+
+  // Get all reviews for creator's courses
+  const { data: reviews, error: reviewsError } = await supabase
+    .from('course_reviews')
+    .select('rating')
+    .in('course_id', courseIds);
+
+  if (reviewsError) throw reviewsError;
+
+  const totalStudents = enrollments?.length || 0;
+  const totalReviews = reviews?.length || 0;
+  const averageRating = totalReviews > 0 
+    ? (reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews)
+    : 0;
+
+  return {
+    totalCourses: courses.length,
+    totalStudents,
+    averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
+    totalReviews
+  };
+}
+
+export async function fetchCourseStats(courseId: string): Promise<any> {
+  // Get enrollments count
+  const { data: enrollments, error: enrollmentsError } = await supabase
+    .from('course_enrollments')
+    .select('id')
+    .eq('course_id', courseId);
+
+  if (enrollmentsError) throw enrollmentsError;
+
+  // Get reviews for this course
+  const { data: reviews, error: reviewsError } = await supabase
+    .from('course_reviews')
+    .select('rating')
+    .eq('course_id', courseId);
+
+  if (reviewsError) throw reviewsError;
+
+  const totalStudents = enrollments?.length || 0;
+  const totalReviews = reviews?.length || 0;
+  const averageRating = totalReviews > 0 
+    ? (reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews)
+    : 0;
+
+  return {
+    totalStudents,
+    averageRating: Math.round(averageRating * 10) / 10,
+    totalReviews
+  };
+}
+
 export async function fetchCourseEnrollment(courseId: string, userId: string): Promise<any> {
   const { data, error } = await supabase
     .from('course_enrollments')

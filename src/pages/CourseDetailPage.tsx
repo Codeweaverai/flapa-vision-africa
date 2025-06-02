@@ -12,7 +12,16 @@ import Layout from '@/components/layout/Layout';
 import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Course, CourseModule, checkEnrollmentStatus, enrollInCourse, fetchCourseWithModulesAndLessons } from '@/services/courseService';
+import { 
+  Course, 
+  CourseModule, 
+  checkEnrollmentStatus, 
+  enrollInCourse, 
+  fetchCourseWithModulesAndLessons,
+  fetchCreatorData,
+  fetchCreatorCourseStats,
+  fetchCourseStats
+} from '@/services/courseService';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
 import CourseReviews from '@/components/course/CourseReviews';
 import VideoPlayer from '@/components/video/VideoPlayer';
@@ -26,30 +35,10 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [creatorData, setCreatorData] = useState<any>(null);
+  const [creatorStats, setCreatorStats] = useState<any>(null);
+  const [courseStats, setCourseStats] = useState<any>(null);
 
-  // Mock dynamic data - in production, fetch from API
-  const [courseStats, setCourseStats] = useState({
-    students: 1234,
-    rating: 4.5,
-    reviewsCount: 128,
-    duration: 0, // Will be calculated from course data
-    modules: 0 // Will be calculated from course data
-  });
-
-  // Mock instructor data - in production, fetch from course creator
-  const instructor = {
-    name: "John Doe",
-    title: "Senior Software Engineer at Tech Corp",
-    bio: "John is a passionate educator with over 10 years of experience in software development. He has taught thousands of students and helped them launch successful careers in tech. His courses are known for their practical approach and real-world examples.",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
-    courses: 15,
-    students: 12500,
-    rating: 4.8,
-    website: "https://johndoe.dev",
-    email: "john@example.com"
-  };
-
-  // Mock FAQs
   const faqs = [
     {
       question: "What prerequisites do I need for this course?",
@@ -82,15 +71,20 @@ const CourseDetailPage = () => {
         const courseData = await fetchCourseWithModulesAndLessons(courseId);
         setCourse(courseData);
         
-        // Update dynamic stats
         if (courseData) {
-          setCourseStats({
-            students: Math.floor(Math.random() * 5000) + 500, // Mock student count
-            rating: parseFloat((Math.random() * 1 + 4).toFixed(1)), // Random rating 4.0-5.0
-            reviewsCount: Math.floor(Math.random() * 200) + 50, // Mock reviews count
-            duration: courseData.duration_minutes,
-            modules: courseData.modules?.length || 0
-          });
+          // Fetch creator data
+          if (courseData.creator_id) {
+            const creator = await fetchCreatorData(courseData.creator_id);
+            setCreatorData(creator);
+            
+            // Fetch creator stats
+            const stats = await fetchCreatorCourseStats(courseData.creator_id);
+            setCreatorStats(stats);
+          }
+          
+          // Fetch course-specific stats
+          const courseStatsData = await fetchCourseStats(courseId);
+          setCourseStats(courseStatsData);
         }
         
         if (user && courseData) {
@@ -135,7 +129,7 @@ const CourseDetailPage = () => {
   };
 
   const startCourse = () => {
-    navigate(`/course/${courseId}/learn`);
+    navigate(`/learning/course/${courseId}`);
   };
 
   if (loading) {
@@ -226,10 +220,12 @@ const CourseDetailPage = () => {
                       ) : (
                         <Badge className="bg-blue-100 text-blue-800 border-blue-200">${course.price}</Badge>
                       )}
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="text-sm font-medium">{courseStats.rating}</span>
-                      </div>
+                      {courseStats && courseStats.averageRating > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                          <span className="text-sm font-medium">{courseStats.averageRating}</span>
+                        </div>
+                      )}
                     </div>
                     
                     <h1 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
@@ -243,22 +239,22 @@ const CourseDetailPage = () => {
                       <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
                         <Clock className="h-6 w-6 mx-auto mb-2 text-purple-600" />
                         <div className="text-sm font-medium text-purple-800">Duration</div>
-                        <div className="text-purple-600">{Math.floor(courseStats.duration / 60)}h {courseStats.duration % 60}m</div>
+                        <div className="text-purple-600">{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m</div>
                       </div>
                       <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
                         <Users className="h-6 w-6 mx-auto mb-2 text-orange-600" />
                         <div className="text-sm font-medium text-orange-800">Students</div>
-                        <div className="text-orange-600">{courseStats.students.toLocaleString()}</div>
+                        <div className="text-orange-600">{courseStats?.totalStudents || 0}</div>
                       </div>
                       <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
                         <Star className="h-6 w-6 mx-auto mb-2 text-purple-600" />
                         <div className="text-sm font-medium text-purple-800">Rating</div>
-                        <div className="text-purple-600">{courseStats.rating} ({courseStats.reviewsCount} reviews)</div>
+                        <div className="text-purple-600">{courseStats?.averageRating || 0} ({courseStats?.totalReviews || 0} reviews)</div>
                       </div>
                       <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
                         <BookOpen className="h-6 w-6 mx-auto mb-2 text-orange-600" />
                         <div className="text-sm font-medium text-orange-800">Modules</div>
-                        <div className="text-orange-600">{courseStats.modules}</div>
+                        <div className="text-orange-600">{course.modules?.length || 0}</div>
                       </div>
                     </div>
                   </div>
@@ -311,11 +307,11 @@ const CourseDetailPage = () => {
                     <div className="space-y-3">
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">{Math.floor(courseStats.duration / 60)}h {courseStats.duration % 60}m of content</span>
+                        <span className="text-sm">{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m of content</span>
                       </div>
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">{courseStats.modules} modules</span>
+                        <span className="text-sm">{course.modules?.length || 0} modules</span>
                       </div>
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />
@@ -440,59 +436,63 @@ const CourseDetailPage = () => {
                     <CardTitle>Meet Your Instructor</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-col md:flex-row gap-6">
-                      <div className="md:w-1/3">
-                        <Avatar className="w-32 h-32 mx-auto md:mx-0">
-                          <AvatarImage src={instructor.avatar} />
-                          <AvatarFallback className="text-2xl">
-                            {instructor.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                      </div>
-                      
-                      <div className="md:w-2/3">
-                        <h3 className="text-2xl font-bold mb-2">{instructor.name}</h3>
-                        <p className="text-lg text-muted-foreground mb-4">{instructor.title}</p>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold">{instructor.rating}</div>
-                            <div className="text-sm text-muted-foreground">Rating</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold">{instructor.courses}</div>
-                            <div className="text-sm text-muted-foreground">Courses</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold">{instructor.students.toLocaleString()}</div>
-                            <div className="text-sm text-muted-foreground">Students</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold">5+</div>
-                            <div className="text-sm text-muted-foreground">Years</div>
-                          </div>
+                    {creatorData ? (
+                      <div className="flex flex-col md:flex-row gap-6">
+                        <div className="md:w-1/3">
+                          <Avatar className="w-32 h-32 mx-auto md:mx-0">
+                            <AvatarImage src={creatorData.avatar_url} />
+                            <AvatarFallback className="text-2xl">
+                              {creatorData.full_name?.split(' ').map((n: string) => n[0]).join('') || 'IN'}
+                            </AvatarFallback>
+                          </Avatar>
                         </div>
                         
-                        <p className="text-muted-foreground mb-6 leading-relaxed">
-                          {instructor.bio}
-                        </p>
-                        
-                        <div className="flex gap-4">
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={instructor.website} target="_blank" rel="noopener noreferrer">
+                        <div className="md:w-2/3">
+                          <h3 className="text-2xl font-bold mb-2">{creatorData.full_name || 'Anonymous'}</h3>
+                          <p className="text-lg text-muted-foreground mb-4">Course Creator</p>
+                          
+                          {creatorStats && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold">{creatorStats.averageRating || 0}</div>
+                                <div className="text-sm text-muted-foreground">Rating</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-2xl font-bold">{creatorStats.totalCourses || 0}</div>
+                                <div className="text-sm text-muted-foreground">Courses</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-2xl font-bold">{creatorStats.totalStudents || 0}</div>
+                                <div className="text-sm text-muted-foreground">Students</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-2xl font-bold">{creatorStats.totalReviews || 0}</div>
+                                <div className="text-sm text-muted-foreground">Reviews</div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <p className="text-muted-foreground mb-6 leading-relaxed">
+                            {creatorData.bio || 'No bio available for this instructor.'}
+                          </p>
+                          
+                          <div className="flex gap-4">
+                            <Button variant="outline" size="sm">
                               <Globe className="h-4 w-4 mr-2" />
-                              Website
-                            </a>
-                          </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={`mailto:${instructor.email}`}>
+                              View Profile
+                            </Button>
+                            <Button variant="outline" size="sm">
                               <Mail className="h-4 w-4 mr-2" />
                               Contact
-                            </a>
-                          </Button>
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-center p-8">
+                        <p className="text-muted-foreground">Loading instructor information...</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
