@@ -1,4 +1,3 @@
-
 import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -39,7 +38,7 @@ import NotificationsPage from '@/pages/NotificationsPage';
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
 import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
-import CareersPage from '@/pages/CareersPage';
+import CareersPage from '@/pages/careers';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -100,6 +99,7 @@ function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/become-creator" element={<BecomeCreatorPage />} />
+          <Route path="/careers" element={<CareersPage />} />
           
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccessPage />} />

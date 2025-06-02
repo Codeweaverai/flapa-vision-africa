@@ -1,17 +1,21 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import Layout from '@/components/layout/Layout';
-import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star } from 'lucide-react';
+import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Course, CourseModule, checkEnrollmentStatus, enrollInCourse, fetchCourseWithModulesAndLessons } from '@/services/courseService';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
 import CourseReviews from '@/components/course/CourseReviews';
-import ReactPlayer from 'react-player';
+import VideoPlayer from '@/components/video/VideoPlayer';
 
 const CourseDetailPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
@@ -23,20 +27,82 @@ const CourseDetailPage = () => {
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Mock dynamic data - in production, fetch from API
+  const [courseStats, setCourseStats] = useState({
+    students: 1234,
+    rating: 4.5,
+    reviewsCount: 128,
+    duration: 0, // Will be calculated from course data
+    modules: 0 // Will be calculated from course data
+  });
+
+  // Mock instructor data - in production, fetch from course creator
+  const instructor = {
+    name: "John Doe",
+    title: "Senior Software Engineer at Tech Corp",
+    bio: "John is a passionate educator with over 10 years of experience in software development. He has taught thousands of students and helped them launch successful careers in tech. His courses are known for their practical approach and real-world examples.",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+    courses: 15,
+    students: 12500,
+    rating: 4.8,
+    website: "https://johndoe.dev",
+    email: "john@example.com"
+  };
+
+  // Mock FAQs
+  const faqs = [
+    {
+      question: "What prerequisites do I need for this course?",
+      answer: "No prior experience is required. This course is designed for beginners and will guide you through all the fundamentals step by step."
+    },
+    {
+      question: "How long do I have access to the course?",
+      answer: "You get lifetime access to the course content, including all future updates and additions."
+    },
+    {
+      question: "Is there a certificate upon completion?",
+      answer: course?.certificate_enabled ? "Yes, you will receive a certificate of completion when you finish all the course modules and pass the final assessment." : "No certificate is provided for this course."
+    },
+    {
+      question: "Can I download the videos for offline viewing?",
+      answer: "Currently, offline downloads are not available. However, you can access the course content anytime with an internet connection."
+    },
+    {
+      question: "What if I'm not satisfied with the course?",
+      answer: "We offer a 30-day money-back guarantee. If you're not satisfied, you can request a full refund within 30 days of purchase."
+    }
+  ];
+
   useEffect(() => {
     const loadCourse = async () => {
       if (!courseId) return;
       
       setLoading(true);
-      const courseData = await fetchCourseWithModulesAndLessons(courseId);
-      setCourse(courseData);
-      
-      if (user && courseData) {
-        const status = await checkEnrollmentStatus(courseId);
-        setIsEnrolled(status);
+      try {
+        const courseData = await fetchCourseWithModulesAndLessons(courseId);
+        setCourse(courseData);
+        
+        // Update dynamic stats
+        if (courseData) {
+          setCourseStats({
+            students: Math.floor(Math.random() * 5000) + 500, // Mock student count
+            rating: parseFloat((Math.random() * 1 + 4).toFixed(1)), // Random rating 4.0-5.0
+            reviewsCount: Math.floor(Math.random() * 200) + 50, // Mock reviews count
+            duration: courseData.duration_minutes,
+            modules: courseData.modules?.length || 0
+          });
+        }
+        
+        if (user && courseData) {
+          const status = await checkEnrollmentStatus(courseId);
+          setIsEnrolled(status);
+        }
+      } catch (error) {
+        console.error('Error loading course:', error);
+        toast.error('Failed to load course details');
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
     
     loadCourse();
@@ -113,20 +179,20 @@ const CourseDetailPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
-                  {/* Course Video/Thumbnail */}
-                  <div className="relative h-64 md:h-80 bg-gradient-to-r from-purple-600 to-orange-500">
+                  {/* Course Video Preview - Centered */}
+                  <div className="relative h-64 md:h-80 bg-gradient-to-r from-purple-600 to-orange-500 flex items-center justify-center">
                     {course.course_preview?.preview_video_url ? (
-                      <div className="relative w-full h-full">
-                        <ReactPlayer
-                          url={course.course_preview.preview_video_url}
-                          width="100%"
-                          height="100%"
-                          controls
-                          className="absolute inset-0"
+                      <div className="w-full h-full">
+                        <VideoPlayer
+                          src={course.course_preview.preview_video_url}
+                          poster={course.thumbnail_url}
+                          controls={true}
+                          autoplay={false}
+                          className="w-full h-full"
                         />
                       </div>
                     ) : course.thumbnail_url ? (
-                      <div className="relative w-full h-full">
+                      <div className="relative w-full h-full flex items-center justify-center">
                         <img 
                           src={course.thumbnail_url} 
                           alt={course.title} 
@@ -162,7 +228,7 @@ const CourseDetailPage = () => {
                       )}
                       <div className="flex items-center gap-1">
                         <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="text-sm font-medium">4.8</span>
+                        <span className="text-sm font-medium">{courseStats.rating}</span>
                       </div>
                     </div>
                     
@@ -172,26 +238,27 @@ const CourseDetailPage = () => {
                     
                     <p className="text-lg text-gray-600 mb-6">{course.summary}</p>
                     
+                    {/* Dynamic Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
                         <Clock className="h-6 w-6 mx-auto mb-2 text-purple-600" />
                         <div className="text-sm font-medium text-purple-800">Duration</div>
-                        <div className="text-purple-600">{Math.round(course.duration_minutes / 60)} hours</div>
-                      </div>
-                      <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
-                        <BookOpen className="h-6 w-6 mx-auto mb-2 text-orange-600" />
-                        <div className="text-sm font-medium text-orange-800">Modules</div>
-                        <div className="text-orange-600">{course.modules?.length || 0}</div>
-                      </div>
-                      <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
-                        <Award className="h-6 w-6 mx-auto mb-2 text-purple-600" />
-                        <div className="text-sm font-medium text-purple-800">Certificate</div>
-                        <div className="text-purple-600">{course.certificate_enabled ? 'Yes' : 'No'}</div>
+                        <div className="text-purple-600">{Math.floor(courseStats.duration / 60)}h {courseStats.duration % 60}m</div>
                       </div>
                       <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
                         <Users className="h-6 w-6 mx-auto mb-2 text-orange-600" />
                         <div className="text-sm font-medium text-orange-800">Students</div>
-                        <div className="text-orange-600">1,234</div>
+                        <div className="text-orange-600">{courseStats.students.toLocaleString()}</div>
+                      </div>
+                      <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
+                        <Star className="h-6 w-6 mx-auto mb-2 text-purple-600" />
+                        <div className="text-sm font-medium text-purple-800">Rating</div>
+                        <div className="text-purple-600">{courseStats.rating} ({courseStats.reviewsCount} reviews)</div>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100">
+                        <BookOpen className="h-6 w-6 mx-auto mb-2 text-orange-600" />
+                        <div className="text-sm font-medium text-orange-800">Modules</div>
+                        <div className="text-orange-600">{courseStats.modules}</div>
                       </div>
                     </div>
                   </div>
@@ -244,11 +311,11 @@ const CourseDetailPage = () => {
                     <div className="space-y-3">
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">{Math.round(course.duration_minutes / 60)} hours of content</span>
+                        <span className="text-sm">{Math.floor(courseStats.duration / 60)}h {courseStats.duration % 60}m of content</span>
                       </div>
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">{course.modules?.length || 0} modules</span>
+                        <span className="text-sm">{courseStats.modules} modules</span>
                       </div>
                       <div className="flex items-center text-green-600">
                         <Check className="h-5 w-5 mr-3" />
@@ -271,21 +338,22 @@ const CourseDetailPage = () => {
             </div>
           </div>
 
-          {/* Course Content */}
+          {/* Course Content Tabs */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-purple-200 p-8">
             <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4 mb-8 bg-purple-50 border border-purple-200">
+              <TabsList className="grid w-full grid-cols-5 mb-8 bg-purple-50 border border-purple-200">
                 <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Overview</TabsTrigger>
-                <TabsTrigger value="content" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Course Content</TabsTrigger>
+                <TabsTrigger value="curriculum" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Curriculum</TabsTrigger>
+                <TabsTrigger value="instructor" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Instructor</TabsTrigger>
                 <TabsTrigger value="reviews" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Reviews</TabsTrigger>
-                <TabsTrigger value="discussion" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Discussion</TabsTrigger>
+                <TabsTrigger value="faq" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">FAQ</TabsTrigger>
               </TabsList>
               
               <TabsContent value="overview" className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold mb-4 text-gray-800">About This Course</h2>
                   <div className="prose max-w-none text-gray-600">
-                    {course.description}
+                    <p className="leading-relaxed mb-6">{course.description}</p>
                   </div>
                 </div>
                 
@@ -296,7 +364,7 @@ const CourseDetailPage = () => {
                     <div className="grid gap-3">
                       {course.course_learning_outcomes.map((outcome, index) => (
                         <div key={outcome.id || index} className="flex items-center text-green-600">
-                          <Check className="h-5 w-5 mr-3 flex-shrink-0" />
+                          <CheckCircle className="h-5 w-5 mr-3 flex-shrink-0" />
                           <span>{outcome.outcome}</span>
                         </div>
                       ))}
@@ -305,48 +373,59 @@ const CourseDetailPage = () => {
                 )}
               </TabsContent>
               
-              <TabsContent value="content">
+              <TabsContent value="curriculum">
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold mb-6 text-gray-800">Course Content</h2>
+                  <h2 className="text-2xl font-bold mb-6 text-gray-800">Course Curriculum</h2>
                   {course.modules && course.modules.length > 0 ? (
-                    course.modules.map((module: CourseModule, index) => (
-                      <div key={module.id} className="border border-purple-200 rounded-lg overflow-hidden bg-white/50">
-                        <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-4 font-medium flex justify-between border-b border-purple-200">
-                          <div className="text-gray-800">Module {index + 1}: {module.title}</div>
-                          <div className="text-purple-600">
-                            {module.lessons?.length || 0} lessons
-                          </div>
-                        </div>
-                        <div className="divide-y divide-purple-100">
-                          {module.lessons?.map((lesson, lessonIndex) => (
-                            <div key={lesson.id} className="p-4 flex items-center justify-between hover:bg-purple-25">
-                              <div>
-                                <div className="font-medium text-gray-800">
-                                  {lessonIndex + 1}. {lesson.title}
-                                </div>
-                                {lesson.description && (
-                                  <div className="text-sm text-gray-600 mt-1">
-                                    {lesson.description}
-                                  </div>
-                                )}
-                              </div>
-                              {lesson.video_url ? (
-                                <Badge variant="outline" className="border-purple-200 text-purple-600">
-                                  <Play className="h-3 w-3 mr-1" />
-                                  Video
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="border-orange-200 text-orange-600">Text</Badge>
-                              )}
+                    <Accordion type="single" collapsible className="w-full">
+                      {course.modules.map((module: CourseModule, index) => (
+                        <AccordionItem key={module.id} value={`module-${index}`}>
+                          <AccordionTrigger className="text-left">
+                            <div className="flex items-center justify-between w-full mr-4">
+                              <span className="font-medium">
+                                Module {index + 1}: {module.title}
+                              </span>
+                              <Badge variant="outline">
+                                {module.lessons?.length || 0} lessons
+                              </Badge>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            {module.description && (
+                              <p className="text-sm text-muted-foreground mb-4">
+                                {module.description}
+                              </p>
+                            )}
+                            {module.lessons && module.lessons.length > 0 && (
+                              <div className="space-y-2">
+                                {module.lessons.map((lesson, lessonIndex) => (
+                                  <div key={lesson.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
+                                    <PlayCircle className="h-4 w-4 text-muted-foreground" />
+                                    <div className="flex-1">
+                                      <div className="font-medium text-sm">
+                                        {lessonIndex + 1}. {lesson.title}
+                                      </div>
+                                      {lesson.description && (
+                                        <div className="text-xs text-muted-foreground">
+                                          {lesson.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <Badge variant="outline" className="text-xs">
+                                      {lesson.video_url ? 'Video' : 'Text'}
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
                   ) : (
                     <div className="text-center p-12 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg border-2 border-dashed border-purple-200">
                       <BookOpen className="h-12 w-12 mx-auto mb-4 text-purple-400" />
-                      <h3 className="text-lg font-medium mb-2 text-gray-800">No content available yet</h3>
+                      <h3 className="text-lg font-medium mb-2 text-gray-800">No curriculum available yet</h3>
                       <p className="text-gray-600">
                         This course is still being developed. Check back soon!
                       </p>
@@ -355,12 +434,95 @@ const CourseDetailPage = () => {
                 </div>
               </TabsContent>
               
+              <TabsContent value="instructor">
+                <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200">
+                  <CardHeader>
+                    <CardTitle>Meet Your Instructor</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col md:flex-row gap-6">
+                      <div className="md:w-1/3">
+                        <Avatar className="w-32 h-32 mx-auto md:mx-0">
+                          <AvatarImage src={instructor.avatar} />
+                          <AvatarFallback className="text-2xl">
+                            {instructor.name.split(' ').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      
+                      <div className="md:w-2/3">
+                        <h3 className="text-2xl font-bold mb-2">{instructor.name}</h3>
+                        <p className="text-lg text-muted-foreground mb-4">{instructor.title}</p>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">{instructor.rating}</div>
+                            <div className="text-sm text-muted-foreground">Rating</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">{instructor.courses}</div>
+                            <div className="text-sm text-muted-foreground">Courses</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">{instructor.students.toLocaleString()}</div>
+                            <div className="text-sm text-muted-foreground">Students</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">5+</div>
+                            <div className="text-sm text-muted-foreground">Years</div>
+                          </div>
+                        </div>
+                        
+                        <p className="text-muted-foreground mb-6 leading-relaxed">
+                          {instructor.bio}
+                        </p>
+                        
+                        <div className="flex gap-4">
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={instructor.website} target="_blank" rel="noopener noreferrer">
+                              <Globe className="h-4 w-4 mr-2" />
+                              Website
+                            </a>
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={`mailto:${instructor.email}`}>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Contact
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
               <TabsContent value="reviews">
                 <CourseReviews courseId={course.id} />
               </TabsContent>
               
-              <TabsContent value="discussion">
-                <CourseDiscussionSection courseId={course.id} />
+              <TabsContent value="faq">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Frequently Asked Questions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      {faqs.map((faq, index) => (
+                        <AccordionItem key={index} value={`faq-${index}`}>
+                          <AccordionTrigger className="text-left">
+                            {faq.question}
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <p className="text-muted-foreground">
+                              {faq.answer}
+                            </p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>
