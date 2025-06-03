@@ -62,7 +62,7 @@ const AboutPage = () => {
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
-      email: "michael@skillpulse.cloud"
+      email: "george@skillpulse.cloud"
     },
     {
       name: "Emily Rodriguez",
