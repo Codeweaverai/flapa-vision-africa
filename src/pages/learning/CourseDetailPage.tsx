@@ -26,7 +26,7 @@ import {
   Mail,
   Play
 } from 'lucide-react';
-import VideoPlayer from '@/components/video/VideoPlayer';
+import ReactPlayer from 'react-player';
 import VideoModal from '@/components/video/VideoModal';
 import CourseReviews from '@/components/course/CourseReviews';
 
@@ -345,20 +345,14 @@ const CourseDetailPage = () => {
               {course.course_preview?.preview_video_url ? (
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold mb-4">Course Preview</h2>
-                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer" onClick={handlePlayPreview}>
-                    <img 
-                      src={course.thumbnail_url} 
-                      alt={course.title} 
-                      className="w-full h-full object-cover"
+                  <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                    <ReactPlayer
+                      url={course.course_preview.preview_video_url}
+                      light={course.thumbnail_url}
+                      controls
+                      width="100%"
+                      height="100%"
                     />
-                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center hover:bg-black/30 transition-colors">
-                      <Button 
-                        size="lg" 
-                        className="bg-white/90 text-purple-600 hover:bg-white rounded-full h-16 w-16 p-0"
-                      >
-                        <Play className="h-8 w-8" />
-                      </Button>
-                    </div>
                   </div>
                 </div>
               ) : course.thumbnail_url ? (
