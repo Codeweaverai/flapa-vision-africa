@@ -47,19 +47,19 @@ const AboutPage = () => {
 
   const teamMembers = [
     {
-      name: "Sarah Johnson",
+      name: "Mbolela Pule",
       role: "CEO & Founder",
       bio: "Passionate about democratizing education through technology. 10+ years in EdTech.",
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
-      email: "sarah@skillpulse.cloud"
+      email: "mbolela.pule@skillpulse.cloud"
     },
     {
-      name: "Michael Chen",
+      name: "George Munganga",
       role: "CTO",
       bio: "Full-stack developer with expertise in scalable learning platforms and AI integration.",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
       email: "michael@skillpulse.cloud"
