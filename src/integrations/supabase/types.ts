@@ -378,6 +378,51 @@ export type Database = {
           },
         ]
       }
+      course_progress: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          last_lesson_completed: string | null
+          progress_percentage: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          last_lesson_completed?: string | null
+          progress_percentage?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          last_lesson_completed?: string | null
+          progress_percentage?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_progress_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_progress_last_lesson_completed_fkey"
+            columns: ["last_lesson_completed"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_reviews: {
         Row: {
           course_id: string

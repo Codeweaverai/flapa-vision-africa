@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -27,10 +28,13 @@ interface Course {
 }
 
 interface CourseProgress {
+  id: string;
   course_id: string;
   user_id: string;
   last_lesson_completed: string | null;
   progress_percentage: number;
+  created_at: string;
+  updated_at: string;
 }
 
 const LearningPage = () => {
