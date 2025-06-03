@@ -12,31 +12,83 @@ import Layout from '@/components/layout/Layout';
 import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  Course, 
-  CourseModule, 
-  checkEnrollmentStatus, 
-  enrollInCourse, 
-  fetchCourseWithModulesAndLessons,
-  fetchCreatorData,
-  fetchCreatorCourseStats,
-  fetchCourseStats
-} from '@/services/courseService';
-import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
+import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
 import VideoPlayer from '@/components/video/VideoPlayer';
+
+interface Course {
+  id: string;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  difficulty_level: string;
+  duration_minutes: number;
+  price: number;
+  is_free: boolean;
+  thumbnail_url?: string;
+  certificate_enabled: boolean;
+  creator_id: string;
+  modules?: CourseModule[];
+  course_learning_outcomes?: LearningOutcome[];
+  course_preview?: CoursePreview;
+}
+
+interface CourseModule {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  lessons?: Lesson[];
+  quizzes?: Quiz[];
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  video_url?: string;
+  content_type: string;
+}
+
+interface Quiz {
+  id: string;
+  title: string;
+  description?: string;
+  passing_score: number;
+}
+
+interface LearningOutcome {
+  id: string;
+  outcome: string;
+}
+
+interface CoursePreview {
+  preview_video_url?: string;
+}
+
+interface CreatorProfile {
+  id: string;
+  full_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  average_rating?: number;
+  total_courses?: number;
+  total_students?: number;
+  total_reviews?: number;
+}
 
 const CourseDetailPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
+  const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [creatorData, setCreatorData] = useState<any>(null);
-  const [creatorStats, setCreatorStats] = useState<any>(null);
   const [courseStats, setCourseStats] = useState<any>(null);
 
   const faqs = [
@@ -70,36 +122,103 @@ const CourseDetailPage = () => {
       try {
         console.log('Loading course data for:', courseId);
         
-        // Fetch course with modules and lessons
-        const courseData = await fetchCourseWithModulesAndLessons(courseId);
+        // Fetch course with modules, lessons, and quizzes
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select(`
+            *,
+            course_learning_outcomes (*),
+            course_preview (*),
+            modules:course_modules (
+              *,
+              lessons (*),
+              quizzes (*)
+            )
+          `)
+          .eq('id', courseId)
+          .single();
+
+        if (courseError) throw courseError;
+
         console.log('Course data loaded:', courseData);
         setCourse(courseData);
         
         if (courseData) {
-          // Fetch creator data
-          if (courseData.creator_id) {
-            console.log('Fetching creator data for:', courseData.creator_id);
-            const creator = await fetchCreatorData(courseData.creator_id);
-            console.log('Creator data:', creator);
-            setCreatorData(creator);
-            
-            // Fetch creator stats
-            const stats = await fetchCreatorCourseStats(courseData.creator_id);
-            console.log('Creator stats:', stats);
-            setCreatorStats(stats);
+          // Fetch creator profile and calculate ratings
+          const { data: creatorData, error: creatorError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', courseData.creator_id)
+            .single();
+
+          if (!creatorError && creatorData) {
+            // Calculate creator's average rating from all their courses
+            const { data: creatorCourses } = await supabase
+              .from('courses')
+              .select('id')
+              .eq('creator_id', courseData.creator_id);
+
+            if (creatorCourses && creatorCourses.length > 0) {
+              const courseIds = creatorCourses.map(c => c.id);
+              
+              const { data: reviews } = await supabase
+                .from('course_reviews')
+                .select('rating')
+                .in('course_id', courseIds);
+
+              const { data: enrollments } = await supabase
+                .from('course_enrollments')
+                .select('id')
+                .in('course_id', courseIds);
+
+              const avgRating = reviews && reviews.length > 0 
+                ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
+                : 0;
+
+              setCreator({
+                ...creatorData,
+                average_rating: Math.round(avgRating * 10) / 10,
+                total_courses: creatorCourses.length,
+                total_students: enrollments ? enrollments.length : 0,
+                total_reviews: reviews ? reviews.length : 0
+              });
+            } else {
+              setCreator(creatorData);
+            }
           }
           
           // Fetch course-specific stats
-          const courseStatsData = await fetchCourseStats(courseId);
-          console.log('Course stats:', courseStatsData);
-          setCourseStats(courseStatsData);
+          const { data: enrollmentStats } = await supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId);
+
+          const { data: reviewStats } = await supabase
+            .from('course_reviews')
+            .select('rating')
+            .eq('course_id', courseId);
+
+          const avgCourseRating = reviewStats && reviewStats.length > 0 
+            ? reviewStats.reduce((sum, r) => sum + r.rating, 0) / reviewStats.length 
+            : 0;
+
+          setCourseStats({
+            totalStudents: enrollmentStats ? enrollmentStats.length : 0,
+            averageRating: Math.round(avgCourseRating * 10) / 10,
+            totalReviews: reviewStats ? reviewStats.length : 0
+          });
         }
         
         // Check enrollment status
         if (user && courseData) {
-          const status = await checkEnrollmentStatus(courseId);
-          console.log('Enrollment status:', status);
-          setIsEnrolled(status);
+          const { data: enrollment } = await supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .eq('user_id', user.id)
+            .single();
+          
+          setIsEnrolled(!!enrollment);
         }
       } catch (error) {
         console.error('Error loading course:', error);
@@ -124,12 +243,18 @@ const CourseDetailPage = () => {
     setEnrolling(true);
     
     try {
-      const success = await enrollInCourse(course.id);
-      
-      if (success) {
-        setIsEnrolled(true);
-        toast.success('Successfully enrolled in the course!');
-      }
+      const { error } = await supabase
+        .from('course_enrollments')
+        .insert([{
+          user_id: user.id,
+          course_id: course.id,
+          payment_status: course.is_free ? 'completed' : 'pending'
+        }]);
+
+      if (error) throw error;
+
+      setIsEnrolled(true);
+      toast.success('Successfully enrolled in the course!');
     } catch (error) {
       console.error('Enrollment error:', error);
       toast.error('Failed to enroll in the course');
@@ -190,16 +315,14 @@ const CourseDetailPage = () => {
               <div className="lg:col-span-2">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
                   {/* Course Video Preview - Centered */}
-                  <div className="relative h-64 md:h-80 flex items-center justify-center bg-black rounded-t-2xl">
+                  <div className="relative h-64 md:h-80 bg-black rounded-t-2xl overflow-hidden">
                     {course.course_preview?.preview_video_url ? (
-                      <div className="w-full h-full">
+                      <div className="w-full h-full flex items-center justify-center">
                         <VideoPlayer
                           src={course.course_preview.preview_video_url}
                           poster={course.thumbnail_url}
                           controls={true}
                           autoplay={false}
-                          fluid={true}
-                          responsive={true}
                           className="w-full h-full"
                         />
                       </div>
@@ -410,8 +533,11 @@ const CourseDetailPage = () => {
                                 {module.description}
                               </p>
                             )}
+                            
+                            {/* Lessons */}
                             {module.lessons && module.lessons.length > 0 && (
-                              <div className="space-y-2">
+                              <div className="space-y-2 mb-4">
+                                <h4 className="font-medium text-sm mb-2">Lessons:</h4>
                                 {module.lessons.map((lesson, lessonIndex) => (
                                   <div key={lesson.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
                                     <PlayCircle className="h-4 w-4 text-muted-foreground" />
@@ -426,14 +552,14 @@ const CourseDetailPage = () => {
                                       )}
                                     </div>
                                     <Badge variant="outline" className="text-xs">
-                                      {lesson.video_url ? 'Video' : 'Text'}
+                                      {lesson.content_type}
                                     </Badge>
                                   </div>
                                 ))}
                               </div>
                             )}
                             
-                            {/* Show quizzes for this module */}
+                            {/* Quizzes */}
                             {module.quizzes && module.quizzes.length > 0 && (
                               <div className="mt-4">
                                 <h4 className="font-medium text-sm mb-2">Module Quizzes:</h4>
@@ -481,44 +607,42 @@ const CourseDetailPage = () => {
                     <CardTitle>Meet Your Instructor</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {creatorData ? (
+                    {creator ? (
                       <div className="flex flex-col md:flex-row gap-6">
                         <div className="md:w-1/3">
                           <Avatar className="w-32 h-32 mx-auto md:mx-0">
-                            <AvatarImage src={creatorData.avatar_url} />
+                            <AvatarImage src={creator.avatar_url} />
                             <AvatarFallback className="text-2xl">
-                              {creatorData.full_name?.split(' ').map((n: string) => n[0]).join('') || 'IN'}
+                              {creator.full_name?.split(' ').map((n: string) => n[0]).join('') || 'IN'}
                             </AvatarFallback>
                           </Avatar>
                         </div>
                         
                         <div className="md:w-2/3">
-                          <h3 className="text-2xl font-bold mb-2">{creatorData.full_name || 'Anonymous'}</h3>
+                          <h3 className="text-2xl font-bold mb-2">{creator.full_name || 'Anonymous'}</h3>
                           <p className="text-lg text-muted-foreground mb-4">Course Creator</p>
                           
-                          {creatorStats && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                              <div className="text-center">
-                                <div className="text-2xl font-bold">{creatorStats.averageRating || 0}</div>
-                                <div className="text-sm text-muted-foreground">Rating</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-2xl font-bold">{creatorStats.totalCourses || 0}</div>
-                                <div className="text-sm text-muted-foreground">Courses</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-2xl font-bold">{creatorStats.totalStudents || 0}</div>
-                                <div className="text-sm text-muted-foreground">Students</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-2xl font-bold">{creatorStats.totalReviews || 0}</div>
-                                <div className="text-sm text-muted-foreground">Reviews</div>
-                              </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{creator.average_rating || 0}</div>
+                              <div className="text-sm text-muted-foreground">Rating</div>
                             </div>
-                          )}
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{creator.total_courses || 0}</div>
+                              <div className="text-sm text-muted-foreground">Courses</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{creator.total_students || 0}</div>
+                              <div className="text-sm text-muted-foreground">Students</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{creator.total_reviews || 0}</div>
+                              <div className="text-sm text-muted-foreground">Reviews</div>
+                            </div>
+                          </div>
                           
                           <p className="text-muted-foreground mb-6 leading-relaxed">
-                            {creatorData.bio || 'No bio available for this instructor.'}
+                            {creator.bio || 'No bio available for this instructor.'}
                           </p>
                           
                           <div className="flex gap-4">

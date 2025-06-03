@@ -1,254 +1,200 @@
 
 import React from 'react';
 import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Target, Award, Heart, Lightbulb, Globe, Calendar, MapPin, Briefcase } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight } from 'lucide-react';
 
 const AboutPage = () => {
   const values = [
     {
-      icon: Target,
-      title: "Mission-Driven",
-      description: "We're committed to bridging the gap between expertise and opportunity, driving professional growth across Africa."
-    },
-    {
-      icon: Lightbulb,
-      title: "Innovation",
-      description: "We leverage cutting-edge technology to create accessible learning experiences for everyone."
-    },
-    {
-      icon: Heart,
-      title: "Community-Focused",
-      description: "Building strong communities where knowledge sharing and collaboration thrive."
-    },
-    {
-      icon: Globe,
-      title: "Global Impact",
-      description: "Creating sustainable learning pathways that reach millions across the continent."
-    }
-  ];
-
-  const team = [
-    {
-      name: "Mbolela Pule",
-      role: "Founder & CEO",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg",
-      description: "Technology leader and entrepreneur passionate about African development."
-    },
-    {
-      name: "George Munganga",
-      role: "Head of Technology",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg",
-      description: "Full-stack developer building scalable learning platforms."
-    },
-    {
-      name: "David Kimani",
-      role: "Head of Learning",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
-      description: "Educational expert with 15+ years in curriculum development."
-    }
-  ];
-
-  const milestones = [
-    {
-      year: "2020",
-      title: "Founded SkillPulse",
-      description: "Started with a vision to transform African education through technology"
-    },
-    {
-      year: "2021",
-      title: "First 1,000 Students",
-      description: "Reached our first milestone of serving 1,000 learners across the continent"
-    },
-    {
-      year: "2022",
-      title: "Platform Launch",
-      description: "Officially launched our comprehensive learning and event booking platform"
-    },
-    {
-      year: "2023",
-      title: "Global Expansion",
-      description: "Expanded our reach to serve learners across multiple African countries"
-    },
-    {
-      year: "2024",
-      title: "10,000+ Students",
-      description: "Celebrating over 10,000 students and 500+ courses on our platform"
-    }
-  ];
-
-  const facts = [
-    {
       icon: Users,
-      number: "10,000+",
-      label: "Students Enrolled",
-      description: "Learners from across Africa and beyond"
+      title: "Community First",
+      description: "We believe in the power of community and collaboration to drive learning and growth."
     },
     {
       icon: Award,
-      number: "500+",
-      label: "Courses Available",
-      description: "Covering technology, business, and innovation"
+      title: "Excellence",
+      description: "We strive for excellence in everything we do, from course quality to user experience."
     },
     {
       icon: Globe,
-      number: "15+",
-      label: "Countries Served",
-      description: "Expanding across the African continent"
+      title: "Global Access",
+      description: "Making quality education accessible to learners worldwide, regardless of location or background."
     },
     {
-      icon: Briefcase,
-      number: "95%",
-      label: "Job Placement Rate",
-      description: "Of our certified graduates find employment"
+      icon: Zap,
+      title: "Innovation",
+      description: "Continuously innovating to improve the learning experience through technology."
     }
   ];
 
-  return (
-    <div className="min-h-screen bg-light-purple">
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          {/* Hero Section */}
-          <div className="text-center mb-16">
-            <h1 className="text-5xl font-bold mb-6">About SkillPulse</h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              We're transforming how people learn and grow professionally across Africa through 
-              innovative technology and community-driven education.
-            </p>
-          </div>
+  const stats = [
+    { number: "10,000+", label: "Active Learners" },
+    { number: "500+", label: "Expert Instructors" },
+    { number: "1,000+", label: "Courses Available" },
+    { number: "50+", label: "Countries Reached" }
+  ];
 
-          {/* Mission Section */}
-          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
-            <div>
-              <h2 className="text-3xl font-bold mb-6">Our Mission</h2>
-              <p className="text-lg mb-4">
-                SkillPulse is a pioneering skills and event booking platform transforming how people 
-                learn and grow professionally. With a unique blend of technical innovation and 
-                educational expertise, we've built SkillPulse to harness collective knowledge 
-                for professional advancement.
-              </p>
-              <p className="text-lg mb-6">
-                Our mission is to bridge the gap between expertise and opportunity, driving 
-                professional growth, and fostering community development throughout the industry, creating 
-                sustainable learning pathways for millions.
-              </p>
-              <Button asChild size="lg">
-                <Link to="/learning">Start Learning</Link>
+  const features = [
+    "Interactive video learning",
+    "Real-time discussions",
+    "Mobile-friendly platform",
+    "Certificate programs",
+    "Progress tracking",
+    "Community support"
+  ];
+
+  return (
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+        {/* Hero Section */}
+        <section className="py-20 px-4">
+          <div className="container mx-auto max-w-4xl text-center">
+            <Badge className="mb-6" variant="outline">
+              Our Story
+            </Badge>
+            <h1 className="text-5xl md:text-6xl font-bold mb-6">
+              About <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">SkillPulse</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed">
+              We're on a mission to democratize education and empower creators worldwide. 
+              Our platform connects passionate instructors with eager learners, fostering 
+              a global community of knowledge sharing and growth.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                Get Started <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
+                Learn More
               </Button>
             </div>
-            <div className="relative">
-              <img 
-                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//40357%20(1).jpg" 
-                alt="Team collaboration" 
-                className="w-full h-96 object-cover rounded-xl shadow-lg" 
-              />
-            </div>
           </div>
+        </section>
 
-          {/* Where We Started Section */}
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold text-center mb-12">Our Journey</h2>
-            <div className="space-y-8">
-              {milestones.map((milestone, index) => (
-                <div key={index} className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white font-bold">
-                    {milestone.year}
+        {/* Stats Section */}
+        <section className="py-16 px-4 bg-white/50">
+          <div className="container mx-auto max-w-6xl">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {stats.map((stat, index) => (
+                <div key={index} className="text-center">
+                  <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent mb-2">
+                    {stat.number}
                   </div>
-                  <div>
-                    <h3 className="text-xl font-semibold mb-2">{milestone.title}</h3>
-                    <p className="text-muted-foreground">{milestone.description}</p>
-                  </div>
+                  <div className="text-muted-foreground">{stat.label}</div>
                 </div>
               ))}
             </div>
           </div>
+        </section>
 
-          {/* Fact Sheet Section */}
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold text-center mb-12">By The Numbers</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {facts.map((fact, index) => (
-                <Card key={index} className="text-center">
-                  <CardHeader>
-                    <fact.icon className="h-12 w-12 mx-auto mb-4 text-primary" />
-                    <div className="text-4xl font-bold text-primary mb-2">{fact.number}</div>
-                    <CardTitle className="text-lg">{fact.label}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {fact.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* Mission Section */}
+        <section className="py-20 px-4">
+          <div className="container mx-auto max-w-6xl">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div>
+                <h2 className="text-4xl font-bold mb-6">
+                  Our Mission
+                </h2>
+                <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
+                  At SkillPulse, we believe that education should be accessible, engaging, and 
+                  transformative. We're building a platform where knowledge flows freely, 
+                  creators are empowered, and learners can achieve their dreams.
+                </p>
+                <div className="space-y-4">
+                  {features.map((feature, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-lg">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="relative">
+                <img
+                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//medium-shot-woman-working-laptop.jpg?w=600&h=400&fit=crop"
+                  alt="Learning together"
+                  className="rounded-2xl shadow-2xl"
+                />
+                <div className="absolute -bottom-6 -right-6 bg-gradient-to-r from-orange-500 to-purple-600 text-white p-6 rounded-2xl shadow-xl">
+                  <Heart className="h-8 w-8 mb-2" />
+                  <div className="font-bold">Passionate</div>
+                  <div className="text-sm opacity-90">Learning Community</div>
+                </div>
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* Values Section */}
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold text-center mb-12">Our Values</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Values Section */}
+        <section className="py-20 px-4 bg-white/50">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold mb-4">Our Values</h2>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                These core values guide everything we do and shape the culture of our platform.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {values.map((value, index) => (
-                <Card key={index} className="text-center">
+                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100">
                   <CardHeader>
-                    <value.icon className="h-12 w-12 mx-auto mb-4 text-primary" />
-                    <CardTitle className="text-lg">{value.title}</CardTitle>
+                    <div className="mb-4">
+                      <value.icon className="h-12 w-12 mx-auto text-purple-600" />
+                    </div>
+                    <CardTitle className="text-purple-800">{value.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {value.description}
-                    </p>
+                    <CardDescription className="text-base">{value.description}</CardDescription>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </div>
+        </section>
 
-          {/* Team Section */}
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold text-center mb-12">Meet Our Team</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {team.map((member, index) => (
-                <Card key={index} className="text-center">
-                  <CardHeader>
-                    <img 
-                      src={member.image} 
-                      alt={member.name}
-                      className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                    />
-                    <CardTitle>{member.name}</CardTitle>
-                    <p className="text-primary font-semibold">{member.role}</p>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {member.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+        {/* Vision Section */}
+        <section className="py-20 px-4">
+          <div className="container mx-auto max-w-4xl">
+            <Card className="bg-gradient-to-r from-purple-600 to-orange-500 text-white">
+              <CardContent className="p-12 text-center">
+                <Target className="h-16 w-16 mx-auto mb-6 opacity-90" />
+                <h2 className="text-4xl font-bold mb-6">Our Vision</h2>
+                <p className="text-xl leading-relaxed mb-8 opacity-90">
+                  To create a world where anyone, anywhere, can learn anything they want and 
+                  share their knowledge with others. We envision a future where geographical 
+                  boundaries don't limit educational opportunities, and where every person 
+                  has the tools to become both a learner and a teacher.
+                </p>
+                <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
+                  Join Our Mission
+                </Button>
+              </CardContent>
+            </Card>
           </div>
+        </section>
 
-          {/* CTA Section */}
-          <div className="text-center">
-            <h2 className="text-3xl font-bold mb-6">Ready to Start Your Journey?</h2>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Join thousands of learners who are advancing their careers with SkillPulse.
+        {/* CTA Section */}
+        <section className="py-20 px-4 bg-white/50">
+          <div className="container mx-auto max-w-4xl text-center">
+            <h2 className="text-4xl font-bold mb-6">Ready to Start Learning?</h2>
+            <p className="text-xl text-muted-foreground mb-8">
+              Join thousands of learners who are already transforming their lives through education.
             </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Button asChild size="lg">
-                <Link to="/register">Get Started</Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                Start Learning Today
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/contact">Contact Us</Link>
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
+                Become an Instructor
               </Button>
             </div>
           </div>
-        </div>
-      </Layout>
-    </div>
+        </section>
+      </div>
+    </Layout>
   );
 };
 

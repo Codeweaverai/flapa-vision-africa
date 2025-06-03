@@ -119,7 +119,9 @@ const MediaPage = () => {
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
-              <h1 className="text-4xl font-bold mb-4">Media & Resources</h1>
+              <h1 className="text-4xl font-bold mb-4">
+                <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Media & Resources</span>
+              </h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Discover our latest videos, podcasts, and articles on technology, business, and innovation.
               </p>
