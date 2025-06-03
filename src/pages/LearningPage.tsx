@@ -163,7 +163,7 @@ const LearningPage = () => {
                       </div>
                     </div>
                     <Button asChild className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                      <Link to={`/learning/course/${course.id}`} className="flex items-center justify-center">
+                      <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
                         <Play className="h-4 w-4 mr-2" />
                         Continue Learning
                       </Link>
