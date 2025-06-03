@@ -128,8 +128,7 @@ const CourseDetailPage = () => {
           .select(`
             *,
             course_learning_outcomes (*),
-            course_preview (*),
-            modules:course_modules (
+            course_modules (
               *,
               lessons (*),
               quizzes (*)
@@ -140,15 +139,29 @@ const CourseDetailPage = () => {
 
         if (courseError) throw courseError;
 
-        console.log('Course data loaded:', courseData);
-        setCourse(courseData);
+        // Fetch course preview separately
+        const { data: previewData } = await supabase
+          .from('course_previews')
+          .select('*')
+          .eq('course_id', courseId)
+          .single();
+
+        // Combine course data with preview
+        const enrichedCourseData = {
+          ...courseData,
+          course_preview: previewData || null,
+          modules: courseData.course_modules || []
+        };
+
+        console.log('Course data loaded:', enrichedCourseData);
+        setCourse(enrichedCourseData);
         
-        if (courseData) {
+        if (enrichedCourseData) {
           // Fetch creator profile and calculate ratings
           const { data: creatorData, error: creatorError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', courseData.creator_id)
+            .eq('id', enrichedCourseData.creator_id)
             .single();
 
           if (!creatorError && creatorData) {
@@ -156,7 +169,7 @@ const CourseDetailPage = () => {
             const { data: creatorCourses } = await supabase
               .from('courses')
               .select('id')
-              .eq('creator_id', courseData.creator_id);
+              .eq('creator_id', enrichedCourseData.creator_id);
 
             if (creatorCourses && creatorCourses.length > 0) {
               const courseIds = creatorCourses.map(c => c.id);
@@ -210,7 +223,7 @@ const CourseDetailPage = () => {
         }
         
         // Check enrollment status
-        if (user && courseData) {
+        if (user && enrichedCourseData) {
           const { data: enrollment } = await supabase
             .from('course_enrollments')
             .select('id')
