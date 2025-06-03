@@ -1,10 +1,9 @@
-
 import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight } from 'lucide-react';
+import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail } from 'lucide-react';
 
 const AboutPage = () => {
   const values = [
@@ -44,6 +43,45 @@ const AboutPage = () => {
     "Certificate programs",
     "Progress tracking",
     "Community support"
+  ];
+
+  const teamMembers = [
+    {
+      name: "Sarah Johnson",
+      role: "CEO & Founder",
+      bio: "Passionate about democratizing education through technology. 10+ years in EdTech.",
+      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
+      linkedin: "#",
+      twitter: "#",
+      email: "sarah@skillpulse.cloud"
+    },
+    {
+      name: "Michael Chen",
+      role: "CTO",
+      bio: "Full-stack developer with expertise in scalable learning platforms and AI integration.",
+      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
+      linkedin: "#",
+      twitter: "#",
+      email: "michael@skillpulse.cloud"
+    },
+    {
+      name: "Emily Rodriguez",
+      role: "Head of Content",
+      bio: "Former university professor specializing in curriculum development and instructional design.",
+      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
+      linkedin: "#",
+      twitter: "#",
+      email: "emily@skillpulse.cloud"
+    },
+    {
+      name: "David Kim",
+      role: "Lead Designer",
+      bio: "UX/UI designer focused on creating intuitive and accessible learning experiences.",
+      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
+      linkedin: "#",
+      twitter: "#",
+      email: "david@skillpulse.cloud"
+    }
   ];
 
   return (
@@ -148,6 +186,47 @@ const AboutPage = () => {
                   </CardHeader>
                   <CardContent>
                     <CardDescription className="text-base">{value.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Meet Our Team Section */}
+        <section className="py-20 px-4">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold mb-4">Meet Our Team</h2>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                The passionate individuals behind SkillPulse, working tirelessly to transform education through technology.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {teamMembers.map((member, index) => (
+                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100">
+                  <CardContent className="p-6">
+                    <div className="mb-4">
+                      <img 
+                        src={member.image} 
+                        alt={member.name}
+                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                      />
+                      <h3 className="text-xl font-bold text-purple-800">{member.name}</h3>
+                      <p className="text-orange-600 font-medium">{member.role}</p>
+                    </div>
+                    <p className="text-muted-foreground text-sm mb-4">{member.bio}</p>
+                    <div className="flex justify-center gap-3">
+                      <Button variant="outline" size="sm" className="p-2">
+                        <Linkedin className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="p-2">
+                        <Twitter className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="p-2">
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
