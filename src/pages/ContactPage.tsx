@@ -19,9 +19,7 @@ const ContactPage = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12">
-              <h1 className="text-4xl font-bold mb-4">
-                <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Contact Us</span>
-              </h1>
+              <h1 className="text-4xl font-bold mb-4">Contact Us</h1>
               <p className="text-lg text-muted-foreground">
                 Get in touch with us. We'd love to hear from you.
               </p>

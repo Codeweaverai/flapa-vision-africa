@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -27,7 +28,6 @@ import {
   Play
 } from 'lucide-react';
 import VideoPlayer from '@/components/video/VideoPlayer';
-import VideoModal from '@/components/video/VideoModal';
 import CourseReviews from '@/components/course/CourseReviews';
 
 interface Course {
@@ -109,7 +109,6 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -277,12 +276,6 @@ const CourseDetailPage = () => {
     navigate(`/learning/course/${id}`);
   };
 
-  const handlePlayPreview = () => {
-    if (course?.course_preview?.preview_video_url) {
-      setIsVideoModalOpen(true);
-    }
-  };
-
   // Mock FAQs data
   const faqs = [
     {
@@ -345,20 +338,14 @@ const CourseDetailPage = () => {
               {course.course_preview?.preview_video_url ? (
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold mb-4">Course Preview</h2>
-                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer" onClick={handlePlayPreview}>
-                    <img 
-                      src={course.thumbnail_url} 
-                      alt={course.title} 
-                      className="w-full h-full object-cover"
+                  <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                    <VideoPlayer
+                      src={course.course_preview.preview_video_url}
+                      poster={course.thumbnail_url}
+                      controls={true}
+                      autoplay={false}
+                      className="w-full h-full"
                     />
-                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center hover:bg-black/30 transition-colors">
-                      <Button 
-                        size="lg" 
-                        className="bg-white/90 text-purple-600 hover:bg-white rounded-full h-16 w-16 p-0"
-                      >
-                        <Play className="h-8 w-8" />
-                      </Button>
-                    </div>
                   </div>
                 </div>
               ) : course.thumbnail_url ? (
@@ -374,7 +361,6 @@ const CourseDetailPage = () => {
                       <Button 
                         size="lg" 
                         className="bg-white/90 text-purple-600 hover:bg-white rounded-full h-16 w-16 p-0"
-                        disabled
                       >
                         <Play className="h-8 w-8" />
                       </Button>
@@ -744,17 +730,6 @@ const CourseDetailPage = () => {
           </Tabs>
         </div>
       </div>
-      
-      {/* Video Modal */}
-      {course?.course_preview?.preview_video_url && (
-        <VideoModal
-          isOpen={isVideoModalOpen}
-          onClose={() => setIsVideoModalOpen(false)}
-          videoUrl={course.course_preview.preview_video_url}
-          title={course.title}
-          thumbnail={course.thumbnail_url}
-        />
-      )}
     </Layout>
   );
 };
