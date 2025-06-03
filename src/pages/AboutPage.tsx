@@ -114,7 +114,7 @@ const AboutPage = () => {
               </div>
               <div className="relative">
                 <img
-                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//medium-shot-woman-working-laptop.jpg?w=600&h=400&fit=crop"
+                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//study-group-african-people.jpg?w=600&h=400&fit=crop"
                   alt="Learning together"
                   className="rounded-2xl shadow-2xl"
                 />
