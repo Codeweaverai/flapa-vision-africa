@@ -118,7 +118,7 @@ const BrowseCategoriesSection = () => {
                     <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                     
                     <Link 
-                      to={`/courses?category=${category.name.toLowerCase()}`}
+                      to={`/explore/courses?category=${category.name.toLowerCase()}`}
                       className="absolute inset-0 z-20"
                     >
                       <span className="sr-only">Browse {category.name} courses</span>
