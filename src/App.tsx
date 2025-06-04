@@ -39,6 +39,8 @@ import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
 import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
 import CareersPage from '@/pages/careers';
+import InboxPage from '@/pages/InboxPage';
+import CreatorPublicProfile from '@/pages/CreatorPublicProfile';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -118,6 +120,8 @@ function App() {
           <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
           <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+          <Route path="/creator/profile/:creatorId" element={<CreatorPublicProfile />} />
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={

@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Bell, Compass, Menu } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
+import InboxIcon from '@/components/inbox/InboxIcon';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -133,6 +134,8 @@ const Navbar = () => {
         <div className="flex items-center gap-4">
           {user ? (
             <>
+              <InboxIcon />
+              
               <Button 
                 variant="ghost" 
                 size="icon" 

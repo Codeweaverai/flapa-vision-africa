@@ -7,16 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Reply, Trash2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Send, Reply, Trash2, User } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface Profile {
   id: string;
   username?: string;
   full_name?: string;
   avatar_url?: string;
+  is_creator?: boolean;
+  role?: string;
 }
 
 interface Message {
@@ -35,6 +39,7 @@ interface Message {
 
 const InboxComponent: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [replyContent, setReplyContent] = useState('');
@@ -47,6 +52,23 @@ const InboxComponent: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchMessages();
+      
+      // Set up realtime subscription
+      const channel = supabase
+        .channel('inbox_messages')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'inbox_messages',
+          filter: `recipient_id=eq.${user.id}`
+        }, () => {
+          fetchMessages();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
 
@@ -56,10 +78,7 @@ const InboxComponent: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('inbox_messages')
-        .select(`
-          *,
-          sender_profile:sender_id(id, username, full_name, avatar_url)
-        `)
+        .select('*')
         .eq('recipient_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -69,7 +88,27 @@ const InboxComponent: React.FC = () => {
         return;
       }
 
-      setMessages(data || []);
+      // Fetch sender profiles separately
+      const messagesWithProfiles = await Promise.all(
+        (data || []).map(async (message) => {
+          if (!message.sender_id) {
+            return { ...message, sender_profile: null };
+          }
+
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url, is_creator, role')
+            .eq('id', message.sender_id)
+            .single();
+
+          return {
+            ...message,
+            sender_profile: profile
+          };
+        })
+      );
+
+      setMessages(messagesWithProfiles);
     } catch (error) {
       console.error('Error in fetchMessages:', error);
       toast.error('Failed to load messages');
@@ -221,6 +260,12 @@ const InboxComponent: React.FC = () => {
     return message.sender_profile.full_name || message.sender_profile.username || 'Unknown User';
   };
 
+  const handleProfileClick = (senderId: string) => {
+    if (senderId) {
+      navigate(`/creator/profile/${senderId}`);
+    }
+  };
+
   if (!user) {
     return (
       <Card>
@@ -259,23 +304,48 @@ const InboxComponent: React.FC = () => {
                     }
                   }}
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="font-medium text-sm">
-                      {getSenderName(message)}
-                    </span>
-                    {!message.is_read && (
-                      <Badge variant="secondary" className="ml-2">
-                        New
-                      </Badge>
-                    )}
+                  <div className="flex items-start gap-3 mb-2">
+                    <Avatar 
+                      className="w-8 h-8 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (message.sender_id) {
+                          handleProfileClick(message.sender_id);
+                        }
+                      }}
+                    >
+                      <AvatarImage src={message.sender_profile?.avatar_url} />
+                      <AvatarFallback>
+                        {message.sender_profile?.full_name?.[0] || 
+                         message.sender_profile?.username?.[0] || 
+                         <User className="w-4 h-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate">
+                          {getSenderName(message)}
+                        </span>
+                        {message.sender_profile?.is_creator && (
+                          <Badge variant="secondary" className="text-xs">
+                            Creator
+                          </Badge>
+                        )}
+                        {!message.is_read && (
+                          <Badge variant="destructive" className="text-xs">
+                            New
+                          </Badge>
+                        )}
+                      </div>
+                      <h4 className="font-medium truncate text-sm">{message.subject}</h4>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {message.content}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(message.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <h4 className="font-medium truncate">{message.subject}</h4>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {message.content}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(message.created_at).toLocaleDateString()}
-                  </p>
                 </div>
               ))
             )}
@@ -318,12 +388,38 @@ const InboxComponent: React.FC = () => {
           ) : selectedMessage ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">{selectedMessage.subject}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    From: {getSenderName(selectedMessage)} • {' '}
-                    {new Date(selectedMessage.created_at).toLocaleString()}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <Avatar 
+                    className="w-10 h-10 cursor-pointer"
+                    onClick={() => {
+                      if (selectedMessage.sender_id) {
+                        handleProfileClick(selectedMessage.sender_id);
+                      }
+                    }}
+                  >
+                    <AvatarImage src={selectedMessage.sender_profile?.avatar_url} />
+                    <AvatarFallback>
+                      {selectedMessage.sender_profile?.full_name?.[0] || 
+                       selectedMessage.sender_profile?.username?.[0] || 
+                       <User className="w-5 h-5" />}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="text-lg font-semibold">{selectedMessage.subject}</h3>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground">
+                        From: {getSenderName(selectedMessage)}
+                      </p>
+                      {selectedMessage.sender_profile?.is_creator && (
+                        <Badge variant="secondary" className="text-xs">
+                          Verified Creator
+                        </Badge>
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        • {new Date(selectedMessage.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <Button
                   variant="outline"
