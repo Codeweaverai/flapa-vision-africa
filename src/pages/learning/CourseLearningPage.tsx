@@ -6,10 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
-import CreatorProfile from '@/components/creator/CreatorProfile';
+import LessonDiscussion from '@/components/course/LessonDiscussion';
+import AIAssistant from '@/components/course/AIAssistant';
 import { 
   fetchCourseDetails, 
   fetchCourseEnrollment, 
@@ -17,6 +20,16 @@ import {
   CourseModule,
   Lesson
 } from '@/services/courseService';
+import { 
+  PlayCircle, 
+  CheckCircle, 
+  Clock, 
+  BookOpen, 
+  MessageSquare,
+  Bot,
+  FileText,
+  Users
+} from 'lucide-react';
 
 const CourseLearningPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
@@ -29,6 +42,7 @@ const CourseLearningPage = () => {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   useEffect(() => {
     if (!user) {
@@ -162,7 +176,7 @@ const CourseLearningPage = () => {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-light-purple">
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
         <Layout>
           <div className="flex justify-center items-center h-[60vh]">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -173,23 +187,137 @@ const CourseLearningPage = () => {
   }
   
   return (
-    <div className="min-h-screen bg-light-purple">
+    <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 relative overflow-hidden">
+      {/* Animated Particles Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(40)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-2 h-2 bg-white/30 rounded-full animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 2}s`,
+              animationDuration: `${2 + Math.random() * 2}s`
+            }}
+          />
+        ))}
+      </div>
+
       <Layout>
-        <div className="container max-w-7xl py-6">
+        <div className="container max-w-full py-6 relative z-10">
           <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-bold">{course?.title}</h1>
-              <Progress value={progress} className="h-2" />
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{Math.round(progress)}% Complete</span>
-                {enrollment && <span>Enrolled on {new Date(enrollment.enrollment_date).toLocaleDateString()}</span>}
-              </div>
-            </div>
+            {/* Course Header with Progress */}
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+              <CardContent className="p-6">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                      {course?.title}
+                    </h1>
+                    <Badge variant="outline" className="border-purple-300">
+                      {Math.round(progress)}% Complete
+                    </Badge>
+                  </div>
+                  
+                  <Progress value={progress} className="h-3 bg-gray-200">
+                    <div 
+                      className="h-full bg-gradient-to-r from-orange-500 to-purple-600 transition-all duration-300 rounded-full"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </Progress>
+                  
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{Math.round(progress)}% Complete</span>
+                    {enrollment && (
+                      <span>Enrolled on {new Date(enrollment.enrollment_date).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Course Curriculum Sidebar */}
               <div className="lg:col-span-3">
+                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl sticky top-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-orange-500" />
+                      Course Curriculum
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-[600px] pr-4">
+                      <div className="space-y-6">
+                        {modules.map((module, moduleIndex) => (
+                          <div key={module.id} className="space-y-3">
+                            <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-3 rounded-lg">
+                              <h3 className="font-semibold text-lg text-gray-800">
+                                Module {moduleIndex + 1}: {module.title}
+                              </h3>
+                              {module.description && (
+                                <p className="text-sm text-gray-600 mt-1">{module.description}</p>
+                              )}
+                            </div>
+                            
+                            <div className="space-y-2 pl-2">
+                              {module.lessons.map((lesson, lessonIndex) => (
+                                <button
+                                  key={lesson.id}
+                                  onClick={() => handleLessonSelect(lesson)}
+                                  className={`flex items-center w-full p-3 rounded-lg text-left transition-all duration-200 ${
+                                    currentLesson?.id === lesson.id
+                                      ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg transform scale-105'
+                                      : 'hover:bg-white/80 hover:shadow-md'
+                                  }`}
+                                >
+                                  <div className="mr-3">
+                                    {lesson.is_completed ? (
+                                      <CheckCircle className="h-5 w-5 text-green-500" />
+                                    ) : (
+                                      <PlayCircle className={`h-5 w-5 ${
+                                        currentLesson?.id === lesson.id ? 'text-white' : 'text-orange-500'
+                                      }`} />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-medium text-sm">
+                                      {lessonIndex + 1}. {lesson.title}
+                                    </div>
+                                    {lesson.description && (
+                                      <div className={`text-xs mt-1 ${
+                                        currentLesson?.id === lesson.id ? 'text-white/80' : 'text-gray-500'
+                                      }`}>
+                                        {lesson.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ml-2 ${
+                                      currentLesson?.id === lesson.id 
+                                        ? 'border-white text-white' 
+                                        : 'border-purple-300 text-purple-600'
+                                    }`}
+                                  >
+                                    {lesson.content_type}
+                                  </Badge>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Main Content Area */}
+              <div className="lg:col-span-6">
                 {currentLesson ? (
-                  <Card className="border-0 shadow-lg overflow-hidden">
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
                     <div className="aspect-video bg-black">
                       {currentLesson.video_url ? (
                         <ReactPlayer
@@ -197,114 +325,135 @@ const CourseLearningPage = () => {
                           width="100%"
                           height="100%"
                           controls
+                          className="rounded-t-lg overflow-hidden"
                         />
                       ) : (
-                        <div className="flex items-center justify-center h-full bg-muted">
-                          <p className="text-muted-foreground">No video available for this lesson</p>
+                        <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-200 to-purple-200">
+                          <div className="text-center">
+                            <PlayCircle className="h-16 w-16 mx-auto mb-4 text-white/60" />
+                            <p className="text-white/80 font-medium">No video available for this lesson</p>
+                          </div>
                         </div>
                       )}
                     </div>
                     
-                    <CardHeader>
-                      <CardTitle>{currentLesson.title}</CardTitle>
+                    <CardHeader className="bg-gradient-to-r from-orange-50 to-purple-50">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-2xl text-gray-800">{currentLesson.title}</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">5 min</span>
+                        </div>
+                      </div>
                       {currentLesson.description && (
-                        <CardDescription>{currentLesson.description}</CardDescription>
+                        <CardDescription className="text-gray-600 text-base">
+                          {currentLesson.description}
+                        </CardDescription>
                       )}
                     </CardHeader>
                     
-                    <CardContent>
-                      <Tabs defaultValue="content">
-                        <TabsList className="mb-4">
-                          <TabsTrigger value="content">Lesson Content</TabsTrigger>
-                          <TabsTrigger value="materials">Additional Materials</TabsTrigger>
+                    <CardContent className="p-6">
+                      <Tabs defaultValue="content" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3 bg-gray-100">
+                          <TabsTrigger value="content" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Content
+                          </TabsTrigger>
+                          <TabsTrigger value="discussion" className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Discussion
+                          </TabsTrigger>
+                          <TabsTrigger value="materials" className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4" />
+                            Materials
+                          </TabsTrigger>
                         </TabsList>
                         
-                        <TabsContent value="content">
+                        <TabsContent value="content" className="mt-6">
                           <div className="prose max-w-none">
                             {currentLesson.content ? (
                               <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
                             ) : (
-                              <p>No additional content for this lesson.</p>
+                              <div className="text-center py-8">
+                                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                <p className="text-gray-500">No additional content for this lesson.</p>
+                              </div>
                             )}
                           </div>
                         </TabsContent>
                         
-                        <TabsContent value="materials">
+                        <TabsContent value="discussion" className="mt-6">
+                          <LessonDiscussion lessonId={currentLesson.id} />
+                        </TabsContent>
+                        
+                        <TabsContent value="materials" className="mt-6">
                           {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
-                            <ul className="space-y-2">
+                            <div className="space-y-3">
                               {currentLesson.materials_urls.map((url: string, idx: number) => (
-                                <li key={idx}>
-                                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                    Material {idx + 1}
-                                  </a>
-                                </li>
+                                <Card key={idx} className="p-4 hover:shadow-md transition-shadow">
+                                  <div className="flex items-center gap-3">
+                                    <FileText className="h-5 w-5 text-purple-600" />
+                                    <a 
+                                      href={url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
+                                    >
+                                      Material {idx + 1}
+                                    </a>
+                                  </div>
+                                </Card>
                               ))}
-                            </ul>
+                            </div>
                           ) : (
-                            <p>No additional materials for this lesson.</p>
+                            <div className="text-center py-8">
+                              <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                              <p className="text-gray-500">No additional materials for this lesson.</p>
+                            </div>
                           )}
                         </TabsContent>
                       </Tabs>
                     </CardContent>
                     
-                    <CardFooter>
-                      <Button onClick={handleLessonComplete} className="ml-auto">
+                    <CardFooter className="bg-gray-50 border-t">
+                      <Button 
+                        onClick={handleLessonComplete} 
+                        className="ml-auto bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-6"
+                        size="lg"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
                         Mark as Completed
                       </Button>
                     </CardFooter>
                   </Card>
                 ) : (
-                  <Card className="border-0 shadow-lg">
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                     <CardHeader>
-                      <CardTitle>Welcome to the Course</CardTitle>
-                      <CardDescription>Select a lesson from the course outline to begin</CardDescription>
+                      <CardTitle className="text-2xl bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                        Welcome to the Course
+                      </CardTitle>
+                      <CardDescription className="text-lg">
+                        Select a lesson from the course outline to begin your learning journey
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <p>{course?.description}</p>
+                    <CardContent className="p-8">
+                      <div className="text-center">
+                        <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-600 leading-relaxed">{course?.description}</p>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
               </div>
-              
-              <div className="space-y-6">
-                {/* Course Outline */}
-                <Card className="border-0 shadow">
-                  <CardHeader>
-                    <CardTitle>Course Outline</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      {modules.map((module) => (
-                        <div key={module.id} className="space-y-2">
-                          <h3 className="font-medium text-lg">{module.title}</h3>
-                          <div className="space-y-1">
-                            {module.lessons.map((lesson) => (
-                              <button
-                                key={lesson.id}
-                                onClick={() => handleLessonSelect(lesson)}
-                                className={`flex items-center w-full p-2 rounded text-left ${
-                                  currentLesson?.id === lesson.id
-                                    ? 'bg-primary/10 text-primary font-medium'
-                                    : 'hover:bg-muted'
-                                } ${lesson.is_completed ? 'text-green-600' : ''}`}
-                              >
-                                <span className="mr-2">
-                                  {lesson.is_completed ? '✅' : '○'}
-                                </span>
-                                <span className="flex-1">{lesson.title}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
 
-                {/* Creator Profile */}
-                {course?.creator_id && (
-                  <CreatorProfile creatorId={course.creator_id} />
-                )}
+              {/* AI Assistant Sidebar */}
+              <div className="lg:col-span-3">
+                <div className="sticky top-6">
+                  <AIAssistant 
+                    lessonTitle={currentLesson?.title}
+                    lessonContent={currentLesson?.content as string}
+                  />
+                </div>
               </div>
             </div>
           </div>
