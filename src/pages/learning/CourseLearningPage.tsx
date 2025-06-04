@@ -545,6 +545,8 @@ const CourseLearningPage = () => {
     );
   }
   
+  const { previous: previousLesson, next: nextLesson } = findAdjacentLessons();
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 relative overflow-hidden">
       {/* Animated Particles Background */}
