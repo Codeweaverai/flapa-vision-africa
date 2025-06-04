@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -12,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { LayoutDashboard, ChevronRight, User, UserPlus, Settings } from 'lucide-react';
+import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 
 interface ProfileData {
@@ -406,6 +405,15 @@ const AccountPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {profile.is_creator && (
+                    <Button variant="outline" className="w-full justify-start" asChild>
+                      <a href={`/creator/profile/${user.id}`}>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View Public Profile
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </a>
+                    </Button>
+                  )}
                   <Button variant="outline" className="w-full justify-start" asChild>
                     <a href="/my-courses">
                       My Courses
