@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -15,6 +14,8 @@ import Layout from '@/components/layout/Layout';
 import LessonDiscussion from '@/components/course/LessonDiscussion';
 import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
 import QuizModal from '@/components/course/QuizModal';
+import QuizInstructionsModal from '@/components/course/QuizInstructionsModal';
+import QuizResultsModal from '@/components/course/QuizResultsModal';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   PlayCircle, 
@@ -31,7 +32,9 @@ import {
   ExternalLink,
   Award,
   Lock,
-  AlertCircle
+  AlertCircle,
+  RotateCcw,
+  ArrowRight
 } from 'lucide-react';
 
 interface Course {
@@ -113,6 +116,10 @@ const CourseLearningPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [isQuizInstructionsOpen, setIsQuizInstructionsOpen] = useState(false);
+  const [isQuizResultsOpen, setIsQuizResultsOpen] = useState(false);
+  const [quizResults, setQuizResults] = useState<{ quiz: Quiz; score: number; passed: boolean } | null>(null);
+  const [nextContent, setNextContent] = useState<{ type: 'lesson' | 'quiz'; content: Lesson | Quiz } | null>(null);
   const [blockedContent, setBlockedContent] = useState<string[]>([]);
   
   useEffect(() => {
@@ -356,7 +363,43 @@ const CourseLearningPage = () => {
     };
   };
 
-  const { previous: previousLesson, next: nextLesson } = findAdjacentLessons();
+  const findNextContent = () => {
+    const allContent: Array<{ type: 'lesson' | 'quiz'; content: Lesson | Quiz; moduleTitle: string }> = [];
+    
+    modules.forEach(module => {
+      module.lessons.forEach(lesson => {
+        allContent.push({ type: 'lesson', content: lesson, moduleTitle: module.title });
+        
+        // Add quizzes associated with this lesson
+        const lessonQuizzes = module.quizzes.filter(quiz => quiz.lesson_id === lesson.id);
+        lessonQuizzes.forEach(quiz => {
+          allContent.push({ type: 'quiz', content: quiz, moduleTitle: module.title });
+        });
+      });
+      
+      // Add module-level quizzes
+      const moduleQuizzes = module.quizzes.filter(quiz => !quiz.lesson_id);
+      moduleQuizzes.forEach(quiz => {
+        allContent.push({ type: 'quiz', content: quiz, moduleTitle: module.title });
+      });
+    });
+
+    const currentIndex = allContent.findIndex(item => 
+      (currentLesson && item.type === 'lesson' && item.content.id === currentLesson.id) ||
+      (currentQuiz && item.type === 'quiz' && item.content.id === currentQuiz.id)
+    );
+    
+    if (currentIndex < allContent.length - 1) {
+      const next = allContent[currentIndex + 1];
+      setNextContent({ type: next.type, content: next.content });
+    } else {
+      setNextContent(null);
+    }
+  };
+
+  useEffect(() => {
+    findNextContent();
+  }, [currentLesson, currentQuiz, modules]);
 
   const navigateToLesson = (lessonData: { lesson: Lesson; moduleTitle: string }) => {
     if (blockedContent.includes(lessonData.lesson.id)) {
@@ -380,7 +423,7 @@ const CourseLearningPage = () => {
       return;
     }
     setCurrentQuiz(quiz);
-    setIsQuizModalOpen(true);
+    setIsQuizInstructionsOpen(true);
   };
 
   const handleQuizComplete = async (score: number, passed: boolean) => {
@@ -400,22 +443,40 @@ const CourseLearningPage = () => {
 
       if (error) throw error;
 
-      if (passed) {
-        toast.success(`Congratulations! You passed with ${score}%`);
-        // Reload course data to update blocked content
-        await loadCourseData();
-      } else {
-        toast.error(`You scored ${score}%. You need ${currentQuiz.passing_score}% to pass. Please review the material and try again.`);
-      }
-
+      // Close quiz modal and show results
       setIsQuizModalOpen(false);
-      setCurrentQuiz(null);
+      setQuizResults({ quiz: currentQuiz, score, passed });
+      setIsQuizResultsOpen(true);
+      
+      // Reload course data to update blocked content
+      await loadCourseData();
+      
     } catch (error) {
       console.error('Error recording quiz attempt:', error);
       toast.error('Failed to record quiz attempt');
     }
   };
-  
+
+  const handleRetakeQuiz = () => {
+    setIsQuizResultsOpen(false);
+    setIsQuizModalOpen(true);
+  };
+
+  const handleProceedAfterQuiz = () => {
+    setIsQuizResultsOpen(false);
+    
+    if (nextContent) {
+      if (nextContent.type === 'lesson') {
+        setCurrentLesson(nextContent.content as Lesson);
+        setCurrentQuiz(null);
+      } else {
+        setCurrentQuiz(nextContent.content as Quiz);
+        setCurrentLesson(null);
+        setIsQuizInstructionsOpen(true);
+      }
+    }
+  };
+
   const handleLessonComplete = async () => {
     if (!currentLesson || !enrollment) return;
 
@@ -756,20 +817,38 @@ const CourseLearningPage = () => {
                         {previousLesson ? `Previous: ${previousLesson.lesson.title}` : 'No Previous Lesson'}
                       </Button>
                       
-                      <Button
-                        variant="outline"
-                        onClick={() => nextLesson && navigateToLesson(nextLesson)}
-                        disabled={!nextLesson || blockedContent.includes(nextLesson.lesson.id)}
-                        className="flex items-center gap-2"
-                      >
-                        {nextLesson ? (
-                          <>
-                            {`Next: ${nextLesson.lesson.title}`}
-                            {blockedContent.includes(nextLesson.lesson.id) && <Lock className="h-4 w-4" />}
-                          </>
-                        ) : 'No Next Lesson'}
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                      {/* Show Next Quiz or Lesson */}
+                      {nextContent ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (nextContent.type === 'quiz') {
+                              handleQuizStart(nextContent.content as Quiz);
+                            } else {
+                              setCurrentLesson(nextContent.content as Lesson);
+                            }
+                          }}
+                          disabled={blockedContent.includes(nextContent.content.id)}
+                          className="flex items-center gap-2"
+                        >
+                          {nextContent.type === 'quiz' ? (
+                            <>
+                              <Award className="h-4 w-4" />
+                              {`Next: Quiz - ${nextContent.content.title}`}
+                            </>
+                          ) : (
+                            <>
+                              {`Next: ${nextContent.content.title}`}
+                              <ChevronRight className="h-4 w-4" />
+                            </>
+                          )}
+                          {blockedContent.includes(nextContent.content.id) && <Lock className="h-4 w-4" />}
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          Course Complete!
+                        </Badge>
+                      )}
                     </div>
 
                     <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
@@ -920,6 +999,16 @@ const CourseLearningPage = () => {
         lessonContent={currentLesson?.content as string}
       />
 
+      {/* Quiz Instructions Modal */}
+      {currentQuiz && (
+        <QuizInstructionsModal
+          isOpen={isQuizInstructionsOpen}
+          onClose={() => setIsQuizInstructionsOpen(false)}
+          quiz={currentQuiz}
+          onStartQuiz={() => handleQuizInstructionsStart(currentQuiz)}
+        />
+      )}
+
       {/* Quiz Modal */}
       {currentQuiz && (
         <QuizModal
@@ -927,6 +1016,20 @@ const CourseLearningPage = () => {
           onClose={() => setIsQuizModalOpen(false)}
           quiz={currentQuiz}
           onComplete={handleQuizComplete}
+        />
+      )}
+
+      {/* Quiz Results Modal */}
+      {quizResults && (
+        <QuizResultsModal
+          isOpen={isQuizResultsOpen}
+          onClose={() => setIsQuizResultsOpen(false)}
+          quiz={quizResults.quiz}
+          score={quizResults.score}
+          passed={quizResults.passed}
+          onRetake={handleRetakeQuiz}
+          onProceed={handleProceedAfterQuiz}
+          hasNextContent={!!nextContent}
         />
       )}
     </div>
