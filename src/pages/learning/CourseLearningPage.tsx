@@ -947,7 +947,7 @@ const CourseLearningPage = () => {
                                         rel="noopener noreferrer" 
                                         className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
                                       >
-                                        Material {idx + 1}
+                                        Course Resource Material {idx + 1}
                                       </a>
                                     </div>
                                   </Card>
