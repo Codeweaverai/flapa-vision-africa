@@ -10,6 +10,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+interface UserProfile {
+  full_name?: string;
+  avatar_url?: string;
+}
+
 interface Discussion {
   id: string;
   content: string;
@@ -19,10 +24,7 @@ interface Discussion {
   is_instructor_reply: boolean;
   created_at: string;
   updated_at: string;
-  user_profile?: {
-    full_name?: string;
-    avatar_url?: string;
-  };
+  user_profile?: UserProfile;
   replies?: Discussion[];
 }
 
@@ -46,42 +48,67 @@ const LessonDiscussion: React.FC<LessonDiscussionProps> = ({ lessonId, isInstruc
 
   const fetchDiscussions = async () => {
     try {
-      const { data, error } = await supabase
+      // First, fetch all discussions for this lesson
+      const { data: discussionsData, error: discussionsError } = await supabase
         .from('lesson_discussions')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('lesson_id', lessonId)
         .is('parent_id', null)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (discussionsError) throw discussionsError;
+
+      // Then, fetch user profiles separately
+      const userIds = discussionsData?.map(d => d.user_id) || [];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of profiles for quick lookup
+      const profilesMap = (profilesData || []).reduce((acc, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {} as Record<string, UserProfile>);
 
       // Fetch replies for each discussion
       const discussionsWithReplies = await Promise.all(
-        (data || []).map(async (discussion) => {
-          const { data: replies } = await supabase
+        (discussionsData || []).map(async (discussion) => {
+          const { data: replies, error: repliesError } = await supabase
             .from('lesson_discussions')
-            .select(`
-              *,
-              profiles:user_id (
-                full_name,
-                avatar_url
-              )
-            `)
+            .select('*')
             .eq('parent_id', discussion.id)
             .order('created_at', { ascending: true });
 
+          if (repliesError) {
+            console.error('Error fetching replies:', repliesError);
+            return {
+              ...discussion,
+              user_profile: profilesMap[discussion.user_id] || {},
+              replies: []
+            };
+          }
+
+          // Fetch profiles for reply authors
+          const replyUserIds = replies?.map(r => r.user_id) || [];
+          const { data: replyProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', replyUserIds);
+
+          const replyProfilesMap = (replyProfiles || []).reduce((acc, profile) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {} as Record<string, UserProfile>);
+
           return {
             ...discussion,
-            user_profile: discussion.profiles,
+            user_profile: profilesMap[discussion.user_id] || {},
             replies: replies?.map(reply => ({
               ...reply,
-              user_profile: reply.profiles
+              user_profile: replyProfilesMap[reply.user_id] || {}
             })) || []
           };
         })
