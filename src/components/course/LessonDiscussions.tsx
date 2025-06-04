@@ -62,38 +62,59 @@ const LessonDiscussions = ({ lessonId }: LessonDiscussionsProps) => {
   }, [lessonId]);
 
   const loadDiscussions = async () => {
-    const { data, error } = await supabase
+    // First get discussions
+    const { data: discussionsData, error: discussionsError } = await supabase
       .from('lesson_discussions')
-      .select(`
-        *,
-        user_profile:profiles!user_id(full_name, avatar_url)
-      `)
+      .select('*')
       .eq('lesson_id', lessonId)
       .is('parent_id', null)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      // Load replies for each discussion
-      const discussionsWithReplies = await Promise.all(
-        data.map(async (discussion) => {
-          const { data: replies } = await supabase
-            .from('lesson_discussions')
-            .select(`
-              *,
-              user_profile:profiles!user_id(full_name, avatar_url)
-            `)
-            .eq('parent_id', discussion.id)
-            .order('created_at', { ascending: true });
-
-          return {
-            ...discussion,
-            replies: replies || []
-          };
-        })
-      );
-
-      setDiscussions(discussionsWithReplies);
+    if (discussionsError || !discussionsData) {
+      console.error('Error loading discussions:', discussionsError);
+      return;
     }
+
+    // Then get user profiles for discussions
+    const userIds = discussionsData.map(d => d.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .in('id', userIds);
+
+    // Load replies for each discussion
+    const discussionsWithReplies = await Promise.all(
+      discussionsData.map(async (discussion) => {
+        const { data: replies } = await supabase
+          .from('lesson_discussions')
+          .select('*')
+          .eq('parent_id', discussion.id)
+          .order('created_at', { ascending: true });
+
+        // Get profiles for replies
+        let repliesWithProfiles = replies || [];
+        if (replies && replies.length > 0) {
+          const replyUserIds = replies.map(r => r.user_id);
+          const { data: replyProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', replyUserIds);
+
+          repliesWithProfiles = replies.map(reply => ({
+            ...reply,
+            user_profile: replyProfiles?.find(p => p.id === reply.user_id)
+          }));
+        }
+
+        return {
+          ...discussion,
+          user_profile: profiles?.find(p => p.id === discussion.user_id),
+          replies: repliesWithProfiles
+        };
+      })
+    );
+
+    setDiscussions(discussionsWithReplies);
   };
 
   const postQuestion = async () => {
