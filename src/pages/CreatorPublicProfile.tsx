@@ -1,14 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, BookOpen, Users, Award, Clock, Globe } from 'lucide-react';
+import { Star, BookOpen, Users, Award, Clock, Globe, Play, MessageCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreatorProfile {
   id: string;
@@ -43,6 +43,7 @@ interface CreatorStats {
 
 const CreatorPublicProfile: React.FC = () => {
   const { creatorId } = useParams<{ creatorId: string }>();
+  const { user } = useAuth();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [stats, setStats] = useState<CreatorStats>({
@@ -139,6 +140,17 @@ const CreatorPublicProfile: React.FC = () => {
       toast.error('Failed to load creator profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendMessage = () => {
+    // Navigate to inbox with a message to this creator
+    if (user && creatorId) {
+      // You can implement a direct message functionality here
+      // For now, we'll navigate to the inbox page
+      window.location.href = '/inbox';
+    } else {
+      toast.error('Please log in to send a message');
     }
   };
 
@@ -254,9 +266,20 @@ const CreatorPublicProfile: React.FC = () => {
                   </div>
                   
                   {creator.bio && (
-                    <p className="text-muted-foreground leading-relaxed max-w-3xl">
+                    <p className="text-muted-foreground leading-relaxed max-w-3xl mb-4">
                       {creator.bio}
                     </p>
+                  )}
+
+                  {/* Inbox Button */}
+                  {user && user.id !== creatorId && (
+                    <Button 
+                      onClick={handleSendMessage}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Send Message
+                    </Button>
                   )}
                 </div>
               </div>
@@ -323,7 +346,7 @@ const CreatorPublicProfile: React.FC = () => {
                         </Badge>
                       </div>
                       
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-1">
                           {renderStars(Math.round(course.average_rating))}
                           <span className="text-sm text-muted-foreground ml-1">
@@ -336,11 +359,11 @@ const CreatorPublicProfile: React.FC = () => {
                         </div>
                       </div>
                       
-                      <Button className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                         <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
-                           <Play className="h-4 w-4 mr-2" />
-                        View Course
-                           </Link>
+                      <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                        <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
+                          <Play className="h-4 w-4 mr-2" />
+                          View Course
+                        </Link>
                       </Button>
                     </CardContent>
                   </Card>
