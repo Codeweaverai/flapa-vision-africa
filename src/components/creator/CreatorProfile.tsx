@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, BookOpen, Users, Award } from 'lucide-react';
+import { Star, BookOpen, Users, Award, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { Link } from 'react-router-dom';
 
 interface CreatorProfileProps {
   creatorId: string;
@@ -164,14 +164,24 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creatorId, className = 
           </div>
         )}
         
-        <div className="flex space-x-2">
-          <Badge variant="secondary" className="text-xs">
-            <Award className="w-3 h-3 mr-1" />
-            Verified Instructor
-          </Badge>
-          <Badge variant="outline" className="text-xs">
-            Expert Level
-          </Badge>
+        <div className="flex flex-col space-y-2">
+          <div className="flex space-x-2">
+            <Badge variant="secondary" className="text-xs">
+              <Award className="w-3 h-3 mr-1" />
+              Verified Instructor
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Expert Level
+            </Badge>
+          </div>
+          
+          {/* View Creator Profile Button */}
+          <Button variant="outline" size="sm" asChild className="w-full">
+            <Link to={`/creator/profile/${creatorId}`} className="flex items-center justify-center">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              View Creator Profile
+            </Link>
+          </Button>
         </div>
       </CardContent>
     </Card>

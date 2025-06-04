@@ -25,6 +25,7 @@ import { Bell, Compass, Menu } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
 import InboxIcon from '@/components/inbox/InboxIcon';
+import { initializeNotificationSound, setupNotificationListener, setupInboxMessageListener } from '@/services/notificationService';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -34,27 +35,36 @@ const Navbar = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
+    // Initialize notification sound
+    initializeNotificationSound();
+
     if (user) {
       loadNotificationCount();
 
-      // Set up realtime subscription for notifications
-      const channel = supabase
-        .channel('public:notifications')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'notifications',
-            filter: `user_id=eq.${user?.id}` 
-          }, 
-          () => {
-            loadNotificationCount();
-          }
-        )
-        .subscribe();
+      // Set up realtime subscription for notifications with sound
+      const unsubscribeNotifications = setupNotificationListener(user.id, (notification) => {
+        console.log('New notification:', notification);
+        loadNotificationCount(); // Reload count
+      });
+
+      // Set up realtime subscription for inbox messages
+      const unsubscribeMessages = setupInboxMessageListener(user.id, (message) => {
+        console.log('New inbox message:', message);
+        
+        // Create a notification for the new message
+        supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            content: `New message: ${message.subject}`,
+            type: 'message',
+            related_id: message.id
+          });
+      });
       
       return () => {
-        supabase.removeChannel(channel);
+        unsubscribeNotifications();
+        unsubscribeMessages();
       };
     }
   }, [user]);
@@ -145,7 +155,7 @@ const Navbar = () => {
                 <Bell className="h-5 w-5" />
                 {unreadNotifications > 0 && (
                   <Badge 
-                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center rounded-full"
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center rounded-full animate-pulse"
                     variant="destructive"
                   >
                     {unreadNotifications > 9 ? '9+' : unreadNotifications}

@@ -143,14 +143,43 @@ const CreatorPublicProfile: React.FC = () => {
     }
   };
 
-  const handleSendMessage = () => {
-    // Navigate to inbox with a message to this creator
-    if (user && creatorId) {
-      // You can implement a direct message functionality here
-      // For now, we'll navigate to the inbox page
-      window.location.href = '/inbox';
-    } else {
+  const handleSendMessage = async () => {
+    if (!user || !creatorId || !creator) {
       toast.error('Please log in to send a message');
+      return;
+    }
+
+    try {
+      // Create a direct message in the inbox
+      const { error } = await supabase
+        .from('inbox_messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: creatorId,
+          subject: `Message to ${creator.full_name}`,
+          content: `Hi ${creator.full_name}, I'd like to connect with you!`,
+          message_type: 'direct'
+        });
+
+      if (error) throw error;
+
+      // Create notification for the recipient
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: creatorId,
+          content: `You have a new message from ${user.user_metadata?.full_name || user.email}`,
+          type: 'message',
+          related_id: creatorId
+        });
+
+      toast.success('Message sent successfully!');
+      
+      // Navigate to inbox
+      window.location.href = '/inbox';
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
     }
   };
 
@@ -229,18 +258,18 @@ const CreatorPublicProfile: React.FC = () => {
             <CardContent className="p-8">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                 <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                  <AvatarImage src={creator.avatar_url} alt={creator.full_name} />
+                  <AvatarImage src={creator?.avatar_url} alt={creator?.full_name} />
                   <AvatarFallback className="text-2xl bg-gradient-to-br from-orange-400 to-purple-600 text-white">
-                    {creator.full_name?.split(' ').map(n => n[0]).join('') || creator.username?.[0] || 'U'}
+                    {creator?.full_name?.split(' ').map(n => n[0]).join('') || creator?.username?.[0] || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      {creator.full_name || creator.username}
+                      {creator?.full_name || creator?.username}
                     </h1>
-                    {creator.is_creator && (
+                    {creator?.is_creator && (
                       <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
                         <Award className="w-3 h-3 mr-1" />
                         Verified Creator
@@ -265,21 +294,24 @@ const CreatorPublicProfile: React.FC = () => {
                     </div>
                   </div>
                   
-                  {creator.bio && (
-                    <p className="text-muted-foreground leading-relaxed max-w-3xl mb-4">
+                  {creator?.bio && (
+                    <p className="text-muted-foreground leading-relaxed max-w-3xl mb-6">
                       {creator.bio}
                     </p>
                   )}
 
-                  {/* Inbox Button */}
+                  {/* Send Message Button - More prominent */}
                   {user && user.id !== creatorId && (
-                    <Button 
-                      onClick={handleSendMessage}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
-                    >
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Send Message
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button 
+                        onClick={handleSendMessage}
+                        size="lg"
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg"
+                      >
+                        <MessageCircle className="w-5 h-5 mr-2" />
+                        Send Message
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>

@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, Check } from 'lucide-react';
+import { Bell, Check, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Notification, fetchUserNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '@/services/communityService';
 import { supabase } from '@/lib/supabaseClient';
@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabaseClient';
 const NotificationsPage = () => {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -85,10 +86,22 @@ const NotificationsPage = () => {
     }
   };
 
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if not already
+    if (!notification.is_read) {
+      await handleMarkAsRead(notification.id);
+    }
+
+    // If it's a message notification, navigate to inbox
+    if (notification.type === 'message') {
+      navigate('/inbox');
+    }
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'message':
-        return <Bell className="h-5 w-5 text-blue-500" />;
+        return <MessageCircle className="h-5 w-5 text-blue-500" />;
       case 'course':
         return <Bell className="h-5 w-5 text-green-500" />;
       case 'event':
@@ -142,7 +155,8 @@ const NotificationsPage = () => {
                     {notifications.map((notification) => (
                       <li 
                         key={notification.id} 
-                        className={`p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors ${!notification.is_read ? 'bg-muted/30 border-l-4 border-l-primary' : ''}`}
+                        className={`p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors cursor-pointer ${!notification.is_read ? 'bg-muted/30 border-l-4 border-l-primary' : ''}`}
+                        onClick={() => handleNotificationClick(notification)}
                       >
                         <div className="flex-shrink-0">
                           {getNotificationIcon(notification.type)}
@@ -159,7 +173,10 @@ const NotificationsPage = () => {
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            onClick={() => handleMarkAsRead(notification.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkAsRead(notification.id);
+                            }}
                             className="opacity-70 hover:opacity-100"
                           >
                             <Check className="h-4 w-4" />
