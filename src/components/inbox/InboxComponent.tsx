@@ -20,6 +20,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface Profile {
+  id: string;
+  full_name?: string;
+  avatar_url?: string;
+  email?: string;
+}
+
 interface Message {
   id: string;
   subject: string;
@@ -30,10 +37,7 @@ interface Message {
   message_type: string;
   related_id?: string;
   created_at: string;
-  sender_profile?: {
-    full_name?: string;
-    avatar_url?: string;
-  };
+  sender_profile?: Profile;
 }
 
 const InboxComponent = () => {
@@ -81,34 +85,43 @@ const InboxComponent = () => {
 
     setLoading(true);
     
-    // First get messages
-    const { data: messagesData, error: messagesError } = await supabase
-      .from('inbox_messages')
-      .select('*')
-      .eq('recipient_id', user.id)
-      .order('created_at', { ascending: false });
+    try {
+      // First get messages
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('inbox_messages')
+        .select('*')
+        .eq('recipient_id', user.id)
+        .order('created_at', { ascending: false });
 
-    if (messagesError || !messagesData) {
-      console.error('Error loading messages:', messagesError);
+      if (messagesError || !messagesData) {
+        console.error('Error loading messages:', messagesError);
+        setLoading(false);
+        return;
+      }
+
+      // Then get sender profiles
+      const senderIds = messagesData.map(m => m.sender_id);
+      if (senderIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, email')
+          .in('id', senderIds);
+
+        // Combine messages with profiles
+        const messagesWithProfiles = messagesData.map(message => ({
+          ...message,
+          sender_profile: profiles?.find(p => p.id === message.sender_id)
+        }));
+
+        setMessages(messagesWithProfiles);
+      } else {
+        setMessages(messagesData);
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Then get sender profiles
-    const senderIds = messagesData.map(m => m.sender_id);
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .in('id', senderIds);
-
-    // Combine messages with profiles
-    const messagesWithProfiles = messagesData.map(message => ({
-      ...message,
-      sender_profile: profiles?.find(p => p.id === message.sender_id)
-    }));
-
-    setMessages(messagesWithProfiles);
-    setLoading(false);
   };
 
   const markAsRead = async (messageId: string) => {
@@ -149,40 +162,45 @@ const InboxComponent = () => {
 
     setComposing(true);
     
-    // Get recipient ID by email or username
-    const { data: recipient } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', composeRecipient)
-      .single();
+    try {
+      // Get recipient ID by email
+      const { data: recipient } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', composeRecipient)
+        .single();
 
-    if (!recipient) {
-      toast.error('Recipient not found');
-      setComposing(false);
-      return;
-    }
+      if (!recipient) {
+        toast.error('Recipient not found');
+        setComposing(false);
+        return;
+      }
 
-    const { error } = await supabase
-      .from('inbox_messages')
-      .insert({
-        sender_id: user.id,
-        recipient_id: recipient.id,
-        subject: composeSubject,
-        content: composeContent,
-        message_type: 'user_message',
-        is_read: false
-      });
+      const { error } = await supabase
+        .from('inbox_messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: recipient.id,
+          subject: composeSubject,
+          content: composeContent,
+          message_type: 'user_message',
+          is_read: false
+        });
 
-    if (error) {
+      if (error) {
+        toast.error('Failed to send message');
+      } else {
+        toast.success('Message sent successfully');
+        setShowCompose(false);
+        setComposeRecipient('');
+        setComposeSubject('');
+        setComposeContent('');
+      }
+    } catch (error) {
       toast.error('Failed to send message');
-    } else {
-      toast.success('Message sent successfully');
-      setShowCompose(false);
-      setComposeRecipient('');
-      setComposeSubject('');
-      setComposeContent('');
+    } finally {
+      setComposing(false);
     }
-    setComposing(false);
   };
 
   const filteredMessages = messages.filter(message =>
