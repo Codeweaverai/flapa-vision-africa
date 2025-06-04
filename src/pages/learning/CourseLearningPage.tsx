@@ -533,6 +533,11 @@ const CourseLearningPage = () => {
     }
   };
   
+  const handleQuizInstructionsStart = (quiz: Quiz) => {
+    setIsQuizInstructionsOpen(false);
+    setIsQuizModalOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
