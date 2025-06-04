@@ -179,8 +179,10 @@ const CareersPage = () => {
                 <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
                   View Open Positions <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
-                  Learn About Our Culture
+                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
+                  <Link to="/learn-our-culture">
+                    Learn About Our Culture
+                  </Link>
                 </Button>
               </div>
             </div>
