@@ -83,6 +83,21 @@ interface CreatorProfile {
   username?: string;
 }
 
+interface QuizAttempt {
+  id: string;
+  quiz_id: string;
+  user_id: string;
+  enrollment_id: string;
+  score: number;
+  passed: boolean;
+  attempt_number: number;
+  started_at: string;
+  completed_at?: string;
+  answers: any;
+  created_at: string;
+  updated_at: string;
+}
+
 const CourseLearningPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -183,11 +198,11 @@ const CourseLearningPage = () => {
 
       if (modulesError) throw modulesError;
 
-      // Fetch quiz attempts to check completion status
+      // Fetch quiz attempts to check completion status - using proper typing
       const { data: quizAttempts } = await supabase
         .from('quiz_attempts')
         .select('quiz_id, score, passed')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id) as { data: { quiz_id: string; score: number; passed: boolean }[] | null };
 
       // Process modules and lessons with completion status
       const processedModules = modulesData?.map(module => ({
@@ -372,7 +387,7 @@ const CourseLearningPage = () => {
     if (!currentQuiz || !enrollment) return;
 
     try {
-      // Record quiz attempt
+      // Record quiz attempt - using proper insert with explicit typing
       const { error } = await supabase
         .from('quiz_attempts')
         .insert({
@@ -381,7 +396,7 @@ const CourseLearningPage = () => {
           enrollment_id: enrollment.id,
           score: score,
           passed: passed
-        });
+        } as const);
 
       if (error) throw error;
 
@@ -390,7 +405,7 @@ const CourseLearningPage = () => {
         // Reload course data to update blocked content
         await loadCourseData();
       } else {
-        toast.error(`You scored ${score}%. You need 70% to pass. Please review the material and try again.`);
+        toast.error(`You scored ${score}%. You need ${currentQuiz.passing_score}% to pass. Please review the material and try again.`);
       }
 
       setIsQuizModalOpen(false);
