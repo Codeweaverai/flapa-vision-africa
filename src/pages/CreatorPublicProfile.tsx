@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, BookOpen, Users, Award, Clock, Globe, Play, MessageCircle } from 'lucide-react';
+import { Star, BookOpen, Users, Award, Clock, Globe, Play, MessageCircle, Calendar, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,11 +34,26 @@ interface Course {
   total_reviews: number;
 }
 
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  image_url: string;
+  price: number;
+  is_free: boolean;
+  start_time: string;
+  end_time: string;
+  location: string;
+  event_type: string;
+  registrations_count: number;
+}
+
 interface CreatorStats {
   totalCourses: number;
   totalStudents: number;
   averageRating: number;
   totalReviews: number;
+  totalEvents: number;
 }
 
 const CreatorPublicProfile: React.FC = () => {
@@ -46,11 +61,13 @@ const CreatorPublicProfile: React.FC = () => {
   const { user } = useAuth();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [stats, setStats] = useState<CreatorStats>({
     totalCourses: 0,
     totalStudents: 0,
     averageRating: 0,
-    totalReviews: 0
+    totalReviews: 0,
+    totalEvents: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -82,6 +99,14 @@ const CreatorPublicProfile: React.FC = () => {
 
       if (coursesError) throw coursesError;
 
+      // Fetch creator events
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('creator_id', creatorId);
+
+      if (eventsError) throw eventsError;
+
       // Fetch enrollments and reviews for each course
       const coursesWithStats = await Promise.all(
         (coursesData || []).map(async (course) => {
@@ -112,6 +137,21 @@ const CreatorPublicProfile: React.FC = () => {
         })
       );
 
+      // Fetch event registrations
+      const eventsWithStats = await Promise.all(
+        (eventsData || []).map(async (event) => {
+          const { data: registrations } = await supabase
+            .from('registrations')
+            .select('id')
+            .eq('event_id', event.id);
+
+          return {
+            ...event,
+            registrations_count: registrations?.length || 0
+          };
+        })
+      );
+
       // Calculate overall stats
       const totalStudents = new Set(
         coursesWithStats.flatMap(course => 
@@ -129,11 +169,13 @@ const CreatorPublicProfile: React.FC = () => {
 
       setCreator(profileData);
       setCourses(coursesWithStats);
+      setEvents(eventsWithStats);
       setStats({
         totalCourses: coursesWithStats.length,
         totalStudents,
         averageRating: overallAverageRating,
-        totalReviews: coursesWithStats.reduce((sum, course) => sum + course.total_reviews, 0)
+        totalReviews: coursesWithStats.reduce((sum, course) => sum + course.total_reviews, 0),
+        totalEvents: eventsWithStats.length
       });
     } catch (error) {
       console.error('Error fetching creator data:', error);
@@ -196,6 +238,16 @@ const CreatorPublicProfile: React.FC = () => {
       );
     }
     return <div className="flex">{stars}</div>;
+  };
+
+  const formatEventDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (loading) {
@@ -281,6 +333,10 @@ const CreatorPublicProfile: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <BookOpen className="w-4 h-4 text-orange-500" />
                       <span>{stats.totalCourses} Courses</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4 text-purple-500" />
+                      <span>{stats.totalEvents} Events</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Users className="w-4 h-4 text-purple-500" />
@@ -395,6 +451,86 @@ const CreatorPublicProfile: React.FC = () => {
                         <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
                           <Play className="h-4 w-4 mr-2" />
                           View Course
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Events Section */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Published Events</h2>
+            
+            {events.length === 0 ? (
+              <Card className="bg-white/80 backdrop-blur-sm">
+                <CardContent className="p-8 text-center">
+                  <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">No Events Yet</h3>
+                  <p className="text-muted-foreground">This creator hasn't published any events yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {events.map((event) => (
+                  <Card 
+                    key={event.id} 
+                    className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0"
+                  >
+                    <div className="aspect-video bg-gradient-to-br from-orange-200 to-purple-200 rounded-t-lg overflow-hidden">
+                      {event.image_url ? (
+                        <img 
+                          src={event.image_url} 
+                          alt={event.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Calendar className="w-12 h-12 text-white/60" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-lg line-clamp-2 flex-1">
+                          {event.title}
+                        </h3>
+                        <Badge 
+                          variant={event.is_free ? "secondary" : "default"}
+                          className="ml-2"
+                        >
+                          {event.is_free ? 'Free' : `$${event.price}`}
+                        </Badge>
+                      </div>
+                      
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                        {event.description}
+                      </p>
+                      
+                      <div className="space-y-2 text-sm text-muted-foreground mb-4">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4 text-orange-500" />
+                          <span>{formatEventDate(event.start_time)}</span>
+                        </div>
+                        {event.location && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4 text-purple-500" />
+                            <span className="line-clamp-1">{event.location}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Users className="w-4 h-4 text-purple-500" />
+                          <span>{event.registrations_count} registered</span>
+                        </div>
+                      </div>
+                      
+                      <Button className="w-full bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700" asChild>
+                        <Link to={`/event/${event.id}`} className="flex items-center justify-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          View Event
                         </Link>
                       </Button>
                     </CardContent>
