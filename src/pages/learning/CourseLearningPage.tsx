@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -13,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import LessonDiscussion from '@/components/course/LessonDiscussion';
 import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
+import QuizModal from '@/components/course/QuizModal';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   PlayCircle, 
@@ -26,7 +28,10 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Award,
+  Lock,
+  AlertCircle
 } from 'lucide-react';
 
 interface Course {
@@ -43,6 +48,7 @@ interface CourseModule {
   description?: string;
   order_index: number;
   lessons: Lesson[];
+  quizzes: Quiz[];
 }
 
 interface Lesson {
@@ -55,6 +61,17 @@ interface Lesson {
   order_index: number;
   is_completed?: boolean;
   materials_urls?: string[];
+}
+
+interface Quiz {
+  id: string;
+  title: string;
+  description?: string;
+  passing_score: number;
+  module_id?: string;
+  lesson_id?: string;
+  is_completed?: boolean;
+  last_score?: number;
 }
 
 interface CreatorProfile {
@@ -77,8 +94,11 @@ const CourseLearningPage = () => {
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [currentModule, setCurrentModule] = useState<CourseModule | null>(null);
+  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [blockedContent, setBlockedContent] = useState<string[]>([]);
   
   useEffect(() => {
     if (!user) {
@@ -142,7 +162,7 @@ const CourseLearningPage = () => {
         }
       }
       
-      // Fetch modules and lessons with progress
+      // Fetch modules, lessons, and quizzes with progress
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
         .select(`
@@ -153,12 +173,21 @@ const CourseLearningPage = () => {
               is_completed,
               completion_date
             )
+          ),
+          quizzes (
+            *
           )
         `)
         .eq('course_id', courseId)
         .order('order_index', { ascending: true });
 
       if (modulesError) throw modulesError;
+
+      // Fetch quiz attempts to check completion status
+      const { data: quizAttempts } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id, score, passed')
+        .eq('user_id', user.id);
 
       // Process modules and lessons with completion status
       const processedModules = modulesData?.map(module => ({
@@ -168,37 +197,27 @@ const CourseLearningPage = () => {
           ?.map((lesson: any) => ({
             ...lesson,
             is_completed: lesson.lesson_progress?.[0]?.is_completed || false
-          })) || []
+          })) || [],
+        quizzes: module.quizzes?.map((quiz: any) => {
+          const attempt = quizAttempts?.find(a => a.quiz_id === quiz.id);
+          return {
+            ...quiz,
+            is_completed: attempt?.passed || false,
+            last_score: attempt?.score || 0
+          };
+        }) || []
       })) || [];
       
       setCourse(courseData);
       setEnrollment(enrollmentData);
       setModules(processedModules);
       
-      // Set the current lesson to the first incomplete lesson, or the first lesson if all are complete
-      let lessonFound = false;
-      let firstLesson: Lesson | null = null;
+      // Calculate blocked content based on quiz requirements
+      const blocked = calculateBlockedContent(processedModules);
+      setBlockedContent(blocked);
       
-      for (const module of processedModules) {
-        if (module.lessons && module.lessons.length > 0) {
-          if (!firstLesson) {
-            firstLesson = module.lessons[0];
-          }
-          
-          for (const lesson of module.lessons) {
-            if (!lesson.is_completed) {
-              setCurrentLesson(lesson);
-              lessonFound = true;
-              break;
-            }
-          }
-          if (lessonFound) break;
-        }
-      }
-      
-      if (!lessonFound && firstLesson) {
-        setCurrentLesson(firstLesson);
-      }
+      // Set the current lesson to the first available lesson
+      setFirstAvailableLesson(processedModules, blocked);
       
       // Calculate overall progress
       calculateProgress(processedModules);
@@ -210,23 +229,98 @@ const CourseLearningPage = () => {
       setLoading(false);
     }
   };
+
+  const calculateBlockedContent = (modulesData: CourseModule[]) => {
+    const blocked: string[] = [];
+    
+    for (let i = 0; i < modulesData.length; i++) {
+      const module = modulesData[i];
+      
+      // Check if previous module's quizzes are passed
+      if (i > 0) {
+        const prevModule = modulesData[i - 1];
+        const hasUnpassedQuiz = prevModule.quizzes.some(quiz => !quiz.is_completed);
+        
+        if (hasUnpassedQuiz) {
+          // Block all content in this module and subsequent modules
+          module.lessons.forEach(lesson => blocked.push(lesson.id));
+          module.quizzes.forEach(quiz => blocked.push(quiz.id));
+          continue;
+        }
+      }
+      
+      // Within the module, check lesson-specific quizzes
+      for (let j = 0; j < module.lessons.length; j++) {
+        const lesson = module.lessons[j];
+        
+        // Check if there are lesson-specific quizzes that need to be passed
+        const lessonQuizzes = module.quizzes.filter(quiz => quiz.lesson_id === lesson.id);
+        
+        if (j > 0 && lessonQuizzes.length > 0) {
+          const prevLesson = module.lessons[j - 1];
+          const prevLessonQuizzes = module.quizzes.filter(quiz => quiz.lesson_id === prevLesson.id);
+          const hasUnpassedQuiz = prevLessonQuizzes.some(quiz => !quiz.is_completed);
+          
+          if (hasUnpassedQuiz) {
+            blocked.push(lesson.id);
+          }
+        }
+      }
+    }
+    
+    return blocked;
+  };
+
+  const setFirstAvailableLesson = (modulesData: CourseModule[], blocked: string[]) => {
+    let lessonFound = false;
+    let firstLesson: Lesson | null = null;
+    
+    for (const module of modulesData) {
+      if (module.lessons && module.lessons.length > 0) {
+        if (!firstLesson) {
+          firstLesson = module.lessons[0];
+        }
+        
+        for (const lesson of module.lessons) {
+          if (!lesson.is_completed && !blocked.includes(lesson.id)) {
+            setCurrentLesson(lesson);
+            lessonFound = true;
+            break;
+          }
+        }
+        if (lessonFound) break;
+      }
+    }
+    
+    if (!lessonFound && firstLesson && !blocked.includes(firstLesson.id)) {
+      setCurrentLesson(firstLesson);
+    }
+  };
   
   const calculateProgress = (modulesData: CourseModule[]) => {
-    let totalLessons = 0;
-    let completedLessons = 0;
+    let totalItems = 0;
+    let completedItems = 0;
     
     modulesData.forEach(module => {
       if (module.lessons) {
-        totalLessons += module.lessons.length;
+        totalItems += module.lessons.length;
         module.lessons.forEach(lesson => {
           if (lesson.is_completed) {
-            completedLessons++;
+            completedItems++;
+          }
+        });
+      }
+      if (module.quizzes) {
+        totalItems += module.quizzes.length;
+        module.quizzes.forEach(quiz => {
+          if (quiz.is_completed) {
+            completedItems++;
           }
         });
       }
     });
     
-    const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+    const progressPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
     setProgress(progressPercentage);
   };
   
@@ -250,11 +344,61 @@ const CourseLearningPage = () => {
   const { previous: previousLesson, next: nextLesson } = findAdjacentLessons();
 
   const navigateToLesson = (lessonData: { lesson: Lesson; moduleTitle: string }) => {
+    if (blockedContent.includes(lessonData.lesson.id)) {
+      toast.error('Complete required quizzes to unlock this lesson');
+      return;
+    }
     setCurrentLesson(lessonData.lesson);
   };
   
   const handleLessonSelect = (lesson: Lesson) => {
+    if (blockedContent.includes(lesson.id)) {
+      toast.error('Complete required quizzes to unlock this lesson');
+      return;
+    }
     setCurrentLesson(lesson);
+  };
+
+  const handleQuizStart = (quiz: Quiz) => {
+    if (blockedContent.includes(quiz.id)) {
+      toast.error('Complete previous requirements to unlock this quiz');
+      return;
+    }
+    setCurrentQuiz(quiz);
+    setIsQuizModalOpen(true);
+  };
+
+  const handleQuizComplete = async (score: number, passed: boolean) => {
+    if (!currentQuiz || !enrollment) return;
+
+    try {
+      // Record quiz attempt
+      const { error } = await supabase
+        .from('quiz_attempts')
+        .insert({
+          quiz_id: currentQuiz.id,
+          user_id: user.id,
+          enrollment_id: enrollment.id,
+          score: score,
+          passed: passed
+        });
+
+      if (error) throw error;
+
+      if (passed) {
+        toast.success(`Congratulations! You passed with ${score}%`);
+        // Reload course data to update blocked content
+        await loadCourseData();
+      } else {
+        toast.error(`You scored ${score}%. You need 70% to pass. Please review the material and try again.`);
+      }
+
+      setIsQuizModalOpen(false);
+      setCurrentQuiz(null);
+    } catch (error) {
+      console.error('Error recording quiz attempt:', error);
+      toast.error('Failed to record quiz attempt');
+    }
   };
   
   const handleLessonComplete = async () => {
@@ -294,37 +438,10 @@ const CourseLearningPage = () => {
         if (error) throw error;
       }
 
-      // Update local state
-      setModules(prevModules =>
-        prevModules.map(module => ({
-          ...module,
-          lessons: module.lessons.map(lesson =>
-            lesson.id === currentLesson.id
-              ? { ...lesson, is_completed: true }
-              : lesson
-          )
-        }))
-      );
-
       toast.success('Lesson marked as completed!');
       
-      if (nextLesson) {
-        setTimeout(() => {
-          navigateToLesson(nextLesson);
-        }, 1000);
-      } else {
-        toast.success('Congratulations! You have completed all lessons in this course!');
-      }
-      
-      const updatedModules = modules.map(module => ({
-        ...module,
-        lessons: module.lessons.map(lesson =>
-          lesson.id === currentLesson.id
-            ? { ...lesson, is_completed: true }
-            : lesson
-        )
-      }));
-      calculateProgress(updatedModules);
+      // Reload course data to update progress and blocking
+      await loadCourseData();
       
     } catch (error) {
       console.error('Error marking lesson as complete:', error);
@@ -438,53 +555,119 @@ const CourseLearningPage = () => {
                                 <Badge variant="outline" className="text-xs">
                                   {module.lessons.filter(l => l.is_completed).length} completed
                                 </Badge>
+                                {module.quizzes.length > 0 && (
+                                  <Badge variant="outline" className="text-xs border-orange-300">
+                                    {module.quizzes.length} quiz{module.quizzes.length !== 1 ? 'zes' : ''}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             
                             <div className="space-y-2 pl-2">
-                              {module.lessons.map((lesson, lessonIndex) => (
-                                <button
-                                  key={lesson.id}
-                                  onClick={() => handleLessonSelect(lesson)}
-                                  className={`flex items-center w-full p-3 rounded-lg text-left transition-all duration-200 ${
-                                    currentLesson?.id === lesson.id
-                                      ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg transform scale-105'
-                                      : 'hover:bg-white/80 hover:shadow-md'
-                                  }`}
-                                >
-                                  <div className="mr-3">
-                                    {lesson.is_completed ? (
-                                      <CheckCircle className="h-5 w-5 text-green-500" />
-                                    ) : (
-                                      <PlayCircle className={`h-5 w-5 ${
-                                        currentLesson?.id === lesson.id ? 'text-white' : 'text-orange-500'
-                                      }`} />
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="font-medium text-sm">
-                                      {lessonIndex + 1}. {lesson.title}
-                                    </div>
-                                    {lesson.description && (
-                                      <div className={`text-xs mt-1 ${
-                                        currentLesson?.id === lesson.id ? 'text-white/80' : 'text-gray-500'
-                                      }`}>
-                                        {lesson.description}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-xs ml-2 ${
-                                      currentLesson?.id === lesson.id 
-                                        ? 'border-white text-white' 
-                                        : 'border-purple-300 text-purple-600'
+                              {module.lessons.map((lesson, lessonIndex) => {
+                                const isBlocked = blockedContent.includes(lesson.id);
+                                return (
+                                  <button
+                                    key={lesson.id}
+                                    onClick={() => handleLessonSelect(lesson)}
+                                    disabled={isBlocked}
+                                    className={`flex items-center w-full p-3 rounded-lg text-left transition-all duration-200 ${
+                                      isBlocked
+                                        ? 'opacity-50 cursor-not-allowed bg-gray-100'
+                                        : currentLesson?.id === lesson.id
+                                        ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg transform scale-105'
+                                        : 'hover:bg-white/80 hover:shadow-md'
                                     }`}
                                   >
-                                    {lesson.content_type}
-                                  </Badge>
-                                </button>
-                              ))}
+                                    <div className="mr-3">
+                                      {isBlocked ? (
+                                        <Lock className="h-5 w-5 text-gray-400" />
+                                      ) : lesson.is_completed ? (
+                                        <CheckCircle className="h-5 w-5 text-green-500" />
+                                      ) : (
+                                        <PlayCircle className={`h-5 w-5 ${
+                                          currentLesson?.id === lesson.id ? 'text-white' : 'text-orange-500'
+                                        }`} />
+                                      )}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="font-medium text-sm">
+                                        {lessonIndex + 1}. {lesson.title}
+                                      </div>
+                                      {lesson.description && (
+                                        <div className={`text-xs mt-1 ${
+                                          currentLesson?.id === lesson.id ? 'text-white/80' : 'text-gray-500'
+                                        }`}>
+                                          {lesson.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-xs ml-2 ${
+                                        currentLesson?.id === lesson.id 
+                                          ? 'border-white text-white' 
+                                          : 'border-purple-300 text-purple-600'
+                                      }`}
+                                    >
+                                      {lesson.content_type}
+                                    </Badge>
+                                  </button>
+                                );
+                              })}
+                              
+                              {/* Module Quizzes */}
+                              {module.quizzes.map((quiz, quizIndex) => {
+                                const isBlocked = blockedContent.includes(quiz.id);
+                                return (
+                                  <div key={quiz.id} className={`ml-4 p-3 rounded-lg border-2 ${
+                                    quiz.is_completed 
+                                      ? 'bg-green-50 border-green-200' 
+                                      : isBlocked
+                                      ? 'bg-gray-50 border-gray-200 opacity-50'
+                                      : 'bg-orange-50 border-orange-200'
+                                  }`}>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        {isBlocked ? (
+                                          <Lock className="h-4 w-4 text-gray-400" />
+                                        ) : quiz.is_completed ? (
+                                          <CheckCircle className="h-4 w-4 text-green-500" />
+                                        ) : (
+                                          <Award className="h-4 w-4 text-orange-500" />
+                                        )}
+                                        <div>
+                                          <div className="font-medium text-sm">
+                                            Quiz {quizIndex + 1}: {quiz.title}
+                                          </div>
+                                          {quiz.description && (
+                                            <div className="text-xs text-gray-600">
+                                              {quiz.description}
+                                            </div>
+                                          )}
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            Passing Score: {quiz.passing_score}%
+                                            {quiz.last_score > 0 && (
+                                              <span className="ml-2">
+                                                Last Score: {quiz.last_score}%
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        variant={quiz.is_completed ? "outline" : "default"}
+                                        onClick={() => handleQuizStart(quiz)}
+                                        disabled={isBlocked}
+                                        className={quiz.is_completed ? "text-green-600 border-green-600" : ""}
+                                      >
+                                        {quiz.is_completed ? 'Retake' : 'Start Quiz'}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         ))}
@@ -561,10 +744,15 @@ const CourseLearningPage = () => {
                       <Button
                         variant="outline"
                         onClick={() => nextLesson && navigateToLesson(nextLesson)}
-                        disabled={!nextLesson}
+                        disabled={!nextLesson || blockedContent.includes(nextLesson.lesson.id)}
                         className="flex items-center gap-2"
                       >
-                        {nextLesson ? `Next: ${nextLesson.lesson.title}` : 'No Next Lesson'}
+                        {nextLesson ? (
+                          <>
+                            {`Next: ${nextLesson.lesson.title}`}
+                            {blockedContent.includes(nextLesson.lesson.id) && <Lock className="h-4 w-4" />}
+                          </>
+                        ) : 'No Next Lesson'}
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -716,6 +904,16 @@ const CourseLearningPage = () => {
         lessonTitle={currentLesson?.title}
         lessonContent={currentLesson?.content as string}
       />
+
+      {/* Quiz Modal */}
+      {currentQuiz && (
+        <QuizModal
+          isOpen={isQuizModalOpen}
+          onClose={() => setIsQuizModalOpen(false)}
+          quiz={currentQuiz}
+          onComplete={handleQuizComplete}
+        />
+      )}
     </div>
   );
 };
