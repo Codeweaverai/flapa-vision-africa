@@ -1,3 +1,4 @@
+
 import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -39,6 +40,8 @@ import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
 import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
 import CareersPage from '@/pages/careers';
+import CreatorPublicProfile from '@/pages/CreatorPublicProfile';
+import InboxPage from '@/pages/InboxPage';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -100,6 +103,7 @@ function App() {
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/become-creator" element={<BecomeCreatorPage />} />
           <Route path="/careers" element={<CareersPage />} />
+          <Route path="/creator/:creatorId" element={<CreatorPublicProfile />} />
           
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
@@ -118,6 +122,7 @@ function App() {
           <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
           <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={

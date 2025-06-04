@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Bell, Compass, Menu } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
+import InboxIcon from '@/components/inbox/InboxIcon';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -149,6 +149,8 @@ const Navbar = () => {
                   </Badge>
                 )}
               </Button>
+
+              <InboxIcon />
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -198,7 +200,7 @@ const Navbar = () => {
                     </>
                   ) : null}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
+                  <DropdownMenuItem onClick={signOut}>
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
