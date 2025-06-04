@@ -8,18 +8,13 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import LessonDiscussion from '@/components/course/LessonDiscussion';
 import AIAssistant from '@/components/course/AIAssistant';
-import { 
-  fetchCourseDetails, 
-  fetchCourseEnrollment, 
-  fetchModuleLessons,
-  CourseModule,
-  Lesson
-} from '@/services/courseService';
+import { supabase } from '@/lib/supabaseClient';
 import { 
   PlayCircle, 
   CheckCircle, 
@@ -28,21 +23,60 @@ import {
   MessageSquare,
   Bot,
   FileText,
-  Users
+  Users,
+  Globe,
+  Mail,
+  Star
 } from 'lucide-react';
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  creator_id: string;
+  thumbnail_url?: string;
+}
+
+interface CourseModule {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  lessons: Lesson[];
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  description?: string;
+  video_url?: string;
+  content?: string;
+  content_type: string;
+  order_index: number;
+  is_completed?: boolean;
+  materials_urls?: string[];
+}
+
+interface CreatorProfile {
+  id: string;
+  full_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  website_url?: string;
+}
 
 const CourseLearningPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  const [course, setCourse] = useState<any>(null);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [enrollment, setEnrollment] = useState<any>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   useEffect(() => {
     if (!user) {
@@ -61,40 +95,84 @@ const CourseLearningPage = () => {
     setLoading(true);
     try {
       // Fetch course details
-      const courseData = await fetchCourseDetails(courseId);
-      if (!courseData) {
-        toast.error('Course not found');
-        navigate('/learning');
-        return;
-      }
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw courseError;
       
       // Fetch user enrollment
-      const enrollmentData = await fetchCourseEnrollment(courseId, user.id);
-      if (!enrollmentData) {
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('*')
+        .eq('course_id', courseId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (enrollmentError) {
         toast.error('You are not enrolled in this course');
         navigate(`/learning/course-detail/${courseId}`);
         return;
       }
       
+      // Fetch creator profile
+      if (courseData.creator_id) {
+        const { data: creatorData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', courseData.creator_id)
+          .single();
+        
+        if (creatorData) {
+          setCreator(creatorData);
+        }
+      }
+      
       // Fetch modules and lessons with progress
-      const modulesData = await fetchModuleLessons(courseId, user.id);
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('course_modules')
+        .select(`
+          *,
+          lessons (
+            *,
+            lesson_progress (
+              is_completed,
+              completion_date
+            )
+          )
+        `)
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: true });
+
+      if (modulesError) throw modulesError;
+
+      // Process modules and lessons with completion status
+      const processedModules = modulesData?.map(module => ({
+        ...module,
+        lessons: module.lessons
+          ?.sort((a: any, b: any) => a.order_index - b.order_index)
+          ?.map((lesson: any) => ({
+            ...lesson,
+            is_completed: lesson.lesson_progress?.[0]?.is_completed || false
+          })) || []
+      })) || [];
       
       setCourse(courseData);
       setEnrollment(enrollmentData);
-      setModules(modulesData);
+      setModules(processedModules);
       
       // Set the current lesson to the first incomplete lesson, or the first lesson if all are complete
       let lessonFound = false;
       let firstLesson: Lesson | null = null;
       
-      for (const module of modulesData) {
+      for (const module of processedModules) {
         if (module.lessons && module.lessons.length > 0) {
-          // Keep track of the first lesson overall
           if (!firstLesson) {
             firstLesson = module.lessons[0];
           }
           
-          // Find the first incomplete lesson
           for (const lesson of module.lessons) {
             if (!lesson.is_completed) {
               setCurrentLesson(lesson);
@@ -106,13 +184,12 @@ const CourseLearningPage = () => {
         }
       }
       
-      // If all lessons are complete, set the first lesson
       if (!lessonFound && firstLesson) {
         setCurrentLesson(firstLesson);
       }
       
       // Calculate overall progress
-      calculateProgress(modulesData);
+      calculateProgress(processedModules);
       
     } catch (error) {
       console.error('Error loading course data:', error);
@@ -145,32 +222,94 @@ const CourseLearningPage = () => {
     setCurrentLesson(lesson);
   };
   
-  const handleLessonComplete = () => {
-    // Implementation for marking a lesson as complete would go here
-    toast.success('Lesson Completed - Moving to the next lesson');
-    
-    // Find the next lesson in sequence
-    let foundCurrent = false;
-    let nextLesson: Lesson | null = null;
-    
-    outerLoop:
-    for (const module of modules) {
-      for (const lesson of module.lessons) {
-        if (foundCurrent) {
-          nextLesson = lesson;
-          break outerLoop;
-        }
-        if (lesson.id === currentLesson?.id) {
-          foundCurrent = true;
+  const handleLessonComplete = async () => {
+    if (!currentLesson || !enrollment) return;
+
+    try {
+      // First check if lesson progress exists
+      const { data: existingProgress } = await supabase
+        .from('lesson_progress')
+        .select('*')
+        .eq('lesson_id', currentLesson.id)
+        .eq('enrollment_id', enrollment.id)
+        .single();
+
+      if (existingProgress) {
+        // Update existing progress
+        const { error } = await supabase
+          .from('lesson_progress')
+          .update({
+            is_completed: true,
+            completion_date: new Date().toISOString()
+          })
+          .eq('id', existingProgress.id);
+
+        if (error) throw error;
+      } else {
+        // Create new progress record
+        const { error } = await supabase
+          .from('lesson_progress')
+          .insert({
+            lesson_id: currentLesson.id,
+            enrollment_id: enrollment.id,
+            is_completed: true,
+            completion_date: new Date().toISOString()
+          });
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      setModules(prevModules =>
+        prevModules.map(module => ({
+          ...module,
+          lessons: module.lessons.map(lesson =>
+            lesson.id === currentLesson.id
+              ? { ...lesson, is_completed: true }
+              : lesson
+          )
+        }))
+      );
+
+      toast.success('Lesson marked as completed!');
+      
+      // Find the next lesson
+      let foundCurrent = false;
+      let nextLesson: Lesson | null = null;
+      
+      outerLoop:
+      for (const module of modules) {
+        for (const lesson of module.lessons) {
+          if (foundCurrent) {
+            nextLesson = lesson;
+            break outerLoop;
+          }
+          if (lesson.id === currentLesson?.id) {
+            foundCurrent = true;
+          }
         }
       }
-    }
-    
-    if (nextLesson) {
-      setCurrentLesson(nextLesson);
-    } else {
-      // No more lessons, possibly show course completion screen
-      toast.success('Congratulations! You have completed all lessons in this course!');
+      
+      if (nextLesson) {
+        setCurrentLesson(nextLesson);
+      } else {
+        toast.success('Congratulations! You have completed all lessons in this course!');
+      }
+      
+      // Recalculate progress
+      const updatedModules = modules.map(module => ({
+        ...module,
+        lessons: module.lessons.map(lesson =>
+          lesson.id === currentLesson.id
+            ? { ...lesson, is_completed: true }
+            : lesson
+        )
+      }));
+      calculateProgress(updatedModules);
+      
+    } catch (error) {
+      console.error('Error marking lesson as complete:', error);
+      toast.error('Failed to mark lesson as complete');
     }
   };
   
@@ -312,6 +451,49 @@ const CourseLearningPage = () => {
                     </ScrollArea>
                   </CardContent>
                 </Card>
+
+                {/* Creator Profile Card */}
+                {creator && (
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl mt-6">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Users className="h-5 w-5 text-purple-600" />
+                        Your Instructor
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-4 mb-4">
+                        <Avatar className="w-16 h-16">
+                          <AvatarImage src={creator.avatar_url} />
+                          <AvatarFallback className="text-lg bg-gradient-to-r from-orange-100 to-purple-100">
+                            {creator.full_name?.split(' ').map(n => n[0]).join('') || 'IN'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold text-lg">{creator.full_name || 'Anonymous'}</h3>
+                          <p className="text-sm text-gray-600">Course Creator</p>
+                        </div>
+                      </div>
+                      
+                      {creator.bio && (
+                        <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                          {creator.bio}
+                        </p>
+                      )}
+                      
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1">
+                          <Globe className="h-4 w-4 mr-2" />
+                          Profile
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1">
+                          <Mail className="h-4 w-4 mr-2" />
+                          Contact
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
               
               {/* Main Content Area */}
@@ -420,9 +602,10 @@ const CourseLearningPage = () => {
                         onClick={handleLessonComplete} 
                         className="ml-auto bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-6"
                         size="lg"
+                        disabled={currentLesson.is_completed}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Mark as Completed
+                        {currentLesson.is_completed ? 'Completed' : 'Mark as Completed'}
                       </Button>
                     </CardFooter>
                   </Card>
