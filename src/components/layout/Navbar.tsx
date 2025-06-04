@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Compass, Menu, Inbox } from 'lucide-react';
+import { Bell, Compass, Menu } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
 
@@ -30,15 +31,13 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     if (user) {
       loadNotificationCount();
-      loadMessageCount();
 
       // Set up realtime subscription for notifications
-      const notificationChannel = supabase
+      const channel = supabase
         .channel('public:notifications')
         .on('postgres_changes', 
           { 
@@ -52,26 +51,9 @@ const Navbar = () => {
           }
         )
         .subscribe();
-
-      // Set up realtime subscription for inbox messages
-      const inboxChannel = supabase
-        .channel('public:inbox_messages')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'inbox_messages',
-            filter: `recipient_id=eq.${user?.id}` 
-          }, 
-          () => {
-            loadMessageCount();
-          }
-        )
-        .subscribe();
       
       return () => {
-        supabase.removeChannel(notificationChannel);
-        supabase.removeChannel(inboxChannel);
+        supabase.removeChannel(channel);
       };
     }
   }, [user]);
@@ -82,20 +64,6 @@ const Navbar = () => {
     const notifications = await fetchUserNotifications(user.id);
     const unreadCount = notifications.filter(n => !n.is_read).length;
     setUnreadNotifications(unreadCount);
-  };
-
-  const loadMessageCount = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('inbox_messages')
-      .select('id')
-      .eq('recipient_id', user.id)
-      .eq('is_read', false);
-
-    if (!error && data) {
-      setUnreadMessages(data.length);
-    }
   };
 
   const navLinks = [
@@ -165,25 +133,6 @@ const Navbar = () => {
         <div className="flex items-center gap-4">
           {user ? (
             <>
-              {/* Inbox Icon */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="relative"
-                onClick={() => navigate('/inbox')}
-              >
-                <Inbox className="h-5 w-5" />
-                {unreadMessages > 0 && (
-                  <Badge 
-                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center rounded-full"
-                    variant="destructive"
-                  >
-                    {unreadMessages > 9 ? '9+' : unreadMessages}
-                  </Badge>
-                )}
-              </Button>
-
-              {/* Notifications Icon */}
               <Button 
                 variant="ghost" 
                 size="icon" 
