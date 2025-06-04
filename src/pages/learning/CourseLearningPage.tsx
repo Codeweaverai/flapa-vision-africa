@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -13,7 +12,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import LessonDiscussion from '@/components/course/LessonDiscussion';
-import AIAssistant from '@/components/course/AIAssistant';
+import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   PlayCircle, 
@@ -21,12 +20,13 @@ import {
   Clock, 
   BookOpen, 
   MessageSquare,
-  Bot,
   FileText,
   Users,
   Globe,
   Mail,
-  Star
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 
 interface Course {
@@ -63,6 +63,7 @@ interface CreatorProfile {
   bio?: string;
   avatar_url?: string;
   website_url?: string;
+  username?: string;
 }
 
 const CourseLearningPage = () => {
@@ -75,6 +76,7 @@ const CourseLearningPage = () => {
   const [enrollment, setEnrollment] = useState<any>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
+  const [currentModule, setCurrentModule] = useState<CourseModule | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
   
@@ -88,6 +90,16 @@ const CourseLearningPage = () => {
       loadCourseData();
     }
   }, [courseId, user]);
+
+  // Update current module when lesson changes
+  useEffect(() => {
+    if (currentLesson && modules.length > 0) {
+      const module = modules.find(m => 
+        m.lessons.some(l => l.id === currentLesson.id)
+      );
+      setCurrentModule(module || null);
+    }
+  }, [currentLesson, modules]);
   
   const loadCourseData = async () => {
     if (!courseId || !user) return;
@@ -218,6 +230,29 @@ const CourseLearningPage = () => {
     setProgress(progressPercentage);
   };
   
+  const findAdjacentLessons = () => {
+    const allLessons: { lesson: Lesson; moduleTitle: string }[] = [];
+    
+    modules.forEach(module => {
+      module.lessons.forEach(lesson => {
+        allLessons.push({ lesson, moduleTitle: module.title });
+      });
+    });
+
+    const currentIndex = allLessons.findIndex(item => item.lesson.id === currentLesson?.id);
+    
+    return {
+      previous: currentIndex > 0 ? allLessons[currentIndex - 1] : null,
+      next: currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null
+    };
+  };
+
+  const { previous: previousLesson, next: nextLesson } = findAdjacentLessons();
+
+  const navigateToLesson = (lessonData: { lesson: Lesson; moduleTitle: string }) => {
+    setCurrentLesson(lessonData.lesson);
+  };
+  
   const handleLessonSelect = (lesson: Lesson) => {
     setCurrentLesson(lesson);
   };
@@ -273,30 +308,14 @@ const CourseLearningPage = () => {
 
       toast.success('Lesson marked as completed!');
       
-      // Find the next lesson
-      let foundCurrent = false;
-      let nextLesson: Lesson | null = null;
-      
-      outerLoop:
-      for (const module of modules) {
-        for (const lesson of module.lessons) {
-          if (foundCurrent) {
-            nextLesson = lesson;
-            break outerLoop;
-          }
-          if (lesson.id === currentLesson?.id) {
-            foundCurrent = true;
-          }
-        }
-      }
-      
       if (nextLesson) {
-        setCurrentLesson(nextLesson);
+        setTimeout(() => {
+          navigateToLesson(nextLesson);
+        }, 1000);
       } else {
         toast.success('Congratulations! You have completed all lessons in this course!');
       }
       
-      // Recalculate progress
       const updatedModules = modules.map(module => ({
         ...module,
         lessons: module.lessons.map(lesson =>
@@ -310,6 +329,14 @@ const CourseLearningPage = () => {
     } catch (error) {
       console.error('Error marking lesson as complete:', error);
       toast.error('Failed to mark lesson as complete');
+    }
+  };
+  
+  const handleCreatorProfileClick = () => {
+    if (creator?.username) {
+      navigate(`/creator/profile/${creator.username}`);
+    } else if (creator?.id) {
+      navigate(`/creator/profile/${creator.id}`);
     }
   };
   
@@ -378,7 +405,7 @@ const CourseLearningPage = () => {
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Course Curriculum Sidebar */}
-              <div className="lg:col-span-3">
+              <div className="lg:col-span-4">
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl sticky top-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -391,13 +418,27 @@ const CourseLearningPage = () => {
                       <div className="space-y-6">
                         {modules.map((module, moduleIndex) => (
                           <div key={module.id} className="space-y-3">
-                            <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-3 rounded-lg">
+                            <div className={`p-4 rounded-lg border-l-4 ${
+                              currentModule?.id === module.id 
+                                ? 'bg-gradient-to-r from-orange-100 to-purple-100 border-orange-500' 
+                                : 'bg-gray-50 border-gray-300'
+                            }`}>
                               <h3 className="font-semibold text-lg text-gray-800">
                                 Module {moduleIndex + 1}: {module.title}
                               </h3>
                               {module.description && (
-                                <p className="text-sm text-gray-600 mt-1">{module.description}</p>
+                                <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+                                  {module.description}
+                                </p>
                               )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">
+                                  {module.lessons.length} lessons
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {module.lessons.filter(l => l.is_completed).length} completed
+                                </Badge>
+                              </div>
                             </div>
                             
                             <div className="space-y-2 pl-2">
@@ -482,9 +523,14 @@ const CourseLearningPage = () => {
                       )}
                       
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="flex-1">
-                          <Globe className="h-4 w-4 mr-2" />
-                          Profile
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={handleCreatorProfileClick}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Profile
                         </Button>
                         <Button variant="outline" size="sm" className="flex-1">
                           <Mail className="h-4 w-4 mr-2" />
@@ -497,118 +543,150 @@ const CourseLearningPage = () => {
               </div>
               
               {/* Main Content Area */}
-              <div className="lg:col-span-6">
+              <div className="lg:col-span-8">
                 {currentLesson ? (
-                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
-                    <div className="aspect-video bg-black">
-                      {currentLesson.video_url ? (
-                        <ReactPlayer
-                          url={currentLesson.video_url}
-                          width="100%"
-                          height="100%"
-                          controls
-                          className="rounded-t-lg overflow-hidden"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-200 to-purple-200">
-                          <div className="text-center">
-                            <PlayCircle className="h-16 w-16 mx-auto mb-4 text-white/60" />
-                            <p className="text-white/80 font-medium">No video available for this lesson</p>
-                          </div>
-                        </div>
-                      )}
+                  <div className="space-y-6">
+                    {/* Lesson Navigation */}
+                    <div className="flex justify-between items-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => previousLesson && navigateToLesson(previousLesson)}
+                        disabled={!previousLesson}
+                        className="flex items-center gap-2"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        {previousLesson ? `Previous: ${previousLesson.lesson.title}` : 'No Previous Lesson'}
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        onClick={() => nextLesson && navigateToLesson(nextLesson)}
+                        disabled={!nextLesson}
+                        className="flex items-center gap-2"
+                      >
+                        {nextLesson ? `Next: ${nextLesson.lesson.title}` : 'No Next Lesson'}
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
-                    
-                    <CardHeader className="bg-gradient-to-r from-orange-50 to-purple-50">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-2xl text-gray-800">{currentLesson.title}</CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">5 min</span>
-                        </div>
+
+                    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
+                      <div className="aspect-video bg-black">
+                        {currentLesson.video_url ? (
+                          <ReactPlayer
+                            url={currentLesson.video_url}
+                            width="100%"
+                            height="100%"
+                            controls
+                            className="rounded-t-lg overflow-hidden"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-200 to-purple-200">
+                            <div className="text-center">
+                              <PlayCircle className="h-16 w-16 mx-auto mb-4 text-white/60" />
+                              <p className="text-white/80 font-medium">No video available for this lesson</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {currentLesson.description && (
-                        <CardDescription className="text-gray-600 text-base">
-                          {currentLesson.description}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    
-                    <CardContent className="p-6">
-                      <Tabs defaultValue="content" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 bg-gray-100">
-                          <TabsTrigger value="content" className="flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            Content
-                          </TabsTrigger>
-                          <TabsTrigger value="discussion" className="flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4" />
-                            Discussion
-                          </TabsTrigger>
-                          <TabsTrigger value="materials" className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4" />
-                            Materials
-                          </TabsTrigger>
-                        </TabsList>
-                        
-                        <TabsContent value="content" className="mt-6">
-                          <div className="prose max-w-none">
-                            {currentLesson.content ? (
-                              <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
-                            ) : (
-                              <div className="text-center py-8">
-                                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                <p className="text-gray-500">No additional content for this lesson.</p>
-                              </div>
+                      
+                      <CardHeader className="bg-gradient-to-r from-orange-50 to-purple-50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-2xl text-gray-800">{currentLesson.title}</CardTitle>
+                            {currentModule && (
+                              <Badge variant="secondary" className="mt-2">
+                                {currentModule.title}
+                              </Badge>
                             )}
                           </div>
-                        </TabsContent>
-                        
-                        <TabsContent value="discussion" className="mt-6">
-                          <LessonDiscussion lessonId={currentLesson.id} />
-                        </TabsContent>
-                        
-                        <TabsContent value="materials" className="mt-6">
-                          {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
-                            <div className="space-y-3">
-                              {currentLesson.materials_urls.map((url: string, idx: number) => (
-                                <Card key={idx} className="p-4 hover:shadow-md transition-shadow">
-                                  <div className="flex items-center gap-3">
-                                    <FileText className="h-5 w-5 text-purple-600" />
-                                    <a 
-                                      href={url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
-                                    >
-                                      Material {idx + 1}
-                                    </a>
-                                  </div>
-                                </Card>
-                              ))}
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">5 min</span>
+                          </div>
+                        </div>
+                        {currentLesson.description && (
+                          <CardDescription className="text-gray-600 text-base mt-2">
+                            {currentLesson.description}
+                          </CardDescription>
+                        )}
+                      </CardHeader>
+                      
+                      <CardContent className="p-6">
+                        <Tabs defaultValue="content" className="w-full">
+                          <TabsList className="grid w-full grid-cols-3 bg-gray-100">
+                            <TabsTrigger value="content" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              Content
+                            </TabsTrigger>
+                            <TabsTrigger value="discussion" className="flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              Discussion
+                            </TabsTrigger>
+                            <TabsTrigger value="materials" className="flex items-center gap-2">
+                              <BookOpen className="h-4 w-4" />
+                              Materials
+                            </TabsTrigger>
+                          </TabsList>
+                          
+                          <TabsContent value="content" className="mt-6">
+                            <div className="prose max-w-none">
+                              {currentLesson.content ? (
+                                <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
+                              ) : (
+                                <div className="text-center py-8">
+                                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                  <p className="text-gray-500">No additional content for this lesson.</p>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="text-center py-8">
-                              <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                              <p className="text-gray-500">No additional materials for this lesson.</p>
-                            </div>
-                          )}
-                        </TabsContent>
-                      </Tabs>
-                    </CardContent>
-                    
-                    <CardFooter className="bg-gray-50 border-t">
-                      <Button 
-                        onClick={handleLessonComplete} 
-                        className="ml-auto bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-6"
-                        size="lg"
-                        disabled={currentLesson.is_completed}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        {currentLesson.is_completed ? 'Completed' : 'Mark as Completed'}
-                      </Button>
-                    </CardFooter>
-                  </Card>
+                          </TabsContent>
+                          
+                          <TabsContent value="discussion" className="mt-6">
+                            <LessonDiscussion lessonId={currentLesson.id} />
+                          </TabsContent>
+                          
+                          <TabsContent value="materials" className="mt-6">
+                            {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
+                              <div className="space-y-3">
+                                {currentLesson.materials_urls.map((url: string, idx: number) => (
+                                  <Card key={idx} className="p-4 hover:shadow-md transition-shadow">
+                                    <div className="flex items-center gap-3">
+                                      <FileText className="h-5 w-5 text-purple-600" />
+                                      <a 
+                                        href={url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
+                                      >
+                                        Material {idx + 1}
+                                      </a>
+                                    </div>
+                                  </Card>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                <p className="text-gray-500">No additional materials for this lesson.</p>
+                              </div>
+                            )}
+                          </TabsContent>
+                        </Tabs>
+                      </CardContent>
+                      
+                      <CardFooter className="bg-gray-50 border-t">
+                        <Button 
+                          onClick={handleLessonComplete} 
+                          className="ml-auto bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-6"
+                          size="lg"
+                          disabled={currentLesson.is_completed}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          {currentLesson.is_completed ? 'Completed' : 'Mark as Completed'}
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </div>
                 ) : (
                   <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                     <CardHeader>
@@ -628,20 +706,16 @@ const CourseLearningPage = () => {
                   </Card>
                 )}
               </div>
-
-              {/* AI Assistant Sidebar */}
-              <div className="lg:col-span-3">
-                <div className="sticky top-6">
-                  <AIAssistant 
-                    lessonTitle={currentLesson?.title}
-                    lessonContent={currentLesson?.content as string}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         </div>
       </Layout>
+
+      {/* Floating AI Assistant */}
+      <FloatingAIAssistant 
+        lessonTitle={currentLesson?.title}
+        lessonContent={currentLesson?.content as string}
+      />
     </div>
   );
 };
