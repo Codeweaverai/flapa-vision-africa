@@ -303,7 +303,7 @@ const CoursesSection = () => {
                     asChild 
                     className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group"
                   >
-                    <Link to={`/course-detail/${course.id}`} className="flex items-center justify-center">
+                    <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
                       <Play className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
                       View Course
                     </Link>
