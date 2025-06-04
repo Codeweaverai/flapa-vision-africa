@@ -142,7 +142,7 @@ const LearnOurCulturePage = () => {
             {/* Culture Image */}
             <div className="mt-16 relative">
               <img
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&h=600&fit=crop"
+                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//study-group-african-people.jpg?w=1200&h=600&fit=crop"
                 alt="Team collaboration and culture"
                 className="rounded-2xl shadow-2xl mx-auto max-w-4xl w-full"
               />
