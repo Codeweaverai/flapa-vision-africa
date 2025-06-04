@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +56,10 @@ const InboxComponent: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('inbox_messages')
-        .select('*')
+        .select(`
+          *,
+          sender_profile:sender_id(id, username, full_name, avatar_url)
+        `)
         .eq('recipient_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -65,34 +69,7 @@ const InboxComponent: React.FC = () => {
         return;
       }
 
-      // Fetch sender profiles for each message
-      const messagesWithProfiles = await Promise.all(
-        (data || []).map(async (message) => {
-          if (!message.sender_id) {
-            return { ...message, sender_profile: null };
-          }
-
-          try {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('id, username, full_name, avatar_url')
-              .eq('id', message.sender_id)
-              .single();
-
-            if (profileError) {
-              console.error('Error fetching profile:', profileError);
-              return { ...message, sender_profile: null };
-            }
-
-            return { ...message, sender_profile: profile };
-          } catch (err) {
-            console.error('Error in profile fetch:', err);
-            return { ...message, sender_profile: null };
-          }
-        })
-      );
-
-      setMessages(messagesWithProfiles);
+      setMessages(data || []);
     } catch (error) {
       console.error('Error in fetchMessages:', error);
       toast.error('Failed to load messages');

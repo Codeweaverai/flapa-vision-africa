@@ -329,8 +329,7 @@ const CreatorPublicProfile: React.FC = () => {
         </div>
       </div>
 
-      <style>
-        {`
+      <style jsx>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px) translateX(0px); }
           25% { transform: translateY(-20px) translateX(10px); }
@@ -340,8 +339,7 @@ const CreatorPublicProfile: React.FC = () => {
         .animate-float {
           animation: float 6s ease-in-out infinite;
         }
-        `}
-      </style>
+      `}</style>
     </Layout>
   );
 };
