@@ -24,7 +24,7 @@ import ConsultPage from "./pages/ConsultPage";
 import ContactPage from "./pages/ContactPage";
 import AuthPage from "./pages/AuthPage";
 import LearningPage from "./pages/LearningPage";
-import CourseDetailPage as LearningCourseDetailPage from "./pages/learning/CourseDetailPage";
+import LearningCourseDetailPage from "./pages/learning/CourseDetailPage";
 import CourseLearningPage from "./pages/learning/CourseLearningPage";
 import CoursePlayerPage from "./pages/CoursePlayerPage";
 import AccountPage from "./pages/AccountPage";
