@@ -135,7 +135,7 @@ const BrowseCategoriesSection = () => {
                 size="lg" 
                 className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 px-10 py-4 text-lg rounded-full group"
               >
-                <Link to="/courses" className="flex items-center">
+                <Link to="/explore/courses" className="flex items-center">
                   <MoreHorizontal className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
                   View All Categories
                 </Link>
