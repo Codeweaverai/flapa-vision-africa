@@ -80,7 +80,7 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Explore', path: '/' },
     { name: 'About Us', path: '/about' },
-    { name: 'Learning', path: '/learning' },
+    { name: 'My Learning', path: '/learning' },
     { name: 'Community', path: '/community' },
     { name: 'Media', path: '/media' },
     { name: 'Contact', path: '/contact' },
@@ -109,7 +109,7 @@ const Navbar = () => {
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center">
             <span className="font-bold text-xl bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-              SkillPulse
+              SkillPulse 
             </span>
           </Link>
 
