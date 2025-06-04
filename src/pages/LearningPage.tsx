@@ -217,7 +217,7 @@ const LearningPage = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="text-center mb-12">
             <h1 className="text-5xl md:text-6xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Learning Hub</span>
+              <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">My Learning Hub</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Continue your learning journey and track your progress across all enrolled courses.
