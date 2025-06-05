@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -489,9 +488,10 @@ const CourseLearningPage = () => {
         <FinalExamResultsModal
           isOpen={showResultsModal}
           onClose={() => setShowResultsModal(false)}
-          score={lastExamResult.score}
-          passed={lastExamResult.passed}
-          passingScore={finalExam?.passing_score || 70}
+          examScore={lastExamResult.score}
+          quizScores={[]}
+          finalGrade={lastExamResult.score}
+          passingGrade={finalExam?.passing_score || 70}
           onRetake={lastExamResult.passed ? undefined : handleRetakeExam}
           courseId={courseId!}
           enrollmentId={enrollment?.id}
