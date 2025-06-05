@@ -273,13 +273,13 @@ const BecomeCreatorPage = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button asChild size="lg" variant="secondary" className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-4 rounded-xl text-lg">
-                    <Link to="/auth">Apply Now - It's Free</Link>
+                    <Link to="/auth"> Enable Your Creator Dashboard - It's Free</Link>
                   </Button>
                   <Button 
                     variant="outline" 
                     size="lg"
                     onClick={() => setShowDemoVideo(true)}
-                    className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg"
+                    className="border-2 border-white text-orange hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg"
                   >
                     <Play className="h-5 w-5 mr-2" />
                     Watch Success Stories
