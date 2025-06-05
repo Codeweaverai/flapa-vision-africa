@@ -54,7 +54,7 @@ const LearningSection = () => {
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-orange-500 to-purple-600 relative overflow-hidden">
+    <section className="py-20 bg-gradient-to-br from-orange-600 to-purple-700 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-48 -translate-y-48"></div>

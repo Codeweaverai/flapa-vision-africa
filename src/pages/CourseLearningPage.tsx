@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,30 +44,33 @@ interface Course {
   certificate_enabled: boolean;
 }
 
-interface Module {
+interface CourseModule {
   id: string;
   course_id: string;
   title: string;
   description: string;
-  order: number;
+  order_index: number;
   created_at: string;
   updated_at: string;
-  lessons: Lesson[];
+  lessons: CourseLesson[];
 }
 
-interface Lesson {
+interface CourseLesson {
   id: string;
   module_id: string;
   title: string;
-  content: string;
+  description: string;
+  content: any;
+  content_type: string;
   video_url?: string;
-  order: number;
+  materials_urls: string[];
+  order_index: number;
   created_at: string;
   updated_at: string;
   is_complete?: boolean;
 }
 
-interface Enrollment {
+interface CourseEnrollment {
   id: string;
   user_id: string;
   course_id: string;
@@ -131,8 +135,8 @@ const CourseLearningPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [modules, setModules] = useState<CourseModule[]>([]);
+  const [enrollment, setEnrollment] = useState<CourseEnrollment | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [enrollmentCount, setEnrollmentCount] = useState(0);
@@ -165,23 +169,23 @@ const CourseLearningPage = () => {
       if (courseError) throw courseError;
       setCourse(courseData as Course);
 
-      // Fetch modules
+      // Fetch modules with updated table name
       const { data: modulesData, error: modulesError } = await supabase
-        .from('modules')
+        .from('course_modules')
         .select('*')
         .eq('course_id', courseId)
-        .order('order', { ascending: true });
+        .order('order_index', { ascending: true });
 
       if (modulesError) throw modulesError;
 
-      // Fetch lessons for each module
+      // Fetch lessons for each module with updated table name
       const modulesWithLessons = await Promise.all(
-        (modulesData as Module[]).map(async (module) => {
+        (modulesData as CourseModule[]).map(async (module) => {
           const { data: lessonsData, error: lessonsError } = await supabase
-            .from('lessons')
+            .from('course_lessons')
             .select('*')
             .eq('module_id', module.id)
-            .order('order', { ascending: true });
+            .order('order_index', { ascending: true });
 
           if (lessonsError) {
             console.error('Error fetching lessons:', lessonsError);
@@ -190,15 +194,15 @@ const CourseLearningPage = () => {
 
           return {
             ...module,
-            lessons: lessonsData as Lesson[],
+            lessons: lessonsData as CourseLesson[],
           };
         })
       );
       setModules(modulesWithLessons);
 
-      // Fetch enrollment count
+      // Fetch enrollment count with updated table name
       const { count: enrolledCount, error: enrollCountError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select('*', { count: 'exact' })
         .eq('course_id', courseId);
 
@@ -220,9 +224,9 @@ const CourseLearningPage = () => {
       setAverageRating(avgRating);
       setReviewCount(ratings.length);
 
-      // Fetch learning outcomes
+      // Fetch learning outcomes with updated table name
       const { data: outcomesData, error: outcomesError } = await supabase
-        .from('learning_outcomes')
+        .from('course_learning_outcomes')
         .select('*')
         .eq('course_id', courseId);
 
@@ -267,7 +271,7 @@ const CourseLearningPage = () => {
   const fetchEnrollmentData = async () => {
     try {
       const { data: enrollmentData, error: enrollmentError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select('*')
         .eq('user_id', user!.id)
         .eq('course_id', courseId)
@@ -282,7 +286,7 @@ const CourseLearningPage = () => {
         // If no record found, it's not an error, just means the user isn't enrolled
         setEnrollment(null);
       } else {
-        setEnrollment(enrollmentData as Enrollment);
+        setEnrollment(enrollmentData as CourseEnrollment);
       }
     } catch (error) {
       console.error('Error fetching enrollment data:', error);

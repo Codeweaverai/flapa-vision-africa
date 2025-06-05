@@ -11,7 +11,7 @@ const HeroSection = () => {
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: "url('https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//hero-bg.jpg')",
+          backgroundImage: "url('https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//pexels-olly-3769021.jpg')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat'
@@ -25,9 +25,9 @@ const HeroSection = () => {
       <div className="relative z-20 container mx-auto px-4 text-center text-white">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-            Transform Your
+            Welcome to
             <span className="block bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
-              Future Today
+              SkillPulse Marketplace
             </span>
           </h1>
           
