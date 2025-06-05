@@ -264,7 +264,7 @@ const AboutPage = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                <Link to="/auth">Start Creating Today</Link>
+                Start Learning Today
               </Button>
               <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
                 Become a Creator
