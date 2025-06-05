@@ -76,7 +76,7 @@ const CallToAction = () => {
               size="lg" 
               className="bg-white text-purple-700 hover:bg-gray-100 px-8 py-6 text-lg font-semibold rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 group"
             >
-              <Link to="/courses" className="flex items-center gap-2">
+              <Link to="/explore/courses" className="flex items-center gap-2">
                 Start Learning Now
                 <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-200" />
               </Link>
@@ -94,7 +94,7 @@ const CallToAction = () => {
 
           {/* Trust Indicators */}
           <div className="mt-12 pt-8 border-t border-white/20">
-            <p className="text-white/70 text-sm mb-4">SkillPulse Marketplace Trusted by professionals at @</p>
+            <p className="text-white/70 text-sm mb-4">SkillPulse Marketplace Trusted by professionals@</p>
             <div className="flex justify-center items-center gap-8 opacity-60">
               <div className="text-white font-semibold">Microsoft</div>
               <div className="text-white font-semibold">Google</div>
