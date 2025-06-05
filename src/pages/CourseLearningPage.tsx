@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
+import FinalExamModal from '@/components/course/FinalExamModal';
+import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
 import { 
   fetchCourseDetails, 
   fetchCourseEnrollment, 
@@ -16,6 +19,26 @@ import {
   CourseModule,
   Lesson
 } from '@/services/courseService';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
+import { GraduationCap, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
+
+interface FinalExam {
+  id: string;
+  title: string;
+  description: string;
+  time_limit_minutes: number;
+  passing_score: number;
+  is_published: boolean;
+}
+
+interface ExamAttempt {
+  id: string;
+  score: number;
+  passed: boolean;
+  attempt_number: number;
+  completed_at: string;
+}
 
 const CourseLearningPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -29,6 +52,11 @@ const CourseLearningPage = () => {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
+  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
+  const [examAttempts, setExamAttempts] = useState<ExamAttempt[]>([]);
+  const [showExamModal, setShowExamModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [lastExamResult, setLastExamResult] = useState<{ score: number; passed: boolean } | null>(null);
   
   useEffect(() => {
     if (!user) {
@@ -64,6 +92,9 @@ const CourseLearningPage = () => {
       
       // Fetch modules and lessons with progress
       const modulesData = await fetchModuleLessons(courseId, user.id);
+      
+      // Fetch final exam
+      await loadFinalExam();
       
       setCourse(courseData);
       setEnrollment(enrollmentData);
@@ -105,6 +136,38 @@ const CourseLearningPage = () => {
       toast({ title: 'Error', description: 'Failed to load course data', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFinalExam = async () => {
+    if (!courseId || !user) return;
+
+    try {
+      const { data: examData, error: examError } = await supabase
+        .from('final_exams')
+        .select('*')
+        .eq('course_id', courseId)
+        .eq('is_published', true)
+        .maybeSingle();
+
+      if (examError) throw examError;
+      
+      if (examData) {
+        setFinalExam(examData);
+        
+        // Load exam attempts
+        const { data: attemptsData, error: attemptsError } = await supabase
+          .from('final_exam_attempts')
+          .select('*')
+          .eq('exam_id', examData.id)
+          .eq('user_id', user.id)
+          .order('attempt_number', { ascending: false });
+
+        if (attemptsError) throw attemptsError;
+        setExamAttempts(attemptsData || []);
+      }
+    } catch (error) {
+      console.error('Error loading final exam:', error);
     }
   };
   
@@ -157,6 +220,52 @@ const CourseLearningPage = () => {
     } else {
       // No more lessons, possibly show course completion screen
       toast({ title: 'Congratulations!', description: 'You have completed all lessons in this course!' });
+    }
+  };
+
+  const handleStartExam = () => {
+    setShowExamModal(true);
+  };
+
+  const handleExamComplete = (score: number, passed: boolean) => {
+    setLastExamResult({ score, passed });
+    setShowResultsModal(true);
+    loadFinalExam(); // Reload to get updated attempts
+  };
+
+  const handleRetakeExam = () => {
+    setShowExamModal(true);
+  };
+
+  const getExamStatus = () => {
+    if (examAttempts.length === 0) return 'not_taken';
+    const latestAttempt = examAttempts[0];
+    return latestAttempt.passed ? 'passed' : 'failed';
+  };
+
+  const getExamStatusBadge = () => {
+    const status = getExamStatus();
+    switch (status) {
+      case 'passed':
+        return (
+          <Badge className="bg-green-100 text-green-800 border-green-200">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Passed
+          </Badge>
+        );
+      case 'failed':
+        return (
+          <Badge className="bg-red-100 text-red-800 border-red-200">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Failed - Retake Required
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline">
+            Not Started
+          </Badge>
+        );
     }
   };
   
@@ -293,6 +402,69 @@ const CourseLearningPage = () => {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Final Exam Section */}
+                    {finalExam && (
+                      <div className="space-y-2 mt-8 pt-6 border-t">
+                        <div className="flex items-center gap-2 mb-3">
+                          <GraduationCap className="h-5 w-5 text-orange-500" />
+                          <h3 className="font-medium text-lg">Final Assessment</h3>
+                        </div>
+                        
+                        <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">{finalExam.title}</h4>
+                            {getExamStatusBadge()}
+                          </div>
+                          
+                          {finalExam.description && (
+                            <p className="text-sm text-muted-foreground mb-3">{finalExam.description}</p>
+                          )}
+                          
+                          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
+                            <div>Time: {finalExam.time_limit_minutes} minutes</div>
+                            <div>Pass: {finalExam.passing_score}%</div>
+                          </div>
+                          
+                          {examAttempts.length > 0 && (
+                            <div className="text-xs text-muted-foreground mb-3">
+                              Latest score: {examAttempts[0].score}% (Attempt {examAttempts[0].attempt_number})
+                            </div>
+                          )}
+                          
+                          <div className="flex gap-2">
+                            {getExamStatus() === 'not_taken' && (
+                              <Button 
+                                onClick={handleStartExam} 
+                                size="sm"
+                                className="bg-gradient-to-r from-orange-500 to-purple-600"
+                              >
+                                Start Final Exam
+                              </Button>
+                            )}
+                            
+                            {getExamStatus() === 'failed' && (
+                              <Button 
+                                onClick={handleRetakeExam} 
+                                size="sm"
+                                variant="outline"
+                                className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                              >
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                Retake Exam
+                              </Button>
+                            )}
+                            
+                            {getExamStatus() === 'passed' && (
+                              <div className="flex items-center gap-2 text-sm text-green-600">
+                                <CheckCircle className="h-4 w-4" />
+                                Exam Completed Successfully
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -300,6 +472,31 @@ const CourseLearningPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Final Exam Modal */}
+      {finalExam && showExamModal && (
+        <FinalExamModal
+          isOpen={showExamModal}
+          onClose={() => setShowExamModal(false)}
+          exam={finalExam}
+          enrollmentId={enrollment?.id}
+          onComplete={handleExamComplete}
+        />
+      )}
+
+      {/* Results Modal */}
+      {lastExamResult && (
+        <FinalExamResultsModal
+          isOpen={showResultsModal}
+          onClose={() => setShowResultsModal(false)}
+          score={lastExamResult.score}
+          passed={lastExamResult.passed}
+          passingScore={finalExam?.passing_score || 70}
+          onRetake={lastExamResult.passed ? undefined : handleRetakeExam}
+          courseId={courseId!}
+          enrollmentId={enrollment?.id}
+        />
+      )}
     </Layout>
   );
 };
