@@ -20,7 +20,7 @@ import {
 } from '@/services/courseService';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { GraduationCap, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock } from 'lucide-react';
 
 interface FinalExam {
   id: string;
@@ -56,6 +56,7 @@ const CourseLearningPage = () => {
   const [showExamModal, setShowExamModal] = useState(false);
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [lastExamResult, setLastExamResult] = useState<{ score: number; passed: boolean } | null>(null);
+  const [certificateGenerated, setCertificateGenerated] = useState(false);
   
   useEffect(() => {
     if (!user) {
@@ -73,7 +74,6 @@ const CourseLearningPage = () => {
     
     setLoading(true);
     try {
-      // Fetch course details
       const courseData = await fetchCourseDetails(courseId);
       if (!courseData) {
         toast({ title: 'Error', description: 'Course not found', variant: 'destructive' });
@@ -81,7 +81,6 @@ const CourseLearningPage = () => {
         return;
       }
       
-      // Fetch user enrollment
       const enrollmentData = await fetchCourseEnrollment(courseId, user.id);
       if (!enrollmentData) {
         toast({ title: 'Access Denied', description: 'You are not enrolled in this course', variant: 'destructive' });
@@ -89,28 +88,23 @@ const CourseLearningPage = () => {
         return;
       }
       
-      // Fetch modules and lessons with progress
       const modulesData = await fetchModuleLessons(courseId, user.id);
       
-      // Fetch final exam
       await loadFinalExam();
       
       setCourse(courseData);
       setEnrollment(enrollmentData);
       setModules(modulesData);
       
-      // Set the current lesson to the first incomplete lesson, or the first lesson if all are complete
       let lessonFound = false;
       let firstLesson: Lesson | null = null;
       
       for (const module of modulesData) {
         if (module.lessons && module.lessons.length > 0) {
-          // Keep track of the first lesson overall
           if (!firstLesson) {
             firstLesson = module.lessons[0];
           }
           
-          // Find the first incomplete lesson
           for (const lesson of module.lessons) {
             if (!lesson.is_completed) {
               setCurrentLesson(lesson);
@@ -122,12 +116,10 @@ const CourseLearningPage = () => {
         }
       }
       
-      // If all lessons are complete, set the first lesson
       if (!lessonFound && firstLesson) {
         setCurrentLesson(firstLesson);
       }
       
-      // Calculate overall progress
       calculateProgress(modulesData);
       
     } catch (error) {
@@ -154,7 +146,6 @@ const CourseLearningPage = () => {
       if (examData) {
         setFinalExam(examData);
         
-        // Load exam attempts
         const { data: attemptsData, error: attemptsError } = await supabase
           .from('final_exam_attempts')
           .select('*')
@@ -164,6 +155,16 @@ const CourseLearningPage = () => {
 
         if (attemptsError) throw attemptsError;
         setExamAttempts(attemptsData || []);
+
+        const { data: certificate } = await supabase
+          .from('certificates')
+          .select('*')
+          .eq('enrollment_id', enrollment?.id)
+          .maybeSingle();
+
+        if (certificate) {
+          setCertificateGenerated(true);
+        }
       }
     } catch (error) {
       console.error('Error loading final exam:', error);
@@ -189,15 +190,46 @@ const CourseLearningPage = () => {
     setProgress(progressPercentage);
   };
   
+  const isAllContentComplete = () => {
+    return modules.every(module => 
+      module.lessons.every(lesson => lesson.is_completed)
+    );
+  };
+
+  const generateCertificate = async () => {
+    if (!enrollment) return;
+
+    try {
+      const response = await fetch('/api/generate-certificate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          enrollmentId: enrollment.id
+        })
+      });
+
+      if (response.ok) {
+        setCertificateGenerated(true);
+        toast.success('Certificate generated successfully!');
+      } else {
+        throw new Error('Failed to generate certificate');
+      }
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      toast.error('Failed to generate certificate');
+    }
+  };
+  
   const handleLessonSelect = (lesson: Lesson) => {
     setCurrentLesson(lesson);
   };
   
   const handleLessonComplete = () => {
-    // Implementation for marking a lesson as complete would go here
     toast({ title: 'Lesson Completed', description: 'Moving to the next lesson' });
     
-    // Find the next lesson in sequence
     let foundCurrent = false;
     let nextLesson: Lesson | null = null;
     
@@ -217,19 +249,27 @@ const CourseLearningPage = () => {
     if (nextLesson) {
       setCurrentLesson(nextLesson);
     } else {
-      // No more lessons, possibly show course completion screen
       toast({ title: 'Congratulations!', description: 'You have completed all lessons in this course!' });
     }
   };
 
   const handleStartExam = () => {
+    if (!isAllContentComplete()) {
+      toast.error('Please complete all lessons before taking the final exam');
+      return;
+    }
     setShowExamModal(true);
   };
 
-  const handleExamComplete = (score: number, passed: boolean) => {
+  const handleExamComplete = async (score: number, passed: boolean) => {
     setLastExamResult({ score, passed });
     setShowResultsModal(true);
-    loadFinalExam(); // Reload to get updated attempts
+    
+    if (passed && course?.certificate_enabled) {
+      await generateCertificate();
+    }
+    
+    loadFinalExam();
   };
 
   const handleRetakeExam = () => {
@@ -431,12 +471,20 @@ const CourseLearningPage = () => {
                             </div>
                           )}
                           
+                          {!isAllContentComplete() && (
+                            <div className="flex items-center gap-2 text-sm text-orange-600 mb-3">
+                              <Lock className="h-4 w-4" />
+                              Complete all lessons to unlock the final exam
+                            </div>
+                          )}
+                          
                           <div className="flex gap-2">
                             {getExamStatus() === 'not_taken' && (
                               <Button 
                                 onClick={handleStartExam} 
                                 size="sm"
                                 className="bg-gradient-to-r from-orange-500 to-purple-600"
+                                disabled={!isAllContentComplete()}
                               >
                                 Start Final Exam
                               </Button>
@@ -455,9 +503,17 @@ const CourseLearningPage = () => {
                             )}
                             
                             {getExamStatus() === 'passed' && (
-                              <div className="flex items-center gap-2 text-sm text-green-600">
-                                <CheckCircle className="h-4 w-4" />
-                                Exam Completed Successfully
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2 text-sm text-green-600">
+                                  <CheckCircle className="h-4 w-4" />
+                                  Exam Completed Successfully
+                                </div>
+                                {course?.certificate_enabled && certificateGenerated && (
+                                  <div className="flex items-center gap-2 text-sm text-purple-600">
+                                    <Award className="h-4 w-4" />
+                                    Certificate Generated
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

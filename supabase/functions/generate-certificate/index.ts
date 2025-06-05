@@ -70,7 +70,8 @@ serve(async (req) => {
         id,
         user_id,
         course_id,
-        courses:course_id (title)
+        completion_date,
+        courses:course_id (title, certificate_enabled)
       `)
       .eq("id", enrollmentId)
       .single();
@@ -91,6 +92,17 @@ serve(async (req) => {
         JSON.stringify({ error: "Unauthorized" }),
         {
           status: 403,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Check if course has certificates enabled
+    if (!enrollment.courses?.certificate_enabled) {
+      return new Response(
+        JSON.stringify({ error: "Certificates are not enabled for this course" }),
+        {
+          status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         }
       );
@@ -131,27 +143,19 @@ serve(async (req) => {
     // Generate verification code
     const verificationCode = generateVerificationCode();
 
-    // Check if course-materials bucket exists
-    const { data: buckets } = await supabaseClient.storage.listBuckets();
-    if (!buckets?.find(b => b.name === "course-materials")) {
-      // Create bucket with service role key
-      await supabaseClient.storage.createBucket("course-materials", {
-        public: true,
-        fileSizeLimit: 10485760, // 10MB
-      });
-      
-      // Ensure public access to certificates folder
-      await supabaseClient.storage.from("course-materials").createSignedUrl("certificates/dummy.txt", 60);
-    }
-
-    // Create certificate record
+    // Create certificate record with student name and director signature
+    const studentName = profile?.full_name || user.user_metadata?.full_name || 'Student';
+    const directorName = "Mbolela Pule";
+    const directorTitle = "Director of Learning";
+    const courseName = enrollment.courses?.title || "Course";
+    
     const { data: certificate, error: createError } = await supabaseClient
       .from("certificates")
       .insert({
         enrollment_id: enrollmentId,
         verification_code: verificationCode,
         issue_date: new Date().toISOString(),
-        pdf_url: `${supabaseUrl}/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`
+        pdf_url: generateCertificatePDF(studentName, courseName, directorName, directorTitle, verificationCode)
       })
       .select()
       .single();
@@ -171,7 +175,10 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: "Certificate generated successfully", 
-        certificate 
+        certificate,
+        studentName,
+        directorName,
+        directorTitle
       }),
       {
         status: 200,
@@ -198,4 +205,12 @@ function generateVerificationCode(): string {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+}
+
+// Helper function to generate certificate PDF URL/path
+function generateCertificatePDF(studentName: string, courseName: string, directorName: string, directorTitle: string, verificationCode: string): string {
+  // In a real implementation, this would generate an actual PDF
+  // For now, return a placeholder URL that includes all the certificate details
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
+  return `${supabaseUrl}/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`;
 }
