@@ -89,12 +89,13 @@ const CourseDiscussionsTab: React.FC = () => {
     try {
       console.log('Fetching posts for course:', selectedCourse);
       
+      // Updated query to use proper foreign key relationships
       const { data, error } = await supabase
         .from('community_posts')
         .select(`
           *,
-          profiles:user_id(full_name, username, avatar_url),
-          courses:course_id(title)
+          profiles!community_posts_user_id_fkey(full_name, username, avatar_url),
+          courses!community_posts_course_id_fkey(title)
         `)
         .eq('course_id', selectedCourse)
         .order('created_at', { ascending: false });
@@ -411,7 +412,7 @@ const CourseDiscussionsTab: React.FC = () => {
               <h3 className="text-lg font-semibold mb-2">Select a Course</h3>
               <p className="text-gray-600">Choose a course above to view and participate in discussions.</p>
             </CardContent>
-          </Card>
+          </div>
         )}
       </div>
     </div>

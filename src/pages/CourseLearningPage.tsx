@@ -1,813 +1,591 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import ReactPlayer from 'react-player';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import Layout from '@/components/layout/Layout';
-import FinalExamModal from '@/components/course/FinalExamModal';
-import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
-import { 
-  fetchCourseDetails, 
-  fetchCourseEnrollment, 
-  fetchModuleLessons,
-  CourseModule,
-  Lesson
-} from '@/services/courseService';
 import { supabase } from '@/lib/supabaseClient';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Play, 
+  Clock, 
+  User, 
+  BookOpen, 
+  Award, 
+  Star, 
+  Users,
+  MessageCircle,
+  Target,
+  CheckCircle
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock, Clock, FileText, Star, BookOpen, Target, User, Mail } from 'lucide-react';
+import CourseModuleList from '@/components/course/CourseModuleList';
+import CourseReviews from '@/components/course/CourseReviews';
+import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
 
-interface FinalExam {
-  id: string;
+interface Course {
+  id?: string;
   title: string;
   description: string;
-  time_limit_minutes: number;
-  passing_score: number;
-  is_published: boolean;
-  questions?: FinalExamQuestion[];
-}
-
-interface FinalExamQuestion {
-  id: string;
-  question: string;
-  question_type: string;
+  summary: string;
+  thumbnail_url?: string;
+  category: string;
+  price: number;
+  is_free: boolean;
+  creator_id: string;
+  duration_minutes: number;
   difficulty_level: string;
-  order_index: number;
-  answers: FinalExamAnswer[];
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+  certificate_enabled: boolean;
 }
 
-interface FinalExamAnswer {
+interface Module {
   id: string;
-  answer: string;
-  is_correct: boolean;
-  order_index: number;
+  course_id: string;
+  title: string;
+  description: string;
+  order: number;
+  created_at: string;
+  updated_at: string;
+  lessons: Lesson[];
 }
 
-interface ExamAttempt {
+interface Lesson {
   id: string;
-  score: number;
-  passed: boolean;
-  attempt_number: number;
-  completed_at: string;
-  answers: any;
+  module_id: string;
+  title: string;
+  content: string;
+  video_url?: string;
+  order: number;
+  created_at: string;
+  updated_at: string;
+  is_complete?: boolean;
+}
+
+interface Enrollment {
+  id: string;
+  user_id: string;
+  course_id: string;
+  enrollment_date: string;
+  payment_status: string;
+}
+
+interface ProgressData {
+  id: string;
+  user_id: string;
+  course_id: string;
+  progress_percentage: number;
+  last_accessed_module_id?: string;
+  last_accessed_lesson_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Review {
+  id: string;
+  course_id: string;
+  user_id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  updated_at: string;
+  profiles?: {
+    id: string;
+    username?: string;
+    full_name?: string;
+    avatar_url?: string;
+  };
 }
 
 interface LearningOutcome {
   id: string;
+  course_id: string;
   outcome: string;
-  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface FinalExam {
+  id: string;
+  course_id: string;
+  title: string;
+  description: string;
+  passing_score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Profile {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+  bio?: string;
 }
 
 const CourseLearningPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
-  const navigate = useNavigate();
-  const { toast: uiToast } = useToast();
   const { user } = useAuth();
-  
-  const [course, setCourse] = useState<any>(null);
-  const [enrollment, setEnrollment] = useState<any>(null);
-  const [modules, setModules] = useState<CourseModule[]>([]);
-  const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [progress, setProgress] = useState<number>(0);
-  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
-  const [examAttempts, setExamAttempts] = useState<ExamAttempt[]>([]);
-  const [showExamModal, setShowExamModal] = useState(false);
-  const [showResultsModal, setShowResultsModal] = useState(false);
-  const [lastExamResult, setLastExamResult] = useState<{ score: number; passed: boolean } | null>(null);
-  const [certificateGenerated, setCertificateGenerated] = useState(false);
-  const [examLoading, setExamLoading] = useState(false);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState<ProgressData | null>(null);
+  const [enrollmentCount, setEnrollmentCount] = useState(0);
+  const [averageRating, setAverageRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
   const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
-  const [instructor, setInstructor] = useState<any>(null);
-  
+  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
+  const [instructor, setInstructor] = useState<Profile | null>(null);
+
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    
     if (courseId) {
-      loadCourseData();
+      fetchCourseData();
+      if (user) {
+        fetchEnrollmentData();
+        fetchProgress();
+      }
     }
   }, [courseId, user]);
-  
-  const loadCourseData = async () => {
-    if (!courseId || !user) return;
-    
+
+  const fetchCourseData = async () => {
     setLoading(true);
     try {
-      const courseData = await fetchCourseDetails(courseId);
-      if (!courseData) {
-        uiToast({ title: 'Error', description: 'Course not found', variant: 'destructive' });
-        navigate('/learning');
-        return;
-      }
-      
-      const enrollmentData = await fetchCourseEnrollment(courseId, user.id);
-      if (!enrollmentData) {
-        uiToast({ title: 'Access Denied', description: 'You are not enrolled in this course', variant: 'destructive' });
-        navigate(`/course/${courseId}`);
-        return;
-      }
-      
-      const modulesData = await fetchModuleLessons(courseId, user.id);
-      
-      // Load additional course data
-      await Promise.all([
-        loadFinalExam(),
-        loadLearningOutcomes(),
-        loadInstructorProfile(courseData.creator_id)
-      ]);
-      
-      setCourse(courseData);
-      setEnrollment(enrollmentData);
-      setModules(modulesData);
-      
-      let lessonFound = false;
-      let firstLesson: Lesson | null = null;
-      
-      for (const module of modulesData) {
-        if (module.lessons && module.lessons.length > 0) {
-          if (!firstLesson) {
-            firstLesson = module.lessons[0];
+      // Fetch course details
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw courseError;
+      setCourse(courseData as Course);
+
+      // Fetch modules
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('modules')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('order', { ascending: true });
+
+      if (modulesError) throw modulesError;
+
+      // Fetch lessons for each module
+      const modulesWithLessons = await Promise.all(
+        (modulesData as Module[]).map(async (module) => {
+          const { data: lessonsData, error: lessonsError } = await supabase
+            .from('lessons')
+            .select('*')
+            .eq('module_id', module.id)
+            .order('order', { ascending: true });
+
+          if (lessonsError) {
+            console.error('Error fetching lessons:', lessonsError);
+            return module;
           }
-          
-          for (const lesson of module.lessons) {
-            if (!lesson.is_completed) {
-              setCurrentLesson(lesson);
-              lessonFound = true;
-              break;
-            }
-          }
-          if (lessonFound) break;
+
+          return {
+            ...module,
+            lessons: lessonsData as Lesson[],
+          };
+        })
+      );
+      setModules(modulesWithLessons);
+
+      // Fetch enrollment count
+      const { count: enrolledCount, error: enrollCountError } = await supabase
+        .from('enrollments')
+        .select('*', { count: 'exact' })
+        .eq('course_id', courseId);
+
+      if (enrollCountError) throw enrollCountError;
+      setEnrollmentCount(enrolledCount || 0);
+
+      // Fetch average rating and review count
+      const { data: ratingData, error: ratingError } = await supabase
+        .from('course_reviews')
+        .select('rating')
+        .eq('course_id', courseId);
+
+      if (ratingError) throw ratingError;
+
+      const ratings = ratingData?.map((review) => review.rating) || [];
+      const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
+      const avgRating = ratings.length > 0 ? totalRating / ratings.length : 0;
+
+      setAverageRating(avgRating);
+      setReviewCount(ratings.length);
+
+      // Fetch learning outcomes
+      const { data: outcomesData, error: outcomesError } = await supabase
+        .from('learning_outcomes')
+        .select('*')
+        .eq('course_id', courseId);
+
+      if (outcomesError) throw outcomesError;
+      setLearningOutcomes(outcomesData as LearningOutcome[]);
+
+      // Fetch final exam
+      const { data: examData, error: examError } = await supabase
+        .from('final_exams')
+        .select('*')
+        .eq('course_id', courseId)
+        .single();
+
+      if (examError) {
+        console.error('Error fetching final exam:', examError);
+      } else {
+        setFinalExam(examData as FinalExam);
+      }
+
+      // Fetch instructor profile
+      if (courseData) {
+        const { data: instructorData, error: instructorError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', courseData.creator_id)
+          .single();
+
+        if (instructorError) {
+          console.error('Error fetching instructor profile:', instructorError);
+        } else {
+          setInstructor(instructorData as Profile);
         }
       }
-      
-      if (!lessonFound && firstLesson) {
-        setCurrentLesson(firstLesson);
-      }
-      
-      calculateProgress(modulesData);
-      
     } catch (error) {
-      console.error('Error loading course data:', error);
-      uiToast({ title: 'Error', description: 'Failed to load course data', variant: 'destructive' });
+      console.error('Error fetching course data:', error);
+      toast.error('Failed to load course data');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadLearningOutcomes = async () => {
-    if (!courseId) return;
-
+  const fetchEnrollmentData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('course_learning_outcomes')
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from('enrollments')
         .select('*')
+        .eq('user_id', user!.id)
         .eq('course_id', courseId)
-        .order('order_index');
-
-      if (error) throw error;
-      setLearningOutcomes(data || []);
-    } catch (error) {
-      console.error('Error loading learning outcomes:', error);
-    }
-  };
-
-  const loadInstructorProfile = async (creatorId: string) => {
-    if (!creatorId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', creatorId)
         .single();
 
-      if (error) throw error;
-      setInstructor(data);
-    } catch (error) {
-      console.error('Error loading instructor profile:', error);
-    }
-  };
-
-  const loadFinalExam = async () => {
-    if (!courseId || !user) return;
-
-    try {
-      // Fetch final exam with questions and answers
-      const { data: examData, error: examError } = await supabase
-        .from('final_exams')
-        .select(`
-          *,
-          final_exam_questions (
-            *,
-            final_exam_answers (*)
-          )
-        `)
-        .eq('course_id', courseId)
-        .eq('is_published', true)
-        .maybeSingle();
-
-      if (examError) throw examError;
-      
-      if (examData) {
-        // Sort questions and answers by order_index and properly map the structure
-        if (examData.final_exam_questions) {
-          examData.final_exam_questions.sort((a: any, b: any) => a.order_index - b.order_index);
-          examData.final_exam_questions.forEach((question: any) => {
-            if (question.final_exam_answers) {
-              question.final_exam_answers.sort((a: any, b: any) => a.order_index - b.order_index);
-            }
-          });
-          
-          // Map the questions to match our interface
-          const mappedQuestions = examData.final_exam_questions.map((q: any) => ({
-            id: q.id,
-            question: q.question,
-            question_type: q.question_type,
-            difficulty_level: q.difficulty_level,
-            order_index: q.order_index,
-            answers: q.final_exam_answers || []
-          }));
-          
-          setFinalExam({
-            ...examData,
-            questions: mappedQuestions
-          });
-        } else {
-          setFinalExam({
-            ...examData,
-            questions: []
-          });
+      if (enrollmentError) {
+        // Check if the error is because no record was found
+        if (enrollmentError.message !== 'No rows found') {
+          console.error('Error fetching enrollment data:', enrollmentError);
+          toast.error('Failed to load enrollment data');
         }
-        
-        // Fetch exam attempts
-        const { data: attemptsData, error: attemptsError } = await supabase
-          .from('final_exam_attempts')
-          .select('*')
-          .eq('exam_id', examData.id)
-          .eq('user_id', user.id)
-          .order('attempt_number', { ascending: false });
-
-        if (attemptsError) throw attemptsError;
-        setExamAttempts(attemptsData || []);
-
-        // Check if certificate exists
-        if (enrollment?.id) {
-          const { data: certificate } = await supabase
-            .from('certificates')
-            .select('*')
-            .eq('enrollment_id', enrollment.id)
-            .maybeSingle();
-
-          if (certificate) {
-            setCertificateGenerated(true);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error loading final exam:', error);
-    }
-  };
-  
-  const calculateProgress = (modulesData: CourseModule[]) => {
-    let totalLessons = 0;
-    let completedLessons = 0;
-    
-    modulesData.forEach(module => {
-      if (module.lessons) {
-        totalLessons += module.lessons.length;
-        module.lessons.forEach(lesson => {
-          if (lesson.is_completed) {
-            completedLessons++;
-          }
-        });
-      }
-    });
-    
-    const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-    setProgress(progressPercentage);
-  };
-  
-  const isAllContentComplete = () => {
-    return modules.every(module => 
-      module.lessons && module.lessons.every(lesson => lesson.is_completed)
-    );
-  };
-
-  const generateCertificate = async () => {
-    if (!enrollment) return;
-
-    try {
-      const response = await fetch('/api/generate-certificate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({
-          enrollmentId: enrollment.id
-        })
-      });
-
-      if (response.ok) {
-        setCertificateGenerated(true);
-        toast('Certificate generated successfully!');
+        // If no record found, it's not an error, just means the user isn't enrolled
+        setEnrollment(null);
       } else {
-        throw new Error('Failed to generate certificate');
+        setEnrollment(enrollmentData as Enrollment);
       }
     } catch (error) {
-      console.error('Error generating certificate:', error);
-      toast('Failed to generate certificate');
+      console.error('Error fetching enrollment data:', error);
+      toast.error('Failed to load enrollment data');
     }
   };
-  
-  const handleLessonSelect = (lesson: Lesson) => {
-    setCurrentLesson(lesson);
-  };
-  
-  const handleLessonComplete = () => {
-    uiToast({ title: 'Lesson Completed', description: 'Moving to the next lesson' });
-    
-    let foundCurrent = false;
-    let nextLesson: Lesson | null = null;
-    
-    outerLoop:
-    for (const module of modules) {
-      for (const lesson of module.lessons) {
-        if (foundCurrent) {
-          nextLesson = lesson;
-          break outerLoop;
-        }
-        if (lesson.id === currentLesson?.id) {
-          foundCurrent = true;
-        }
+
+  const fetchProgress = async () => {
+    try {
+      const { data: progressData, error: progressError } = await supabase
+        .from('course_progress')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('course_id', courseId)
+        .single();
+
+      if (progressError) {
+        // If no record found, it's not an error, just means no progress yet
+        setProgress(null);
+      } else {
+        setProgress(progressData as ProgressData);
       }
-    }
-    
-    if (nextLesson) {
-      setCurrentLesson(nextLesson);
-    } else {
-      uiToast({ title: 'Congratulations!', description: 'You have completed all lessons in this course!' });
+    } catch (error) {
+      console.error('Error fetching progress data:', error);
+      toast.error('Failed to load progress data');
     }
   };
 
-  const handleStartExam = () => {
-    if (!isAllContentComplete()) {
-      toast('Please complete all lessons before taking the final exam');
-      return;
-    }
-    setShowExamModal(true);
-  };
-
-  const handleExamComplete = async (score: number, passed: boolean) => {
-    setExamLoading(true);
-    
-    // Simulate 30-second processing time
-    setTimeout(async () => {
-      setLastExamResult({ score, passed });
-      setShowResultsModal(true);
-      
-      if (passed && course?.certificate_enabled) {
-        await generateCertificate();
-      }
-      
-      await loadFinalExam(); // Reload exam data
-      setExamLoading(false);
-    }, 30000); // 30 seconds
-  };
-
-  const handleRetakeExam = () => {
-    setShowExamModal(true);
-  };
-
-  const getExamStatus = () => {
-    if (examAttempts.length === 0) return 'not_taken';
-    const latestAttempt = examAttempts[0];
-    return latestAttempt.passed ? 'passed' : 'failed';
-  };
-
-  const getExamStatusBadge = () => {
-    const status = getExamStatus();
-    switch (status) {
-      case 'passed':
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-200">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Passed
-          </Badge>
-        );
-      case 'failed':
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-200">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Failed - Retake Available
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline">
-            <FileText className="h-3 w-3 mr-1" />
-            Ready to Take
-          </Badge>
-        );
+  const handleStartLearning = () => {
+    if (modules.length > 0 && modules[0].lessons.length > 0) {
+      const firstLesson = modules[0].lessons[0];
+      window.location.href = `/course/${courseId}/lesson/${firstLesson.id}`;
     }
   };
-  
+
+  const enrolledUser = enrollment && enrollment.payment_status === 'completed';
+
   if (loading) {
     return (
-      <Layout>
-        <div className="flex justify-center items-center h-[60vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
     );
   }
-  
+
+  if (!course) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
+          <Link to="/explore/courses">
+            <Button>Browse Courses</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Layout>
-      <div className="container max-w-7xl py-6">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold">{course?.title}</h1>
-            <Progress value={progress} className="h-2" />
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>{Math.round(progress)}% Complete</span>
-              {enrollment && <span>Enrolled on {new Date(enrollment.enrollment_date).toLocaleDateString()}</span>}
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Course Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Badge variant="secondary">{course.category}</Badge>
+            <Badge variant="outline">{course.difficulty_level}</Badge>
+            {course.is_free && <Badge className="bg-green-500">Free</Badge>}
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              {currentLesson ? (
-                <Card className="border-0 shadow-lg overflow-hidden">
-                  <div className="aspect-video bg-black">
-                    {currentLesson.video_url ? (
-                      <ReactPlayer
-                        url={currentLesson.video_url}
-                        width="100%"
-                        height="100%"
-                        controls
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full bg-muted">
-                        <p className="text-muted-foreground">No video available for this lesson</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">{course.title}</h1>
+          <p className="text-xl text-gray-600 mb-6">{course.summary}</p>
+          
+          <div className="flex flex-wrap items-center gap-6 text-gray-600">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              <span>{course.duration_minutes} minutes</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              <span>{modules.length} modules</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              <span>{enrollmentCount} students</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+              <span>{averageRating.toFixed(1)} ({reviewCount} reviews)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Bar for Enrolled Users */}
+        {enrolledUser && (
+          <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Your Progress</h3>
+                <span className="text-2xl font-bold text-orange-600">{progress?.progress_percentage || 0}%</span>
+              </div>
+              <Progress value={progress?.progress_percentage || 0} className="h-3" />
+              <p className="text-sm text-gray-600 mt-2">
+                Keep going! You're doing great.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            <Tabs defaultValue="content" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="content">Content</TabsTrigger>
+                <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+                <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                <TabsTrigger value="discussion">Discussion</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="content" className="space-y-6">
+                {/* Course Overview */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Course Overview
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-700 whitespace-pre-line">{course.description}</p>
+                  </CardContent>
+                </Card>
+
+                {/* Learning Outcomes */}
+                {learningOutcomes.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5" />
+                        What You'll Learn
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {learningOutcomes.map((outcome) => (
+                          <div key={outcome.id} className="flex items-start gap-3">
+                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span className="text-gray-700">{outcome.outcome}</span>
+                          </div>
+                        ))}
                       </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Course Objectives */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Award className="h-5 w-5" />
+                      Course Objectives
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">Master the core concepts and principles covered in this course</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">Apply learned skills through practical exercises and projects</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">Build confidence in implementing solutions in real-world scenarios</span>
+                      </div>
+                      {course.certificate_enabled && (
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span className="text-gray-700">Earn a certificate of completion to showcase your achievement</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="curriculum">
+                <CourseModuleList 
+                  modules={modules} 
+                  enrolledUser={enrolledUser}
+                  courseId={courseId!}
+                  finalExam={finalExam}
+                />
+              </TabsContent>
+              
+              <TabsContent value="reviews">
+                <CourseReviews courseId={courseId!} />
+              </TabsContent>
+              
+              <TabsContent value="discussion">
+                <CourseDiscussionSection courseId={courseId!} />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Enrollment Card */}
+            <Card className="sticky top-4">
+              <CardContent className="p-6">
+                {!enrolledUser ? (
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-orange-600 mb-2">
+                        {course.is_free ? 'Free' : `$${course.price}`}
+                      </div>
+                      {!course.is_free && (
+                        <p className="text-sm text-gray-600">One-time payment</p>
+                      )}
+                    </div>
+                    {user ? (
+                      <Button 
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
+                      >
+                        {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        onClick={() => window.location.href = '/auth'}
+                      >
+                        Sign in to Enroll
+                      </Button>
                     )}
                   </div>
-                  
-                  <CardHeader>
-                    <CardTitle>{currentLesson.title}</CardTitle>
-                    {currentLesson.description && (
-                      <CardDescription>{currentLesson.description}</CardDescription>
-                    )}
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <Tabs defaultValue="content">
-                      <TabsList className="mb-4">
-                        <TabsTrigger value="content">Course Overview</TabsTrigger>
-                        <TabsTrigger value="materials">Additional Materials</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="content">
-                        <div className="space-y-6">
-                          {/* Course Overview */}
-                          <div>
-                            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                              <BookOpen className="h-5 w-5 text-orange-500" />
-                              Course Overview
-                            </h3>
-                            <p className="text-gray-700 leading-relaxed">{course?.description}</p>
-                          </div>
-
-                          {/* What You'll Learn */}
-                          {learningOutcomes.length > 0 && (
-                            <div>
-                              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                                <Target className="h-5 w-5 text-purple-500" />
-                                What You'll Learn
-                              </h3>
-                              <ul className="space-y-2">
-                                {learningOutcomes.map((outcome) => (
-                                  <li key={outcome.id} className="flex items-center gap-3">
-                                    <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                    <span className="text-gray-700">{outcome.outcome}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {/* Course Objectives */}
-                          <div>
-                            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                              <Star className="h-5 w-5 text-yellow-500" />
-                              Course Objectives
-                            </h3>
-                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg">
-                              <p className="text-gray-700 leading-relaxed">
-                                This course is designed to provide you with comprehensive knowledge and practical skills 
-                                in {course?.category}. By the end of this course, you'll have gained valuable insights 
-                                and hands-on experience that you can apply in real-world scenarios.
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Instructor Card */}
-                          {instructor && (
-                            <div>
-                              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                                <User className="h-5 w-5 text-blue-500" />
-                                Your Instructor
-                              </h3>
-                              <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200">
-                                <CardContent className="p-4">
-                                  <div className="flex items-center gap-4">
-                                    <img
-                                      src={instructor.avatar_url || '/placeholder.svg'}
-                                      alt={instructor.full_name || 'Instructor'}
-                                      className="w-16 h-16 rounded-full object-cover"
-                                    />
-                                    <div className="flex-1">
-                                      <h4 className="font-semibold text-lg">{instructor.full_name || 'Instructor'}</h4>
-                                      {instructor.bio && (
-                                        <p className="text-gray-600 text-sm mt-1">{instructor.bio}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-2 mt-4">
-                                    <Link to={`/creator/profile/${instructor.id}`}>
-                                      <Button variant="outline" size="sm">
-                                        <User className="h-4 w-4 mr-2" />
-                                        View Profile
-                                      </Button>
-                                    </Link>
-                                    <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
-                                      <Button variant="outline" size="sm">
-                                        <Mail className="h-4 w-4 mr-2" />
-                                        Contact
-                                      </Button>
-                                    </Link>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </div>
-                          )}
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="materials">
-                        {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
-                          <ul className="space-y-2">
-                            {currentLesson.materials_urls.map((url: string, idx: number) => (
-                              <li key={idx}>
-                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                  Material {idx + 1}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p>No additional materials for this lesson.</p>
-                        )}
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                  
-                  <CardFooter>
-                    <Button onClick={handleLessonComplete} className="ml-auto">
-                      Mark as Completed
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold text-green-600 mb-2">Enrolled</h3>
+                      <p className="text-sm text-gray-600">You have access to this course</p>
+                    </div>
+                    <Button 
+                      onClick={handleStartLearning}
+                      className="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Continue Learning
                     </Button>
-                  </CardFooter>
-                </Card>
-              ) : (
-                <Card className="border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Welcome to the Course</CardTitle>
-                    <CardDescription>Select a lesson from the course outline to begin</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p>{course?.description}</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-            
-            {/* Enhanced Curriculum Sidebar */}
-            <div>
-              <Card className="border-0 shadow">
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Instructor Card */}
+            {instructor && (
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5" />
-                    Course Curriculum
+                    <User className="h-5 w-5" />
+                    Your Instructor
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Course Modules */}
-                    {modules.map((module) => (
-                      <div key={module.id} className="space-y-2">
-                        <h3 className="font-medium text-lg flex items-center gap-2">
-                          <Target className="h-4 w-4 text-orange-500" />
-                          {module.title}
-                        </h3>
-                        <div className="space-y-1">
-                          {module.lessons.map((lesson) => (
-                            <button
-                              key={lesson.id}
-                              onClick={() => handleLessonSelect(lesson)}
-                              className={`flex items-center w-full p-3 rounded-lg text-left transition-all ${
-                                currentLesson?.id === lesson.id
-                                  ? 'bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 text-orange-700 font-medium'
-                                  : 'hover:bg-muted'
-                              } ${lesson.is_completed ? 'text-green-600' : ''}`}
-                            >
-                              <span className="mr-3">
-                                {lesson.is_completed ? (
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
-                                )}
-                              </span>
-                              <span className="flex-1">{lesson.title}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {/* Final Exam Section - Enhanced and Always Visible */}
-                    {finalExam && (
-                      <div className="space-y-2 mt-8 pt-6 border-t border-gray-200">
-                        <div className="flex items-center gap-2 mb-4">
-                          <GraduationCap className="h-6 w-6 text-orange-500" />
-                          <h3 className="font-semibold text-lg text-gray-800">Final Assessment</h3>
-                        </div>
-                        
-                        <div className="bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 p-6 rounded-xl border border-orange-200 shadow-sm">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-bold text-lg text-gray-800">{finalExam.title}</h4>
-                            {getExamStatusBadge()}
-                          </div>
-                          
-                          {finalExam.description && (
-                            <p className="text-sm text-gray-600 mb-4 leading-relaxed">{finalExam.description}</p>
-                          )}
-                          
-                          {/* Exam Details Grid */}
-                          <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div className="bg-white/60 p-3 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-orange-500" />
-                                <span className="text-xs font-medium text-gray-600">Duration</span>
-                              </div>
-                              <div className="text-sm font-semibold text-gray-800">{finalExam.time_limit_minutes} minutes</div>
-                            </div>
-                            
-                            <div className="bg-white/60 p-3 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <Target className="h-4 w-4 text-purple-500" />
-                                <span className="text-xs font-medium text-gray-600">Pass Score</span>
-                              </div>
-                              <div className="text-sm font-semibold text-gray-800">{finalExam.passing_score}%</div>
-                            </div>
-                            
-                            {finalExam.questions && (
-                              <div className="bg-white/60 p-3 rounded-lg col-span-2">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-blue-500" />
-                                  <span className="text-xs font-medium text-gray-600">Questions</span>
-                                </div>
-                                <div className="text-sm font-semibold text-gray-800">{finalExam.questions.length} questions</div>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Exam Attempt History */}
-                          {examAttempts.length > 0 && (
-                            <div className="bg-white/60 p-3 rounded-lg mb-4">
-                              <div className="text-xs font-medium text-gray-600 mb-2">Latest Attempt</div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm">Score: {examAttempts[0].score}%</span>
-                                <span className="text-xs text-gray-500">Attempt #{examAttempts[0].attempt_number}</span>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Lock Message */}
-                          {!isAllContentComplete() && (
-                            <div className="flex items-center gap-2 text-sm text-orange-600 mb-4 bg-orange-50 p-3 rounded-lg border border-orange-200">
-                              <Lock className="h-4 w-4" />
-                              <span className="font-medium">Complete all lessons to unlock the final exam</span>
-                            </div>
-                          )}
-                          
-                          {/* Action Buttons */}
-                          <div className="flex flex-col gap-2">
-                            {getExamStatus() === 'not_taken' && (
-                              <Button 
-                                onClick={handleStartExam} 
-                                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold"
-                                disabled={!isAllContentComplete()}
-                              >
-                                <GraduationCap className="h-4 w-4 mr-2" />
-                                {isAllContentComplete() ? 'Start Final Exam' : 'Complete Course First'}
-                              </Button>
-                            )}
-                            
-                            {getExamStatus() === 'failed' && (
-                              <Button 
-                                onClick={handleRetakeExam} 
-                                variant="outline"
-                                className="border-orange-300 text-orange-600 hover:bg-orange-50 font-semibold"
-                              >
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                                Retake Exam
-                              </Button>
-                            )}
-                            
-                            {getExamStatus() === 'passed' && (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
-                                  <CheckCircle className="h-4 w-4" />
-                                  <span className="font-medium">Exam Completed Successfully!</span>
-                                </div>
-                                {course?.certificate_enabled && certificateGenerated && (
-                                  <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 p-3 rounded-lg border border-purple-200">
-                                    <Award className="h-4 w-4" />
-                                    <span className="font-medium">Certificate Generated</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
-                            {/* Navigation hint for completed course */}
-                            {isAllContentComplete() && finalExam && getExamStatus() === 'not_taken' && (
-                              <div className="text-center mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                                <p className="text-sm font-medium text-blue-700 mb-2">🎉 Course Complete!</p>
-                                <p className="text-xs text-blue-600">Proceed to Final Exam to earn your certificate</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={instructor.avatar_url || undefined} />
+                      <AvatarFallback>
+                        {instructor.full_name?.charAt(0) || 'I'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h4 className="font-semibold">{instructor.full_name}</h4>
+                      <p className="text-sm text-gray-600">Course Creator</p>
+                    </div>
+                  </div>
+                  
+                  {instructor.bio && (
+                    <p className="text-sm text-gray-700">{instructor.bio}</p>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    <Link to={`/creator/profile/${instructor.id}`}>
+                      <Button variant="outline" size="sm" className="flex-1">
+                        View Profile
+                      </Button>
+                    </Link>
+                    <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <MessageCircle className="h-4 w-4 mr-1" />
+                        Contact
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Exam Loading Modal */}
-      {examLoading && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-96">
-            <CardContent className="p-8 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-              <h3 className="text-lg font-semibold mb-2">Processing Your Exam</h3>
-              <p className="text-gray-600">Your exam is being marked automatically. This will take about 30 seconds...</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Final Exam Modal */}
-      {finalExam && showExamModal && (
-        <FinalExamModal
-          isOpen={showExamModal}
-          onClose={() => setShowExamModal(false)}
-          exam={finalExam}
-          enrollmentId={enrollment?.id}
-          onComplete={handleExamComplete}
-        />
-      )}
-
-      {/* Results Modal */}
-      {lastExamResult && (
-        <FinalExamResultsModal
-          isOpen={showResultsModal}
-          onClose={() => setShowResultsModal(false)}
-          examScore={lastExamResult.score}
-          quizScores={[]}
-          finalGrade={lastExamResult.score}
-          passed={lastExamResult.passed}
-          courseName={course?.title || ''}
-          studentName={user?.user_metadata?.full_name || 'Student'}
-          enrollmentId={enrollment?.id}
-          onRetake={lastExamResult.passed ? undefined : handleRetakeExam}
-        />
-      )}
-    </Layout>
+    </div>
   );
 };
 
