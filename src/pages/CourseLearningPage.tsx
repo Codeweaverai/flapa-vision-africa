@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -170,12 +171,14 @@ const CourseLearningPage = () => {
       if (examError) throw examError;
       
       if (examData) {
-        // Sort questions and answers by order_index
+        // Sort questions and answers by order_index and properly map the structure
         if (examData.final_exam_questions) {
           examData.final_exam_questions.sort((a: any, b: any) => a.order_index - b.order_index);
           examData.final_exam_questions.forEach((question: any) => {
             if (question.final_exam_answers) {
               question.final_exam_answers.sort((a: any, b: any) => a.order_index - b.order_index);
+              // Map final_exam_answers to answers for the component
+              question.answers = question.final_exam_answers;
             }
           });
         }
@@ -579,7 +582,7 @@ const CourseLearningPage = () => {
                                 disabled={!isAllContentComplete()}
                               >
                                 <GraduationCap className="h-4 w-4 mr-2" />
-                                Start Final Exam
+                                {isAllContentComplete() ? 'Start Final Exam' : 'Complete Course First'}
                               </Button>
                             )}
                             
@@ -606,6 +609,14 @@ const CourseLearningPage = () => {
                                     <span className="font-medium">Certificate Generated</span>
                                   </div>
                                 )}
+                              </div>
+                            )}
+                            
+                            {/* Navigation hint for completed course */}
+                            {isAllContentComplete() && finalExam && getExamStatus() === 'not_taken' && (
+                              <div className="text-center mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                                <p className="text-sm font-medium text-blue-700 mb-2">🎉 Course Complete!</p>
+                                <p className="text-xs text-blue-600">Proceed to Final Exam to earn your certificate</p>
                               </div>
                             )}
                           </div>

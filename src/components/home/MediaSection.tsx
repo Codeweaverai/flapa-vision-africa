@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, ArrowRight, Play, FileText, Headphones, Eye, Star } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { supabase } from '@/lib/supabaseClient';
 
 interface MediaPost {
   id: string;
@@ -25,49 +26,65 @@ const MediaSection = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data for demonstration - replace with actual API call
-    const mockPosts: MediaPost[] = [
-      {
-        id: '1',
-        title: 'The Future of Digital Innovation in Africa',
-        summary: 'Exploring how African entrepreneurs are leveraging technology to solve local challenges and create global impact.',
-        content: 'Content here...',
-        post_type: 'article',
-        image_url: '/placeholder.svg',
-        published_at: '2024-01-15T10:00:00Z',
-        category: 'Innovation'
-      },
-      {
-        id: '2',
-        title: 'Building Sustainable Business Models',
-        summary: 'A deep dive into creating business models that balance profit with social and environmental impact.',
-        content: 'Content here...',
-        post_type: 'video',
-        image_url: '/placeholder.svg',
-        media_url: '/video.mp4',
-        duration_minutes: 25,
-        published_at: '2024-01-12T14:30:00Z',
-        category: 'Business'
-      },
-      {
-        id: '3',
-        title: 'Leadership in the Digital Age',
-        summary: 'How modern leaders are adapting their strategies to navigate the complexities of digital transformation.',
-        content: 'Content here...',
-        post_type: 'podcast',
-        image_url: '/placeholder.svg',
-        media_url: '/audio.mp3',
-        duration_minutes: 45,
-        published_at: '2024-01-10T08:00:00Z',
-        category: 'Leadership'
-      }
-    ];
-    
-    setTimeout(() => {
-      setPosts(mockPosts);
-      setLoading(false);
-    }, 1000);
+    fetchMediaPosts();
   }, []);
+
+  const fetchMediaPosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('media_posts')
+        .select('*')
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+
+      setPosts(data || []);
+    } catch (error) {
+      console.error('Error fetching media posts:', error);
+      // Fallback to mock data if there's an error
+      const mockPosts: MediaPost[] = [
+        {
+          id: '1',
+          title: 'The Future of Digital Innovation in Africa',
+          summary: 'Exploring how African entrepreneurs are leveraging technology to solve local challenges and create global impact.',
+          content: 'Content here...',
+          post_type: 'article',
+          image_url: '/placeholder.svg',
+          published_at: '2024-01-15T10:00:00Z',
+          category: 'Innovation'
+        },
+        {
+          id: '2',
+          title: 'Building Sustainable Business Models',
+          summary: 'A deep dive into creating business models that balance profit with social and environmental impact.',
+          content: 'Content here...',
+          post_type: 'video',
+          image_url: '/placeholder.svg',
+          media_url: '/video.mp4',
+          duration_minutes: 25,
+          published_at: '2024-01-12T14:30:00Z',
+          category: 'Business'
+        },
+        {
+          id: '3',
+          title: 'Leadership in the Digital Age',
+          summary: 'How modern leaders are adapting their strategies to navigate the complexities of digital transformation.',
+          content: 'Content here...',
+          post_type: 'podcast',
+          image_url: '/placeholder.svg',
+          media_url: '/audio.mp3',
+          duration_minutes: 45,
+          published_at: '2024-01-10T08:00:00Z',
+          category: 'Leadership'
+        }
+      ];
+      setPosts(mockPosts);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getPostIcon = (type: string) => {
     switch (type) {
@@ -136,9 +153,8 @@ const MediaSection = () => {
                     </AspectRatio>
                   ) : (
                     <AspectRatio ratio={16/9}>
-                      <div className={`w-full h-full bg-gradient-to-br ${getPostTypeColor(post.post_type)} flex items-center justify-center`}>
-                        {getPostIcon(post.post_type)}
-                        <span className="text-white opacity-80 text-6xl ml-4">
+                      <div className={`w-full h-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center`}>
+                        <span className="text-white opacity-80 text-6xl">
                           {post.post_type === 'video' && <Play className="h-16 w-16" />}
                           {post.post_type === 'podcast' && <Headphones className="h-16 w-16" />}
                           {post.post_type === 'article' && <FileText className="h-16 w-16" />}
@@ -150,7 +166,7 @@ const MediaSection = () => {
                   {/* Overlay Badges */}
                   <div className="absolute top-4 left-4 flex flex-col gap-2">
                     <Badge 
-                      className={`bg-gradient-to-r ${getPostTypeColor(post.post_type)} text-white border-0 font-semibold`}
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 font-semibold"
                     >
                       <span className="mr-1">{getPostIcon(post.post_type)}</span>
                       {post.post_type.charAt(0).toUpperCase() + post.post_type.slice(1)}

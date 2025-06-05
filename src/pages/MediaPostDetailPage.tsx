@@ -6,7 +6,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, User, Clock, Play } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Clock, Play, FileText, Headphones, Eye, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MediaPost {
@@ -69,13 +69,15 @@ const MediaPostDetailPage = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="section-container py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-            <div className="space-y-2">
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+          <div className="container mx-auto px-4 py-8">
+            <div className="animate-pulse space-y-4 max-w-4xl mx-auto">
+              <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+              <div className="h-64 bg-gray-200 rounded"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -86,17 +88,26 @@ const MediaPostDetailPage = () => {
   if (!post) {
     return (
       <Layout>
-        <div className="section-container py-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">Media Post Not Found</h2>
-          <p className="text-muted-foreground mb-6">
-            The media post you're looking for doesn't exist or has been removed.
-          </p>
-          <Button asChild>
-            <Link to="/media">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Media
-            </Link>
-          </Button>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+          <div className="container mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto text-center">
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-12 shadow-xl">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-orange-100 to-purple-100 flex items-center justify-center">
+                  <FileText className="h-10 w-10 text-gray-400" />
+                </div>
+                <h2 className="text-3xl font-bold mb-4 text-gray-800">Media Post Not Found</h2>
+                <p className="text-gray-600 mb-8 text-lg">
+                  The media post you're looking for doesn't exist or has been removed.
+                </p>
+                <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold rounded-xl">
+                  <Link to="/media">
+                    <ArrowLeft className="mr-2 h-5 w-5" />
+                    Back to Media
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </Layout>
     );
@@ -110,121 +121,204 @@ const MediaPostDetailPage = () => {
     });
   };
 
+  const getPostIcon = () => {
+    switch (post.post_type) {
+      case 'video':
+        return <Play className="h-5 w-5" />;
+      case 'podcast':
+        return <Headphones className="h-5 w-5" />;
+      default:
+        return <FileText className="h-5 w-5" />;
+    }
+  };
+
   return (
     <Layout>
-      <div className="section-container py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Back Button */}
-          <div className="mb-6">
-            <Button variant="outline" asChild>
-              <Link to="/media">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Media
-              </Link>
-            </Button>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            {/* Back Button */}
+            <div className="mb-8">
+              <Button variant="outline" asChild className="bg-white/80 backdrop-blur-sm border-white/40 hover:bg-white/90">
+                <Link to="/media">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Media
+                </Link>
+              </Button>
+            </div>
 
-          {/* Main Content */}
-          <Card>
-            <CardHeader>
-              <div className="space-y-4">
-                {/* Meta Information */}
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center">
-                    <Calendar className="mr-1 h-4 w-4" />
-                    {formatDate(post.published_at)}
+            {/* Main Content */}
+            <Card className="bg-white/90 backdrop-blur-sm shadow-2xl border-0 overflow-hidden">
+              {/* Hero Section */}
+              <div className="relative">
+                {post.image_url ? (
+                  <div className="relative h-80 overflow-hidden">
+                    <img
+                      src={post.image_url}
+                      alt={post.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                   </div>
-                  {post.duration_minutes && (
-                    <div className="flex items-center">
-                      <Clock className="mr-1 h-4 w-4" />
-                      {post.duration_minutes} min
+                ) : (
+                  <div className="h-80 bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center">
+                    <div className="text-white/80 text-8xl">
+                      {getPostIcon()}
                     </div>
-                  )}
-                </div>
-
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{post.post_type}</Badge>
+                  </div>
+                )}
+                
+                {/* Floating Badges */}
+                <div className="absolute top-6 left-6 flex flex-col gap-3">
+                  <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 font-semibold text-sm px-3 py-1">
+                    <span className="mr-2">{getPostIcon()}</span>
+                    {post.post_type.charAt(0).toUpperCase() + post.post_type.slice(1)}
+                  </Badge>
                   {post.category && (
-                    <Badge variant="outline">{post.category}</Badge>
+                    <Badge variant="outline" className="bg-white/90 backdrop-blur-sm border-white/40 text-gray-800 font-medium">
+                      {post.category}
+                    </Badge>
                   )}
                 </div>
-
-                {/* Title */}
-                <CardTitle className="text-3xl">{post.title}</CardTitle>
-
-                {/* Summary */}
-                {post.summary && (
-                  <p className="text-lg text-muted-foreground">{post.summary}</p>
+                
+                {post.duration_minutes && (
+                  <div className="absolute top-6 right-6 bg-black/70 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    {post.duration_minutes} min
+                  </div>
                 )}
               </div>
-            </CardHeader>
 
-            <CardContent className="space-y-6">
-              {/* Featured Image */}
-              {post.image_url && (
-                <div className="relative">
-                  <img
-                    src={post.image_url}
-                    alt={post.title}
-                    className="w-full h-64 md:h-96 object-cover rounded-lg"
-                  />
-                  {post.media_url && post.post_type === 'video' && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Button
-                        size="lg"
-                        className="rounded-full w-16 h-16"
-                        onClick={() => {
-                          if (post.media_url) {
-                            window.open(post.media_url, '_blank');
-                          }
-                        }}
-                      >
-                        <Play className="h-8 w-8" />
-                      </Button>
+              <CardHeader className="p-8 pb-6">
+                <div className="space-y-6">
+                  {/* Meta Information */}
+                  <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-full bg-gradient-to-r from-orange-100 to-purple-100">
+                        <Calendar className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <span className="font-medium">{formatDate(post.published_at)}</span>
                     </div>
+                    {post.duration_minutes && (
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-full bg-gradient-to-r from-orange-100 to-purple-100">
+                          <Clock className="h-4 w-4 text-orange-600" />
+                        </div>
+                        <span className="font-medium">{post.duration_minutes} min read/watch</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Title */}
+                  <CardTitle className="text-4xl font-bold leading-tight bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    {post.title}
+                  </CardTitle>
+
+                  {/* Summary */}
+                  {post.summary && (
+                    <p className="text-xl text-gray-700 leading-relaxed font-medium">{post.summary}</p>
                   )}
                 </div>
-              )}
+              </CardHeader>
 
-              {/* Audio Player */}
-              {post.media_url && post.post_type === 'audio' && (
-                <div className="bg-muted p-4 rounded-lg">
-                  <audio controls className="w-full">
-                    <source src={post.media_url} type="audio/mpeg" />
-                    Your browser does not support the audio element.
-                  </audio>
+              <CardContent className="p-8 pt-0 space-y-8">
+                {/* Media Player Section */}
+                {post.media_url && (
+                  <div className="bg-gradient-to-br from-orange-50 to-purple-50 p-6 rounded-2xl border border-orange-200">
+                    {post.post_type === 'video' ? (
+                      <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Button
+                            size="lg"
+                            className="rounded-full w-20 h-20 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                            onClick={() => {
+                              if (post.media_url) {
+                                window.open(post.media_url, '_blank');
+                              }
+                            }}
+                          >
+                            <Play className="h-10 w-10" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : post.post_type === 'podcast' ? (
+                      <div className="text-center">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center">
+                          <Headphones className="h-10 w-10 text-white" />
+                        </div>
+                        <audio controls className="w-full rounded-lg">
+                          <source src={post.media_url} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="prose prose-lg max-w-none">
+                  <div 
+                    className="text-gray-700 leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: post.content }} 
+                  />
                 </div>
-              )}
 
-              {/* Content */}
-              <div className="prose prose-lg max-w-none">
-                <div dangerouslySetInnerHTML={{ __html: post.content }} />
-              </div>
-
-              {/* Media Link for External Content */}
-              {post.media_url && post.post_type !== 'audio' && (
-                <div className="border-t pt-6">
-                  <Button asChild className="w-full sm:w-auto">
-                    <a 
-                      href={post.media_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
+                  {post.media_url && post.post_type !== 'podcast' && (
+                    <Button 
+                      asChild 
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold"
                     >
-                      {post.post_type === 'video' ? (
-                        <>
-                          <Play className="mr-2 h-4 w-4" />
-                          Watch Video
-                        </>
-                      ) : (
-                        'View Content'
-                      )}
-                    </a>
+                      <a 
+                        href={post.media_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2"
+                      >
+                        {post.post_type === 'video' ? (
+                          <>
+                            <Play className="h-4 w-4" />
+                            Watch Video
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-4 w-4" />
+                            View Content
+                          </>
+                        )}
+                      </a>
+                    </Button>
+                  )}
+                  
+                  <Button 
+                    variant="outline"
+                    className="border-2 border-orange-200 text-orange-600 hover:bg-orange-50 px-6 py-3 rounded-xl font-semibold"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success('Link copied to clipboard!');
+                    }}
+                  >
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Related Content Section */}
+            <div className="mt-12 text-center">
+              <Button 
+                asChild 
+                size="lg" 
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                <Link to="/media">
+                  Explore More Insights
+                </Link>
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>
