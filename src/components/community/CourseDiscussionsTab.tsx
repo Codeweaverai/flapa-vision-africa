@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -412,7 +411,7 @@ const CourseDiscussionsTab: React.FC = () => {
               <h3 className="text-lg font-semibold mb-2">Select a Course</h3>
               <p className="text-gray-600">Choose a course above to view and participate in discussions.</p>
             </CardContent>
-          </div>
+          </Card>
         )}
       </div>
     </div>
