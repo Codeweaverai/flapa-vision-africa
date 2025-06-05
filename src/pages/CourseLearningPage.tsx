@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import {
 } from '@/services/courseService';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock, Clock, FileText, Star, BookOpen, Target } from 'lucide-react';
+import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock, Clock, FileText, Star, BookOpen, Target, User, MessageCircle, Users, TrendingUp } from 'lucide-react';
 
 interface FinalExam {
   id: string;
@@ -76,6 +76,7 @@ const CourseLearningPage = () => {
   const [lastExamResult, setLastExamResult] = useState<{ score: number; passed: boolean } | null>(null);
   const [certificateGenerated, setCertificateGenerated] = useState(false);
   const [examLoading, setExamLoading] = useState(false);
+  const [learningOutcomes, setLearningOutcomes] = useState<any[]>([]);
   
   useEffect(() => {
     if (!user) {
@@ -108,6 +109,17 @@ const CourseLearningPage = () => {
       }
       
       const modulesData = await fetchModuleLessons(courseId, user.id);
+      
+      // Load learning outcomes
+      const { data: outcomes } = await supabase
+        .from('course_learning_outcomes')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('order_index');
+      
+      if (outcomes) {
+        setLearningOutcomes(outcomes);
+      }
       
       // Load final exam BEFORE setting state
       await loadFinalExam();
@@ -467,11 +479,115 @@ const CourseLearningPage = () => {
               ) : (
                 <Card className="border-0 shadow-lg">
                   <CardHeader>
-                    <CardTitle>Welcome to the Course</CardTitle>
-                    <CardDescription>Select a lesson from the course outline to begin</CardDescription>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-6 w-6 text-orange-500" />
+                      Course Overview
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p>{course?.description}</p>
+                    <Tabs defaultValue="overview" className="w-full">
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="outcomes">What You'll Learn</TabsTrigger>
+                        <TabsTrigger value="instructor">Instructor</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="overview" className="mt-6 space-y-6">
+                        <div>
+                          <h3 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                            <Target className="h-5 w-5 text-purple-500" />
+                            Course Description
+                          </h3>
+                          <p className="text-muted-foreground leading-relaxed">{course?.description}</p>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5 text-green-500" />
+                            Course Details
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-muted p-4 rounded-lg">
+                              <div className="text-sm text-muted-foreground">Duration</div>
+                              <div className="font-semibold">{course?.duration_minutes} minutes</div>
+                            </div>
+                            <div className="bg-muted p-4 rounded-lg">
+                              <div className="text-sm text-muted-foreground">Difficulty</div>
+                              <div className="font-semibold capitalize">{course?.difficulty_level}</div>
+                            </div>
+                            <div className="bg-muted p-4 rounded-lg">
+                              <div className="text-sm text-muted-foreground">Category</div>
+                              <div className="font-semibold">{course?.category}</div>
+                            </div>
+                            <div className="bg-muted p-4 rounded-lg">
+                              <div className="text-sm text-muted-foreground">Certificate</div>
+                              <div className="font-semibold">{course?.certificate_enabled ? 'Yes' : 'No'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+                      
+                      <TabsContent value="outcomes" className="mt-6">
+                        <div>
+                          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                            Learning Objectives
+                          </h3>
+                          {learningOutcomes && learningOutcomes.length > 0 ? (
+                            <ul className="space-y-3">
+                              {learningOutcomes.map((outcome, index) => (
+                                <li key={index} className="flex items-start gap-3">
+                                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                  <span className="text-muted-foreground">{outcome.outcome}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-muted-foreground">Learning outcomes will be available soon.</p>
+                          )}
+                        </div>
+                      </TabsContent>
+                      
+                      <TabsContent value="instructor" className="mt-6">
+                        <div>
+                          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <User className="h-5 w-5 text-blue-500" />
+                            Your Instructor
+                          </h3>
+                          {course?.creator_id && (
+                            <Card className="p-6">
+                              <div className="flex items-center gap-4 mb-4">
+                                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                                  {course?.profiles?.full_name?.[0] || 'I'}
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-lg">{course?.profiles?.full_name || 'Instructor'}</h4>
+                                  <p className="text-muted-foreground">Course Creator</p>
+                                </div>
+                              </div>
+                              
+                              {course?.profiles?.bio && (
+                                <p className="text-muted-foreground mb-4">{course?.profiles?.bio}</p>
+                              )}
+                              
+                              <div className="flex gap-3">
+                                <Button variant="outline" asChild>
+                                  <Link to={`/creator/profile/${course?.creator_id}`}>
+                                    View Profile
+                                  </Link>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                  <Link to={`/inbox?username=${course?.profiles?.username || ''}`}>
+                                    <MessageCircle className="h-4 w-4 mr-2" />
+                                    Contact
+                                  </Link>
+                                </Button>
+                              </div>
+                            </Card>
+                          )}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </CardContent>
                 </Card>
               )}
