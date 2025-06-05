@@ -65,7 +65,7 @@ const HeroSection = () => {
                 <Award className="h-6 w-6 mr-2" />
                 <span className="text-3xl font-bold">500+</span>
               </div>
-              <p className="text-gray-200">Expert Instructors</p>
+              <p className="text-gray-200">Expert Creators</p>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center mb-2">
