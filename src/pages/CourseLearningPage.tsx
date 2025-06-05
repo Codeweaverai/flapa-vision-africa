@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -633,7 +634,7 @@ const CourseLearningPage = () => {
                           {module.title}
                         </h3>
                         <div className="space-y-1">
-                          {module.lessons.map((lesson) => (
+                          {module.lessons && module.lessons.map((lesson) => (
                             <button
                               key={lesson.id}
                               onClick={() => handleLessonSelect(lesson)}
@@ -825,3 +826,4 @@ const CourseLearningPage = () => {
 };
 
 export default CourseLearningPage;
+
