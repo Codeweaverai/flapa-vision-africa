@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,7 +37,9 @@ import {
   AlertCircle,
   RotateCcw,
   ArrowRight,
-  GraduationCap
+  GraduationCap,
+  Target,
+  Star
 } from 'lucide-react';
 
 interface Course {
@@ -169,10 +171,17 @@ const CourseLearningPage = () => {
     
     setLoading(true);
     try {
-      // Fetch course details
+      // Fetch course details with learning outcomes
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
-        .select('*')
+        .select(`
+          *,
+          course_learning_outcomes (
+            id,
+            outcome,
+            order_index
+          )
+        `)
         .eq('id', courseId)
         .single();
 
@@ -559,10 +568,16 @@ const CourseLearningPage = () => {
   };
   
   const handleCreatorProfileClick = () => {
-    if (creator?.username) {
-      navigate(`/creator/profile/${creator.username}`);
-    } else if (creator?.id) {
+    if (creator?.id) {
       navigate(`/creator/profile/${creator.id}`);
+    }
+  };
+
+  const handleContactCreator = () => {
+    if (creator?.username) {
+      navigate(`/inbox?recipient=${creator.username}`);
+    } else if (creator?.id) {
+      navigate(`/inbox?recipient=${creator.id}`);
     }
   };
   
@@ -863,6 +878,59 @@ const CourseLearningPage = () => {
                             </div>
                           </div>
                         ))}
+
+                        {/* Final Exam Section */}
+                        {finalExam && (
+                          <div className="space-y-3">
+                            <div className="p-4 rounded-lg border-l-4 bg-gradient-to-r from-purple-100 to-orange-100 border-purple-500">
+                              <h3 className="font-semibold text-lg text-gray-800 flex items-center gap-2">
+                                <GraduationCap className="h-5 w-5 text-purple-600" />
+                                Final Examination
+                              </h3>
+                              <p className="text-sm text-gray-600 mt-2">
+                                Complete all modules to unlock the final exam
+                              </p>
+                            </div>
+                            
+                            <div className="pl-2">
+                              <div className={`p-4 rounded-lg border-2 ${
+                                isAllContentComplete()
+                                  ? 'bg-blue-50 border-blue-200'
+                                  : 'bg-gray-50 border-gray-200 opacity-50'
+                              }`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    {isAllContentComplete() ? (
+                                      <GraduationCap className="h-5 w-5 text-blue-600" />
+                                    ) : (
+                                      <Lock className="h-5 w-5 text-gray-400" />
+                                    )}
+                                    <div>
+                                      <div className="font-medium text-sm">
+                                        {finalExam.title}
+                                      </div>
+                                      <div className="text-xs text-gray-600 mt-1">
+                                        {finalExam.description}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Time Limit: {finalExam.time_limit_minutes} minutes | 
+                                        Passing Score: {finalExam.passing_score}%
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    onClick={handleFinalExamStart}
+                                    disabled={!isAllContentComplete()}
+                                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                                  >
+                                    Start Exam
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </ScrollArea>
                   </CardContent>
@@ -907,7 +975,12 @@ const CourseLearningPage = () => {
                           <ExternalLink className="h-4 w-4 mr-2" />
                           View Profile
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={handleContactCreator}
+                        >
                           <Mail className="h-4 w-4 mr-2" />
                           Contact
                         </Button>
@@ -1022,18 +1095,77 @@ const CourseLearningPage = () => {
                             </TabsTrigger>
                             <TabsTrigger value="materials" className="flex items-center gap-2">
                               <BookOpen className="h-4 w-4" />
-                              Course Resource Materials
+                              Materials
                             </TabsTrigger>
                           </TabsList>
                           
                           <TabsContent value="content" className="mt-6">
-                            <div className="prose max-w-none">
-                              {currentLesson.content ? (
-                                <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
-                              ) : (
-                                <div className="text-center py-8">
-                                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                  <p className="text-gray-500">No additional content for this lesson.</p>
+                            <div className="space-y-6">
+                              {/* Course Overview */}
+                              <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg">
+                                <h3 className="text-xl font-semibold mb-4 text-gray-800">Course Overview</h3>
+                                <p className="text-gray-700 leading-relaxed mb-4">
+                                  {course?.description}
+                                </p>
+                                
+                                {/* What You'll Learn */}
+                                {course?.course_learning_outcomes && course.course_learning_outcomes.length > 0 && (
+                                  <div className="mt-6">
+                                    <h4 className="text-lg font-semibold mb-3 text-gray-800 flex items-center gap-2">
+                                      <Target className="h-5 w-5 text-orange-500" />
+                                      What You'll Learn
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      {course.course_learning_outcomes
+                                        .sort((a, b) => a.order_index - b.order_index)
+                                        .map((outcome, index) => (
+                                          <div key={outcome.id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
+                                            <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                            <span className="text-gray-700">{outcome.outcome}</span>
+                                          </div>
+                                        ))
+                                      }
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Course Objectives */}
+                                <div className="mt-6">
+                                  <h4 className="text-lg font-semibold mb-3 text-gray-800 flex items-center gap-2">
+                                    <BookOpen className="h-5 w-5 text-purple-500" />
+                                    Course Objectives
+                                  </h4>
+                                  <div className="grid grid-cols-1 gap-4">
+                                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <Star className="h-5 w-5 text-yellow-500" />
+                                        <span className="font-medium text-gray-800">Master the fundamentals</span>
+                                      </div>
+                                      <p className="text-gray-600 text-sm">Build a strong foundation in the core concepts and principles.</p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <Target className="h-5 w-5 text-blue-500" />
+                                        <span className="font-medium text-gray-800">Apply practical skills</span>
+                                      </div>
+                                      <p className="text-gray-600 text-sm">Gain hands-on experience through real-world projects and examples.</p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <Award className="h-5 w-5 text-purple-500" />
+                                        <span className="font-medium text-gray-800">Achieve certification</span>
+                                      </div>
+                                      <p className="text-gray-600 text-sm">Complete the course and earn a certificate to showcase your skills.</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Lesson Content */}
+                              {currentLesson.content && (
+                                <div className="prose max-w-none">
+                                  <h3 className="text-lg font-semibold mb-3 text-gray-800">Lesson Content</h3>
+                                  <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
                                 </div>
                               )}
                             </div>

@@ -1,4 +1,6 @@
+
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -102,11 +104,15 @@ const AboutPage = () => {
               a global community of knowledge sharing and growth.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                Get Started <ArrowRight className="ml-2 h-5 w-5" />
+              <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                <Link to="/auth">
+                  Get Started <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
-                Learn More
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
+                <Link to="/become-creator">
+                  Learn More
+                </Link>
               </Button>
             </div>
           </div>
@@ -247,8 +253,10 @@ const AboutPage = () => {
                   boundaries don't limit educational opportunities, and where every person 
                   has the tools to become both a learner and a teacher.
                 </p>
-                <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
-                  Join Our Mission
+                <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
+                  <Link to="/become-creator">
+                    Join Our Mission
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -263,11 +271,15 @@ const AboutPage = () => {
               Join thousands of learners who are already transforming their lives through education.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                Start Learning Today
+              <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                <Link to="/explore/courses">
+                  Start Learning Today
+                </Link>
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
-                Become a Creator
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
+                <Link to="/become-creator">
+                  Become a Creator
+                </Link>
               </Button>
             </div>
           </div>
