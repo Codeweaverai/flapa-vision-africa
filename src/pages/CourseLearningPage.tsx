@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -21,7 +20,7 @@ import {
 } from '@/services/courseService';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock } from 'lucide-react';
+import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock, Clock, FileText, Star, BookOpen, Target } from 'lucide-react';
 
 interface FinalExam {
   id: string;
@@ -30,6 +29,23 @@ interface FinalExam {
   time_limit_minutes: number;
   passing_score: number;
   is_published: boolean;
+  questions?: FinalExamQuestion[];
+}
+
+interface FinalExamQuestion {
+  id: string;
+  question: string;
+  question_type: string;
+  difficulty_level: string;
+  order_index: number;
+  answers: FinalExamAnswer[];
+}
+
+interface FinalExamAnswer {
+  id: string;
+  answer: string;
+  is_correct: boolean;
+  order_index: number;
 }
 
 interface ExamAttempt {
@@ -38,6 +54,7 @@ interface ExamAttempt {
   passed: boolean;
   attempt_number: number;
   completed_at: string;
+  answers: any;
 }
 
 const CourseLearningPage = () => {
@@ -58,6 +75,7 @@ const CourseLearningPage = () => {
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [lastExamResult, setLastExamResult] = useState<{ score: number; passed: boolean } | null>(null);
   const [certificateGenerated, setCertificateGenerated] = useState(false);
+  const [examLoading, setExamLoading] = useState(false);
   
   useEffect(() => {
     if (!user) {
@@ -135,9 +153,16 @@ const CourseLearningPage = () => {
     if (!courseId || !user) return;
 
     try {
+      // Fetch final exam with questions and answers
       const { data: examData, error: examError } = await supabase
         .from('final_exams')
-        .select('*')
+        .select(`
+          *,
+          final_exam_questions (
+            *,
+            final_exam_answers (*)
+          )
+        `)
         .eq('course_id', courseId)
         .eq('is_published', true)
         .maybeSingle();
@@ -145,8 +170,22 @@ const CourseLearningPage = () => {
       if (examError) throw examError;
       
       if (examData) {
-        setFinalExam(examData);
+        // Sort questions and answers by order_index
+        if (examData.final_exam_questions) {
+          examData.final_exam_questions.sort((a: any, b: any) => a.order_index - b.order_index);
+          examData.final_exam_questions.forEach((question: any) => {
+            if (question.final_exam_answers) {
+              question.final_exam_answers.sort((a: any, b: any) => a.order_index - b.order_index);
+            }
+          });
+        }
         
+        setFinalExam({
+          ...examData,
+          questions: examData.final_exam_questions || []
+        });
+        
+        // Fetch exam attempts
         const { data: attemptsData, error: attemptsError } = await supabase
           .from('final_exam_attempts')
           .select('*')
@@ -157,14 +196,17 @@ const CourseLearningPage = () => {
         if (attemptsError) throw attemptsError;
         setExamAttempts(attemptsData || []);
 
-        const { data: certificate } = await supabase
-          .from('certificates')
-          .select('*')
-          .eq('enrollment_id', enrollment?.id)
-          .maybeSingle();
+        // Check if certificate exists
+        if (enrollment?.id) {
+          const { data: certificate } = await supabase
+            .from('certificates')
+            .select('*')
+            .eq('enrollment_id', enrollment.id)
+            .maybeSingle();
 
-        if (certificate) {
-          setCertificateGenerated(true);
+          if (certificate) {
+            setCertificateGenerated(true);
+          }
         }
       }
     } catch (error) {
@@ -263,14 +305,20 @@ const CourseLearningPage = () => {
   };
 
   const handleExamComplete = async (score: number, passed: boolean) => {
-    setLastExamResult({ score, passed });
-    setShowResultsModal(true);
+    setExamLoading(true);
     
-    if (passed && course?.certificate_enabled) {
-      await generateCertificate();
-    }
-    
-    loadFinalExam();
+    // Simulate 30-second processing time
+    setTimeout(async () => {
+      setLastExamResult({ score, passed });
+      setShowResultsModal(true);
+      
+      if (passed && course?.certificate_enabled) {
+        await generateCertificate();
+      }
+      
+      await loadFinalExam(); // Reload exam data
+      setExamLoading(false);
+    }, 30000); // 30 seconds
   };
 
   const handleRetakeExam = () => {
@@ -297,13 +345,14 @@ const CourseLearningPage = () => {
         return (
           <Badge className="bg-red-100 text-red-800 border-red-200">
             <AlertCircle className="h-3 w-3 mr-1" />
-            Failed - Retake Required
+            Failed - Retake Available
           </Badge>
         );
       default:
         return (
           <Badge variant="outline">
-            Not Started
+            <FileText className="h-3 w-3 mr-1" />
+            Ready to Take
           </Badge>
         );
     }
@@ -412,29 +461,41 @@ const CourseLearningPage = () => {
               )}
             </div>
             
+            {/* Enhanced Curriculum Sidebar */}
             <div>
               <Card className="border-0 shadow">
                 <CardHeader>
-                  <CardTitle>Course Outline</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    Course Curriculum
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
+                    {/* Course Modules */}
                     {modules.map((module) => (
                       <div key={module.id} className="space-y-2">
-                        <h3 className="font-medium text-lg">{module.title}</h3>
+                        <h3 className="font-medium text-lg flex items-center gap-2">
+                          <Target className="h-4 w-4 text-orange-500" />
+                          {module.title}
+                        </h3>
                         <div className="space-y-1">
                           {module.lessons.map((lesson) => (
                             <button
                               key={lesson.id}
                               onClick={() => handleLessonSelect(lesson)}
-                              className={`flex items-center w-full p-2 rounded text-left ${
+                              className={`flex items-center w-full p-3 rounded-lg text-left transition-all ${
                                 currentLesson?.id === lesson.id
-                                  ? 'bg-primary/10 text-primary font-medium'
+                                  ? 'bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 text-orange-700 font-medium'
                                   : 'hover:bg-muted'
                               } ${lesson.is_completed ? 'text-green-600' : ''}`}
                             >
-                              <span className="mr-2">
-                                {lesson.is_completed ? '✅' : '○'}
+                              <span className="mr-3">
+                                {lesson.is_completed ? (
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
+                                )}
                               </span>
                               <span className="flex-1">{lesson.title}</span>
                             </button>
@@ -443,50 +504,81 @@ const CourseLearningPage = () => {
                       </div>
                     ))}
                     
-                    {/* Final Exam Section */}
+                    {/* Final Exam Section - Enhanced */}
                     {finalExam && (
-                      <div className="space-y-2 mt-8 pt-6 border-t">
-                        <div className="flex items-center gap-2 mb-3">
-                          <GraduationCap className="h-5 w-5 text-orange-500" />
-                          <h3 className="font-medium text-lg">Final Assessment</h3>
+                      <div className="space-y-2 mt-8 pt-6 border-t border-gray-200">
+                        <div className="flex items-center gap-2 mb-4">
+                          <GraduationCap className="h-6 w-6 text-orange-500" />
+                          <h3 className="font-semibold text-lg text-gray-800">Final Assessment</h3>
                         </div>
                         
-                        <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">{finalExam.title}</h4>
+                        <div className="bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 p-6 rounded-xl border border-orange-200 shadow-sm">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-bold text-lg text-gray-800">{finalExam.title}</h4>
                             {getExamStatusBadge()}
                           </div>
                           
                           {finalExam.description && (
-                            <p className="text-sm text-muted-foreground mb-3">{finalExam.description}</p>
+                            <p className="text-sm text-gray-600 mb-4 leading-relaxed">{finalExam.description}</p>
                           )}
                           
-                          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
-                            <div>Time: {finalExam.time_limit_minutes} minutes</div>
-                            <div>Pass: {finalExam.passing_score}%</div>
+                          {/* Exam Details Grid */}
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-white/60 p-3 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-orange-500" />
+                                <span className="text-xs font-medium text-gray-600">Duration</span>
+                              </div>
+                              <div className="text-sm font-semibold text-gray-800">{finalExam.time_limit_minutes} minutes</div>
+                            </div>
+                            
+                            <div className="bg-white/60 p-3 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Target className="h-4 w-4 text-purple-500" />
+                                <span className="text-xs font-medium text-gray-600">Pass Score</span>
+                              </div>
+                              <div className="text-sm font-semibold text-gray-800">{finalExam.passing_score}%</div>
+                            </div>
+                            
+                            {finalExam.questions && (
+                              <div className="bg-white/60 p-3 rounded-lg col-span-2">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-blue-500" />
+                                  <span className="text-xs font-medium text-gray-600">Questions</span>
+                                </div>
+                                <div className="text-sm font-semibold text-gray-800">{finalExam.questions.length} questions</div>
+                              </div>
+                            )}
                           </div>
                           
+                          {/* Exam Attempt History */}
                           {examAttempts.length > 0 && (
-                            <div className="text-xs text-muted-foreground mb-3">
-                              Latest score: {examAttempts[0].score}% (Attempt {examAttempts[0].attempt_number})
+                            <div className="bg-white/60 p-3 rounded-lg mb-4">
+                              <div className="text-xs font-medium text-gray-600 mb-2">Latest Attempt</div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm">Score: {examAttempts[0].score}%</span>
+                                <span className="text-xs text-gray-500">Attempt #{examAttempts[0].attempt_number}</span>
+                              </div>
                             </div>
                           )}
                           
+                          {/* Lock Message */}
                           {!isAllContentComplete() && (
-                            <div className="flex items-center gap-2 text-sm text-orange-600 mb-3">
+                            <div className="flex items-center gap-2 text-sm text-orange-600 mb-4 bg-orange-50 p-3 rounded-lg border border-orange-200">
                               <Lock className="h-4 w-4" />
-                              Complete all lessons to unlock the final exam
+                              <span className="font-medium">Complete all lessons to unlock the final exam</span>
                             </div>
                           )}
                           
-                          <div className="flex gap-2">
+                          {/* Action Buttons */}
+                          <div className="flex flex-col gap-2">
                             {getExamStatus() === 'not_taken' && (
                               <Button 
                                 onClick={handleStartExam} 
-                                size="sm"
-                                className="bg-gradient-to-r from-orange-500 to-purple-600"
+                                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold"
                                 disabled={!isAllContentComplete()}
                               >
+                                <GraduationCap className="h-4 w-4 mr-2" />
                                 Start Final Exam
                               </Button>
                             )}
@@ -494,25 +586,24 @@ const CourseLearningPage = () => {
                             {getExamStatus() === 'failed' && (
                               <Button 
                                 onClick={handleRetakeExam} 
-                                size="sm"
                                 variant="outline"
-                                className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                                className="border-orange-300 text-orange-600 hover:bg-orange-50 font-semibold"
                               >
-                                <RotateCcw className="h-3 w-3 mr-1" />
+                                <RotateCcw className="h-4 w-4 mr-2" />
                                 Retake Exam
                               </Button>
                             )}
                             
                             {getExamStatus() === 'passed' && (
-                              <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-2 text-sm text-green-600">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
                                   <CheckCircle className="h-4 w-4" />
-                                  Exam Completed Successfully
+                                  <span className="font-medium">Exam Completed Successfully!</span>
                                 </div>
                                 {course?.certificate_enabled && certificateGenerated && (
-                                  <div className="flex items-center gap-2 text-sm text-purple-600">
+                                  <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 p-3 rounded-lg border border-purple-200">
                                     <Award className="h-4 w-4" />
-                                    Certificate Generated
+                                    <span className="font-medium">Certificate Generated</span>
                                   </div>
                                 )}
                               </div>
@@ -528,6 +619,19 @@ const CourseLearningPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Exam Loading Modal */}
+      {examLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-96">
+            <CardContent className="p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+              <h3 className="text-lg font-semibold mb-2">Processing Your Exam</h3>
+              <p className="text-gray-600">Your exam is being marked automatically. This will take about 30 seconds...</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Final Exam Modal */}
       {finalExam && showExamModal && (
