@@ -86,15 +86,15 @@ const CallToAction = () => {
               asChild 
               variant="outline" 
               size="lg" 
-              className="border-2 border-white/30 text-white hover:bg-white/10 px-8 py-6 text-lg font-semibold rounded-xl backdrop-blur-sm transition-all duration-300"
-            >
-              <Link to="/events">Explore Events</Link>
-            </Button>
+               className="bg-white text-purple-700 hover:bg-gray-100 px-8 py-6 text-lg font-semibold rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 group"
+               >
+              <Link to="/explore/events">Explore Events</Link>
+            </Button>   
           </div>
 
           {/* Trust Indicators */}
           <div className="mt-12 pt-8 border-t border-white/20">
-            <p className="text-white/70 text-sm mb-4">Trusted by professionals at</p>
+            <p className="text-white/70 text-sm mb-4">SkillPulse Marketplace Trusted by professionals at @</p>
             <div className="flex justify-center items-center gap-8 opacity-60">
               <div className="text-white font-semibold">Microsoft</div>
               <div className="text-white font-semibold">Google</div>
