@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Inbox } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -64,14 +64,13 @@ const InboxIcon: React.FC = () => {
     <Button 
       variant="ghost" 
       size="icon" 
-      className="relative"
+      className="relative hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all duration-200"
       onClick={handleClick}
     >
-      <Inbox className="h-5 w-5" />
+      <MessageCircle className="h-5 w-5 text-gray-600 hover:text-transparent hover:bg-gradient-to-r hover:from-orange-500 hover:to-purple-600 hover:bg-clip-text" />
       {unreadCount > 0 && (
         <Badge 
-          className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center rounded-full"
-          variant="destructive"
+          className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0"
         >
           {unreadCount > 9 ? '9+' : unreadCount}
         </Badge>

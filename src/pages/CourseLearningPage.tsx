@@ -109,6 +109,7 @@ const CourseLearningPage = () => {
       
       const modulesData = await fetchModuleLessons(courseId, user.id);
       
+      // Load final exam BEFORE setting state
       await loadFinalExam();
       
       setCourse(courseData);
@@ -176,8 +177,6 @@ const CourseLearningPage = () => {
           examData.final_exam_questions.forEach((question: any) => {
             if (question.final_exam_answers) {
               question.final_exam_answers.sort((a: any, b: any) => a.order_index - b.order_index);
-              // Map final_exam_answers to answers for the component
-              question.answers = question.final_exam_answers;
             }
           });
           
@@ -521,7 +520,7 @@ const CourseLearningPage = () => {
                       </div>
                     ))}
                     
-                    {/* Final Exam Section - Enhanced */}
+                    {/* Final Exam Section - Enhanced and Always Visible */}
                     {finalExam && (
                       <div className="space-y-2 mt-8 pt-6 border-t border-gray-200">
                         <div className="flex items-center gap-2 mb-4">
