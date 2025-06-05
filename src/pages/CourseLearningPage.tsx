@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -169,7 +168,7 @@ const CourseLearningPage = () => {
       if (courseError) throw courseError;
       setCourse(courseData as Course);
 
-      // Fetch modules with updated table name
+      // Fetch modules with lessons
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
         .select('*')
@@ -178,11 +177,11 @@ const CourseLearningPage = () => {
 
       if (modulesError) throw modulesError;
 
-      // Fetch lessons for each module with updated table name
+      // Fetch lessons for each module - using correct table name 'lessons'
       const modulesWithLessons = await Promise.all(
         (modulesData as CourseModule[]).map(async (module) => {
           const { data: lessonsData, error: lessonsError } = await supabase
-            .from('course_lessons')
+            .from('lessons')
             .select('*')
             .eq('module_id', module.id)
             .order('order_index', { ascending: true });
@@ -477,10 +476,15 @@ const CourseLearningPage = () => {
               
               <TabsContent value="curriculum">
                 <CourseModuleList 
-                  modules={modules} 
-                  enrolledUser={enrolledUser}
-                  courseId={courseId!}
-                  finalExam={finalExam}
+                  modules={modules}
+                  onLessonSelect={(lesson) => {
+                    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
+                  }}
+                  currentLessonId={undefined}
+                  completedLessons={[]}
+                  onQuizStart={(quizId) => {
+                    console.log('Starting quiz:', quizId);
+                  }}
                 />
               </TabsContent>
               
