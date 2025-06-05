@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +21,7 @@ import {
 } from '@/services/courseService';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock, Clock, FileText, Star, BookOpen, Target } from 'lucide-react';
+import { GraduationCap, CheckCircle, AlertCircle, RotateCcw, Award, Lock, Clock, FileText, Star, BookOpen, Target, User, Mail } from 'lucide-react';
 
 interface FinalExam {
   id: string;
@@ -57,6 +58,12 @@ interface ExamAttempt {
   answers: any;
 }
 
+interface LearningOutcome {
+  id: string;
+  outcome: string;
+  order_index: number;
+}
+
 const CourseLearningPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -76,6 +83,8 @@ const CourseLearningPage = () => {
   const [lastExamResult, setLastExamResult] = useState<{ score: number; passed: boolean } | null>(null);
   const [certificateGenerated, setCertificateGenerated] = useState(false);
   const [examLoading, setExamLoading] = useState(false);
+  const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
+  const [instructor, setInstructor] = useState<any>(null);
   
   useEffect(() => {
     if (!user) {
@@ -109,8 +118,12 @@ const CourseLearningPage = () => {
       
       const modulesData = await fetchModuleLessons(courseId, user.id);
       
-      // Load final exam BEFORE setting state
-      await loadFinalExam();
+      // Load additional course data
+      await Promise.all([
+        loadFinalExam(),
+        loadLearningOutcomes(),
+        loadInstructorProfile(courseData.creator_id)
+      ]);
       
       setCourse(courseData);
       setEnrollment(enrollmentData);
@@ -147,6 +160,40 @@ const CourseLearningPage = () => {
       uiToast({ title: 'Error', description: 'Failed to load course data', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadLearningOutcomes = async () => {
+    if (!courseId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('course_learning_outcomes')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('order_index');
+
+      if (error) throw error;
+      setLearningOutcomes(data || []);
+    } catch (error) {
+      console.error('Error loading learning outcomes:', error);
+    }
+  };
+
+  const loadInstructorProfile = async (creatorId: string) => {
+    if (!creatorId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', creatorId)
+        .single();
+
+      if (error) throw error;
+      setInstructor(data);
+    } catch (error) {
+      console.error('Error loading instructor profile:', error);
     }
   };
 
@@ -251,7 +298,7 @@ const CourseLearningPage = () => {
   
   const isAllContentComplete = () => {
     return modules.every(module => 
-      module.lessons.every(lesson => lesson.is_completed)
+      module.lessons && module.lessons.every(lesson => lesson.is_completed)
     );
   };
 
@@ -426,16 +473,93 @@ const CourseLearningPage = () => {
                   <CardContent>
                     <Tabs defaultValue="content">
                       <TabsList className="mb-4">
-                        <TabsTrigger value="content">Lesson Content</TabsTrigger>
+                        <TabsTrigger value="content">Course Overview</TabsTrigger>
                         <TabsTrigger value="materials">Additional Materials</TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="content">
-                        <div className="prose max-w-none">
-                          {currentLesson.content ? (
-                            <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
-                          ) : (
-                            <p>No additional content for this lesson.</p>
+                        <div className="space-y-6">
+                          {/* Course Overview */}
+                          <div>
+                            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                              <BookOpen className="h-5 w-5 text-orange-500" />
+                              Course Overview
+                            </h3>
+                            <p className="text-gray-700 leading-relaxed">{course?.description}</p>
+                          </div>
+
+                          {/* What You'll Learn */}
+                          {learningOutcomes.length > 0 && (
+                            <div>
+                              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                                <Target className="h-5 w-5 text-purple-500" />
+                                What You'll Learn
+                              </h3>
+                              <ul className="space-y-2">
+                                {learningOutcomes.map((outcome) => (
+                                  <li key={outcome.id} className="flex items-center gap-3">
+                                    <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                    <span className="text-gray-700">{outcome.outcome}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Course Objectives */}
+                          <div>
+                            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                              <Star className="h-5 w-5 text-yellow-500" />
+                              Course Objectives
+                            </h3>
+                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg">
+                              <p className="text-gray-700 leading-relaxed">
+                                This course is designed to provide you with comprehensive knowledge and practical skills 
+                                in {course?.category}. By the end of this course, you'll have gained valuable insights 
+                                and hands-on experience that you can apply in real-world scenarios.
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Instructor Card */}
+                          {instructor && (
+                            <div>
+                              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                                <User className="h-5 w-5 text-blue-500" />
+                                Your Instructor
+                              </h3>
+                              <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200">
+                                <CardContent className="p-4">
+                                  <div className="flex items-center gap-4">
+                                    <img
+                                      src={instructor.avatar_url || '/placeholder.svg'}
+                                      alt={instructor.full_name || 'Instructor'}
+                                      className="w-16 h-16 rounded-full object-cover"
+                                    />
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-lg">{instructor.full_name || 'Instructor'}</h4>
+                                      {instructor.bio && (
+                                        <p className="text-gray-600 text-sm mt-1">{instructor.bio}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 mt-4">
+                                    <Link to={`/creator/profile/${instructor.id}`}>
+                                      <Button variant="outline" size="sm">
+                                        <User className="h-4 w-4 mr-2" />
+                                        View Profile
+                                      </Button>
+                                    </Link>
+                                    <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
+                                      <Button variant="outline" size="sm">
+                                        <Mail className="h-4 w-4 mr-2" />
+                                        Contact
+                                      </Button>
+                                    </Link>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
                           )}
                         </div>
                       </TabsContent>

@@ -50,11 +50,19 @@ const CourseDiscussionsTab: React.FC = () => {
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [newPost, setNewPost] = useState({ title: '', content: '' });
   const [loading, setLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(false);
 
   useEffect(() => {
     fetchCourses();
-    fetchCoursePosts();
-  }, [selectedCourse]);
+  }, []);
+
+  useEffect(() => {
+    if (selectedCourse) {
+      fetchCoursePosts();
+    } else {
+      setPosts([]);
+    }
+  }, [selectedCourse, user]);
 
   const fetchCourses = async () => {
     try {
@@ -68,70 +76,96 @@ const CourseDiscussionsTab: React.FC = () => {
       setCourses(data || []);
     } catch (error) {
       console.error('Error fetching courses:', error);
+      toast.error('Failed to load courses');
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchCoursePosts = async () => {
+    if (!selectedCourse) return;
+    
+    setPostsLoading(true);
     try {
-      let query = supabase
+      console.log('Fetching posts for course:', selectedCourse);
+      
+      const { data, error } = await supabase
         .from('community_posts')
         .select(`
           *,
           profiles:user_id(full_name, username, avatar_url),
           courses:course_id(title)
         `)
-        .not('course_id', 'is', null)
+        .eq('course_id', selectedCourse)
         .order('created_at', { ascending: false });
 
-      if (selectedCourse) {
-        query = query.eq('course_id', selectedCourse);
+      if (error) {
+        console.error('Error fetching posts:', error);
+        throw error;
       }
 
-      const { data, error } = await query;
+      console.log('Fetched posts:', data);
 
-      if (error) throw error;
-
-      // Process the data to match our interface
+      // Process the data to get likes and comments counts
       const postsWithCounts = await Promise.all(
         (data || []).map(async (post: any) => {
-          const [likesResult, commentsResult, userLikeResult] = await Promise.all([
-            supabase
-              .from('post_likes')
-              .select('id')
-              .eq('post_id', post.id),
-            supabase
-              .from('post_comments')
-              .select('id')
-              .eq('post_id', post.id),
-            user ? supabase
-              .from('post_likes')
-              .select('id')
-              .eq('post_id', post.id)
-              .eq('user_id', user.id)
-              .single() : Promise.resolve({ data: null })
-          ]);
+          try {
+            const [likesResult, commentsResult, userLikeResult] = await Promise.all([
+              supabase
+                .from('post_likes')
+                .select('id')
+                .eq('post_id', post.id),
+              supabase
+                .from('post_comments')
+                .select('id')
+                .eq('post_id', post.id),
+              user ? supabase
+                .from('post_likes')
+                .select('id')
+                .eq('post_id', post.id)
+                .eq('user_id', user.id)
+                .maybeSingle() : Promise.resolve({ data: null })
+            ]);
 
-          return {
-            id: post.id,
-            title: post.title,
-            content: post.content,
-            user_id: post.user_id,
-            course_id: post.course_id,
-            created_at: post.created_at,
-            profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-            courses: Array.isArray(post.courses) ? post.courses[0] : post.courses,
-            likes_count: likesResult.data?.length || 0,
-            comments_count: commentsResult.data?.length || 0,
-            user_liked: !!userLikeResult.data
-          } as CoursePost;
+            return {
+              id: post.id,
+              title: post.title,
+              content: post.content,
+              user_id: post.user_id,
+              course_id: post.course_id,
+              created_at: post.created_at,
+              profiles: post.profiles,
+              courses: post.courses,
+              likes_count: likesResult.data?.length || 0,
+              comments_count: commentsResult.data?.length || 0,
+              user_liked: !!userLikeResult.data
+            } as CoursePost;
+          } catch (error) {
+            console.error('Error processing post:', post.id, error);
+            return {
+              id: post.id,
+              title: post.title,
+              content: post.content,
+              user_id: post.user_id,
+              course_id: post.course_id,
+              created_at: post.created_at,
+              profiles: post.profiles,
+              courses: post.courses,
+              likes_count: 0,
+              comments_count: 0,
+              user_liked: false
+            } as CoursePost;
+          }
         })
       );
 
+      console.log('Processed posts with counts:', postsWithCounts);
       setPosts(postsWithCounts);
     } catch (error) {
       console.error('Error fetching course posts:', error);
+      toast.error('Failed to load discussions');
     } finally {
-      setLoading(false);
+      setPostsLoading(false);
     }
   };
 
@@ -143,20 +177,28 @@ const CourseDiscussionsTab: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase
+      console.log('Creating post:', { title: newPost.title, content: newPost.content, course_id: selectedCourse });
+      
+      const { data, error } = await supabase
         .from('community_posts')
         .insert({
           title: newPost.title,
           content: newPost.content,
           user_id: user.id,
           course_id: selectedCourse
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating post:', error);
+        throw error;
+      }
 
+      console.log('Post created successfully:', data);
       setNewPost({ title: '', content: '' });
       toast.success('Post created successfully!');
-      fetchCoursePosts();
+      fetchCoursePosts(); // Refresh posts
     } catch (error) {
       console.error('Error creating post:', error);
       toast.error('Failed to create post');
@@ -183,9 +225,10 @@ const CourseDiscussionsTab: React.FC = () => {
           });
       }
 
-      fetchCoursePosts();
+      fetchCoursePosts(); // Refresh to update counts
     } catch (error) {
       console.error('Error toggling like:', error);
+      toast.error('Failed to update like');
     }
   };
 
@@ -299,7 +342,11 @@ const CourseDiscussionsTab: React.FC = () => {
       {/* Posts List */}
       <div className="space-y-4">
         {selectedCourse ? (
-          posts.length > 0 ? (
+          postsLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            </div>
+          ) : posts.length > 0 ? (
             posts.map((post) => (
               <Card key={post.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader>
