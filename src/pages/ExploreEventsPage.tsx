@@ -342,7 +342,7 @@ const ExploreEventsPage = () => {
                       asChild 
                       className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 rounded-xl h-12 font-semibold text-base group"
                     >
-                      <Link to={`/events/${event.id}`} className="flex items-center justify-center gap-2">
+                      <Link to={`/event/${event.id}`} className="flex items-center justify-center gap-2">
                         View Event Details
                         <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
                       </Link>
