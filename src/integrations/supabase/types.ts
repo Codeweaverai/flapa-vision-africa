@@ -41,6 +41,38 @@ export type Database = {
           },
         ]
       }
+      comment_likes: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          like_type: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          like_type?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          like_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_messages: {
         Row: {
           channel: string
@@ -68,7 +100,9 @@ export type Database = {
       community_posts: {
         Row: {
           content: string
+          course_id: string | null
           created_at: string
+          emoji_reactions: Json | null
           id: string
           title: string
           updated_at: string
@@ -76,7 +110,9 @@ export type Database = {
         }
         Insert: {
           content: string
+          course_id?: string | null
           created_at?: string
+          emoji_reactions?: Json | null
           id?: string
           title: string
           updated_at?: string
@@ -84,13 +120,23 @@ export type Database = {
         }
         Update: {
           content?: string
+          course_id?: string | null
           created_at?: string
+          emoji_reactions?: Json | null
           id?: string
           title?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "community_posts_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       consultation_bookings: {
         Row: {
@@ -1625,7 +1671,9 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          emoji_reactions: Json | null
           id: string
+          parent_id: string | null
           post_id: string
           updated_at: string
           user_id: string
@@ -1633,7 +1681,9 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          emoji_reactions?: Json | null
           id?: string
+          parent_id?: string | null
           post_id: string
           updated_at?: string
           user_id: string
@@ -1641,14 +1691,55 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          emoji_reactions?: Json | null
           id?: string
+          parent_id?: string | null
           post_id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "post_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          created_at: string
+          id: string
+          like_type: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          like_type?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          like_type?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "community_posts"

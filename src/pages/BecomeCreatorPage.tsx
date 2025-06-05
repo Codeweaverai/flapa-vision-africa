@@ -1,193 +1,174 @@
 
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  BookOpen, 
-  Calendar, 
-  DollarSign, 
+  Sparkles, 
   Users, 
-  TrendingUp, 
-  Globe, 
-  Star,
-  CheckCircle,
-  PlayCircle,
-  Award,
-  Smartphone,
-  CreditCard
+  DollarSign, 
+  BookOpen, 
+  Play, 
+  CheckCircle, 
+  TrendingUp,
+  Globe,
+  Shield,
+  Heart
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import YouTubeModal from '@/components/video/YouTubeModal';
 
 const BecomeCreatorPage = () => {
-  const features = [
-    {
-      icon: <BookOpen className="h-8 w-8 text-primary" />,
-      title: "Create Courses",
-      description: "Build comprehensive online courses with videos, quizzes, and materials"
-    },
-    {
-      icon: <Calendar className="h-8 w-8 text-primary" />,
-      title: "Host Events",
-      description: "Organize webinars, workshops, and live events for your audience"
-    },
-    {
-      icon: <DollarSign className="h-8 w-8 text-primary" />,
-      title: "Monetize Content",
-      description: "Set your own prices and earn from your expertise and knowledge"
-    },
-    {
-      icon: <Users className="h-8 w-8 text-primary" />,
-      title: "Build Community",
-      description: "Connect with students and build a loyal following"
-    },
-    {
-      icon: <TrendingUp className="h-8 w-8 text-primary" />,
-      title: "Track Analytics",
-      description: "Monitor your performance with detailed insights and metrics"
-    },
-    {
-      icon: <Globe className="h-8 w-8 text-primary" />,
-      title: "Global Reach",
-      description: "Reach students worldwide with our international platform"
-    }
-  ];
+  const [showDemoVideo, setShowDemoVideo] = useState(false);
+  const demoVideoUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"; // Replace with actual demo video URL
 
-  const testimonials = [
+  const benefits = [
     {
-      name: "Sarah Mwaba",
-      role: "Digital Marketing Expert",
-      content: "SkillPulse has transformed my teaching career. I've reached over 10,000 students and built a sustainable income stream.",
-      rating: 5,
-      avatar: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//16303.jpg?w=100&h=100&fit=crop&crop=face"
+      icon: <DollarSign className="h-8 w-8" />,
+      title: "Earn Revenue",
+      description: "Set your own prices and earn up to 85% revenue share from course sales and events."
     },
     {
-      name: "David Chen",
-      role: "Programming Instructor",
-      content: "The platform's tools make it easy to create engaging content. My course completion rates have increased by 40%.",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
+      icon: <Users className="h-8 w-8" />,
+      title: "Global Reach",
+      description: "Access thousands of learners worldwide and build your personal brand."
     },
     {
-      name: "Maria Rodriguez",
-      role: "Business Coach",
-      content: "The payment system is seamless. I love how I can accept payments from students across Africa using mobile money.",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face"
+      icon: <BookOpen className="h-8 w-8" />,
+      title: "Course Creation Tools",
+      description: "Use our intuitive course builder with video hosting, quizzes, and assessments."
+    },
+    {
+      icon: <TrendingUp className="h-8 w-8" />,
+      title: "Analytics & Insights",
+      description: "Track your performance with detailed analytics and student feedback."
+    },
+    {
+      icon: <Globe className="h-8 w-8" />,
+      title: "Marketing Support",
+      description: "Get featured on our platform and receive marketing support to grow your audience."
+    },
+    {
+      icon: <Shield className="h-8 w-8" />,
+      title: "Secure Payments",
+      description: "Reliable payment processing with automatic payouts and fraud protection."
     }
   ];
 
   const steps = [
     {
-      step: "1",
-      title: "Enable Creator Mode",
-      description: "Click 'Enable Creator Mode' in your account settings to get started"
+      number: "01",
+      title: "Apply to Become a Creator",
+      description: "Fill out our creator application form with your background and teaching interests."
     },
     {
-      step: "2",
+      number: "02",
+      title: "Get Approved",
+      description: "Our team reviews your application and gets back to you within 48 hours."
+    },
+    {
+      number: "03",
       title: "Create Your Content",
-      description: "Upload courses, schedule events, and build your curriculum"
+      description: "Use our course builder to create engaging courses and events."
     },
     {
-      step: "3",
-      title: "Set Your Prices",
-      description: "Choose your pricing strategy and set up payment methods"
-    },
-    {
-      step: "4",
+      number: "04",
       title: "Launch & Earn",
-      description: "Publish your content and start earning from your expertise"
+      description: "Publish your content and start earning from day one."
     }
   ];
 
-  const paymentMethods = [
-    "Stripe for global payments",
-    "Mobile Money across 19 African countries",
-    "Bank transfers and digital wallets",
-    "Cryptocurrency payments (coming soon)"
+  const stats = [
+    { number: "10,000+", label: "Active Learners" },
+    { number: "500+", label: "Creators" },
+    { number: "$2M+", label: "Creator Earnings" },
+    { number: "95%", label: "Creator Satisfaction" }
   ];
 
   return (
-    <div className="min-h-screen bg-light-purple">
-      <Layout>
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         {/* Hero Section */}
-        <section className="relative py-20 px-4">
-          <div className="container mx-auto max-w-6xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <Badge className="mb-4" variant="secondary">
-                  💡 Become a Creator
-                </Badge>
-                <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                  Share Your Knowledge, Build Your Empire
-                </h1>
-                <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-                  Join thousands of creators who are monetizing their expertise through courses and events. 
-                  Reach a global audience and build a sustainable income doing what you love.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button size="lg" className="text-lg px-8 py-6" asChild>
-                    <Link to="/account">Start Creating Today</Link>
-                  </Button>
-                  <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-                    <PlayCircle className="mr-2 h-5 w-5" />
-                    Watch Demo
-                  </Button>
-                </div>
-                <div className="mt-8 flex items-center gap-6">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">10K+</div>
-                    <div className="text-sm text-muted-foreground">Active Creators</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">500K+</div>
-                    <div className="text-sm text-muted-foreground">Students Enrolled</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">$2M+</div>
-                    <div className="text-sm text-muted-foreground">Creator Earnings</div>
-                  </div>
-                </div>
+        <section className="pt-32 pb-20 relative overflow-hidden">
+          <div className="absolute inset-0">
+            <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-orange-300/30 to-purple-400/30 rounded-full blur-3xl"></div>
+            <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-purple-300/20 to-pink-400/20 rounded-full blur-2xl"></div>
+            <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-orange-400/25 to-purple-500/25 rounded-full blur-xl"></div>
+          </div>
+
+          <div className="container mx-auto px-4 relative z-10">
+            <div className="text-center max-w-4xl mx-auto">
+              <Badge className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 px-6 py-2 text-lg">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Creator Program
+              </Badge>
+              
+              <h1 className="text-5xl md:text-7xl font-bold mb-8">
+                Share Your Knowledge,
+                <span className="block bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                  Earn Money
+                </span>
+              </h1>
+              
+              <p className="text-xl text-gray-700 mb-12 max-w-3xl mx-auto leading-relaxed">
+                Join thousands of creators who are transforming lives through education while building 
+                sustainable income streams. Create courses, host events, and grow your impact.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
+                <Button asChild size="lg" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold px-8 py-4 rounded-xl shadow-lg text-lg">
+                  <Link to="/auth">Start Creating Today</Link>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={() => setShowDemoVideo(true)}
+                  className="border-2 border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 font-semibold px-8 py-4 rounded-xl text-lg"
+                >
+                  <Play className="h-5 w-5 mr-2" />
+                  Watch Demo
+                </Button>
               </div>
-              <div className="relative">
-                <img 
-                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//pexels-olly-3769021.jpg?w=600&h=400&fit=crop" 
-                  alt="Creator working on content"
-                  className="rounded-2xl shadow-2xl"
-                />
-                <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <Award className="h-8 w-8 text-yellow-500" />
-                    <div>
-                      <div className="font-semibold">Top Creator</div>
-                      <div className="text-sm text-muted-foreground">$15,000/month</div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                {stats.map((stat, index) => (
+                  <div key={index} className="text-center">
+                    <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                      {stat.number}
                     </div>
+                    <div className="text-gray-600 font-medium">{stat.label}</div>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </section>
 
-        {/* Features Section */}
-        <section className="py-20 px-4 bg-white/50">
-          <div className="container mx-auto max-w-6xl">
+        {/* Benefits Section */}
+        <section className="py-20">
+          <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">Everything You Need to Succeed</h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Our platform provides all the tools and features you need to create, market, and monetize your content.
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Why Choose SkillPulse?
+              </h2>
+              <p className="text-xl text-gray-700 max-w-3xl mx-auto">
+                We provide everything you need to succeed as an online educator and content creator.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {features.map((feature, index) => (
-                <Card key={index} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="mb-4">{feature.icon}</div>
-                    <CardTitle>{feature.title}</CardTitle>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {benefits.map((benefit, index) => (
+                <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group">
+                  <CardHeader className="text-center pb-4">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300">
+                      {benefit.icon}
+                    </div>
+                    <CardTitle className="text-xl mb-2">{benefit.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-base">{feature.description}</CardDescription>
+                    <p className="text-gray-600 text-center">{benefit.description}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -195,115 +176,78 @@ const BecomeCreatorPage = () => {
           </div>
         </section>
 
-        {/* Payment Methods Section */}
-        <section className="py-20 px-4">
-          <div className="container mx-auto max-w-6xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <h2 className="text-4xl font-bold mb-6">
-                  Get Paid Your Way
-                </h2>
-                <p className="text-xl text-muted-foreground mb-8">
-                  We support multiple payment methods to ensure you can receive payments from students worldwide, 
-                  especially across Africa where mobile money is king.
-                </p>
-                <div className="space-y-4">
-                  {paymentMethods.map((method, index) => (
-                    <div key={index} className="flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <span className="text-lg">{method}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Smartphone className="h-6 w-6 text-green-600" />
-                    <h3 className="font-semibold text-green-800">Mobile Money Coverage</h3>
-                  </div>
-                  <p className="text-green-700">
-                    Reach students across 19 African countries with mobile money payments including MTN, Airtel, 
-                    Orange, and more. No barriers, just pure accessibility.
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="p-6 text-center">
-                  <CreditCard className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Stripe Integration</h3>
-                  <p className="text-sm text-muted-foreground">Global payments, instant transfers</p>
-                </Card>
-                <Card className="p-6 text-center">
-                  <Smartphone className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Mobile Money</h3>
-                  <p className="text-sm text-muted-foreground">African mobile payments</p>
-                </Card>
-                <Card className="p-6 text-center">
-                  <DollarSign className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Low Fees</h3>
-                  <p className="text-sm text-muted-foreground">Keep more of what you earn</p>
-                </Card>
-                <Card className="p-6 text-center">
-                  <TrendingUp className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Real-time Analytics</h3>
-                  <p className="text-sm text-muted-foreground">Track your earnings</p>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* How It Works Section */}
-        <section className="py-20 px-4 bg-white/50">
-          <div className="container mx-auto max-w-6xl">
+        <section className="py-20 bg-white/50 backdrop-blur-sm">
+          <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">How It Works</h2>
-              <p className="text-xl text-muted-foreground">
-                Getting started as a creator is simple. Follow these steps to begin your journey.
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                How It Works
+              </h2>
+              <p className="text-xl text-gray-700 max-w-3xl mx-auto">
+                Getting started as a creator is simple. Follow these four easy steps.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
               {steps.map((step, index) => (
-                <div key={index} className="text-center">
-                  <div className="w-16 h-16 bg-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                    {step.step}
+                <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 text-center relative">
+                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
+                      {step.number}
+                    </div>
                   </div>
-                  <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-                  <p className="text-muted-foreground">{step.description}</p>
-                </div>
+                  <CardHeader className="pt-8 pb-4">
+                    <CardTitle className="text-lg">{step.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600">{step.description}</p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Testimonials Section */}
-        <section className="py-20 px-4">
-          <div className="container mx-auto max-w-6xl">
+        {/* Success Stories Section */}
+        <section className="py-20">
+          <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">What Our Creators Say</h2>
-              <p className="text-xl text-muted-foreground">
-                Hear from successful creators who have built thriving businesses on our platform.
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Creator Success Stories
+              </h2>
+              <p className="text-xl text-gray-700">
+                See how our creators are making an impact and earning revenue.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {testimonials.map((testimonial, index) => (
-                <Card key={index} className="p-6">
-                  <CardContent className="p-0">
-                    <div className="flex items-center gap-1 mb-4">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground mb-6 italic">"{testimonial.content}"</p>
-                    <div className="flex items-center gap-3">
-                      <img 
-                        src={testimonial.avatar} 
-                        alt={testimonial.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <div>
-                        <div className="font-semibold">{testimonial.name}</div>
-                        <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((_, index) => (
+                <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                  <CardHeader>
+                    <div className="flex items-center space-x-4">
+                      <div className="w-16 h-16 bg-gradient-to-r from-orange-200 to-purple-200 rounded-full flex items-center justify-center">
+                        <Users className="h-8 w-8 text-orange-600" />
                       </div>
+                      <div>
+                        <CardTitle className="text-lg">Sarah Johnson</CardTitle>
+                        <CardDescription>Web Development Instructor</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 mb-4">
+                      "SkillPulse has allowed me to reach over 5,000 students and earn a full-time income 
+                      teaching what I love. The platform makes it so easy to create and manage courses."
+                    </p>
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <span className="flex items-center">
+                        <Users className="h-4 w-4 mr-1" />
+                        5,000+ students
+                      </span>
+                      <span className="flex items-center">
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        $50K+ earned
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -313,28 +257,48 @@ const BecomeCreatorPage = () => {
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 px-4 bg-gradient-to-r from-primary to-purple-600 text-white">
-          <div className="container mx-auto max-w-4xl text-center">
-            <h2 className="text-4xl font-bold mb-6">Ready to Start Your Creator Journey?</h2>
-            <p className="text-xl mb-8 opacity-90">
-              Join thousands of creators who are already building successful businesses. 
-              Enable your creator dashboard today and start monetizing your expertise.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
-                <Link to="/account">Enable Creator Mode</Link>
-              </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 bg-transparent border-white text-white hover:bg-white hover:text-primary">
-                Learn More 
-              </Button>
-            </div>
-            <div className="mt-8 text-sm opacity-75">
-              No setup fees • Start earning immediately • 24/7 support
-            </div>
+        <section className="py-20">
+          <div className="container mx-auto px-4">
+            <Card className="bg-gradient-to-r from-orange-500 to-purple-600 border-0 shadow-2xl max-w-4xl mx-auto overflow-hidden">
+              <CardContent className="p-12 text-center text-white">
+                <div className="mb-6">
+                  <Heart className="h-16 w-16 mx-auto mb-4 text-white/90" />
+                </div>
+                <h3 className="text-4xl font-bold mb-6">
+                  Ready to Start Your Creator Journey?
+                </h3>
+                <p className="text-xl mb-8 text-white/90 max-w-2xl mx-auto">
+                  Join our community of passionate educators and start making an impact today. 
+                  Your expertise can change lives while building your dream career.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button asChild size="lg" variant="secondary" className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-4 rounded-xl text-lg">
+                    <Link to="/auth">Apply Now - It's Free</Link>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    onClick={() => setShowDemoVideo(true)}
+                    className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg"
+                  >
+                    <Play className="h-5 w-5 mr-2" />
+                    Watch Success Stories
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
-      </Layout>
-    </div>
+
+        {/* YouTube Demo Modal */}
+        <YouTubeModal
+          isOpen={showDemoVideo}
+          onClose={() => setShowDemoVideo(false)}
+          videoUrl={demoVideoUrl}
+          title="SkillPulse Creator Program Demo"
+        />
+      </div>
+    </Layout>
   );
 };
 

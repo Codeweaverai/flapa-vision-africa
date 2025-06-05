@@ -33,25 +33,23 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
-    // Initialize notification sound
     initializeNotificationSound();
 
     if (user) {
       loadNotificationCount();
+      fetchUserProfile();
 
-      // Set up realtime subscription for notifications with sound
       const unsubscribeNotifications = setupNotificationListener(user.id, (notification) => {
         console.log('New notification:', notification);
-        loadNotificationCount(); // Reload count
+        loadNotificationCount();
       });
 
-      // Set up realtime subscription for inbox messages
       const unsubscribeMessages = setupInboxMessageListener(user.id, (message) => {
         console.log('New inbox message:', message);
         
-        // Create a notification for the new message
         supabase
           .from('notifications')
           .insert({
@@ -61,13 +59,48 @@ const Navbar = () => {
             related_id: message.id
           });
       });
+
+      // Subscribe to community notifications
+      const communityChannel = supabase
+        .channel('community-notifications')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          loadNotificationCount();
+        })
+        .subscribe();
       
       return () => {
         unsubscribeNotifications();
         unsubscribeMessages();
+        supabase.removeChannel(communityChannel);
       };
     }
   }, [user]);
+
+  const fetchUserProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url, full_name, username')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+    }
+  };
 
   const loadNotificationCount = async () => {
     if (!user) return;
@@ -149,14 +182,13 @@ const Navbar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="relative"
-                onClick={() => navigate('/notifications')}
+                className="relative hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all duration-200"
+                onClick={() => navigate('/community?tab=notifications')}
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-5 w-5 text-gray-600" />
                 {unreadNotifications > 0 && (
                   <Badge 
-                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center rounded-full animate-pulse"
-                    variant="destructive"
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 animate-pulse"
                   >
                     {unreadNotifications > 9 ? '9+' : unreadNotifications}
                   </Badge>
@@ -167,9 +199,9 @@ const Navbar = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="rounded-full h-9 w-9 p-0">
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src="https://github.com/shadcn.png" />
-                      <AvatarFallback>
-                        {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                      <AvatarImage src={userProfile?.avatar_url || "https://github.com/shadcn.png"} />
+                      <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
+                        {userProfile?.full_name?.charAt(0) || user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
