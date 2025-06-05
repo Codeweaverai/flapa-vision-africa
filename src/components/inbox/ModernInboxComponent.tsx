@@ -19,7 +19,8 @@ import {
   User,
   Edit3,
   X,
-  Reply
+  Reply,
+  MessageCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
