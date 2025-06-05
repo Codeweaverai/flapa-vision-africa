@@ -1022,7 +1022,7 @@ const CourseLearningPage = () => {
                             </TabsTrigger>
                             <TabsTrigger value="materials" className="flex items-center gap-2">
                               <BookOpen className="h-4 w-4" />
-                              Materials
+                              Course Resource Materials
                             </TabsTrigger>
                           </TabsList>
                           
