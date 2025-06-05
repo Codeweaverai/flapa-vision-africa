@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, MessageCircle, Heart, Share2, BookOpen, Users } from 'lucide-react';
+import { Search, MessageCircle, Heart, Share2, BookOpen } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -30,13 +30,13 @@ interface CoursePost {
   course_id: string;
   created_at: string;
   profiles?: {
-    full_name: string;
-    username: string;
-    avatar_url: string;
-  };
+    full_name: string | null;
+    username: string | null;
+    avatar_url: string | null;
+  } | null;
   courses?: {
     title: string;
-  };
+  } | null;
   likes_count?: number;
   comments_count?: number;
   user_liked?: boolean;
@@ -91,9 +91,9 @@ const CourseDiscussionsTab: React.FC = () => {
 
       if (error) throw error;
 
-      // Fetch likes and comments count for each post
+      // Process the data to match our interface
       const postsWithCounts = await Promise.all(
-        (data || []).map(async (post) => {
+        (data || []).map(async (post: any) => {
           const [likesResult, commentsResult, userLikeResult] = await Promise.all([
             supabase
               .from('post_likes')
@@ -112,11 +112,18 @@ const CourseDiscussionsTab: React.FC = () => {
           ]);
 
           return {
-            ...post,
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            user_id: post.user_id,
+            course_id: post.course_id,
+            created_at: post.created_at,
+            profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
+            courses: Array.isArray(post.courses) ? post.courses[0] : post.courses,
             likes_count: likesResult.data?.length || 0,
             comments_count: commentsResult.data?.length || 0,
             user_liked: !!userLikeResult.data
-          };
+          } as CoursePost;
         })
       );
 
@@ -298,7 +305,7 @@ const CourseDiscussionsTab: React.FC = () => {
                 <CardHeader>
                   <div className="flex items-center space-x-3">
                     <Avatar>
-                      <AvatarImage src={post.profiles?.avatar_url} />
+                      <AvatarImage src={post.profiles?.avatar_url || undefined} />
                       <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
                         {post.profiles?.full_name?.charAt(0) || 'U'}
                       </AvatarFallback>
