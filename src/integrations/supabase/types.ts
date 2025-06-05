@@ -739,6 +739,189 @@ export type Database = {
         }
         Relationships: []
       }
+      final_exam_answers: {
+        Row: {
+          answer: string
+          created_at: string | null
+          id: string
+          is_correct: boolean
+          order_index: number
+          question_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          answer: string
+          created_at?: string | null
+          id?: string
+          is_correct?: boolean
+          order_index?: number
+          question_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          answer?: string
+          created_at?: string | null
+          id?: string
+          is_correct?: boolean
+          order_index?: number
+          question_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "final_exam_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "final_exam_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      final_exam_attempts: {
+        Row: {
+          answers: Json | null
+          attempt_number: number
+          completed_at: string | null
+          created_at: string | null
+          enrollment_id: string
+          exam_id: string
+          id: string
+          passed: boolean
+          score: number
+          started_at: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          attempt_number?: number
+          completed_at?: string | null
+          created_at?: string | null
+          enrollment_id: string
+          exam_id: string
+          id?: string
+          passed?: boolean
+          score?: number
+          started_at?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          attempt_number?: number
+          completed_at?: string | null
+          created_at?: string | null
+          enrollment_id?: string
+          exam_id?: string
+          id?: string
+          passed?: boolean
+          score?: number
+          started_at?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "final_exam_attempts_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "course_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "final_exam_attempts_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "final_exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      final_exam_questions: {
+        Row: {
+          created_at: string | null
+          difficulty_level: string
+          exam_id: string
+          id: string
+          order_index: number
+          question: string
+          question_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty_level: string
+          exam_id: string
+          id?: string
+          order_index?: number
+          question: string
+          question_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          difficulty_level?: string
+          exam_id?: string
+          id?: string
+          order_index?: number
+          question?: string
+          question_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "final_exam_questions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "final_exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      final_exams: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_published: boolean | null
+          passing_score: number
+          time_limit_minutes: number
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          passing_score?: number
+          time_limit_minutes?: number
+          title?: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          passing_score?: number
+          time_limit_minutes?: number
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "final_exams_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       general_settings: {
         Row: {
           contact_email: string | null

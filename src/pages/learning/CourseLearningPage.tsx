@@ -16,6 +16,8 @@ import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
 import QuizModal from '@/components/course/QuizModal';
 import QuizInstructionsModal from '@/components/course/QuizInstructionsModal';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
+import FinalExamModal from '@/components/course/FinalExamModal';
+import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   PlayCircle, 
@@ -34,7 +36,8 @@ import {
   Lock,
   AlertCircle,
   RotateCcw,
-  ArrowRight
+  ArrowRight,
+  GraduationCap
 } from 'lucide-react';
 
 interface Course {
@@ -101,6 +104,15 @@ interface QuizAttempt {
   updated_at: string;
 }
 
+interface FinalExam {
+  id: string;
+  title: string;
+  description: string;
+  time_limit_minutes: number;
+  passing_score: number;
+  is_published: boolean;
+}
+
 const CourseLearningPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -113,6 +125,15 @@ const CourseLearningPage = () => {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [currentModule, setCurrentModule] = useState<CourseModule | null>(null);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
+  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
+  const [isFinalExamModalOpen, setIsFinalExamModalOpen] = useState(false);
+  const [isFinalExamResultsOpen, setIsFinalExamResultsOpen] = useState(false);
+  const [finalExamResults, setFinalExamResults] = useState<{
+    examScore: number;
+    quizScores: number[];
+    finalGrade: number;
+    passed: boolean;
+  } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
@@ -210,6 +231,18 @@ const CourseLearningPage = () => {
         .from('quiz_attempts')
         .select('quiz_id, score, passed')
         .eq('user_id', user.id) as { data: { quiz_id: string; score: number; passed: boolean }[] | null };
+
+      // Load final exam
+      const { data: examData } = await supabase
+        .from('final_exams')
+        .select('*')
+        .eq('course_id', courseId)
+        .eq('is_published', true)
+        .single();
+
+      if (examData) {
+        setFinalExam(examData);
+      }
 
       // Process modules and lessons with completion status
       const processedModules = modulesData?.map(module => ({
@@ -536,6 +569,82 @@ const CourseLearningPage = () => {
   const handleQuizInstructionsStart = (quiz: Quiz) => {
     setIsQuizInstructionsOpen(false);
     setIsQuizModalOpen(true);
+  };
+
+  const calculateFinalGrade = (examScore: number) => {
+    const quizScores = [];
+    
+    // Collect all quiz scores
+    modules.forEach(module => {
+      module.quizzes?.forEach(quiz => {
+        if (quiz.last_score && quiz.last_score > 0) {
+          quizScores.push(quiz.last_score);
+        }
+      });
+    });
+
+    if (quizScores.length === 0) {
+      return { finalGrade: examScore, quizScores: [] };
+    }
+
+    const quizAverage = quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length;
+    
+    // Weight: 60% quizzes, 40% final exam
+    const finalGrade = Math.round((quizAverage * 0.6) + (examScore * 0.4));
+    
+    return { finalGrade, quizScores };
+  };
+
+  const handleFinalExamStart = () => {
+    if (!finalExam) return;
+    
+    // Check if all modules and lessons are completed
+    const allCompleted = modules.every(module => 
+      module.lessons.every(lesson => lesson.is_completed) &&
+      module.quizzes.every(quiz => quiz.is_completed)
+    );
+
+    if (!allCompleted) {
+      toast.error('Please complete all lessons and quizzes before taking the final exam');
+      return;
+    }
+
+    setIsFinalExamModalOpen(true);
+  };
+
+  const handleFinalExamComplete = async (examScore: number, passed: boolean) => {
+    const { finalGrade, quizScores } = calculateFinalGrade(examScore);
+    const overallPassed = finalGrade >= 70;
+
+    setFinalExamResults({
+      examScore,
+      quizScores,
+      finalGrade,
+      passed: overallPassed
+    });
+
+    // Update course enrollment completion if passed
+    if (overallPassed && enrollment) {
+      try {
+        await supabase
+          .from('course_enrollments')
+          .update({
+            is_completed: true,
+            completion_date: new Date().toISOString()
+          })
+          .eq('id', enrollment.id);
+      } catch (error) {
+        console.error('Error updating course completion:', error);
+      }
+    }
+
+    setIsFinalExamModalOpen(false);
+    setIsFinalExamResultsOpen(true);
+  };
+
+  const handleFinalExamRetake = () => {
+    setIsFinalExamResultsOpen(false);
+    setIsFinalExamModalOpen(true);
   };
 
   if (loading) {
@@ -1037,6 +1146,33 @@ const CourseLearningPage = () => {
           onRetake={handleRetakeQuiz}
           onProceed={handleProceedAfterQuiz}
           hasNextContent={!!nextContent}
+        />
+      )}
+
+      {/* Final Exam Modal */}
+      {finalExam && (
+        <FinalExamModal
+          isOpen={isFinalExamModalOpen}
+          onClose={() => setIsFinalExamModalOpen(false)}
+          exam={finalExam}
+          enrollmentId={enrollment?.id || ''}
+          onComplete={handleFinalExamComplete}
+        />
+      )}
+
+      {/* Final Exam Results Modal */}
+      {finalExamResults && (
+        <FinalExamResultsModal
+          isOpen={isFinalExamResultsOpen}
+          onClose={() => setIsFinalExamResultsOpen(false)}
+          examScore={finalExamResults.examScore}
+          quizScores={finalExamResults.quizScores}
+          finalGrade={finalExamResults.finalGrade}
+          passed={finalExamResults.passed}
+          courseName={course?.title || ''}
+          studentName={user?.user_metadata?.full_name || 'Student'}
+          enrollmentId={enrollment?.id || ''}
+          onRetake={handleFinalExamRetake}
         />
       )}
     </div>

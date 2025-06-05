@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -6,7 +5,8 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Book, ArrowLeft, Plus } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Book, ArrowLeft, Plus, GraduationCap, Edit, Trash2, Eye } from 'lucide-react';
 import { 
   Course, 
   CourseModule, 
@@ -20,6 +20,18 @@ import ModuleAccordion from '@/components/admin/ModuleAccordion';
 import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
 import LessonFormDialog from '@/components/admin/LessonFormDialog';
 import QuizFormDialog from '@/components/admin/QuizFormDialog';
+import FinalExamFormDialog from '@/components/admin/FinalExamFormDialog';
+import { supabase } from '@/lib/supabaseClient';
+
+interface FinalExam {
+  id: string;
+  title: string;
+  description: string;
+  time_limit_minutes: number;
+  passing_score: number;
+  is_published: boolean;
+  question_count?: number;
+}
 
 const CreatorCourseContent = () => {
   const navigate = useNavigate();
@@ -27,15 +39,18 @@ const CreatorCourseContent = () => {
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
+  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
 
   // Dialog states
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
   const [quizDialogOpen, setQuizDialogOpen] = useState(false);
+  const [finalExamDialogOpen, setFinalExamDialogOpen] = useState(false);
   
   // Selected items for editing
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [editingFinalExam, setEditingFinalExam] = useState<FinalExam | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
@@ -52,6 +67,7 @@ const CreatorCourseContent = () => {
         if (courseData) {
           setCourse(courseData);
           setModules(courseData.modules || []);
+          await loadFinalExam(id);
         } else {
           toast.error('Course not found');
           navigate('/creator/courses');
@@ -66,6 +82,32 @@ const CreatorCourseContent = () => {
 
     loadCourseData();
   }, [id, navigate]);
+
+  const loadFinalExam = async (courseId: string) => {
+    try {
+      const { data: examData, error } = await supabase
+        .from('final_exams')
+        .select(`
+          *,
+          final_exam_questions(count)
+        `)
+        .eq('course_id', courseId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (examData) {
+        setFinalExam({
+          ...examData,
+          question_count: examData.final_exam_questions?.[0]?.count || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading final exam:', error);
+    }
+  };
 
   // Module handlers
   const handleAddModule = () => {
@@ -178,6 +220,68 @@ const CreatorCourseContent = () => {
     setQuizDialogOpen(false);
   };
 
+  // Final Exam handlers
+  const handleCreateFinalExam = () => {
+    setEditingFinalExam(null);
+    setFinalExamDialogOpen(true);
+  };
+
+  const handleEditFinalExam = () => {
+    setEditingFinalExam(finalExam);
+    setFinalExamDialogOpen(true);
+  };
+
+  const handleFinalExamSaved = (examData: FinalExam) => {
+    setFinalExam(examData);
+    setFinalExamDialogOpen(false);
+    // Reload to get question count
+    if (id) {
+      loadFinalExam(id);
+    }
+  };
+
+  const handleDeleteFinalExam = async () => {
+    if (!finalExam) return;
+
+    if (!confirm('Are you sure you want to delete this final exam? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('final_exams')
+        .delete()
+        .eq('id', finalExam.id);
+
+      if (error) throw error;
+
+      setFinalExam(null);
+      toast.success('Final exam deleted successfully');
+    } catch (error) {
+      console.error('Error deleting final exam:', error);
+      toast.error('Failed to delete final exam');
+    }
+  };
+
+  const handleToggleExamPublished = async () => {
+    if (!finalExam) return;
+
+    try {
+      const { error } = await supabase
+        .from('final_exams')
+        .update({ is_published: !finalExam.is_published })
+        .eq('id', finalExam.id);
+
+      if (error) throw error;
+
+      setFinalExam({ ...finalExam, is_published: !finalExam.is_published });
+      toast.success(`Final exam ${finalExam.is_published ? 'unpublished' : 'published'} successfully`);
+    } catch (error) {
+      console.error('Error updating final exam:', error);
+      toast.error('Failed to update final exam');
+    }
+  };
+
   // Module ordering handlers
   const handleMoveModuleUp = (index: number) => {
     if (index <= 0) return;
@@ -246,51 +350,167 @@ const CreatorCourseContent = () => {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="flex items-center">
-                <Book className="h-5 w-5 mr-2" />
-                Course Content
-              </CardTitle>
-              <CardDescription>
-                Organize your course into modules and lessons
-              </CardDescription>
-            </div>
-            <Button onClick={handleAddModule}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Module
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {modules.length === 0 ? (
-            <div className="text-center py-12 border border-dashed rounded-md">
-              <h3 className="text-lg font-medium mb-2">No modules yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Start building your course by adding modules
-              </p>
-              <Button onClick={handleAddModule}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add First Module
-              </Button>
-            </div>
-          ) : (
-            <ModuleAccordion
-              modules={modules}
-              onEditModule={handleEditModule}
-              onDeleteModule={handleDeleteModule}
-              onAddLesson={handleAddLesson}
-              onEditLesson={handleEditLesson}
-              onDeleteLesson={handleDeleteLesson}
-              onAddQuiz={handleAddQuiz}
-              onMoveUp={handleMoveModuleUp}
-              onMoveDown={handleMoveModuleDown}
-            />
-          )}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="modules" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="modules">Modules & Lessons</TabsTrigger>
+          <TabsTrigger value="final-exam">Final Exam</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="modules">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <Book className="h-5 w-5 mr-2" />
+                    Course Content
+                  </CardTitle>
+                  <CardDescription>
+                    Organize your course into modules and lessons
+                  </CardDescription>
+                </div>
+                <Button onClick={handleAddModule}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Module
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {modules.length === 0 ? (
+                <div className="text-center py-12 border border-dashed rounded-md">
+                  <h3 className="text-lg font-medium mb-2">No modules yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Start building your course by adding modules
+                  </p>
+                  <Button onClick={handleAddModule}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Module
+                  </Button>
+                </div>
+              ) : (
+                <ModuleAccordion
+                  modules={modules}
+                  onEditModule={handleEditModule}
+                  onDeleteModule={handleDeleteModule}
+                  onAddLesson={handleAddLesson}
+                  onEditLesson={handleEditLesson}
+                  onDeleteLesson={handleDeleteLesson}
+                  onAddQuiz={handleAddQuiz}
+                  onMoveUp={handleMoveModuleUp}
+                  onMoveDown={handleMoveModuleDown}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="final-exam">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <GraduationCap className="h-5 w-5 mr-2 text-orange-500" />
+                    Final Exam
+                  </CardTitle>
+                  <CardDescription>
+                    Create a comprehensive final exam to test student understanding
+                  </CardDescription>
+                </div>
+                {!finalExam && (
+                  <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Final Exam
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!finalExam ? (
+                <div className="text-center py-12 border border-dashed rounded-md">
+                  <GraduationCap className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Final Exam Created</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create a comprehensive final exam with MCQ questions covering all course materials
+                  </p>
+                  <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Final Exam
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Card className="border-l-4 border-l-orange-500">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-xl">{finalExam.title}</CardTitle>
+                          {finalExam.description && (
+                            <CardDescription className="mt-2">{finalExam.description}</CardDescription>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge variant={finalExam.is_published ? "default" : "outline"}>
+                            {finalExam.is_published ? "Published" : "Draft"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Questions</p>
+                          <p className="text-lg font-semibold">{finalExam.question_count || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Time Limit</p>
+                          <p className="text-lg font-semibold">{finalExam.time_limit_minutes} min</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Passing Score</p>
+                          <p className="text-lg font-semibold">{finalExam.passing_score}%</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Status</p>
+                          <p className="text-lg font-semibold">{finalExam.is_published ? "Live" : "Draft"}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button onClick={handleEditFinalExam} variant="outline">
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button onClick={handleToggleExamPublished} variant="outline">
+                          <Eye className="h-4 w-4 mr-2" />
+                          {finalExam.is_published ? 'Unpublish' : 'Publish'}
+                        </Button>
+                        <Button onClick={handleDeleteFinalExam} variant="outline" className="text-red-600 hover:text-red-700">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="bg-gradient-to-r from-orange-50 to-purple-50">
+                    <CardContent className="pt-6">
+                      <h4 className="font-medium mb-2">Exam Guidelines</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        <li>• Recommended: 60% Easy/Moderate questions (recall & understanding)</li>
+                        <li>• 30% Application-based questions (practical knowledge)</li>
+                        <li>• 10% Advanced/Critical-thinking questions</li>
+                        <li>• Students must achieve 70% average (including all quizzes) to pass</li>
+                        <li>• Certificates are generated automatically upon successful completion</li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Module Form Dialog */}
       {moduleDialogOpen && (
@@ -323,6 +543,17 @@ const CreatorCourseContent = () => {
           lessonId={selectedLessonId}
           moduleId={selectedModuleId}
           onQuizSaved={handleQuizSaved}
+        />
+      )}
+
+      {/* Final Exam Form Dialog */}
+      {finalExamDialogOpen && (
+        <FinalExamFormDialog
+          open={finalExamDialogOpen}
+          onOpenChange={setFinalExamDialogOpen}
+          courseId={id!}
+          onExamSaved={handleFinalExamSaved}
+          editingExam={editingFinalExam}
         />
       )}
     </CreatorLayout>
