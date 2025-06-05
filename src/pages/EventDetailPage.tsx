@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -153,23 +154,34 @@ const EventDetailPage = () => {
           user_id,
           rating,
           review,
-          created_at,
-          profiles:user_id (
-            full_name,
-            avatar_url
-          )
+          created_at
         `)
         .eq('event_id', id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      const reviewsData = data || [];
-      setReviews(reviewsData);
+      // Fetch user profiles separately
+      const reviewsWithProfiles = await Promise.all(
+        (data || []).map(async (review) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', review.user_id)
+            .single();
+          
+          return {
+            ...review,
+            profiles: profile || { full_name: 'Anonymous', avatar_url: null }
+          };
+        })
+      );
+      
+      setReviews(reviewsWithProfiles);
       
       // Calculate average rating
-      if (reviewsData.length > 0) {
-        const avg = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
+      if (reviewsWithProfiles.length > 0) {
+        const avg = reviewsWithProfiles.reduce((sum, review) => sum + review.rating, 0) / reviewsWithProfiles.length;
         setAverageRating(Math.round(avg * 10) / 10);
       }
     } catch (error) {
