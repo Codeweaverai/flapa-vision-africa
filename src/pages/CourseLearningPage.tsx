@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -263,7 +264,7 @@ const CourseLearningPage = () => {
   
   const isAllContentComplete = () => {
     return modules.every(module => 
-      module.lessons.every(lesson => lesson.is_completed)
+      module.lessons && module.lessons.every(lesson => lesson.is_completed)
     );
   };
 
@@ -487,9 +488,9 @@ const CourseLearningPage = () => {
                   <CardContent>
                     <Tabs defaultValue="overview" className="w-full">
                       <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="overview">Course Outline</TabsTrigger>
                         <TabsTrigger value="outcomes">What You'll Learn</TabsTrigger>
-                        <TabsTrigger value="instructor">Instructor</TabsTrigger>
+                        <TabsTrigger value="instructor">Your Instructor</TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="overview" className="mt-6 space-y-6">
@@ -523,6 +524,26 @@ const CourseLearningPage = () => {
                               <div className="text-sm text-muted-foreground">Certificate</div>
                               <div className="font-semibold">{course?.certificate_enabled ? 'Yes' : 'No'}</div>
                             </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                            <BookOpen className="h-5 w-5 text-blue-500" />
+                            Course Modules
+                          </h3>
+                          <div className="space-y-3">
+                            {modules.map((module, index) => (
+                              <div key={module.id} className="bg-muted p-4 rounded-lg">
+                                <h4 className="font-semibold">Module {index + 1}: {module.title}</h4>
+                                {module.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
+                                )}
+                                <div className="text-sm text-muted-foreground mt-2">
+                                  {module.lessons?.length || 0} lessons
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </TabsContent>
