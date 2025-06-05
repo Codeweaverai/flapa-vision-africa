@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +39,21 @@ const MediaSection = () => {
 
       if (error) throw error;
 
-      setPosts(data || []);
+      // Map the database response to match our interface types
+      const mappedPosts = data?.map(post => ({
+        id: post.id,
+        title: post.title,
+        summary: post.summary,
+        content: post.content,
+        post_type: post.post_type as 'article' | 'video' | 'podcast',
+        image_url: post.image_url,
+        media_url: post.media_url,
+        duration_minutes: post.duration_minutes,
+        published_at: post.published_at,
+        category: post.category
+      })) || [];
+
+      setPosts(mappedPosts);
     } catch (error) {
       console.error('Error fetching media posts:', error);
       // Fallback to mock data if there's an error

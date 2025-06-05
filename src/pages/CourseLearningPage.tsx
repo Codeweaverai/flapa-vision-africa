@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -181,12 +180,27 @@ const CourseLearningPage = () => {
               question.answers = question.final_exam_answers;
             }
           });
+          
+          // Map the questions to match our interface
+          const mappedQuestions = examData.final_exam_questions.map((q: any) => ({
+            id: q.id,
+            question: q.question,
+            question_type: q.question_type,
+            difficulty_level: q.difficulty_level,
+            order_index: q.order_index,
+            answers: q.final_exam_answers || []
+          }));
+          
+          setFinalExam({
+            ...examData,
+            questions: mappedQuestions
+          });
+        } else {
+          setFinalExam({
+            ...examData,
+            questions: []
+          });
         }
-        
-        setFinalExam({
-          ...examData,
-          questions: examData.final_exam_questions || []
-        });
         
         // Fetch exam attempts
         const { data: attemptsData, error: attemptsError } = await supabase
