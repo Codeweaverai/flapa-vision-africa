@@ -279,7 +279,7 @@ const BecomeCreatorPage = () => {
                     variant="outline" 
                     size="lg"
                     onClick={() => setShowDemoVideo(true)}
-                    className="border-2 border-orange text-orange hover:bg-orange/10 font-semibold px-8 py-4 rounded-xl text-lg"
+                    className="border-2 border-white text-orange-600 hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg"
                   >
                     <Play className="h-5 w-5 mr-2" />
                     Watch Success Stories
