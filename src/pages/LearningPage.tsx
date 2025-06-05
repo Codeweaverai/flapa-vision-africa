@@ -331,7 +331,7 @@ const LearningPage = () => {
                 <h2 className="text-2xl font-bold mb-4">No courses enrolled yet</h2>
                 <p className="text-gray-600 mb-6">Explore our wide range of courses and start your learning journey today.</p>
                 <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                  <Link to="/courses">Explore Courses</Link>
+                  <Link to="/explore/courses">Explore Courses</Link>
                 </Button>
               </div>
             </div>
