@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -42,7 +43,7 @@ interface ExamAttempt {
 const CourseLearningPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
   const { user } = useAuth();
   
   const [course, setCourse] = useState<any>(null);
@@ -76,14 +77,14 @@ const CourseLearningPage = () => {
     try {
       const courseData = await fetchCourseDetails(courseId);
       if (!courseData) {
-        toast({ title: 'Error', description: 'Course not found', variant: 'destructive' });
+        uiToast({ title: 'Error', description: 'Course not found', variant: 'destructive' });
         navigate('/learning');
         return;
       }
       
       const enrollmentData = await fetchCourseEnrollment(courseId, user.id);
       if (!enrollmentData) {
-        toast({ title: 'Access Denied', description: 'You are not enrolled in this course', variant: 'destructive' });
+        uiToast({ title: 'Access Denied', description: 'You are not enrolled in this course', variant: 'destructive' });
         navigate(`/course/${courseId}`);
         return;
       }
@@ -124,7 +125,7 @@ const CourseLearningPage = () => {
       
     } catch (error) {
       console.error('Error loading course data:', error);
-      toast({ title: 'Error', description: 'Failed to load course data', variant: 'destructive' });
+      uiToast({ title: 'Error', description: 'Failed to load course data', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -213,13 +214,13 @@ const CourseLearningPage = () => {
 
       if (response.ok) {
         setCertificateGenerated(true);
-        toast.success('Certificate generated successfully!');
+        toast('Certificate generated successfully!');
       } else {
         throw new Error('Failed to generate certificate');
       }
     } catch (error) {
       console.error('Error generating certificate:', error);
-      toast.error('Failed to generate certificate');
+      toast('Failed to generate certificate');
     }
   };
   
@@ -228,7 +229,7 @@ const CourseLearningPage = () => {
   };
   
   const handleLessonComplete = () => {
-    toast({ title: 'Lesson Completed', description: 'Moving to the next lesson' });
+    uiToast({ title: 'Lesson Completed', description: 'Moving to the next lesson' });
     
     let foundCurrent = false;
     let nextLesson: Lesson | null = null;
@@ -249,13 +250,13 @@ const CourseLearningPage = () => {
     if (nextLesson) {
       setCurrentLesson(nextLesson);
     } else {
-      toast({ title: 'Congratulations!', description: 'You have completed all lessons in this course!' });
+      uiToast({ title: 'Congratulations!', description: 'You have completed all lessons in this course!' });
     }
   };
 
   const handleStartExam = () => {
     if (!isAllContentComplete()) {
-      toast.error('Please complete all lessons before taking the final exam');
+      toast('Please complete all lessons before taking the final exam');
       return;
     }
     setShowExamModal(true);
