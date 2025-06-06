@@ -85,7 +85,7 @@ interface Review {
   review_text: string;
   created_at: string;
   user_id: string;
-  profiles: {
+  user_profile?: {
     full_name: string;
     avatar_url: string;
   };
@@ -192,20 +192,32 @@ const CourseDetailPage = () => {
         setPreviewVideo(previewData);
       }
 
-      // Fetch reviews
+      // Fetch reviews with user profiles
       const { data: reviewsData } = await supabase
         .from('course_reviews')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('course_id', id)
         .order('created_at', { ascending: false });
 
-      setReviews(reviewsData || []);
+      if (reviewsData) {
+        // Fetch user profiles separately for each review
+        const reviewsWithProfiles = await Promise.all(
+          reviewsData.map(async (review) => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', review.user_id)
+              .single();
+
+            return {
+              ...review,
+              user_profile: profileData || { full_name: 'Anonymous', avatar_url: '' }
+            };
+          })
+        );
+
+        setReviews(reviewsWithProfiles);
+      }
 
       // Fetch related courses
       const { data: relatedData } = await supabase
@@ -601,11 +613,11 @@ const CourseDetailPage = () => {
                             <div key={review.id} className="border-b pb-4 last:border-b-0">
                               <div className="flex items-start gap-4">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-                                  {review.profiles?.full_name?.charAt(0) || 'U'}
+                                  {review.user_profile?.full_name?.charAt(0) || 'U'}
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <span className="font-medium">{review.profiles?.full_name || 'Anonymous'}</span>
+                                    <span className="font-medium">{review.user_profile?.full_name || 'Anonymous'}</span>
                                     <div className="flex">
                                       {[...Array(5)].map((_, i) => (
                                         <Star

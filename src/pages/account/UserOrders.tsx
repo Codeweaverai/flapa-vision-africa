@@ -34,7 +34,7 @@ interface Enrollment {
   course_id: string;
   payment_status: string;
   enrollment_date: string;
-  course: {
+  courses: {
     id: string;
     title: string;
     thumbnail_url?: string;
@@ -50,7 +50,7 @@ interface EventBooking {
   payment_amount: number;
   payment_currency: string;
   ticket_quantity: number;
-  event: {
+  events: {
     id: string;
     title: string;
     start_time: string;
@@ -162,7 +162,7 @@ const UserOrders = () => {
 
   const totalItems = orders.length + enrollments.length + eventBookings.length;
   const totalSpent = orders.reduce((sum, order) => sum + order.total_amount, 0) + 
-                   enrollments.reduce((sum, enrollment) => sum + (enrollment.course?.price || 0), 0) +
+                   enrollments.reduce((sum, enrollment) => sum + (enrollment.courses?.price || 0), 0) +
                    eventBookings.reduce((sum, booking) => sum + booking.payment_amount, 0);
 
   if (loading) {
@@ -391,7 +391,7 @@ const UserOrders = () => {
                           ✓ Enrolled
                         </Badge>
                         <p className="text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mt-2">
-                          ${enrollment.course.price}
+                          ${enrollment.courses?.price || 0}
                         </p>
                       </div>
                     </div>
@@ -402,10 +402,10 @@ const UserOrders = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4 flex-1">
                           <div className="w-16 h-16 rounded-lg overflow-hidden bg-gradient-to-r from-green-400 to-blue-600">
-                            {enrollment.course.thumbnail_url ? (
+                            {enrollment.courses?.thumbnail_url ? (
                               <img 
-                                src={enrollment.course.thumbnail_url} 
-                                alt={enrollment.course.title}
+                                src={enrollment.courses.thumbnail_url} 
+                                alt={enrollment.courses.title}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -415,7 +415,7 @@ const UserOrders = () => {
                             )}
                           </div>
                           <div className="flex-1">
-                            <h4 className="font-semibold text-gray-800 text-lg">{enrollment.course.title}</h4>
+                            <h4 className="font-semibold text-gray-800 text-lg">{enrollment.courses?.title || 'Course'}</h4>
                             <Badge variant="outline" className="border-green-300 text-green-700 bg-white mt-2">
                               📚 Course
                             </Badge>
@@ -426,7 +426,7 @@ const UserOrders = () => {
                           <Button 
                             size="sm" 
                             className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
-                            onClick={() => window.location.href = `/learning/course/${enrollment.course.id}`}
+                            onClick={() => window.location.href = `/learning/course/${enrollment.courses?.id}`}
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             Continue Learning
@@ -476,7 +476,7 @@ const UserOrders = () => {
                             <Ticket className="w-6 h-6 text-white" />
                           </div>
                           <div className="flex-1">
-                            <h4 className="font-semibold text-gray-800 text-lg">{booking.event.title}</h4>
+                            <h4 className="font-semibold text-gray-800 text-lg">{booking.events?.title || 'Event'}</h4>
                             <div className="flex items-center gap-4 mt-2">
                               <Badge variant="outline" className="border-blue-300 text-blue-700 bg-white">
                                 🎫 Event Ticket
@@ -484,14 +484,16 @@ const UserOrders = () => {
                               <span className="text-sm text-gray-600 font-medium">
                                 Qty: {booking.ticket_quantity}
                               </span>
-                              <div className="flex items-center gap-1 text-sm text-gray-600">
-                                <Calendar className="h-3 w-3" />
-                                <span>{format(new Date(booking.event.start_time), 'PPP')}</span>
-                              </div>
-                              {booking.event.location && (
+                              {booking.events?.start_time && (
+                                <div className="flex items-center gap-1 text-sm text-gray-600">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{format(new Date(booking.events.start_time), 'PPP')}</span>
+                                </div>
+                              )}
+                              {booking.events?.location && (
                                 <div className="flex items-center gap-1 text-sm text-gray-600">
                                   <MapPin className="h-3 w-3" />
-                                  <span>{booking.event.location}</span>
+                                  <span>{booking.events.location}</span>
                                 </div>
                               )}
                             </div>
@@ -502,7 +504,7 @@ const UserOrders = () => {
                           <Button 
                             size="sm" 
                             className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-                            onClick={() => window.location.href = `/events/${booking.event.id}`}
+                            onClick={() => window.location.href = `/events/${booking.events?.id}`}
                           >
                             <Ticket className="w-4 h-4 mr-2" />
                             View Event
