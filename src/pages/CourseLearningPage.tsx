@@ -586,17 +586,17 @@ const CourseLearningPage = () => {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h4 className="font-semibold">{instructor.full_name}</h4>
+                      <h4 className="font-semibold">{creator.full_name}</h4>
                       <p className="text-sm text-gray-600">Course Creator</p>
                     </div>
                   </div>
                   
-                  {instructor.bio && (
-                    <p className="text-sm text-gray-700">{instructor.bio}</p>
+                  {creator.bio && (
+                    <p className="text-sm text-gray-700">{creator.bio}</p>
                   )}
                   
                   <div className="flex gap-2">
-                    <Link to={`/creator/profile/${instructor.id}`}>
+                    <Link to={`/creator/profile/${creator.id}`}>
                       <Button variant="outline" size="sm" className="flex-1">
                         View Profile
                       </Button>
