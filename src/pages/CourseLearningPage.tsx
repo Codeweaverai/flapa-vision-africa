@@ -601,10 +601,10 @@ const CourseLearningPage = () => {
                         View Profile
                       </Button>
                     </Link>
-                    <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
+                    <Link to={`/inbox?username=${.username creator|| creator.full_name}`}>
                       <Button variant="outline" size="sm" className="flex-1">
                         <MessageCircle className="h-4 w-4 mr-1" />
-                        Contact
+                        Send Message
                       </Button>
                     </Link>
                   </div>
