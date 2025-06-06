@@ -211,6 +211,9 @@ const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate('/account')}>
                     My Profile
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/account/orders')}>
+                    My Orders
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/my-courses')}>
                     My Courses
                   </DropdownMenuItem>
