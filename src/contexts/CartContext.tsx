@@ -43,6 +43,25 @@ export const useCart = () => {
   return context;
 };
 
+// Helper function to safely convert Json to TicketHolder[]
+const convertToTicketHolders = (jsonData: any): TicketHolder[] => {
+  if (!jsonData) return [];
+  
+  try {
+    if (Array.isArray(jsonData)) {
+      return jsonData.filter((item): item is TicketHolder => 
+        typeof item === 'object' && 
+        item !== null && 
+        typeof item.name === 'string'
+      );
+    }
+    return [];
+  } catch (error) {
+    console.error('Error converting ticket holders:', error);
+    return [];
+  }
+};
+
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
@@ -104,7 +123,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             title,
             thumbnail_url,
             event_id,
-            ticket_holder_names: (item.ticket_holder_names as TicketHolder[]) || []
+            ticket_holder_names: convertToTicketHolders(item.ticket_holder_names)
           };
         })
       );
@@ -143,7 +162,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           item_type: item.item_type,
           price: item.price,
           quantity: item.quantity,
-          ticket_holder_names: (item.ticket_holder_names || []) as any
+          ticket_holder_names: item.ticket_holder_names || []
         })
         .select()
         .single();
@@ -214,7 +233,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { error } = await supabase
         .from('carts')
-        .update({ ticket_holder_names: holders as any })
+        .update({ ticket_holder_names: holders })
         .eq('id', itemId);
 
       if (error) throw error;
