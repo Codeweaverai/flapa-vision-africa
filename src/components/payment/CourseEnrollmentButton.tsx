@@ -12,8 +12,10 @@ interface CourseEnrollmentButtonProps {
   isFree: boolean;
   price: number;
   currency?: string;
-  isUserEnrolled: boolean;
+  isUserEnrolled?: boolean;
   creatorId?: string;
+  className?: string;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 }
 
 const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
@@ -22,8 +24,10 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
   isFree,
   price,
   currency = 'USD',
-  isUserEnrolled,
-  creatorId
+  isUserEnrolled = false,
+  creatorId,
+  className,
+  variant = "default"
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -93,7 +97,7 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
 
   if (isUserEnrolled) {
     return (
-      <Button disabled className="w-full">
+      <Button disabled className={className} variant={variant}>
         Already Enrolled
       </Button>
     );
@@ -104,7 +108,8 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
       <Button 
         onClick={handleFreeEnrollment} 
         disabled={loading}
-        className="w-full"
+        className={className}
+        variant={variant}
       >
         {loading ? "Enrolling..." : "Enroll for Free"}
       </Button>
@@ -115,7 +120,8 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
     <Button 
       onClick={handlePaidEnrollment} 
       disabled={loading}
-      className="w-full"
+      className={className}
+      variant={variant}
     >
       {loading ? "Processing..." : `Enroll Now - ${currency} ${price.toFixed(2)}`}
     </Button>

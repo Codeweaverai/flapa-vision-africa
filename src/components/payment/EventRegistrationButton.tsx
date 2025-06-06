@@ -15,6 +15,8 @@ interface EventRegistrationButtonProps {
   currency: string;
   isUserRegistered: boolean;
   creatorId?: string;
+  className?: string;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 }
 
 const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
@@ -24,7 +26,9 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
   price,
   currency,
   isUserRegistered,
-  creatorId
+  creatorId,
+  className,
+  variant = "default"
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -72,7 +76,7 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
 
   if (isUserRegistered) {
     return (
-      <Button disabled className="w-full">
+      <Button disabled className={className} variant={variant}>
         Already Registered
       </Button>
     );
@@ -83,7 +87,8 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
       <Button 
         onClick={handleFreeRegistration} 
         disabled={loading}
-        className="w-full"
+        className={className}
+        variant={variant}
       >
         {loading ? "Registering..." : "Register for Free"}
       </Button>
@@ -98,7 +103,7 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
       currency={currency}
       title={eventName}
       creatorId={creatorId}
-      className="w-full"
+      className={className}
     >
       Register - {currency} {price.toFixed(2)}
     </EnhancedPaymentButton>
