@@ -661,6 +661,7 @@ const CourseDetailPage = () => {
                           <div className="flex gap-4">
                             <Button variant="outline" size="sm">
                               <Globe className="h-4 w-4 mr-2" />
+                              <Link to={`/creator/profile/${user.id}`}>
                               View Profile
                             </Button>
                             <Button variant="outline" size="sm">
