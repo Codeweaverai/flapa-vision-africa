@@ -1,9 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Download, Eye, Package, Ticket, CreditCard, MapPin, Clock } from 'lucide-react';
+import { Calendar, Download, Eye, Package, Ticket, CreditCard, MapPin, Clock, QrCode } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -18,6 +17,8 @@ interface Order {
   payment_method: string;
   receipt_url?: string;
   created_at: string;
+  stripe_payment_intent_id?: string;
+  receipt_generated_at?: string;
   order_items: Array<{
     id: string;
     item_type: string;
@@ -50,12 +51,20 @@ interface EventBooking {
   payment_amount: number;
   payment_currency: string;
   ticket_quantity: number;
+  status: string;
   events: {
     id: string;
     title: string;
     start_time: string;
     location?: string;
   };
+  generated_tickets?: Array<{
+    id: string;
+    ticket_code: string;
+    ticket_holder_name: string;
+    qr_code_data: string;
+    ticket_status: string;
+  }>;
 }
 
 const UserOrders = () => {
@@ -96,7 +105,7 @@ const UserOrders = () => {
         .from('course_enrollments')
         .select(`
           *,
-          courses:course_id (
+          courses (
             id,
             title,
             thumbnail_url,
@@ -104,7 +113,6 @@ const UserOrders = () => {
           )
         `)
         .eq('user_id', user?.id)
-        .eq('payment_status', 'completed')
         .order('enrollment_date', { ascending: false });
 
       if (enrollmentsError) {
@@ -113,20 +121,26 @@ const UserOrders = () => {
         setEnrollments(enrollmentsData || []);
       }
 
-      // Fetch event bookings
+      // Fetch event bookings with tickets
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
           *,
-          events:event_id (
+          events (
             id,
             title,
             start_time,
             location
+          ),
+          generated_tickets (
+            id,
+            ticket_code,
+            ticket_holder_name,
+            qr_code_data,
+            ticket_status
           )
         `)
         .eq('user_id', user?.id)
-        .eq('payment_status', 'completed')
         .order('booking_date', { ascending: false });
 
       if (bookingsError) {
@@ -146,14 +160,23 @@ const UserOrders = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border-green-300';
+      case 'confirmed': return 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border-green-300';
       case 'pending': return 'bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border-yellow-300';
       case 'failed': return 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border-red-300';
       default: return 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border-gray-300';
     }
   };
 
-  const getItemIcon = (itemType: string) => {
-    return itemType === 'course' ? <Eye className="w-4 h-4" /> : <Ticket className="w-4 h-4" />;
+  const downloadTicket = async (ticketId: string, ticketCode: string) => {
+    try {
+      // Generate a simple ticket PDF or open ticket view
+      const ticketUrl = `/ticket/${ticketId}`;
+      window.open(ticketUrl, '_blank');
+      toast.success('Ticket opened in new tab');
+    } catch (error) {
+      console.error('Error downloading ticket:', error);
+      toast.error('Failed to download ticket');
+    }
   };
 
   const downloadReceipt = (receiptUrl: string) => {
@@ -244,123 +267,97 @@ const UserOrders = () => {
 
             {/* Orders Grid */}
             <div className="space-y-6">
-              {/* Traditional Orders */}
-              {orders.map((order) => (
-                <Card key={order.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300">
-                  <CardHeader className="bg-gradient-to-r from-orange-100 to-purple-100 rounded-t-lg">
+              {/* Event Bookings with Tickets */}
+              {eventBookings.map((booking) => (
+                <Card key={booking.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300">
+                  <CardHeader className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-t-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center">
-                          <CreditCard className="h-6 w-6 text-white" />
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                          <Ticket className="h-6 w-6 text-white" />
                         </div>
                         <div>
                           <CardTitle className="text-xl text-gray-800">
-                            Order #{order.id.slice(-8).toUpperCase()}
+                            Event Tickets - {booking.events?.title}
                           </CardTitle>
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Calendar className="h-4 w-4" />
-                            <span>{format(new Date(order.created_at), 'PPP')}</span>
+                            <span>{format(new Date(booking.booking_date), 'PPP')}</span>
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge className={`${getStatusColor(order.payment_status)} border font-medium px-3 py-1`}>
-                          {order.payment_status === 'completed' ? '✓ Completed' : order.payment_status}
+                        <Badge className={`${getStatusColor(booking.status)} border font-medium px-3 py-1`}>
+                          {booking.status === 'confirmed' ? '✓ Confirmed' : booking.status}
                         </Badge>
-                        <p className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mt-2">
-                          ${order.total_amount}
+                        <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mt-2">
+                          {booking.payment_currency} {booking.payment_amount}
                         </p>
-                        <p className="text-sm text-gray-500">{order.currency}</p>
                       </div>
                     </div>
                   </CardHeader>
                   
                   <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {order.order_items.map((item) => (
-                        <div key={item.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border border-orange-200/50">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4 flex-1">
-                              <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-orange-400 to-purple-600 flex items-center justify-center">
-                                {getItemIcon(item.item_type)}
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200/50 mb-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="font-semibold text-gray-800 text-lg">{booking.events?.title}</h4>
+                          <div className="flex items-center gap-4 mt-2">
+                            <Badge variant="outline" className="border-blue-300 text-blue-700 bg-white">
+                              🎫 {booking.ticket_quantity} Ticket{booking.ticket_quantity > 1 ? 's' : ''}
+                            </Badge>
+                            {booking.events?.start_time && (
+                              <div className="flex items-center gap-1 text-sm text-gray-600">
+                                <Calendar className="h-3 w-3" />
+                                <span>{format(new Date(booking.events.start_time), 'PPP')}</span>
                               </div>
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-gray-800 text-lg">{item.item_name}</h4>
-                                <div className="flex items-center gap-4 mt-2">
-                                  <Badge 
-                                    variant="outline" 
-                                    className="border-orange-300 text-orange-700 bg-white"
-                                  >
-                                    {item.item_type === 'course' ? '📚 Course' : '🎫 Event Ticket'}
-                                  </Badge>
-                                  {item.quantity > 1 && (
-                                    <span className="text-sm text-gray-600 font-medium">
-                                      Qty: {item.quantity}
-                                    </span>
-                                  )}
-                                  <span className="text-sm text-gray-500">
-                                    ${item.unit_price} each
-                                  </span>
-                                </div>
+                            )}
+                            {booking.events?.location && (
+                              <div className="flex items-center gap-1 text-sm text-gray-600">
+                                <MapPin className="h-3 w-3" />
+                                <span>{booking.events.location}</span>
                               </div>
-                            </div>
-                            
-                            <div className="text-right ml-4">
-                              <p className="text-xl font-bold text-gray-800">${item.total_price}</p>
-                              {item.item_type === 'course' && order.payment_status === 'completed' && (
-                                <Button 
-                                  size="sm" 
-                                  className="mt-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-                                  onClick={() => window.location.href = `/learning/course/${item.item_id}`}
-                                >
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  Access Course
-                                </Button>
-                              )}
-                              {item.item_type === 'event_ticket' && order.payment_status === 'completed' && (
-                                <Button 
-                                  size="sm" 
-                                  className="mt-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                                  onClick={() => window.location.href = `/events/${item.item_id}`}
-                                >
-                                  <Ticket className="w-4 h-4 mr-2" />
-                                  View Event
-                                </Button>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    
-                    {/* Order Footer */}
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                      <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CreditCard className="h-4 w-4 text-orange-500" />
-                          <span className="font-medium">Payment Method:</span>
-                          <Badge variant="outline" className="border-purple-300 text-purple-700 bg-white">
-                            {order.payment_method}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Clock className="h-4 w-4 text-purple-500" />
-                          <span>
-                            {format(new Date(order.created_at), 'h:mm a')}
-                          </span>
-                        </div>
                       </div>
-                      
-                      {order.receipt_url && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                          onClick={() => downloadReceipt(order.receipt_url!)}
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download Receipt
-                        </Button>
+
+                      {/* Generated Tickets */}
+                      {booking.generated_tickets && booking.generated_tickets.length > 0 && (
+                        <div className="mt-4">
+                          <h5 className="font-medium text-sm mb-3">Your Tickets:</h5>
+                          <div className="grid gap-2">
+                            {booking.generated_tickets.map((ticket, index) => (
+                              <div key={ticket.id} className="bg-white p-3 rounded-lg border border-blue-200 flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium">{ticket.ticket_holder_name}</p>
+                                  <p className="text-sm text-gray-600">Code: {ticket.ticket_code}</p>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs mt-1 ${
+                                      ticket.ticket_status === 'active' 
+                                        ? 'border-green-300 text-green-700' 
+                                        : 'border-gray-300 text-gray-700'
+                                    }`}
+                                  >
+                                    {ticket.ticket_status}
+                                  </Badge>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                                    onClick={() => downloadTicket(ticket.id, ticket.ticket_code)}
+                                  >
+                                    <QrCode className="w-4 h-4 mr-2" />
+                                    View Ticket
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </CardContent>
@@ -438,79 +435,124 @@ const UserOrders = () => {
                 </Card>
               ))}
 
-              {/* Event Bookings */}
-              {eventBookings.map((booking) => (
-                <Card key={booking.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300">
-                  <CardHeader className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-t-lg">
+              {/* Traditional Orders */}
+              {orders.map((order) => (
+                <Card key={order.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300">
+                  <CardHeader className="bg-gradient-to-r from-orange-100 to-purple-100 rounded-t-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                          <Ticket className="h-6 w-6 text-white" />
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center">
+                          <CreditCard className="h-6 w-6 text-white" />
                         </div>
                         <div>
                           <CardTitle className="text-xl text-gray-800">
-                            Event Ticket
+                            Order #{order.id.slice(-8).toUpperCase()}
                           </CardTitle>
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Calendar className="h-4 w-4" />
-                            <span>{format(new Date(booking.booking_date), 'PPP')}</span>
+                            <span>{format(new Date(order.created_at), 'PPP')}</span>
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge className={`${getStatusColor(booking.payment_status)} border font-medium px-3 py-1`}>
-                          ✓ Confirmed
+                        <Badge className={`${getStatusColor(order.payment_status)} border font-medium px-3 py-1`}>
+                          {order.payment_status === 'completed' ? '✓ Completed' : order.payment_status}
                         </Badge>
-                        <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mt-2">
-                          {booking.payment_currency} {booking.payment_amount}
+                        <p className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mt-2">
+                          ${order.total_amount}
                         </p>
+                        <p className="text-sm text-gray-500">{order.currency}</p>
                       </div>
                     </div>
                   </CardHeader>
                   
                   <CardContent className="p-6">
-                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200/50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-400 to-purple-600 flex items-center justify-center">
-                            <Ticket className="w-6 h-6 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-800 text-lg">{booking.events?.title || 'Event'}</h4>
-                            <div className="flex items-center gap-4 mt-2">
-                              <Badge variant="outline" className="border-blue-300 text-blue-700 bg-white">
-                                🎫 Event Ticket
-                              </Badge>
-                              <span className="text-sm text-gray-600 font-medium">
-                                Qty: {booking.ticket_quantity}
-                              </span>
-                              {booking.events?.start_time && (
-                                <div className="flex items-center gap-1 text-sm text-gray-600">
-                                  <Calendar className="h-3 w-3" />
-                                  <span>{format(new Date(booking.events.start_time), 'PPP')}</span>
+                    <div className="space-y-4">
+                      {order.order_items.map((item) => (
+                        <div key={item.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border border-orange-200/50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-orange-400 to-purple-600 flex items-center justify-center">
+                                {item.item_type === 'course' ? <Eye className="w-4 h-4" /> : <Ticket className="w-4 h-4" />}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-800 text-lg">{item.item_name}</h4>
+                                <div className="flex items-center gap-4 mt-2">
+                                  <Badge 
+                                    variant="outline" 
+                                    className="border-orange-300 text-orange-700 bg-white"
+                                  >
+                                    {item.item_type === 'course' ? '📚 Course' : '🎫 Event Ticket'}
+                                  </Badge>
+                                  {item.quantity > 1 && (
+                                    <span className="text-sm text-gray-600 font-medium">
+                                      Qty: {item.quantity}
+                                    </span>
+                                  )}
+                                  <span className="text-sm text-gray-500">
+                                    ${item.unit_price} each
+                                  </span>
                                 </div>
+                              </div>
+                            </div>
+                            
+                            <div className="text-right ml-4">
+                              <p className="text-xl font-bold text-gray-800">${item.total_price}</p>
+                              {item.item_type === 'course' && order.payment_status === 'completed' && (
+                                <Button 
+                                  size="sm" 
+                                  className="mt-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                                  onClick={() => window.location.href = `/learning/course/${item.item_id}`}
+                                >
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Access Course
+                                </Button>
                               )}
-                              {booking.events?.location && (
-                                <div className="flex items-center gap-1 text-sm text-gray-600">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{booking.events.location}</span>
-                                </div>
+                              {item.item_type === 'event_ticket' && order.payment_status === 'completed' && (
+                                <Button 
+                                  size="sm" 
+                                  className="mt-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                                  onClick={() => window.location.href = `/events/${item.item_id}`}
+                                >
+                                  <Ticket className="w-4 h-4 mr-2" />
+                                  View Event
+                                </Button>
                               )}
                             </div>
                           </div>
                         </div>
-                        
-                        <div className="text-right ml-4">
-                          <Button 
-                            size="sm" 
-                            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-                            onClick={() => window.location.href = `/events/${booking.events?.id}`}
-                          >
-                            <Ticket className="w-4 h-4 mr-2" />
-                            View Event
-                          </Button>
+                      ))}
+                    </div>
+                    
+                    {/* Order Footer with Receipt */}
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <CreditCard className="h-4 w-4 text-orange-500" />
+                          <span className="font-medium">Payment Method:</span>
+                          <Badge variant="outline" className="border-purple-300 text-purple-700 bg-white">
+                            {order.payment_method}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Clock className="h-4 w-4 text-purple-500" />
+                          <span>
+                            {format(new Date(order.created_at), 'h:mm a')}
+                          </span>
                         </div>
                       </div>
+                      
+                      {order.receipt_url && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                          onClick={() => downloadReceipt(order.receipt_url!)}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download Receipt
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

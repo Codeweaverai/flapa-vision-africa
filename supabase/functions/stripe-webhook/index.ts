@@ -40,6 +40,10 @@ serve(async (req) => {
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
         break;
       
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+        break;
+      
       case 'checkout.session.async_payment_succeeded':
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
         break;
@@ -70,107 +74,124 @@ serve(async (req) => {
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log('Processing completed checkout session:', session.id);
   
-  const metadata = session.metadata;
-  if (!metadata) return;
-
-  const { user_id, reference_type, reference_id, creator_id, amount } = metadata;
-  const amountValue = parseInt(amount) / 100; // Convert from cents
-  
-  // Calculate platform fee and creator earning
-  const platformFee = amountValue * 0.08;
-  const creatorEarning = amountValue * 0.92;
-  const payoutEligibleDate = new Date();
-  payoutEligibleDate.setDate(payoutEligibleDate.getDate() + 7);
-
   try {
-    // Create payment transaction
-    const { data: paymentData, error: paymentError } = await supabaseClient
-      .from('payment_transactions')
-      .insert({
-        user_id,
-        creator_id: creator_id || null,
-        reference_type,
-        reference_id,
-        amount: amountValue,
-        currency: 'usd',
-        status: 'completed',
-        provider: 'stripe',
-        stripe_session_id: session.id,
-        stripe_payment_intent_id: session.payment_intent,
-        platform_fee_amount: platformFee,
-        creator_earning: creatorEarning,
-        payout_eligible_date: payoutEligibleDate.toISOString()
-      })
-      .select();
+    // Find order by Stripe session ID
+    const { data: order, error: orderError } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .eq('payment_provider_id', session.id)
+      .single();
 
-    if (paymentError) {
-      console.error('Error creating payment transaction:', paymentError);
+    if (orderError || !order) {
+      console.error('Order not found for session:', session.id);
       return;
     }
 
-    // Create enrollment or booking record
-    if (reference_type === 'course') {
-      const { error: enrollmentError } = await supabaseClient
-        .from('course_enrollments')
-        .insert({
-          user_id,
-          course_id: reference_id,
-          payment_status: 'completed',
-          payment_id: paymentData[0].id
-        });
-
-      if (enrollmentError) {
-        console.error('Error creating course enrollment:', enrollmentError);
-      }
-    } else if (reference_type === 'event') {
-      const { error: bookingError } = await supabaseClient
-        .from('event_bookings')
-        .insert({
-          user_id,
-          event_id: reference_id,
-          payment_status: 'completed',
-          status: 'confirmed',
-          payment_amount: amountValue,
-          payment_currency: 'USD',
-          payment_id: paymentData[0].id
-        });
-
-      if (bookingError) {
-        console.error('Error creating event booking:', bookingError);
+    // Update receipt URL from Stripe if available
+    let receiptUrl = null;
+    if (session.payment_intent) {
+      const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
+      if (paymentIntent.charges?.data?.[0]?.receipt_url) {
+        receiptUrl = paymentIntent.charges.data[0].receipt_url;
       }
     }
 
-    console.log('Successfully processed payment completion');
+    // Update order with receipt URL
+    if (receiptUrl) {
+      await supabaseClient
+        .from('orders')
+        .update({ receipt_url: receiptUrl })
+        .eq('id', order.id);
+    }
+
+    // Use our payment processing function
+    const { data: result, error: processError } = await supabaseClient.rpc(
+      'process_payment_success',
+      {
+        p_order_id: order.id,
+        p_payment_intent_id: session.payment_intent as string || null,
+        p_session_id: session.id
+      }
+    );
+
+    if (processError) {
+      console.error('Error processing payment:', processError);
+      throw processError;
+    }
+
+    console.log(`Successfully processed payment for order ${order.id}`);
   } catch (error) {
     console.error('Error handling checkout session completed:', error);
+    throw error;
+  }
+}
+
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  console.log('Processing payment intent succeeded:', paymentIntent.id);
+  
+  try {
+    // Find order by payment intent ID
+    const { data: order, error: orderError } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .eq('stripe_payment_intent_id', paymentIntent.id)
+      .single();
+
+    if (orderError || !order) {
+      console.log('No order found for payment intent:', paymentIntent.id);
+      return;
+    }
+
+    // Get receipt URL if available
+    let receiptUrl = null;
+    if (paymentIntent.charges?.data?.[0]?.receipt_url) {
+      receiptUrl = paymentIntent.charges.data[0].receipt_url;
+    }
+
+    // Update order with receipt URL
+    if (receiptUrl) {
+      await supabaseClient
+        .from('orders')
+        .update({ receipt_url: receiptUrl })
+        .eq('id', order.id);
+    }
+
+    // Process payment success
+    const { error: processError } = await supabaseClient.rpc(
+      'process_payment_success',
+      {
+        p_order_id: order.id,
+        p_payment_intent_id: paymentIntent.id
+      }
+    );
+
+    if (processError) {
+      console.error('Error processing payment intent:', processError);
+    }
+  } catch (error) {
+    console.error('Error handling payment intent succeeded:', error);
   }
 }
 
 async function handleCheckoutSessionFailed(session: Stripe.Checkout.Session) {
   console.log('Processing failed checkout session:', session.id);
   
-  const metadata = session.metadata;
-  if (!metadata) return;
-
-  const { user_id, reference_type, reference_id, creator_id, amount } = metadata;
-  const amountValue = parseInt(amount) / 100;
-
   try {
-    await supabaseClient
-      .from('payment_transactions')
-      .insert({
-        user_id,
-        creator_id: creator_id || null,
-        reference_type,
-        reference_id,
-        amount: amountValue,
-        currency: 'usd',
-        status: 'failed',
-        provider: 'stripe',
-        stripe_session_id: session.id
-      });
+    const { data: order } = await supabaseClient
+      .from('orders')
+      .select('id')
+      .eq('payment_provider_id', session.id)
+      .single();
 
-    console.log('Recorded failed payment transaction');
+    if (order) {
+      await supabaseClient
+        .from('orders')
+        .update({ 
+          payment_status: 'failed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+    }
   } catch (error) {
     console.error('Error handling failed checkout session:', error);
   }
@@ -179,29 +200,22 @@ async function handleCheckoutSessionFailed(session: Stripe.Checkout.Session) {
 async function handleCheckoutSessionExpired(session: Stripe.Checkout.Session) {
   console.log('Processing expired checkout session:', session.id);
   
-  // Similar to failed, but with expired status
-  const metadata = session.metadata;
-  if (!metadata) return;
-
-  const { user_id, reference_type, reference_id, creator_id, amount } = metadata;
-  const amountValue = parseInt(amount) / 100;
-
   try {
-    await supabaseClient
-      .from('payment_transactions')
-      .insert({
-        user_id,
-        creator_id: creator_id || null,
-        reference_type,
-        reference_id,
-        amount: amountValue,
-        currency: 'usd',
-        status: 'expired',
-        provider: 'stripe',
-        stripe_session_id: session.id
-      });
+    const { data: order } = await supabaseClient
+      .from('orders')
+      .select('id')
+      .eq('payment_provider_id', session.id)
+      .single();
 
-    console.log('Recorded expired payment transaction');
+    if (order) {
+      await supabaseClient
+        .from('orders')
+        .update({ 
+          payment_status: 'expired',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+    }
   } catch (error) {
     console.error('Error handling expired checkout session:', error);
   }

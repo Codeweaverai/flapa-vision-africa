@@ -1,39 +1,36 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-export interface CartItem {
+interface TicketHolder {
+  name: string;
+  email?: string;
+}
+
+interface CartItem {
   id: string;
-  item_type: 'course' | 'event_ticket';
   item_id: string;
-  item_name: string;
-  quantity: number;
+  item_type: 'course' | 'event_ticket';
   price: number;
-  course?: {
-    id: string;
-    title: string;
-    thumbnail_url?: string;
-  };
-  event_ticket?: {
-    id: string;
-    name: string;
-    ticket_type: string;
-    event_id: string;
-    event_title?: string;
-  };
+  quantity: number;
+  title: string;
+  thumbnail_url?: string;
+  event_id?: string;
+  ticket_holder_names?: TicketHolder[];
 }
 
 interface CartContextType {
   items: CartItem[];
-  totalItems: number;
-  totalAmount: number;
+  loading: boolean;
   addToCart: (item: Omit<CartItem, 'id'>) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
+  updateTicketHolders: (itemId: string, holders: TicketHolder[]) => Promise<void>;
   clearCart: () => Promise<void>;
-  loading: boolean;
+  getTotalPrice: () => number;
+  getItemCount: () => number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -51,130 +48,121 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Generate session ID for guest users
-  const getSessionId = () => {
-    let sessionId = localStorage.getItem('cart_session_id');
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      localStorage.setItem('cart_session_id', sessionId);
-    }
-    return sessionId;
-  };
-
-  // Load cart items on mount and when user changes
   useEffect(() => {
-    loadCartItems();
+    if (user) {
+      loadCart();
+    } else {
+      setItems([]);
+    }
   }, [user]);
 
-  const loadCartItems = async () => {
+  const loadCart = async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('carts')
-        .select('*');
-
-      if (user) {
-        query = query.eq('user_id', user.id);
-      } else {
-        query = query.eq('session_id', getSessionId());
-      }
-
-      const { data: cartData, error } = await query;
+        .select('*')
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
-      // Now fetch the related course and event data separately
-      const cartItems: CartItem[] = [];
-      
-      for (const item of cartData || []) {
-        let itemName = 'Unknown Item';
-        let courseData = undefined;
-        let eventData = undefined;
+      const cartItems: CartItem[] = await Promise.all(
+        data.map(async (item) => {
+          let title = '';
+          let thumbnail_url = '';
+          let event_id = '';
 
-        // Ensure item_type is properly typed
-        const itemType = item.item_type as 'course' | 'event_ticket';
-
-        if (itemType === 'course') {
-          const { data: course } = await supabase
-            .from('courses')
-            .select('id, title, thumbnail_url')
-            .eq('id', item.item_id)
-            .single();
-          
-          if (course) {
-            itemName = course.title;
-            courseData = course;
+          if (item.item_type === 'course') {
+            const { data: course } = await supabase
+              .from('courses')
+              .select('title, thumbnail_url')
+              .eq('id', item.item_id)
+              .single();
+            
+            title = course?.title || 'Unknown Course';
+            thumbnail_url = course?.thumbnail_url || '';
+          } else if (item.item_type === 'event_ticket') {
+            const { data: ticket } = await supabase
+              .from('event_tickets')
+              .select('name, event_id, events(title, image_url)')
+              .eq('id', item.item_id)
+              .single();
+            
+            title = ticket?.name || 'Unknown Ticket';
+            thumbnail_url = ticket?.events?.image_url || '';
+            event_id = ticket?.event_id || '';
           }
-        } else if (itemType === 'event_ticket') {
-          const { data: event } = await supabase
-            .from('events')
-            .select('id, title')
-            .eq('id', item.item_id)
-            .single();
-          
-          if (event) {
-            itemName = `${event.title} - Ticket`;
-            eventData = {
-              id: item.item_id,
-              name: itemName,
-              ticket_type: 'ordinary',
-              event_id: item.item_id,
-              event_title: event.title,
-            };
-          }
-        }
 
-        cartItems.push({
-          id: item.id,
-          item_type: itemType,
-          item_id: item.item_id,
-          quantity: item.quantity,
-          price: item.price,
-          item_name: itemName,
-          course: courseData,
-          event_ticket: eventData,
-        });
-      }
+          return {
+            id: item.id,
+            item_id: item.item_id,
+            item_type: item.item_type,
+            price: parseFloat(item.price),
+            quantity: item.quantity,
+            title,
+            thumbnail_url,
+            event_id,
+            ticket_holder_names: item.ticket_holder_names || []
+          };
+        })
+      );
 
       setItems(cartItems);
     } catch (error) {
       console.error('Error loading cart:', error);
+      toast.error('Failed to load cart');
     } finally {
       setLoading(false);
     }
   };
 
-  const addToCart = async (newItem: Omit<CartItem, 'id'>) => {
+  const addToCart = async (item: Omit<CartItem, 'id'>) => {
+    if (!user) {
+      toast.error('Please sign in to add items to cart');
+      return;
+    }
+
     try {
+      // Check if item already exists
       const existingItem = items.find(
-        item => item.item_type === newItem.item_type && item.item_id === newItem.item_id
+        (cartItem) => cartItem.item_id === item.item_id && cartItem.item_type === item.item_type
       );
 
       if (existingItem) {
-        await updateQuantity(existingItem.id, existingItem.quantity + newItem.quantity);
+        await updateQuantity(existingItem.id, existingItem.quantity + item.quantity);
         return;
       }
 
-      const insertData: any = {
-        item_type: newItem.item_type,
-        item_id: newItem.item_id,
-        quantity: newItem.quantity,
-        price: newItem.price,
-      };
-
-      if (user) {
-        insertData.user_id = user.id;
-      } else {
-        insertData.session_id = getSessionId();
-      }
-
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('carts')
-        .insert(insertData);
+        .insert({
+          user_id: user.id,
+          item_id: item.item_id,
+          item_type: item.item_type,
+          price: item.price,
+          quantity: item.quantity,
+          ticket_holder_names: item.ticket_holder_names || []
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      await loadCartItems();
+      const newCartItem: CartItem = {
+        id: data.id,
+        item_id: item.item_id,
+        item_type: item.item_type,
+        price: item.price,
+        quantity: item.quantity,
+        title: item.title,
+        thumbnail_url: item.thumbnail_url,
+        event_id: item.event_id,
+        ticket_holder_names: item.ticket_holder_names || []
+      };
+
+      setItems([...items, newCartItem]);
       toast.success('Item added to cart');
     } catch (error) {
       console.error('Error adding to cart:', error);
@@ -195,7 +183,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.success('Item removed from cart');
     } catch (error) {
       console.error('Error removing from cart:', error);
-      toast.error('Failed to remove item from cart');
+      toast.error('Failed to remove item');
     }
   };
 
@@ -222,39 +210,61 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const clearCart = async () => {
+  const updateTicketHolders = async (itemId: string, holders: TicketHolder[]) => {
     try {
-      let query = supabase.from('carts').delete();
+      const { error } = await supabase
+        .from('carts')
+        .update({ ticket_holder_names: holders })
+        .eq('id', itemId);
 
-      if (user) {
-        query = query.eq('user_id', user.id);
-      } else {
-        query = query.eq('session_id', getSessionId());
-      }
+      if (error) throw error;
 
-      const { error } = await query;
+      setItems(items.map(item => 
+        item.id === itemId ? { ...item, ticket_holder_names: holders } : item
+      ));
+    } catch (error) {
+      console.error('Error updating ticket holders:', error);
+      toast.error('Failed to update ticket holders');
+    }
+  };
+
+  const clearCart = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('carts')
+        .delete()
+        .eq('user_id', user.id);
+
       if (error) throw error;
 
       setItems([]);
     } catch (error) {
       console.error('Error clearing cart:', error);
-      throw error;
+      toast.error('Failed to clear cart');
     }
   };
 
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const getTotalPrice = () => {
+    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+
+  const getItemCount = () => {
+    return items.reduce((total, item) => total + item.quantity, 0);
+  };
 
   return (
     <CartContext.Provider value={{
       items,
-      totalItems,
-      totalAmount,
+      loading,
       addToCart,
       removeFromCart,
       updateQuantity,
+      updateTicketHolders,
       clearCart,
-      loading,
+      getTotalPrice,
+      getItemCount
     }}>
       {children}
     </CartContext.Provider>

@@ -18,6 +18,7 @@ export type Database = {
           price: number
           quantity: number
           session_id: string | null
+          ticket_holder_names: Json | null
           updated_at: string | null
           user_id: string | null
         }
@@ -29,6 +30,7 @@ export type Database = {
           price: number
           quantity?: number
           session_id?: string | null
+          ticket_holder_names?: Json | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -40,6 +42,7 @@ export type Database = {
           price?: number
           quantity?: number
           session_id?: string | null
+          ticket_holder_names?: Json | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -1168,6 +1171,47 @@ export type Database = {
         }
         Relationships: []
       }
+      generated_tickets: {
+        Row: {
+          booking_id: string | null
+          created_at: string | null
+          id: string
+          qr_code_data: string
+          ticket_code: string
+          ticket_holder_name: string
+          ticket_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string | null
+          id?: string
+          qr_code_data: string
+          ticket_code: string
+          ticket_holder_name: string
+          ticket_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string | null
+          id?: string
+          qr_code_data?: string
+          ticket_code?: string
+          ticket_holder_name?: string
+          ticket_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_tickets_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "event_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_messages: {
         Row: {
           content: string
@@ -1765,7 +1809,9 @@ export type Database = {
           payment_method: string
           payment_provider_id: string | null
           payment_status: string
+          receipt_generated_at: string | null
           receipt_url: string | null
+          stripe_payment_intent_id: string | null
           tax_amount: number | null
           total_amount: number
           updated_at: string | null
@@ -1779,7 +1825,9 @@ export type Database = {
           payment_method: string
           payment_provider_id?: string | null
           payment_status?: string
+          receipt_generated_at?: string | null
           receipt_url?: string | null
+          stripe_payment_intent_id?: string | null
           tax_amount?: number | null
           total_amount: number
           updated_at?: string | null
@@ -1793,7 +1841,9 @@ export type Database = {
           payment_method?: string
           payment_provider_id?: string | null
           payment_status?: string
+          receipt_generated_at?: string | null
           receipt_url?: string | null
+          stripe_payment_intent_id?: string | null
           tax_amount?: number | null
           total_amount?: number
           updated_at?: string | null
@@ -2511,8 +2561,20 @@ export type Database = {
           count: string
         }[]
       }
+      generate_ticket_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      process_payment_success: {
+        Args: {
+          p_order_id: string
+          p_payment_intent_id?: string
+          p_session_id?: string
+        }
         Returns: boolean
       }
     }

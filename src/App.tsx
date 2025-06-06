@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, BrowserRouter as Router } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/sonner';
@@ -110,14 +109,16 @@ import { CartProvider } from '@/contexts/CartContext';
 import CheckoutPage from '@/pages/CheckoutPage';
 import CheckoutSuccessPage from '@/pages/CheckoutSuccessPage';
 
+import TicketPage from '@/pages/TicketPage';
+
 const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <CartProvider>
-          <div className="min-h-screen bg-background">
+    <AuthProvider>
+      <CartProvider>
+        <QueryClient client={queryClient}>
+          <Router>
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<HomePage />} />
@@ -222,14 +223,17 @@ function App() {
               <Route path="/payment/cancel" element={<PaymentCancelPage />} />
               <Route path="/payment/result" element={<PaymentResultPage />} />
 
+              {/* Ticket Route */}
+              <Route path="/ticket/:ticketId" element={<TicketPage />} />
+
               {/* 404 Route */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
             <Toaster />
-          </div>
-        </CartProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+          </Router>
+        </QueryClient>
+      </CartProvider>
+    </AuthProvider>
   );
 }
 
