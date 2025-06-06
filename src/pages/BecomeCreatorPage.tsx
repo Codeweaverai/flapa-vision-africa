@@ -59,8 +59,8 @@ const BecomeCreatorPage = () => {
   const steps = [
     {
       number: "01",
-      title: "Apply to Become a Creator",
-      description: "Fill out our creator application form with your background and teaching interests."
+      title: "Enable to Become a Creator",
+      description: "Create an account,login upload your profile photo and enter your short Bio and then Enable Creator Dashboard."
     },
     {
       number: "02",
