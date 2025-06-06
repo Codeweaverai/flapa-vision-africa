@@ -150,8 +150,8 @@ const ModernInboxComponent: React.FC = () => {
       const existing = chatMap.get(otherUserId);
       if (!existing || new Date(message.created_at) > new Date(existing.timestamp)) {
         const profile = message.sender_id === user?.id 
-          ? { id: message.recipient_id, username: 'Unknown', full_name: 'Unknown User' }
-          : message.sender_profile || { id: otherUserId, username: 'Unknown', full_name: 'Unknown User' };
+          ? { id: message.recipient_id}
+          : message.sender_profile || { id: otherUserId};
 
         chatMap.set(otherUserId, {
           id: otherUserId,
@@ -423,7 +423,7 @@ const ModernInboxComponent: React.FC = () => {
                 </Avatar>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">
-                    {chatPreviews.find(c => c.id === selectedChat)?.user.full_name || 'Unknown User'}
+                    {chatPreviews.find(c => c.id === selectedChat)?.user.full_name}
                   </p>
                   <p className="text-xs text-gray-500">
                     {chatPreviews.find(c => c.id === selectedChat)?.isOnline ? 'Online' : 'Last seen recently'}
