@@ -659,11 +659,12 @@ const CourseDetailPage = () => {
                           </p>
                           
                           <div className="flex gap-4">
+                            <Link to={`/creator/profile/${user.id}`}>
                             <Button variant="outline" size="sm">
                               <Globe className="h-4 w-4 mr-2" />
-                              <Link to={`/creator/profile/${user.id}`}>
                               View Profile
                             </Button>
+                              </Link>
                             <Button variant="outline" size="sm">
                               <Mail className="h-4 w-4 mr-2" />
                               Contact
