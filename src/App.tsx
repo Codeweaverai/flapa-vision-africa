@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -50,6 +51,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import UserProfile from '@/pages/account/UserProfile';
 import UserCourses from '@/pages/account/UserCourses';
 import UserEvents from '@/pages/account/UserEvents';
+import UserOrders from '@/pages/account/UserOrders';
 import UserConsultations from '@/pages/account/UserConsultations';
 import UserSettings from '@/pages/account/UserSettings';
 

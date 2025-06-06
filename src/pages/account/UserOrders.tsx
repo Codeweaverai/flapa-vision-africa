@@ -24,12 +24,7 @@ interface Order {
     quantity: number;
     unit_price: number;
     total_price: number;
-    courses?: { title: string; id: string };
-    event_tickets?: { 
-      name: string; 
-      id: string;
-      events: { title: string; start_time: string; id: string } 
-    };
+    item_id: string;
   }>;
 }
 
@@ -50,15 +45,7 @@ const UserOrders = () => {
         .from('orders')
         .select(`
           *,
-          order_items (
-            *,
-            courses:item_id (id, title),
-            event_tickets:item_id (
-              id, 
-              name, 
-              events:event_id (id, title, start_time)
-            )
-          )
+          order_items (*)
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -151,21 +138,13 @@ const UserOrders = () => {
                 {order.order_items.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <h4 className="font-medium">
-                        {item.item_type === 'course' ? item.courses?.title : item.event_tickets?.name}
-                      </h4>
+                      <h4 className="font-medium">{item.item_name}</h4>
                       <div className="flex items-center gap-4 mt-1">
                         <Badge variant="outline">
                           {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
                         </Badge>
                         {item.quantity > 1 && (
                           <span className="text-sm text-gray-600">Qty: {item.quantity}</span>
-                        )}
-                        {item.event_tickets?.events && (
-                          <span className="text-sm text-gray-600 flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            {format(new Date(item.event_tickets.events.start_time), 'PPP')}
-                          </span>
                         )}
                       </div>
                     </div>
@@ -176,7 +155,7 @@ const UserOrders = () => {
                           size="sm" 
                           variant="outline" 
                           className="mt-2"
-                          onClick={() => window.location.href = `/learning/course/${item.courses?.id}`}
+                          onClick={() => window.location.href = `/learning/course/${item.item_id}`}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           Access Course

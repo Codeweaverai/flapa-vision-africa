@@ -6,13 +6,9 @@ import Layout from '@/components/layout/Layout';
 
 interface UserAccountLayoutProps {
   children: React.ReactNode;
-  activeTab?: string;
 }
 
-const UserAccountLayout: React.FC<UserAccountLayoutProps> = ({ 
-  children,
-  activeTab = 'profile'
-}) => {
+const UserAccountLayout: React.FC<UserAccountLayoutProps> = ({ children }) => {
   const { user } = useAuth();
 
   return (
@@ -20,7 +16,7 @@ const UserAccountLayout: React.FC<UserAccountLayoutProps> = ({
       <div className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-8">
           {/* Sidebar */}
-          <UserAccountSidebar activeTab={activeTab} />
+          <UserAccountSidebar />
           
           {/* Main Content */}
           <div className="bg-white px-6 py-8 rounded-lg border shadow-sm">
