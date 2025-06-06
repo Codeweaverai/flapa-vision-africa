@@ -154,6 +154,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      // For event tickets, initialize with empty ticket holder names based on quantity
+      const initialTicketHolders = item.item_type === 'event_ticket' 
+        ? Array.from({ length: item.quantity }, () => ({ name: '', email: '' }))
+        : [];
+
       const { data, error } = await supabase
         .from('carts')
         .insert({
@@ -162,7 +167,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           item_type: item.item_type,
           price: item.price,
           quantity: item.quantity,
-          ticket_holder_names: (item.ticket_holder_names || []) as any
+          ticket_holder_names: initialTicketHolders as any
         })
         .select()
         .single();
@@ -178,7 +183,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: item.title,
         thumbnail_url: item.thumbnail_url,
         event_id: item.event_id,
-        ticket_holder_names: item.ticket_holder_names || []
+        ticket_holder_names: initialTicketHolders
       };
 
       setItems([...items, newCartItem]);
@@ -213,15 +218,34 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      // For event tickets, adjust ticket holder names array to match quantity
+      let updatedTicketHolders = item.ticket_holder_names || [];
+      if (item.item_type === 'event_ticket') {
+        if (quantity > updatedTicketHolders.length) {
+          // Add new empty holders
+          const newHolders = Array.from({ length: quantity - updatedTicketHolders.length }, () => ({ name: '', email: '' }));
+          updatedTicketHolders = [...updatedTicketHolders, ...newHolders];
+        } else if (quantity < updatedTicketHolders.length) {
+          // Remove excess holders
+          updatedTicketHolders = updatedTicketHolders.slice(0, quantity);
+        }
+      }
+
       const { error } = await supabase
         .from('carts')
-        .update({ quantity })
+        .update({ 
+          quantity,
+          ticket_holder_names: updatedTicketHolders as any
+        })
         .eq('id', itemId);
 
       if (error) throw error;
 
       setItems(items.map(item => 
-        item.id === itemId ? { ...item, quantity } : item
+        item.id === itemId ? { ...item, quantity, ticket_holder_names: updatedTicketHolders } : item
       ));
     } catch (error) {
       console.error('Error updating quantity:', error);

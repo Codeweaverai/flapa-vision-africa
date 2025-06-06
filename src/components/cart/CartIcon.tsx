@@ -1,8 +1,10 @@
 
 import React, { useState } from 'react';
-import { ShoppingCart, X, Plus, Minus } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useCart } from '@/contexts/CartContext';
 import {
   Sheet,
@@ -16,7 +18,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 
 const CartIcon = () => {
-  const { items, getItemCount, getTotalPrice, removeFromCart, updateQuantity } = useCart();
+  const { items, getItemCount, getTotalPrice, removeFromCart, updateQuantity, updateTicketHolders } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -24,8 +26,27 @@ const CartIcon = () => {
   const totalAmount = getTotalPrice();
 
   const handleCheckout = () => {
+    // Validate that all event tickets have names
+    const eventItems = items.filter(item => item.item_type === 'event_ticket');
+    for (const item of eventItems) {
+      const holders = item.ticket_holder_names || [];
+      if (holders.some(holder => !holder.name.trim())) {
+        alert(`Please provide names for all tickets for ${item.title}`);
+        return;
+      }
+    }
+
     setIsOpen(false);
     navigate('/checkout');
+  };
+
+  const updateTicketHolderName = (itemId: string, holderIndex: number, name: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const updatedHolders = [...(item.ticket_holder_names || [])];
+    updatedHolders[holderIndex] = { ...updatedHolders[holderIndex], name };
+    updateTicketHolders(itemId, updatedHolders);
   };
 
   return (
@@ -42,7 +63,7 @@ const CartIcon = () => {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent>
+      <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Shopping Cart</SheetTitle>
           <SheetDescription>
@@ -82,26 +103,45 @@ const CartIcon = () => {
                       </div>
                       
                       {item.item_type === 'event_ticket' && (
-                        <div className="flex items-center justify-between mt-3">
-                          <span className="text-xs text-gray-500">Quantity:</span>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="text-sm font-medium">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-500">Quantity:</span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="text-sm font-medium">{item.quantity}</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {/* Ticket Holder Names */}
+                          <div className="space-y-2">
+                            <Label className="text-xs font-medium text-gray-700">Ticket Holder Names:</Label>
+                            {Array.from({ length: item.quantity }).map((_, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <User className="h-3 w-3 text-gray-400" />
+                                <Input
+                                  placeholder={`Ticket ${index + 1} holder name`}
+                                  value={item.ticket_holder_names?.[index]?.name || ''}
+                                  onChange={(e) => updateTicketHolderName(item.id, index, e.target.value)}
+                                  className="text-xs h-7"
+                                  required
+                                />
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}

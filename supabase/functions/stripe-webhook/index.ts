@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -87,10 +86,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       return;
     }
 
-    // Update receipt URL from Stripe if available
+    // Get receipt URL from Stripe
     let receiptUrl = null;
     if (session.payment_intent) {
-      const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
+      const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string, {
+        expand: ['charges.data.receipt_url']
+      });
       if (paymentIntent.charges?.data?.[0]?.receipt_url) {
         receiptUrl = paymentIntent.charges.data[0].receipt_url;
       }
@@ -117,6 +118,50 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     if (processError) {
       console.error('Error processing payment:', processError);
       throw processError;
+    }
+
+    // Additional processing for event tickets with ticket holder names
+    const { data: orderItems } = await supabaseClient
+      .from('order_items')
+      .select('*')
+      .eq('order_id', order.id)
+      .eq('item_type', 'event_ticket');
+
+    if (orderItems) {
+      for (const item of orderItems) {
+        // Get cart item to access ticket holder names
+        const { data: cartItem } = await supabaseClient
+          .from('carts')
+          .select('ticket_holder_names')
+          .eq('user_id', order.user_id)
+          .eq('item_id', item.item_id)
+          .eq('item_type', 'event_ticket')
+          .single();
+
+        if (cartItem?.ticket_holder_names) {
+          // Update generated tickets with proper holder names
+          const { data: tickets } = await supabaseClient
+            .from('generated_tickets')
+            .select('id')
+            .eq('booking_id', item.item_id)
+            .limit(item.quantity);
+
+          if (tickets) {
+            const ticketHolders = Array.isArray(cartItem.ticket_holder_names) 
+              ? cartItem.ticket_holder_names 
+              : [];
+
+            for (let i = 0; i < tickets.length && i < ticketHolders.length; i++) {
+              await supabaseClient
+                .from('generated_tickets')
+                .update({ 
+                  ticket_holder_name: ticketHolders[i]?.name || `Ticket Holder ${i + 1}`
+                })
+                .eq('id', tickets[i].id);
+            }
+          }
+        }
+      }
     }
 
     console.log(`Successfully processed payment for order ${order.id}`);
