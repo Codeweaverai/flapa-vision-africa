@@ -125,7 +125,12 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({
         .single();
 
       if (data) {
-        setUserReview(data);
+        // Add default profiles object to match interface
+        const reviewWithProfiles = {
+          ...data,
+          profiles: { full_name: 'You', avatar_url: null }
+        };
+        setUserReview(reviewWithProfiles);
         setNewRating(data.rating);
         setNewReview(data.review_text || '');
       }
