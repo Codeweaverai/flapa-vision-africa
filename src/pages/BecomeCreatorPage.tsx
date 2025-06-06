@@ -112,8 +112,8 @@ const BecomeCreatorPage = () => {
               </h1>
               
               <p className="text-xl text-gray-700 mb-12 max-w-3xl mx-auto leading-relaxed">
-                Join thousands of creators who are transforming lives through education while building 
-                sustainable income streams. Create courses, host events, and grow your impact.
+                Join thousands of creators who are transforming lives through Skills Training and Events managemnt while building 
+                sustainable income streams with SkillPulse Marketplace. Create courses, host events, and grow your impact.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
