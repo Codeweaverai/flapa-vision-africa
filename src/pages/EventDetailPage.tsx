@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Calendar, MapPin, Users, Clock, ArrowLeft, User, Globe, Linkedin, Twitter, Video, Star, MessageCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, ArrowLeft, User, Globe, Linkedin, Twitter, Video, Star, MessageCircle, CheckCircle, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -14,6 +13,7 @@ import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import AddToCartButton from '@/components/cart/AddToCartButton';
 import EventRegistrationButton from '@/components/payment/EventRegistrationButton';
 import { fetchEventSpeakers, fetchEventAgenda, KeynoteSpeaker, EventAgenda } from '@/services/eventManagementService';
 
@@ -142,6 +142,32 @@ const EventDetailPage = () => {
       setIsUserRegistered(!!data);
     } catch (error) {
       console.error('Error checking registration:', error);
+    }
+  };
+
+  const handleFreeRegistration = async () => {
+    if (!user || !event) {
+      toast.error('Please sign in to register for this event');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('event_bookings')
+        .insert({
+          user_id: user.id,
+          event_id: event.id,
+          payment_status: 'completed',
+          status: 'confirmed'
+        });
+
+      if (error) throw error;
+
+      toast.success('Successfully registered for the event! Your free ticket has been issued.');
+      setIsUserRegistered(true);
+    } catch (error) {
+      console.error('Error registering for event:', error);
+      toast.error('Failed to register for event');
     }
   };
 
@@ -565,14 +591,47 @@ const EventDetailPage = () => {
                   
                   <Separator />
                   
-                  <EventRegistrationButton
-                    eventId={event.id}
-                    eventName={event.title}
-                    isFree={event.is_free}
-                    price={event.price}
-                    currency={event.currency}
-                    isUserRegistered={isUserRegistered}
-                  />
+                  {isUserRegistered ? (
+                    <Button 
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700" 
+                      size="lg"
+                      disabled
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Registered ✓
+                    </Button>
+                  ) : event.is_free ? (
+                    <Button 
+                      onClick={handleFreeRegistration}
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" 
+                      size="lg"
+                    >
+                      <Ticket className="h-4 w-4 mr-2" />
+                      Get Free Ticket
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <AddToCartButton
+                        itemType="event_ticket"
+                        itemId={event.id}
+                        itemName={event.title}
+                        price={event.price}
+                        eventId={event.id}
+                        eventTitle={event.title}
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                      />
+                      <EventRegistrationButton
+                        eventId={event.id}
+                        eventName={event.title}
+                        isFree={event.is_free}
+                        price={event.price}
+                        currency={event.currency}
+                        isUserRegistered={isUserRegistered}
+                        className="w-full"
+                        variant="outline"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

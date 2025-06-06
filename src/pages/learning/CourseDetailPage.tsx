@@ -1,335 +1,176 @@
+
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
+import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, Clock, Users, Star, Award, Play, BookOpen, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useAuth } from '@/contexts/AuthContext';
+import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { 
-  BookOpen, 
-  Clock, 
-  Users, 
-  Star, 
-  PlayCircle,
-  Award,
-  CheckCircle,
-  DollarSign,
-  MessageSquare,
-  ThumbsUp,
-  Globe,
-  Mail,
-  Play
-} from 'lucide-react';
-import ReactPlayer from 'react-player';
-import VideoModal from '@/components/video/VideoModal';
-import CourseReviews from '@/components/course/CourseReviews';
+import AddToCartButton from '@/components/cart/AddToCartButton';
+import CourseEnrollmentButton from '@/components/payment/CourseEnrollmentButton';
 
 interface Course {
   id: string;
   title: string;
-  summary: string;
   description: string;
-  category: string;
-  difficulty_level: string;
-  duration_minutes: number;
   price: number;
   is_free: boolean;
-  thumbnail_url?: string;
-  certificate_enabled: boolean;
+  duration_minutes: number;
+  difficulty_level: string;
+  thumbnail_url: string;
+  category: string;
   creator_id: string;
-  modules?: CourseModule[];
-  course_learning_outcomes?: LearningOutcome[];
-  course_preview?: CoursePreview;
+  certificate_enabled: boolean;
 }
 
-interface CourseModule {
+interface Creator {
   id: string;
-  title: string;
-  description?: string;
-  order_index: number;
-  lessons?: Lesson[];
-  quizzes?: Quiz[];
-}
-
-interface Lesson {
-  id: string;
-  title: string;
-  description?: string;
-  order_index: number;
-  video_url?: string;
-  content_type: string;
-}
-
-interface Quiz {
-  id: string;
-  title: string;
-  description?: string;
-  passing_score: number;
-}
-
-interface LearningOutcome {
-  id: string;
-  outcome: string;
-}
-
-interface CoursePreview {
-  preview_video_url?: string;
-}
-
-interface CreatorProfile {
-  id: string;
-  full_name?: string;
-  bio?: string;
-  avatar_url?: string;
-  average_rating?: number;
-  total_courses?: number;
-  total_students?: number;
-  total_reviews?: number;
-}
-
-interface CourseStats {
-  totalStudents: number;
-  averageRating: number;
-  totalReviews: number;
+  full_name: string;
+  bio: string;
+  avatar_url: string;
 }
 
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
-  const [creator, setCreator] = useState<CreatorProfile | null>(null);
-  const [courseStats, setCourseStats] = useState<CourseStats | null>(null);
-  const [relatedCourses, setRelatedCourses] = useState<Course[]>([]);
+  const [creator, setCreator] = useState<Creator | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
-  const [enrolling, setEnrolling] = useState(false);
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [enrollmentCount, setEnrollmentCount] = useState(0);
+  const [rating, setRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
-    const loadCourseData = async () => {
-      if (!id) return;
-      
-      try {
-        setLoading(true);
-        console.log('Loading course data for:', id);
-        
-        // Fetch course with modules, lessons, quizzes, and learning outcomes
-        const { data: courseData, error: courseError } = await supabase
-          .from('courses')
-          .select(`
-            *,
-            course_learning_outcomes (*),
-            course_modules (
-              *,
-              lessons (*),
-              quizzes (*)
-            )
-          `)
-          .eq('id', id)
-          .single();
-
-        if (courseError) throw courseError;
-
-        // Fetch course preview separately
-        const { data: previewData } = await supabase
-          .from('course_previews')
-          .select('*')
-          .eq('course_id', id)
-          .single();
-
-        // Combine course data with preview
-        const enrichedCourseData = {
-          ...courseData,
-          course_preview: previewData || null,
-          modules: courseData.course_modules || []
-        };
-
-        console.log('Course data loaded:', enrichedCourseData);
-        setCourse(enrichedCourseData);
-
-        if (enrichedCourseData) {
-          // Fetch creator profile
-          const { data: creatorData, error: creatorError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', enrichedCourseData.creator_id)
-            .single();
-
-          if (!creatorError && creatorData) {
-            // Get all courses by this creator
-            const { data: creatorCourses } = await supabase
-              .from('courses')
-              .select('id')
-              .eq('creator_id', enrichedCourseData.creator_id);
-
-            if (creatorCourses && creatorCourses.length > 0) {
-              const courseIds = creatorCourses.map(c => c.id);
-              
-              // Get all reviews for creator's courses
-              const { data: reviews } = await supabase
-                .from('course_reviews')
-                .select('rating')
-                .in('course_id', courseIds);
-
-              // Get all enrollments for creator's courses
-              const { data: enrollments } = await supabase
-                .from('course_enrollments')
-                .select('id')
-                .in('course_id', courseIds);
-
-              const avgRating = reviews && reviews.length > 0 
-                ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
-                : 0;
-
-              setCreator({
-                ...creatorData,
-                average_rating: Math.round(avgRating * 10) / 10,
-                total_courses: creatorCourses.length,
-                total_students: enrollments ? enrollments.length : 0,
-                total_reviews: reviews ? reviews.length : 0
-              });
-            } else {
-              setCreator(creatorData);
-            }
-          }
-
-          // Fetch course-specific stats
-          const { data: enrollmentStats } = await supabase
-            .from('course_enrollments')
-            .select('id')
-            .eq('course_id', id);
-
-          const { data: reviewStats } = await supabase
-            .from('course_reviews')
-            .select('rating')
-            .eq('course_id', id);
-
-          const avgCourseRating = reviewStats && reviewStats.length > 0 
-            ? reviewStats.reduce((sum, r) => sum + r.rating, 0) / reviewStats.length 
-            : 0;
-
-          setCourseStats({
-            totalStudents: enrollmentStats ? enrollmentStats.length : 0,
-            averageRating: Math.round(avgCourseRating * 10) / 10,
-            totalReviews: reviewStats ? reviewStats.length : 0
-          });
-
-          // Fetch related courses (same category, different course)
-          const { data: relatedCoursesData } = await supabase
-            .from('courses')
-            .select('*')
-            .eq('category', enrichedCourseData.category)
-            .eq('is_published', true)
-            .neq('id', id)
-            .limit(4);
-
-          if (relatedCoursesData) {
-            setRelatedCourses(relatedCoursesData);
-          }
-        }
-        
-        // Check enrollment status
-        if (user && enrichedCourseData) {
-          const { data: enrollment } = await supabase
-            .from('course_enrollments')
-            .select('id')
-            .eq('course_id', id)
-            .eq('user_id', user.id)
-            .single();
-          
-          setIsEnrolled(!!enrollment);
-        }
-      } catch (error) {
-        console.error('Error loading course data:', error);
-        toast.error('Failed to load course details');
-      } finally {
-        setLoading(false);
+    if (id) {
+      fetchCourseDetails();
+      fetchEnrollmentStats();
+      if (user) {
+        checkEnrollmentStatus();
       }
-    };
-
-    loadCourseData();
+    }
   }, [id, user]);
 
-  const handleEnroll = async () => {
-    if (!user) {
-      navigate('/auth');
+  const fetchCourseDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      setCourse(data as Course);
+
+      // Fetch creator details
+      if (data.creator_id) {
+        const { data: creatorData, error: creatorError } = await supabase
+          .from('profiles')
+          .select('id, full_name, bio, avatar_url')
+          .eq('id', data.creator_id)
+          .single();
+
+        if (!creatorError && creatorData) {
+          setCreator(creatorData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching course:', error);
+      toast.error('Failed to load course details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEnrollmentStats = async () => {
+    try {
+      // Get enrollment count
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('id', { count: 'exact', head: true })
+        .eq('course_id', id);
+
+      if (!enrollmentError) {
+        setEnrollmentCount(enrollments?.length || 0);
+      }
+
+      // Get rating stats
+      const { data: reviews, error: reviewError } = await supabase
+        .from('course_reviews')
+        .select('rating')
+        .eq('course_id', id);
+
+      if (!reviewError && reviews && reviews.length > 0) {
+        const avgRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+        setRating(Math.round(avgRating * 10) / 10);
+        setReviewCount(reviews.length);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  const checkEnrollmentStatus = async () => {
+    if (!user || !id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('course_id', id)
+        .eq('user_id', user.id)
+        .eq('payment_status', 'completed')
+        .maybeSingle();
+
+      if (!error && data) {
+        setIsEnrolled(true);
+      }
+    } catch (error) {
+      console.error('Error checking enrollment:', error);
+    }
+  };
+
+  const handleFreeEnrollment = async () => {
+    if (!user || !course) {
+      toast.error('Please sign in to enroll in this course');
       return;
     }
 
-    if (!course || !id) return;
-
     try {
-      setEnrolling(true);
       const { error } = await supabase
         .from('course_enrollments')
-        .insert([{
+        .insert({
           user_id: user.id,
           course_id: course.id,
-          payment_status: course.is_free ? 'completed' : 'pending'
-        }]);
+          payment_status: 'completed'
+        });
 
       if (error) throw error;
 
+      toast.success('Successfully enrolled in the course!');
       setIsEnrolled(true);
-      toast.success('Successfully enrolled in course!');
     } catch (error) {
       console.error('Error enrolling in course:', error);
       toast.error('Failed to enroll in course');
-    } finally {
-      setEnrolling(false);
     }
   };
 
-  const handleStartLearning = () => {
-    navigate(`/learning/course/${id}`);
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return hours > 0 ? `${hours}h ${remainingMinutes}m` : `${minutes}m`;
   };
-
-  const handlePlayPreview = () => {
-    if (course?.course_preview?.preview_video_url) {
-      setIsVideoModalOpen(true);
-    }
-  };
-
-  // Mock FAQs data
-  const faqs = [
-    {
-      question: "What prerequisites do I need for this course?",
-      answer: "No prior experience is required. This course is designed for beginners and will guide you through all the fundamentals step by step."
-    },
-    {
-      question: "How long do I have access to the course?",
-      answer: "You get lifetime access to the course content, including all future updates and additions."
-    },
-    {
-      question: "Is there a certificate upon completion?",
-      answer: course?.certificate_enabled ? "Yes, you will receive a certificate of completion when you finish all the course modules and pass the final assessment." : "No certificate is provided for this course."
-    },
-    {
-      question: "Can I download the videos for offline viewing?",
-      answer: "Currently, offline downloads are not available. However, you can access the course content anytime with an internet connection."
-    },
-    {
-      question: "What if I'm not satisfied with the course?",
-      answer: "We offer a 30-day money-back guarantee. If you're not satisfied, you can request a full refund within 30 days of purchase."
-    }
-  ];
 
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
-          <div className="container mx-auto py-8 px-4">
-            <div className="flex justify-center items-center min-h-96">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          </div>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
         </div>
       </Layout>
     );
@@ -338,14 +179,11 @@ const CourseDetailPage = () => {
   if (!course) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
-          <div className="container mx-auto py-8 px-4">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
-              <p className="text-muted-foreground mb-4">The course you're looking for doesn't exist.</p>
-              <Button onClick={() => navigate('/courses')}>Browse Courses</Button>
-            </div>
-          </div>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex flex-col justify-center items-center gap-4">
+          <p>Course not found</p>
+          <Button asChild>
+            <Link to="/explore/courses">Back to Courses</Link>
+          </Button>
         </div>
       </Layout>
     );
@@ -353,501 +191,173 @@ const CourseDetailPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 relative overflow-hidden">
-        {/* Animated Particles Background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(30)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-white/40 rounded-full animate-pulse"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${2 + Math.random() * 2}s`
-              }}
-            />
-          ))}
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="section-container">
+          <Button variant="ghost" className="mb-6" asChild>
+            <Link to="/explore/courses" className="flex items-center gap-1">
+              <ArrowLeft className="h-4 w-4" /> Back to Courses
+            </Link>
+          </Button>
 
-        <div className="container mx-auto py-8 px-4 max-w-7xl relative z-10">
-          {/* Course Header */}
-          <div className="mb-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Main Content */}
-              <div className="lg:col-span-2">
-                {/* Course Preview Video */}
-                {course.course_preview?.preview_video_url ? (
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-bold mb-4">Course Preview</h2>
-                    <div className="aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
-                      <ReactPlayer
-                        url={course.course_preview.preview_video_url}
-                        light={course.thumbnail_url}
-                        controls
-                        width="100%"
-                        height="100%"
-                      />
-                    </div>
-                  </div>
-                ) : course.thumbnail_url ? (
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-bold mb-4">Course Preview</h2>
-                    <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Main content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Hero Section */}
+              <Card className="overflow-hidden border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                <div className="relative">
+                  {course.thumbnail_url && (
+                    <AspectRatio ratio={16/9}>
                       <img 
                         src={course.thumbnail_url} 
                         alt={course.title} 
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                        <Button 
-                          size="lg" 
-                          className="bg-white/90 text-purple-600 hover:bg-white rounded-full h-16 w-16 p-0"
-                          disabled
-                        >
-                          <Play className="h-8 w-8" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Course Info */}
-                <div className="mb-8">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">{course.category}</Badge>
-                    <Badge variant="outline" className="border-purple-300">{course.difficulty_level}</Badge>
-                    {course.certificate_enabled && (
-                      <Badge variant="outline" className="border-orange-300">
-                        <Award className="h-3 w-3 mr-1" />
-                        Certificate
-                      </Badge>
-                    )}
-                    {courseStats && courseStats.averageRating > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="text-sm font-medium">{courseStats.averageRating}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{course.title}</h1>
-                  <p className="text-xl text-muted-foreground mb-6">{course.summary}</p>
-                  
-                  <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      {courseStats?.totalStudents || 0} students
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      {courseStats?.averageRating || 0} ({courseStats?.totalReviews || 0} reviews)
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <BookOpen className="h-4 w-4" />
-                      {course.modules?.length || 0} modules
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Sidebar */}
-              <div className="lg:col-span-1">
-                <Card className="sticky top-8 bg-white/90 backdrop-blur-sm border-0 shadow-2xl">
-                  <CardHeader>
-                    <div className="text-center">
-                      {course.thumbnail_url && (
-                        <img 
-                          src={course.thumbnail_url} 
-                          alt={course.title}
-                          className="w-full aspect-video object-cover rounded-lg mb-4"
-                        />
-                      )}
-                      
-                      <div className="mb-4">
-                        {course.is_free ? (
-                          <div className="text-3xl font-bold text-green-600">Free</div>
-                        ) : (
-                          <div className="flex items-center justify-center gap-1">
-                            <DollarSign className="h-6 w-6" />
-                            <span className="text-3xl font-bold">{course.price}</span>
-                            <span className="text-sm text-muted-foreground">USD</span>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                      <div className="absolute bottom-4 left-4 right-4 text-white">
+                        <Badge className="mb-2 bg-gradient-to-r from-orange-500 to-purple-600">
+                          {course.category}
+                        </Badge>
+                        <h1 className="text-3xl font-bold mb-2">{course.title}</h1>
+                        <div className="flex flex-wrap gap-4 text-sm">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            <span>{formatDuration(course.duration_minutes)}</span>
                           </div>
-                        )}
-                      </div>
-
-                      {isEnrolled ? (
-                        <Button 
-                          className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" 
-                          size="lg"
-                          onClick={handleStartLearning}
-                        >
-                          Continue Learning
-                        </Button>
-                      ) : (
-                        <Button 
-                          className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" 
-                          size="lg"
-                          onClick={handleEnroll}
-                          disabled={enrolling}
-                        >
-                          {enrolling ? 'Enrolling...' : course.is_free ? 'Enroll for Free' : 'Enroll Now'}
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <div className="space-y-4">
-                      <Separator />
-                      
-                      <div>
-                        <h4 className="font-semibold mb-2">This course includes:</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span>{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m on-demand video</span>
+                          <div className="flex items-center gap-1">
+                            <Users className="h-4 w-4" />
+                            <span>{enrollmentCount} students</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-muted-foreground" />
-                            <span>{course.modules?.length || 0} modules</span>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="border-white text-white">
+                              {course.difficulty_level}
+                            </Badge>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                            <span>Full lifetime access</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                            <span>Access on mobile and desktop</span>
-                          </div>
-                          {course.certificate_enabled && (
-                            <div className="flex items-center gap-2">
-                              <Award className="h-4 w-4 text-muted-foreground" />
-                              <span>Certificate of completion</span>
+                          {rating > 0 && (
+                            <div className="flex items-center gap-1">
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                              <span>{rating} ({reviewCount})</span>
                             </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    </AspectRatio>
+                  )}
+                </div>
+              </Card>
+
+              {/* Course Description */}
+              <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                <CardHeader>
+                  <CardTitle>About This Course</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="whitespace-pre-line text-gray-700 leading-relaxed">{course.description}</p>
+                </CardContent>
+              </Card>
             </div>
-          </div>
 
-          {/* Course Content Tabs */}
-          <div className="mb-8">
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
-                <TabsTrigger value="instructor">Instructor</TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                <TabsTrigger value="faq">FAQ</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="overview" className="mt-6">
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle>About This Course</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="prose max-w-none">
-                      <p className="text-muted-foreground leading-relaxed mb-6">
-                        {course.description}
-                      </p>
-                      
-                      {/* Learning Outcomes */}
-                      {course.course_learning_outcomes && course.course_learning_outcomes.length > 0 && (
-                        <div className="mt-8">
-                          <h3 className="text-xl font-semibold mb-4">What You'll Learn</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {course.course_learning_outcomes.map((outcome, index) => (
-                              <div key={outcome.id || index} className="flex items-start gap-2">
-                                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span className="text-sm">{outcome.outcome}</span>
-                              </div>
-                            ))}
-                          </div>
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Enrollment Card */}
+              <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl sticky top-24">
+                <CardContent className="p-6 space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                      {course.is_free ? 'Free' : `$${course.price}`}
+                    </p>
+                  </div>
+
+                  {isEnrolled ? (
+                    <Button 
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700" 
+                      size="lg"
+                      asChild
+                    >
+                      <Link to={`/learning/course/${course.id}`}>
+                        <Play className="h-4 w-4 mr-2" />
+                        Continue Learning
+                      </Link>
+                    </Button>
+                  ) : course.is_free ? (
+                    <Button 
+                      onClick={handleFreeEnrollment}
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" 
+                      size="lg"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Enroll for Free
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <AddToCartButton
+                        itemType="course"
+                        itemId={course.id}
+                        itemName={course.title}
+                        price={course.price}
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                      />
+                      <CourseEnrollmentButton
+                        courseId={course.id}
+                        courseName={course.title}
+                        price={course.price}
+                        isFree={course.is_free}
+                        className="w-full"
+                        variant="outline"
+                      />
+                      <p className="text-sm text-gray-600 text-center">30-day money-back guarantee</p>
+                    </div>
+                  )}
+
+                  {/* Course Benefits */}
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium mb-3">This course includes:</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-orange-600" />
+                        <span>Full lifetime access</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-orange-600" />
+                        <span>Access on mobile and desktop</span>
+                      </div>
+                      {course.certificate_enabled && (
+                        <div className="flex items-center gap-2">
+                          <Award className="w-4 h-4 text-orange-600" />
+                          <span>Certificate of completion</span>
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="curriculum" className="mt-6">
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Course Curriculum</CardTitle>
-                    <CardDescription>
-                      {course.modules?.length || 0} modules • {course.modules?.reduce((total, module) => total + (module.lessons?.length || 0), 0) || 0} lessons
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {course.modules && course.modules.length > 0 ? (
-                      <Accordion type="single" collapsible className="w-full">
-                        {course.modules.map((module, index) => (
-                          <AccordionItem key={module.id} value={`module-${index}`}>
-                            <AccordionTrigger className="text-left">
-                              <div className="flex items-center justify-between w-full mr-4">
-                                <span className="font-medium">
-                                  Module {index + 1}: {module.title}
-                                </span>
-                                <Badge variant="outline">
-                                  {module.lessons?.length || 0} lessons
-                                </Badge>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              {module.description && (
-                                <p className="text-sm text-muted-foreground mb-4">
-                                  {module.description}
-                                </p>
-                              )}
-                              
-                              {/* Lessons */}
-                              {module.lessons && module.lessons.length > 0 && (
-                                <div className="space-y-2 mb-4">
-                                  <h4 className="font-medium text-sm mb-2">Lessons:</h4>
-                                  {module.lessons.map((lesson, lessonIndex) => (
-                                    <div key={lesson.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                                      <PlayCircle className="h-4 w-4 text-muted-foreground" />
-                                      <div className="flex-1">
-                                        <div className="font-medium text-sm">
-                                          {lessonIndex + 1}. {lesson.title}
-                                        </div>
-                                        {lesson.description && (
-                                          <div className="text-xs text-muted-foreground">
-                                            {lesson.description}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <Badge variant="outline" className="text-xs">
-                                        {lesson.content_type}
-                                      </Badge>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              
-                              {/* Quizzes */}
-                              {module.quizzes && module.quizzes.length > 0 && (
-                                <div className="mt-4">
-                                  <h4 className="font-medium text-sm mb-2">Module Quizzes:</h4>
-                                  <div className="space-y-2">
-                                    {module.quizzes.map((quiz, quizIndex) => (
-                                      <div key={quiz.id} className="flex items-center gap-3 p-2 rounded-lg bg-blue-50">
-                                        <Award className="h-4 w-4 text-blue-600" />
-                                        <div className="flex-1">
-                                          <div className="font-medium text-sm text-blue-800">
-                                            Quiz {quizIndex + 1}: {quiz.title}
-                                          </div>
-                                          {quiz.description && (
-                                            <div className="text-xs text-blue-600">
-                                              {quiz.description}
-                                            </div>
-                                          )}
-                                        </div>
-                                        <Badge variant="outline" className="text-xs border-blue-200 text-blue-600">
-                                          Passing: {quiz.passing_score}%
-                                        </Badge>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </AccordionContent>
-                          </AccordionItem>
-                        ))}
-                      </Accordion>
-                    ) : (
-                      <div className="text-center py-8">
-                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                        <h3 className="text-lg font-medium mb-2">No curriculum available</h3>
-                        <p className="text-muted-foreground">
-                          This course is still being developed. Check back soon!
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="instructor" className="mt-6">
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Meet Your Instructor</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {creator ? (
-                      <div className="flex flex-col md:flex-row gap-6">
-                        <div className="md:w-1/3">
-                          <Avatar className="w-32 h-32 mx-auto md:mx-0">
-                            <AvatarImage src={creator.avatar_url} />
-                            <AvatarFallback className="text-2xl">
-                              {creator.full_name?.split(' ').map((n: string) => n[0]).join('') || 'IN'}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                        
-                        <div className="md:w-2/3">
-                          <h3 className="text-2xl font-bold mb-2">{creator.full_name || 'Anonymous'}</h3>
-                          <p className="text-lg text-muted-foreground mb-4">Course Creator</p>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">{creator.average_rating || 0}</div>
-                              <div className="text-sm text-muted-foreground">Rating</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">{creator.total_courses || 0}</div>
-                              <div className="text-sm text-muted-foreground">Courses</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">{creator.total_students || 0}</div>
-                              <div className="text-sm text-muted-foreground">Students</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">{creator.total_reviews || 0}</div>
-                              <div className="text-sm text-muted-foreground">Reviews</div>
-                            </div>
-                          </div>
-                          
-                          <p className="text-muted-foreground mb-6 leading-relaxed">
-                            {creator.bio || 'No bio available for this instructor.'}
-                          </p>
-                          
-                          <div className="flex gap-4">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link to={`/creator/profile/${creator.id}`}>
-                                <Globe className="h-4 w-4 mr-2" />
-                                View Creator Profile
-                              </Link>
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Message
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center p-8">
-                        <p className="text-muted-foreground">Loading instructor information...</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="reviews" className="mt-6">
-                <CourseReviews courseId={course.id} />
-              </TabsContent>
-              
-              <TabsContent value="faq" className="mt-6">
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Frequently Asked Questions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Accordion type="single" collapsible className="w-full">
-                      {faqs.map((faq, index) => (
-                        <AccordionItem key={index} value={`faq-${index}`}>
-                          <AccordionTrigger className="text-left">
-                            {faq.question}
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <p className="text-muted-foreground">
-                              {faq.answer}
-                            </p>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Related Courses Section */}
-          {relatedCourses.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Related Courses</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {relatedCourses.map((relatedCourse) => (
-                  <Card 
-                    key={relatedCourse.id} 
-                    className="group bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0"
-                  >
-                    <div className="aspect-video bg-gradient-to-br from-orange-200 to-purple-200 rounded-t-lg overflow-hidden">
-                      {relatedCourse.thumbnail_url ? (
-                        <img 
-                          src={relatedCourse.thumbnail_url} 
-                          alt={relatedCourse.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <BookOpen className="w-12 h-12 text-white/60" />
-                        </div>
-                      )}
+              {/* Creator Card */}
+              {creator && (
+                <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Instructor</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
+                        {creator.full_name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-800">{creator.full_name}</h3>
+                        <p className="text-sm text-muted-foreground">Course Instructor</p>
+                      </div>
                     </div>
                     
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-sm line-clamp-2 flex-1">
-                          {relatedCourse.title}
-                        </h3>
-                        <Badge 
-                          variant={relatedCourse.is_free ? "secondary" : "default"}
-                          className="ml-2 text-xs"
-                        >
-                          {relatedCourse.is_free ? 'Free' : `$${relatedCourse.price}`}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          <span>{Math.floor(relatedCourse.duration_minutes / 60)}h {relatedCourse.duration_minutes % 60}m</span>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {relatedCourse.difficulty_level}
-                        </Badge>
-                      </div>
-                      
-                      <Button className="w-full text-xs bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
-                        <Link to={`/learning/course-detail/${relatedCourse.id}`} className="flex items-center justify-center">
-                          <Play className="h-3 w-3 mr-1" />
-                          View Course
-                        </Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    {creator.bio && (
+                      <p className="text-sm text-gray-600 line-clamp-3">{creator.bio}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
-      
-      {/* Video Modal */}
-      {course?.course_preview?.preview_video_url && (
-        <VideoModal
-          isOpen={isVideoModalOpen}
-          onClose={() => setIsVideoModalOpen(false)}
-          videoUrl={course.course_preview.preview_video_url}
-          title={course.title}
-          thumbnail={course.thumbnail_url}
-        />
-      )}
     </Layout>
   );
 };
