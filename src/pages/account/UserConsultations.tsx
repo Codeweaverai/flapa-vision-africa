@@ -79,7 +79,7 @@ const UserConsultations: React.FC = () => {
   };
 
   return (
-    <UserAccountLayout activeTab="consultations">
+    <UserAccountLayout>
       <div>
         <h1 className="text-2xl font-bold mb-6">My Consultations</h1>
         

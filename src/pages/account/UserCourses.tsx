@@ -199,7 +199,7 @@ const UserCourses = () => {
 
   return (
     <Layout>
-      <UserAccountLayout activeTab="courses">
+      <UserAccountLayout>
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">My Courses</h1>
           <p className="text-muted-foreground">Manage your course enrollments and track your progress</p>

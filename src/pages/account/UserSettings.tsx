@@ -116,7 +116,7 @@ const UserSettings: React.FC = () => {
 
   if (loading) {
     return (
-      <UserAccountLayout activeTab="settings">
+      <UserAccountLayout>
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
         </div>
@@ -125,7 +125,7 @@ const UserSettings: React.FC = () => {
   }
 
   return (
-    <UserAccountLayout activeTab="settings">
+    <UserAccountLayout>
       <div>
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
         
