@@ -29,20 +29,54 @@ interface Order {
   }>;
 }
 
+interface Enrollment {
+  id: string;
+  course_id: string;
+  payment_status: string;
+  enrollment_date: string;
+  course: {
+    id: string;
+    title: string;
+    thumbnail_url?: string;
+    price: number;
+  };
+}
+
+interface EventBooking {
+  id: string;
+  event_id: string;
+  payment_status: string;
+  booking_date: string;
+  payment_amount: number;
+  payment_currency: string;
+  ticket_quantity: number;
+  event: {
+    id: string;
+    title: string;
+    start_time: string;
+    location?: string;
+  };
+}
+
 const UserOrders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [eventBookings, setEventBookings] = useState<EventBooking[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-      fetchOrders();
+      fetchAllOrders();
     }
   }, [user]);
 
-  const fetchOrders = async () => {
+  const fetchAllOrders = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      
+      // Fetch traditional orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
           *,
@@ -51,8 +85,56 @@ const UserOrders = () => {
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setOrders(data || []);
+      if (ordersError) {
+        console.error('Orders error:', ordersError);
+      } else {
+        setOrders(ordersData || []);
+      }
+
+      // Fetch course enrollments
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select(`
+          *,
+          courses:course_id (
+            id,
+            title,
+            thumbnail_url,
+            price
+          )
+        `)
+        .eq('user_id', user?.id)
+        .eq('payment_status', 'completed')
+        .order('enrollment_date', { ascending: false });
+
+      if (enrollmentsError) {
+        console.error('Enrollments error:', enrollmentsError);
+      } else {
+        setEnrollments(enrollmentsData || []);
+      }
+
+      // Fetch event bookings
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from('event_bookings')
+        .select(`
+          *,
+          events:event_id (
+            id,
+            title,
+            start_time,
+            location
+          )
+        `)
+        .eq('user_id', user?.id)
+        .eq('payment_status', 'completed')
+        .order('booking_date', { ascending: false });
+
+      if (bookingsError) {
+        console.error('Bookings error:', bookingsError);
+      } else {
+        setEventBookings(bookingsData || []);
+      }
+
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error('Failed to load orders');
@@ -78,6 +160,11 @@ const UserOrders = () => {
     window.open(receiptUrl, '_blank');
   };
 
+  const totalItems = orders.length + enrollments.length + eventBookings.length;
+  const totalSpent = orders.reduce((sum, order) => sum + order.total_amount, 0) + 
+                   enrollments.reduce((sum, enrollment) => sum + (enrollment.course?.price || 0), 0) +
+                   eventBookings.reduce((sum, booking) => sum + booking.payment_amount, 0);
+
   if (loading) {
     return (
       <Layout>
@@ -99,7 +186,7 @@ const UserOrders = () => {
     );
   }
 
-  if (orders.length === 0) {
+  if (totalItems === 0) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
@@ -151,12 +238,13 @@ const UserOrders = () => {
               </p>
               <div className="flex items-center justify-center gap-2 mt-4">
                 <Package className="h-5 w-5 text-orange-500" />
-                <span className="text-gray-700 font-medium">{orders.length} total orders</span>
+                <span className="text-gray-700 font-medium">{totalItems} total orders</span>
               </div>
             </div>
 
             {/* Orders Grid */}
             <div className="space-y-6">
+              {/* Traditional Orders */}
               {orders.map((order) => (
                 <Card key={order.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300">
                   <CardHeader className="bg-gradient-to-r from-orange-100 to-purple-100 rounded-t-lg">
@@ -278,6 +366,153 @@ const UserOrders = () => {
                   </CardContent>
                 </Card>
               ))}
+
+              {/* Course Enrollments */}
+              {enrollments.map((enrollment) => (
+                <Card key={enrollment.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300">
+                  <CardHeader className="bg-gradient-to-r from-green-100 to-blue-100 rounded-t-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-green-500 to-blue-600 flex items-center justify-center">
+                          <Eye className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-xl text-gray-800">
+                            Course Enrollment
+                          </CardTitle>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(enrollment.enrollment_date), 'PPP')}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge className={`${getStatusColor(enrollment.payment_status)} border font-medium px-3 py-1`}>
+                          ✓ Enrolled
+                        </Badge>
+                        <p className="text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mt-2">
+                          ${enrollment.course.price}
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="p-6">
+                    <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-16 h-16 rounded-lg overflow-hidden bg-gradient-to-r from-green-400 to-blue-600">
+                            {enrollment.course.thumbnail_url ? (
+                              <img 
+                                src={enrollment.course.thumbnail_url} 
+                                alt={enrollment.course.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Eye className="w-8 h-8 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-800 text-lg">{enrollment.course.title}</h4>
+                            <Badge variant="outline" className="border-green-300 text-green-700 bg-white mt-2">
+                              📚 Course
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        <div className="text-right ml-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+                            onClick={() => window.location.href = `/learning/course/${enrollment.course.id}`}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            Continue Learning
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* Event Bookings */}
+              {eventBookings.map((booking) => (
+                <Card key={booking.id} className="border-0 bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300">
+                  <CardHeader className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-t-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                          <Ticket className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-xl text-gray-800">
+                            Event Ticket
+                          </CardTitle>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(booking.booking_date), 'PPP')}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge className={`${getStatusColor(booking.payment_status)} border font-medium px-3 py-1`}>
+                          ✓ Confirmed
+                        </Badge>
+                        <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mt-2">
+                          {booking.payment_currency} {booking.payment_amount}
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="p-6">
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-400 to-purple-600 flex items-center justify-center">
+                            <Ticket className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-800 text-lg">{booking.event.title}</h4>
+                            <div className="flex items-center gap-4 mt-2">
+                              <Badge variant="outline" className="border-blue-300 text-blue-700 bg-white">
+                                🎫 Event Ticket
+                              </Badge>
+                              <span className="text-sm text-gray-600 font-medium">
+                                Qty: {booking.ticket_quantity}
+                              </span>
+                              <div className="flex items-center gap-1 text-sm text-gray-600">
+                                <Calendar className="h-3 w-3" />
+                                <span>{format(new Date(booking.event.start_time), 'PPP')}</span>
+                              </div>
+                              {booking.event.location && (
+                                <div className="flex items-center gap-1 text-sm text-gray-600">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>{booking.event.location}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="text-right ml-4">
+                          <Button 
+                            size="sm" 
+                            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                            onClick={() => window.location.href = `/events/${booking.event.id}`}
+                          >
+                            <Ticket className="w-4 h-4 mr-2" />
+                            View Event
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
             {/* Summary Card */}
@@ -287,19 +522,19 @@ const UserOrders = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      {orders.length}
+                      {totalItems}
                     </p>
                     <p className="text-sm text-gray-600">Total Orders</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      ${orders.reduce((sum, order) => sum + order.total_amount, 0).toFixed(2)}
+                      ${totalSpent.toFixed(2)}
                     </p>
                     <p className="text-sm text-gray-600">Total Spent</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      {orders.filter(order => order.payment_status === 'completed').length}
+                      {orders.filter(order => order.payment_status === 'completed').length + enrollments.length + eventBookings.length}
                     </p>
                     <p className="text-sm text-gray-600">Completed Orders</p>
                   </div>
