@@ -45,20 +45,11 @@ const AddToCartButton: React.FC<AddToCartButtonProps> = ({
       await addToCart({
         item_type: itemType,
         item_id: itemId,
-        item_name: itemName,
+        title: itemName,
         quantity: 1,
         price,
-        course: itemType === 'course' ? {
-          id: itemId,
-          title: itemName,
-        } : undefined,
-        event_ticket: itemType === 'event_ticket' ? {
-          id: itemId,
-          name: itemName,
-          ticket_type: ticketType || 'ordinary',
-          event_id: eventId || '',
-          event_title: eventTitle,
-        } : undefined,
+        event_id: eventId,
+        ticket_holder_names: []
       });
     } catch (error) {
       console.error('Error adding to cart:', error);

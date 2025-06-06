@@ -98,13 +98,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return {
             id: item.id,
             item_id: item.item_id,
-            item_type: item.item_type,
-            price: parseFloat(item.price),
+            item_type: item.item_type as 'course' | 'event_ticket',
+            price: parseFloat(item.price.toString()),
             quantity: item.quantity,
             title,
             thumbnail_url,
             event_id,
-            ticket_holder_names: item.ticket_holder_names || []
+            ticket_holder_names: (item.ticket_holder_names as TicketHolder[]) || []
           };
         })
       );
@@ -143,7 +143,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           item_type: item.item_type,
           price: item.price,
           quantity: item.quantity,
-          ticket_holder_names: item.ticket_holder_names || []
+          ticket_holder_names: (item.ticket_holder_names || []) as any
         })
         .select()
         .single();
@@ -214,7 +214,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { error } = await supabase
         .from('carts')
-        .update({ ticket_holder_names: holders })
+        .update({ ticket_holder_names: holders as any })
         .eq('id', itemId);
 
       if (error) throw error;

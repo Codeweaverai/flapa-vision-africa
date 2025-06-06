@@ -16,9 +16,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 
 const CartIcon = () => {
-  const { items, totalItems, totalAmount, removeFromCart, updateQuantity } = useCart();
+  const { items, getItemCount, getTotalPrice, removeFromCart, updateQuantity } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+
+  const totalItems = getItemCount();
+  const totalAmount = getTotalPrice();
 
   const handleCheckout = () => {
     setIsOpen(false);
@@ -62,9 +65,9 @@ const CartIcon = () => {
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{item.item_name}</h4>
+                          <h4 className="font-medium text-sm truncate">{item.title}</h4>
                           <p className="text-xs text-gray-500">
-                            {item.item_type === 'course' ? 'Course' : `Event Ticket - ${item.event_ticket?.ticket_type}`}
+                            {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
                           </p>
                           <p className="text-sm font-semibold">${item.price.toFixed(2)}</p>
                         </div>

@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { CreditCard, Smartphone, Plus, Minus, Trash2 } from 'lucide-react';
 
 const CheckoutPage = () => {
-  const { items, totalAmount, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { items, getTotalPrice, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -26,6 +26,7 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   
+  const totalAmount = getTotalPrice();
   const TAX_RATE = 0.1; // 10% tax
   const taxAmount = totalAmount * TAX_RATE;
   const finalAmount = totalAmount + taxAmount - discount;
@@ -95,7 +96,7 @@ const CheckoutPage = () => {
           items: items.map(item => ({
             item_type: item.item_type,
             item_id: item.item_id,
-            item_name: item.item_name,
+            item_name: item.title,
             quantity: item.quantity,
             price: item.price,
           })),
@@ -135,7 +136,7 @@ const CheckoutPage = () => {
           items: items.map(item => ({
             item_type: item.item_type,
             item_id: item.item_id,
-            item_name: item.item_name,
+            item_name: item.title,
             quantity: item.quantity,
             price: item.price,
           })),
@@ -197,14 +198,11 @@ const CheckoutPage = () => {
                     {items.map((item) => (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex-1">
-                          <h4 className="font-medium">{item.item_name}</h4>
+                          <h4 className="font-medium">{item.title}</h4>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="secondary">
                               {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
                             </Badge>
-                            {item.event_ticket && (
-                              <Badge variant="outline">{item.event_ticket.ticket_type}</Badge>
-                            )}
                           </div>
                           <p className="text-lg font-semibold mt-2">${item.price.toFixed(2)}</p>
                         </div>
