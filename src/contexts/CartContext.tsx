@@ -91,7 +91,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let courseData = undefined;
         let eventData = undefined;
 
-        if (item.item_type === 'course') {
+        // Ensure item_type is properly typed
+        const itemType = item.item_type as 'course' | 'event_ticket';
+
+        if (itemType === 'course') {
           const { data: course } = await supabase
             .from('courses')
             .select('id, title, thumbnail_url')
@@ -102,7 +105,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             itemName = course.title;
             courseData = course;
           }
-        } else if (item.item_type === 'event_ticket') {
+        } else if (itemType === 'event_ticket') {
           const { data: event } = await supabase
             .from('events')
             .select('id, title')
@@ -123,7 +126,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         cartItems.push({
           id: item.id,
-          item_type: item.item_type,
+          item_type: itemType,
           item_id: item.item_id,
           quantity: item.quantity,
           price: item.price,
