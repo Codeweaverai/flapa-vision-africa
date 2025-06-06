@@ -1,182 +1,199 @@
 
-// @ts-ignore - Deno imports will be available when deployed
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; 
-// @ts-ignore - Deno imports will be available when deployed
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"; 
-// @ts-ignore - Deno imports will be available when deployed
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
-import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// @ts-ignore - Deno namespace available at runtime in Supabase Edge Functions
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '');
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-// @ts-ignore - Deno serve method available at runtime
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders,
-      status: 204,
-    });
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get the authorization header from the request
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
-    }
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16",
+    });
 
-    // Create a Supabase client with the auth header
     const supabaseClient = createClient(
-      // @ts-ignore - Deno env available at runtime
-      Deno.env.get('SUPABASE_URL') || '',
-      // @ts-ignore - Deno env available at runtime
-      Deno.env.get('SUPABASE_ANON_KEY') || '',
-      {
-        global: {
-          headers: {
-            Authorization: authHeader,
-          },
-        },
-      }
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
     );
 
-    // Get the user from the client
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
+    // Get authenticated user
+    const authHeader = req.headers.get("Authorization")!;
+    const token = authHeader.replace("Bearer ", "");
+    const { data } = await supabaseClient.auth.getUser(token);
+    const user = data.user;
 
-    if (userError || !user) {
-      throw new Error('Unauthorized');
+    if (!user?.email) {
+      throw new Error("User not authenticated");
     }
 
-    // Get the request body
-    const { courseId, eventId, returnUrl } = await req.json();
+    const { 
+      items,
+      total_amount,
+      tax_amount,
+      discount_amount,
+      promo_code,
+      currency,
+      success_url,
+      cancel_url
+    } = await req.json();
 
-    if (!courseId && !eventId) {
-      throw new Error('Missing courseId or eventId in request body');
+    // Create order in database
+    const { data: order, error: orderError } = await supabaseClient
+      .from('orders')
+      .insert({
+        user_id: user.id,
+        email: user.email,
+        total_amount,
+        tax_amount: tax_amount || 0,
+        currency: currency || 'USD',
+        payment_method: 'card',
+        payment_status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (orderError) throw orderError;
+
+    // Create order items
+    const orderItems = items.map((item: any) => ({
+      order_id: order.id,
+      item_type: item.item_type,
+      item_id: item.item_id,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      unit_price: item.price,
+      total_price: item.price * item.quantity
+    }));
+
+    const { error: orderItemsError } = await supabaseClient
+      .from('order_items')
+      .insert(orderItems);
+
+    if (orderItemsError) throw orderItemsError;
+
+    // Update promo code usage if used
+    if (promo_code) {
+      await supabaseClient
+        .from('promo_codes')
+        .update({ current_uses: supabaseClient.rpc('increment_uses') })
+        .eq('code', promo_code);
     }
 
-    if (!returnUrl) {
-      throw new Error('Missing returnUrl in request body');
-    }
-
-    // Check if the user already exists as a Stripe customer
-    const customers = await stripe.customers.list({
-      email: user.email,
-      limit: 1,
+    // Check if customer exists
+    const customers = await stripe.customers.list({ 
+      email: user.email, 
+      limit: 1 
     });
 
     let customerId;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
     } else {
-      // Create a new Stripe customer
       const customer = await stripe.customers.create({
         email: user.email,
         metadata: {
-          userId: user.id,
-        },
+          user_id: user.id,
+          order_id: order.id
+        }
       });
       customerId = customer.id;
     }
 
-    let lineItems = [];
-    let successUrl = returnUrl;
-    let metadata = {};
-
-    // Set up the appropriate line items and success URL based on whether it's a course or event
-    if (courseId) {
-      // Get course details
-      const { data: course, error: courseError } = await supabaseClient
-        .from('courses')
-        .select('*')
-        .eq('id', courseId)
-        .single();
-
-      if (courseError) {
-        throw new Error('Failed to fetch course');
-      }
-
-      lineItems = [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Course: ${course.title}`,
-              description: course.description,
-              images: course.thumbnail_url ? [course.thumbnail_url] : [],
-            },
-            unit_amount: Math.round(Number(course.price || 0) * 100),
-          },
-          quantity: 1,
+    // Create line items for Stripe
+    const lineItems = items.map((item: any) => ({
+      price_data: {
+        currency: currency || 'usd',
+        product_data: {
+          name: item.item_name,
+          metadata: {
+            item_type: item.item_type,
+            item_id: item.item_id,
+            order_id: order.id
+          }
         },
-      ];
+        unit_amount: Math.round(item.price * 100), // Convert to cents
+      },
+      quantity: item.quantity,
+    }));
 
-      metadata = {
-        type: 'course',
-        courseId: courseId,
-        userId: user.id,
-      };
-
-      successUrl = `${returnUrl}?type=course&id=${courseId}&session={CHECKOUT_SESSION_ID}`;
-    } else if (eventId) {
-      // Get event details
-      const { data: event, error: eventError } = await supabaseClient
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single();
-
-      if (eventError) {
-        throw new Error('Failed to fetch event');
-      }
-
-      lineItems = [
-        {
-          price_data: {
-            currency: event.currency?.toLowerCase() || 'usd',
-            product_data: {
-              name: `Event: ${event.title}`,
-              description: event.description,
-              images: event.image_url ? [event.image_url] : [],
-            },
-            unit_amount: Math.round(Number(event.price || 0) * 100),
+    // Add tax as a line item if applicable
+    if (tax_amount > 0) {
+      lineItems.push({
+        price_data: {
+          currency: currency || 'usd',
+          product_data: {
+            name: 'Tax',
           },
-          quantity: 1,
+          unit_amount: Math.round(tax_amount * 100),
         },
-      ];
-
-      metadata = {
-        type: 'event',
-        eventId: eventId,
-        userId: user.id,
-      };
-
-      successUrl = `${returnUrl}?type=event&id=${eventId}&session={CHECKOUT_SESSION_ID}`;
+        quantity: 1,
+      });
     }
 
-    // Create a Stripe checkout session
+    // Add discount as a negative line item if applicable
+    if (discount_amount > 0) {
+      lineItems.push({
+        price_data: {
+          currency: currency || 'usd',
+          product_data: {
+            name: `Discount${promo_code ? ` (${promo_code})` : ''}`,
+          },
+          unit_amount: -Math.round(discount_amount * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ['card'],
       line_items: lineItems,
-      mode: 'payment',
-      success_url: successUrl,
-      cancel_url: `${returnUrl}?canceled=true`,
-      metadata: metadata,
+      mode: "payment",
+      success_url: success_url,
+      cancel_url: cancel_url,
+      metadata: {
+        user_id: user.id,
+        order_id: order.id,
+        promo_code: promo_code || ''
+      }
     });
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    // Update order with Stripe session ID
+    await supabaseClient
+      .from('orders')
+      .update({ payment_provider_id: session.id })
+      .eq('id', order.id);
+
+    return new Response(
+      JSON.stringify({ url: session.url, order_id: order.id }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        },
+        status: 200 
+      }
+    );
+
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    });
+    console.error('Error creating checkout session:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        },
+        status: 500 
+      }
+    );
   }
 });

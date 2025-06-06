@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { fetchUserNotifications } from '@/services/communityService';
 import InboxIcon from '@/components/inbox/InboxIcon';
 import { initializeNotificationSound, setupNotificationListener, setupInboxMessageListener } from '@/services/notificationService';
+import CartIcon from '@/components/cart/CartIcon';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -177,6 +177,7 @@ const Navbar = () => {
         <div className="flex items-center gap-4">
           {user ? (
             <>
+              <CartIcon />
               <InboxIcon />
               
               <Button 

@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviews from '@/components/course/CourseReviews';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
+import AddToCartButton from '@/components/cart/AddToCartButton';
 
 interface Course {
   id?: string;
@@ -514,12 +515,32 @@ const CourseLearningPage = () => {
                       )}
                     </div>
                     {user ? (
-                      <Button 
-                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
-                      </Button>
+                      <div className="space-y-2">
+                        {course.is_free ? (
+                          <Button 
+                            className="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+                            onClick={() => window.location.href = `/course/${courseId}/enroll`}
+                          >
+                            Enroll for Free
+                          </Button>
+                        ) : (
+                          <>
+                            <AddToCartButton
+                              itemType="course"
+                              itemId={courseId!}
+                              itemName={course.title}
+                              price={course.price || 0}
+                              className="w-full mb-2"
+                            />
+                            <Button 
+                              className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                              onClick={() => window.location.href = `/course/${courseId}/enroll`}
+                            >
+                              Enroll Now
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     ) : (
                       <Button 
                         className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
