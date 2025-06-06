@@ -576,7 +576,7 @@ const CourseDetailPage = () => {
                           </div>
                           <Button
                             variant="outline"
-                            onClick={() => window.location.href = `/creator/profile/${user.id}`}
+                            onClick={() => window.location.href = `/creator/profile/${creator.id}`}
                             className="border-orange-300 text-orange-600 hover:bg-orange-50"
                           >
                             <User className="w-4 h-4 mr-2" />
