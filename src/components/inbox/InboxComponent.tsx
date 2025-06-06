@@ -257,7 +257,7 @@ const InboxComponent: React.FC = () => {
     if (!message.sender_profile) {
       return 'System';
     }
-    return message.sender_profile.full_name || message.sender_profile.username || 'Unknown User';
+    return message.sender_profile.full_name || message.sender_profile.username || message.sender_profile.full_name;
   };
 
   const handleProfileClick = (senderId: string) => {
