@@ -664,7 +664,7 @@ const EventDetailPage = () => {
                       className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
                       asChild
                     >
-                      <Link to={`/creator/${creator.username || creator.id}`}>
+                      <Link to={`/creator/profile/${user.id}`}>
                         View Creator Profile
                       </Link>
                     </Button>
