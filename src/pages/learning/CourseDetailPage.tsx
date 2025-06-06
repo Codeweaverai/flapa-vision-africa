@@ -245,15 +245,92 @@ const CourseDetailPage = () => {
                 </div>
               </Card>
 
-              {/* Course Description */}
-              <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
-                <CardHeader>
-                  <CardTitle>About This Course</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="whitespace-pre-line text-gray-700 leading-relaxed">{course.description}</p>
-                </CardContent>
-              </Card>
+              {/* Tabs Section */}
+              <Tabs defaultValue="overview" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+                  <TabsTrigger value="instructor">Instructor</TabsTrigger>
+                  <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="space-y-4">
+                  <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                    <CardHeader>
+                      <CardTitle>About This Course</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="whitespace-pre-line text-gray-700 leading-relaxed">{course.description}</p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="curriculum" className="space-y-4">
+                  <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                    <CardHeader>
+                      <CardTitle>Course Curriculum</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-600">
+                        Course curriculum will be available after enrollment.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="instructor" className="space-y-4">
+                  {creator && (
+                    <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                      <CardHeader>
+                        <CardTitle>Meet Your Instructor</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-r from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold text-xl">
+                            {creator.full_name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-xl font-semibold text-gray-800">{creator.full_name}</h3>
+                            <p className="text-muted-foreground">Course Instructor</p>
+                          </div>
+                        </div>
+                        
+                        {creator.bio && (
+                          <p className="text-gray-600 leading-relaxed">{creator.bio}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="reviews" className="space-y-4">
+                  <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        Student Reviews
+                        {rating > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                            <span className="font-semibold">{rating}</span>
+                            <span className="text-muted-foreground">({reviewCount} reviews)</span>
+                          </div>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {reviewCount === 0 ? (
+                        <p className="text-gray-600 text-center py-8">
+                          No reviews yet. Be the first to review this course!
+                        </p>
+                      ) : (
+                        <p className="text-gray-600">
+                          Reviews will be displayed here once available.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
 
             {/* Sidebar */}

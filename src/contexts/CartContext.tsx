@@ -71,27 +71,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       let query = supabase
         .from('carts')
-        .select(`
-          id,
-          item_type,
-          item_id,
-          quantity,
-          price,
-          courses:item_id (
-            id,
-            title,
-            thumbnail_url
-          ),
-          event_tickets:item_id (
-            id,
-            name,
-            ticket_type,
-            event_id,
-            events:event_id (
-              title
-            )
-          )
-        `);
+        .select('*');
 
       if (user) {
         query = query.eq('user_id', user.id);
@@ -99,24 +79,59 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         query = query.eq('session_id', getSessionId());
       }
 
-      const { data, error } = await query;
+      const { data: cartData, error } = await query;
 
       if (error) throw error;
 
-      const cartItems: CartItem[] = (data || []).map((item: any) => ({
-        id: item.id,
-        item_type: item.item_type,
-        item_id: item.item_id,
-        quantity: item.quantity,
-        price: item.price,
-        item_name: item.item_type === 'course' 
-          ? item.courses?.title || 'Unknown Course'
-          : item.event_tickets?.name || 'Unknown Ticket',
-        course: item.item_type === 'course' ? item.courses : undefined,
-        event_ticket: item.item_type === 'event_ticket' 
-          ? { ...item.event_tickets, event_title: item.event_tickets?.events?.title }
-          : undefined,
-      }));
+      // Now fetch the related course and event data separately
+      const cartItems: CartItem[] = [];
+      
+      for (const item of cartData || []) {
+        let itemName = 'Unknown Item';
+        let courseData = undefined;
+        let eventData = undefined;
+
+        if (item.item_type === 'course') {
+          const { data: course } = await supabase
+            .from('courses')
+            .select('id, title, thumbnail_url')
+            .eq('id', item.item_id)
+            .single();
+          
+          if (course) {
+            itemName = course.title;
+            courseData = course;
+          }
+        } else if (item.item_type === 'event_ticket') {
+          const { data: event } = await supabase
+            .from('events')
+            .select('id, title')
+            .eq('id', item.item_id)
+            .single();
+          
+          if (event) {
+            itemName = `${event.title} - Ticket`;
+            eventData = {
+              id: item.item_id,
+              name: itemName,
+              ticket_type: 'ordinary',
+              event_id: item.item_id,
+              event_title: event.title,
+            };
+          }
+        }
+
+        cartItems.push({
+          id: item.id,
+          item_type: item.item_type,
+          item_id: item.item_id,
+          quantity: item.quantity,
+          price: item.price,
+          item_name: itemName,
+          course: courseData,
+          event_ticket: eventData,
+        });
+      }
 
       setItems(cartItems);
     } catch (error) {
