@@ -59,18 +59,18 @@ const BecomeCreatorPage = () => {
   const steps = [
     {
       number: "01",
-      title: "Enable to Become a Creator",
-      description: "Create an account,login upload your profile photo and enter your short Bio and then Enable Creator Dashboard."
+      title: "Create Your Account",
+      description: "Create an account,login upload your profile photo and enter your short Bio."
     },
     {
       number: "02",
-      title: "Get Approved",
-      description: "Our team reviews your application and gets back to you within 48 hours."
+      title: "Enable Your Creator Dashboard",
+      description: "In your account you will see a Button called Enable Creator Dashboard, click on it and a Go to Creator Dashboard button will appear."
     },
     {
       number: "03",
       title: "Create Your Content",
-      description: "Use our course builder to create engaging courses and events."
+      description: "Use your dashboard to create engaging courses and events."
     },
     {
       number: "04",
