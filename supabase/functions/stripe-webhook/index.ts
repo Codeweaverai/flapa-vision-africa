@@ -120,54 +120,138 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       throw processError;
     }
 
-    // Additional processing for event tickets with ticket holder names
+    // Get order items and cart data for ticket holder processing
     const { data: orderItems } = await supabaseClient
       .from('order_items')
       .select('*')
       .eq('order_id', order.id)
       .eq('item_type', 'event_ticket');
 
-    if (orderItems) {
+    if (orderItems && orderItems.length > 0) {
+      console.log('Processing event ticket items:', orderItems.length);
+      
       for (const item of orderItems) {
         // Get cart item to access ticket holder names
-        const { data: cartItem } = await supabaseClient
+        const { data: cartItems } = await supabaseClient
           .from('carts')
           .select('ticket_holder_names')
           .eq('user_id', order.user_id)
           .eq('item_id', item.item_id)
-          .eq('item_type', 'event_ticket')
+          .eq('item_type', 'event_ticket');
+
+        let ticketHolderNames = [];
+        if (cartItems && cartItems.length > 0 && cartItems[0].ticket_holder_names) {
+          ticketHolderNames = Array.isArray(cartItems[0].ticket_holder_names) 
+            ? cartItems[0].ticket_holder_names 
+            : [];
+        }
+
+        console.log('Found ticket holder names:', ticketHolderNames);
+
+        // Find the booking for this item
+        const { data: booking } = await supabaseClient
+          .from('event_bookings')
+          .select('id')
+          .eq('user_id', order.user_id)
+          .eq('event_ticket_id', item.item_id)
+          .eq('order_id', order.id)
           .single();
 
-        if (cartItem?.ticket_holder_names) {
-          // Update generated tickets with proper holder names
+        if (booking) {
+          // Get generated tickets for this booking
           const { data: tickets } = await supabaseClient
             .from('generated_tickets')
             .select('id')
-            .eq('booking_id', item.item_id)
+            .eq('booking_id', booking.id)
             .limit(item.quantity);
 
           if (tickets) {
-            const ticketHolders = Array.isArray(cartItem.ticket_holder_names) 
-              ? cartItem.ticket_holder_names 
-              : [];
-
-            for (let i = 0; i < tickets.length && i < ticketHolders.length; i++) {
+            console.log('Updating', tickets.length, 'generated tickets with holder names');
+            
+            // Update each ticket with proper holder name
+            for (let i = 0; i < tickets.length; i++) {
+              const holderName = ticketHolderNames[i]?.name?.trim() || `Ticket Holder ${i + 1}`;
+              
               await supabaseClient
                 .from('generated_tickets')
                 .update({ 
-                  ticket_holder_name: ticketHolders[i]?.name || `Ticket Holder ${i + 1}`
+                  ticket_holder_name: holderName
                 })
                 .eq('id', tickets[i].id);
+              
+              console.log(`Updated ticket ${i + 1} with holder name: ${holderName}`);
             }
           }
         }
       }
+      
+      // Send confirmation emails for event bookings
+      await sendEventConfirmationEmails(order.id, orderItems);
     }
 
     console.log(`Successfully processed payment for order ${order.id}`);
   } catch (error) {
     console.error('Error handling checkout session completed:', error);
     throw error;
+  }
+}
+
+async function sendEventConfirmationEmails(orderId: string, eventItems: any[]) {
+  try {
+    console.log('Sending event confirmation emails for order:', orderId);
+    
+    for (const item of eventItems) {
+      // Get event and booking details
+      const { data: booking } = await supabaseClient
+        .from('event_bookings')
+        .select(`
+          *,
+          events (
+            title,
+            start_time,
+            location
+          ),
+          generated_tickets (
+            ticket_code,
+            ticket_holder_name,
+            qr_code_data
+          )
+        `)
+        .eq('order_id', orderId)
+        .eq('event_ticket_id', item.item_id)
+        .single();
+
+      if (booking && booking.events) {
+        // Get user email
+        const { data: order } = await supabaseClient
+          .from('orders')
+          .select('email')
+          .eq('id', orderId)
+          .single();
+
+        if (order?.email) {
+          // Send event confirmation email
+          await supabaseClient.functions.invoke('send-event-confirmation', {
+            body: {
+              email: order.email,
+              attendeeName: booking.generated_tickets?.[0]?.ticket_holder_name || 'Event Attendee',
+              eventTitle: booking.events.title,
+              eventId: booking.event_id,
+              eventDate: booking.events.start_time,
+              eventTime: new Date(booking.events.start_time).toLocaleTimeString(),
+              location: booking.events.location || 'Online Event',
+              ticketCode: booking.generated_tickets?.[0]?.ticket_code || '',
+              qrCodeData: booking.generated_tickets?.[0]?.qr_code_data || '',
+              organizerName: 'SkillPulse Events'
+            }
+          });
+          
+          console.log('Event confirmation email sent for:', booking.events.title);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error sending event confirmation emails:', error);
   }
 }
 

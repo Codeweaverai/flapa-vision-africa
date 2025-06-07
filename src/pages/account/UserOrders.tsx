@@ -46,6 +46,7 @@ interface Enrollment {
 interface EventBooking {
   id: string;
   event_id: string;
+  event_ticket_id: string;
   payment_status: string;
   booking_date: string;
   payment_amount: number;
@@ -57,6 +58,10 @@ interface EventBooking {
     title: string;
     start_time: string;
     location?: string;
+    image_url?: string;
+  };
+  event_tickets: {
+    name: string;
   };
   generated_tickets?: Array<{
     id: string;
@@ -121,7 +126,7 @@ const UserOrders = () => {
         setEnrollments(enrollmentsData || []);
       }
 
-      // Fetch event bookings with tickets
+      // Fixed query for event bookings - removed the problematic nested query
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
@@ -130,7 +135,11 @@ const UserOrders = () => {
             id,
             title,
             start_time,
-            location
+            location,
+            image_url
+          ),
+          event_tickets (
+            name
           ),
           generated_tickets (
             id,
@@ -146,6 +155,7 @@ const UserOrders = () => {
       if (bookingsError) {
         console.error('Bookings error:', bookingsError);
       } else {
+        console.log('Event bookings data:', bookingsData);
         setEventBookings(bookingsData || []);
       }
 
@@ -169,7 +179,6 @@ const UserOrders = () => {
 
   const downloadTicket = async (ticketId: string, ticketCode: string) => {
     try {
-      // Generate a simple ticket PDF or open ticket view
       const ticketUrl = `/ticket/${ticketId}`;
       window.open(ticketUrl, '_blank');
       toast.success('Ticket opened in new tab');
@@ -278,7 +287,7 @@ const UserOrders = () => {
                         </div>
                         <div>
                           <CardTitle className="text-xl text-gray-800">
-                            Event Tickets - {booking.events?.title}
+                            {booking.event_tickets?.name || 'Event Ticket'} - {booking.events?.title}
                           </CardTitle>
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Calendar className="h-4 w-4" />
@@ -322,7 +331,7 @@ const UserOrders = () => {
                         </div>
                       </div>
 
-                      {/* Generated Tickets */}
+                      {/* Generated Tickets with proper names display */}
                       {booking.generated_tickets && booking.generated_tickets.length > 0 && (
                         <div className="mt-4">
                           <h5 className="font-medium text-sm mb-3">Your Tickets:</h5>
@@ -330,7 +339,7 @@ const UserOrders = () => {
                             {booking.generated_tickets.map((ticket, index) => (
                               <div key={ticket.id} className="bg-white p-3 rounded-lg border border-blue-200 flex items-center justify-between">
                                 <div>
-                                  <p className="font-medium">{ticket.ticket_holder_name}</p>
+                                  <p className="font-medium">{ticket.ticket_holder_name || `Ticket Holder ${index + 1}`}</p>
                                   <p className="text-sm text-gray-600">Code: {ticket.ticket_code}</p>
                                   <Badge 
                                     variant="outline" 

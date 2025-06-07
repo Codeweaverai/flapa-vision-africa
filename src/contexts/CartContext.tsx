@@ -255,6 +255,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateTicketHolders = async (itemId: string, holders: TicketHolder[]) => {
     try {
+      console.log('Updating ticket holders for item:', itemId, 'with holders:', holders);
+      
       const { error } = await supabase
         .from('carts')
         .update({ ticket_holder_names: holders as any })
@@ -265,6 +267,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setItems(items.map(item => 
         item.id === itemId ? { ...item, ticket_holder_names: holders } : item
       ));
+      
+      console.log('Successfully updated ticket holders in database');
     } catch (error) {
       console.error('Error updating ticket holders:', error);
       toast.error('Failed to update ticket holders');
