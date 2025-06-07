@@ -1,16 +1,77 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
 
 const ContactPage = () => {
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
+    
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.subject || !formData.message) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Call the edge function to send email and store submission
+      const { data, error } = await supabase.functions.invoke('send-contact-email', {
+        body: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message
+        }
+      });
+
+      if (error) {
+        console.error('Error submitting contact form:', error);
+        toast.error('Failed to send message. Please try again.');
+        return;
+      }
+
+      console.log('Contact form submitted successfully:', data);
+      toast.success('Thank you for your message! We\'ll get back to you soon.');
+      
+      // Reset form
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        subject: '',
+        message: ''
+      });
+
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      toast.error('Failed to send message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -38,30 +99,59 @@ const ContactPage = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium mb-2">First Name</label>
-                        <Input placeholder="Your first name" />
+                        <Input 
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleInputChange}
+                          placeholder="Your first name" 
+                          required
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-2">Last Name</label>
-                        <Input placeholder="Your last name" />
+                        <Input 
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleInputChange}
+                          placeholder="Your last name" 
+                          required
+                        />
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">Email</label>
-                      <Input type="email" placeholder="your.email@example.com" />
+                      <Input 
+                        type="email" 
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        placeholder="your.email@example.com" 
+                        required
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">Subject</label>
-                      <Input placeholder="What is this about?" />
+                      <Input 
+                        name="subject"
+                        value={formData.subject}
+                        onChange={handleInputChange}
+                        placeholder="What is this about?" 
+                        required
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">Message</label>
                       <Textarea 
+                        name="message"
+                        value={formData.message}
+                        onChange={handleInputChange}
                         placeholder="Tell us more about your inquiry..."
                         rows={6}
+                        required
                       />
                     </div>
-                    <Button type="submit" className="w-full">
-                      Send Message
+                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                      {isSubmitting ? 'Sending...' : 'Send Message'}
                     </Button>
                   </form>
                 </CardContent>
