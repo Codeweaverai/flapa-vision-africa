@@ -874,7 +874,7 @@ const CourseLearningPage = () => {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <Users className="h-5 w-5 text-purple-600" />
-                        Your Instructor
+                        Course Creator
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
