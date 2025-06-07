@@ -103,13 +103,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             title = course?.title || 'Unknown Course';
             thumbnail_url = course?.thumbnail_url || '';
           } else if (item.item_type === 'event_ticket') {
-            // Fixed query using the foreign key relationship
+            // Using explicit foreign key hint to resolve ambiguity
             const { data: ticket } = await supabase
               .from('event_tickets')
               .select(`
                 name, 
                 event_id,
-                events (
+                events!fk_event_tickets_event_id (
                   title,
                   image_url
                 )
