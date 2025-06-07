@@ -40,7 +40,7 @@ const CheckoutSuccessPage = () => {
             order_items (
               *,
               courses:item_id (title),
-              event_tickets:item_id (name, events:event_id (title, start_time))
+              event_tickets:item_id (name, event_id, events:event_id (title, start_time))
             )
           `)
           .eq('id', orderId)
@@ -56,7 +56,7 @@ const CheckoutSuccessPage = () => {
             order_items (
               *,
               courses:item_id (title),
-              event_tickets:item_id (name, events:event_id (title, start_time))
+              event_tickets:item_id (name, event_id, events:event_id (title, start_time))
             )
           `)
           .eq('payment_provider_id', sessionId)
