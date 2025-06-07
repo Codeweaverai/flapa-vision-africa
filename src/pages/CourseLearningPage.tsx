@@ -18,13 +18,15 @@ import {
   Users,
   MessageCircle,
   Target,
-  CheckCircle
+  CheckCircle,
+  StickyNote
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviews from '@/components/course/CourseReviews';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
 import AddToCartButton from '@/components/cart/AddToCartButton';
+import LessonNotesTab from '@/components/course/LessonNotesTab';
 
 interface Course {
   id?: string;
@@ -395,84 +397,90 @@ const CourseLearningPage = () => {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Course Curriculum Sidebar */}
+          <div className="lg:col-span-4">
+            <Card className="sticky top-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Course Curriculum
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CourseModuleList 
+                  modules={modules}
+                  onLessonSelect={(lesson) => {
+                    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
+                  }}
+                  currentLessonId={undefined}
+                  completedLessons={[]}
+                  onQuizStart={(quizId) => {
+                    console.log('Starting quiz:', quizId);
+                  }}
+                />
+                
+                {/* Final Exam */}
+                {finalExam && (
+                  <div className="mt-4 p-4 border border-orange-200 rounded-lg bg-orange-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-5 w-5 text-orange-600" />
+                        <span className="font-semibold text-orange-800">Final Exam</span>
+                      </div>
+                      <Badge variant="outline" className="text-orange-700">
+                        {finalExam.passing_score}% to pass
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-orange-600 mt-2">{finalExam.description}</p>
+                    {enrolledUser && (
+                      <Button 
+                        size="sm" 
+                        className="mt-3 bg-orange-600 hover:bg-orange-700"
+                        onClick={() => window.location.href = `/course/${courseId}/exam/${finalExam.id}`}
+                      >
+                        Take Final Exam
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Main Content */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="content" className="w-full">
+          <div className="lg:col-span-8">
+            <Tabs defaultValue="lesson-notes" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="content">Content</TabsTrigger>
+                <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
+                  <StickyNote className="h-4 w-4" />
+                  Lesson Notes
+                </TabsTrigger>
                 <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
                 <TabsTrigger value="reviews">Reviews</TabsTrigger>
                 <TabsTrigger value="discussion">Discussion</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="content" className="space-y-6">
-                {/* Course Overview */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5" />
-                      Course Overview
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-700 whitespace-pre-line">{course.description}</p>
-                  </CardContent>
-                </Card>
-
-                {/* Learning Outcomes */}
-                {learningOutcomes.length > 0 && (
+              <TabsContent value="lesson-notes" className="space-y-6">
+                {enrolledUser ? (
+                  <LessonNotesTab 
+                    lessonId={modules[0]?.lessons[0]?.id || ''} 
+                    currentVideoTime={0}
+                  />
+                ) : (
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Target className="h-5 w-5" />
-                        What You'll Learn
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {learningOutcomes.map((outcome) => (
-                          <div key={outcome.id} className="flex items-start gap-3">
-                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                            <span className="text-gray-700">{outcome.outcome}</span>
-                          </div>
-                        ))}
-                      </div>
+                    <CardContent className="text-center py-8">
+                      <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-500 mb-4">Enroll in this course to start taking lesson notes</p>
+                      <Button 
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
+                      >
+                        Enroll Now
+                      </Button>
                     </CardContent>
                   </Card>
                 )}
-
-                {/* Course Objectives */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Award className="h-5 w-5" />
-                      Course Objectives
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-700">Master the core concepts and principles covered in this course</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-700">Apply learned skills through practical exercises and projects</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-700">Build confidence in implementing solutions in real-world scenarios</span>
-                      </div>
-                      {course.certificate_enabled && (
-                        <div className="flex items-start gap-3">
-                          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700">Earn a certificate of completion to showcase your achievement</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
               
               <TabsContent value="curriculum">
@@ -498,121 +506,94 @@ const CourseLearningPage = () => {
               </TabsContent>
             </Tabs>
           </div>
+        </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Enrollment Card */}
-            <Card className="sticky top-4">
-              <CardContent className="p-6">
-                {!enrolledUser ? (
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-orange-600 mb-2">
-                        {course.is_free ? 'Free' : `$${course.price}`}
-                      </div>
-                      {!course.is_free && (
-                        <p className="text-sm text-gray-600">One-time payment</p>
-                      )}
-                    </div>
-                    {user ? (
-                      <div className="space-y-2">
-                        {course.is_free ? (
-                          <Button 
-                            className="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
-                            onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                          >
-                            Enroll for Free
-                          </Button>
-                        ) : (
-                          <>
-                            <AddToCartButton
-                              itemType="course"
-                              itemId={courseId!}
-                              itemName={course.title}
-                              price={course.price || 0}
-                              className="w-full mb-2"
-                            />
-                            <Button 
-                              className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                              onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                            >
-                              Enroll Now
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <Button 
-                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = '/auth'}
-                      >
-                        Sign in to Enroll
-                      </Button>
-                    )}
+        {/* Enrollment Actions */}
+        {!enrolledUser && (
+          <Card className="mt-8 sticky bottom-4">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-orange-600 mb-2">
+                    {course.is_free ? 'Free' : `$${course.price}`}
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold text-green-600 mb-2">Enrolled</h3>
-                      <p className="text-sm text-gray-600">You have access to this course</p>
-                    </div>
+                  {!course.is_free && (
+                    <p className="text-sm text-gray-600">One-time payment</p>
+                  )}
+                </div>
+                {user ? (
+                  <div className="flex gap-2">
+                    {!course.is_free && (
+                      <AddToCartButton
+                        itemType="course"
+                        itemId={courseId!}
+                        itemName={course.title}
+                        price={course.price || 0}
+                      />
+                    )}
                     <Button 
-                      onClick={handleStartLearning}
-                      className="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                      onClick={() => window.location.href = `/course/${courseId}/enroll`}
                     >
-                      <Play className="mr-2 h-4 w-4" />
-                      Continue Learning
+                      {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
                     </Button>
                   </div>
+                ) : (
+                  <Button 
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                    onClick={() => window.location.href = '/auth'}
+                  >
+                    Sign in to Enroll
+                  </Button>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-            {/* Instructor Card */}
-            {instructor && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Your Instructor
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={instructor.avatar_url || undefined} />
-                      <AvatarFallback>
-                        {instructor.full_name?.charAt(0) || 'I'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h4 className="font-semibold">{instructor.full_name}</h4>
-                      <p className="text-sm text-gray-600">Course Creator</p>
-                    </div>
-                  </div>
-                  
-                  {instructor.bio && (
-                    <p className="text-sm text-gray-700">{instructor.bio}</p>
-                  )}
-                  
-                  <div className="flex gap-2">
-                    <Link to={`/creator/profile/${instructor.id}`}>
-                      <Button variant="outline" size="sm" className="flex-1">
-                        View Profile
-                      </Button>
-                    </Link>
-                    <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <MessageCircle className="h-4 w-4 mr-1" />
-                        Send Message
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
+        {/* Instructor Card */}
+        {instructor && (
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Your Instructor
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={instructor.avatar_url || undefined} />
+                  <AvatarFallback>
+                    {instructor.full_name?.charAt(0) || 'I'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h4 className="font-semibold">{instructor.full_name}</h4>
+                  <p className="text-sm text-gray-600">Course Creator</p>
+                </div>
+              </div>
+              
+              {instructor.bio && (
+                <p className="text-sm text-gray-700">{instructor.bio}</p>
+              )}
+              
+              <div className="flex gap-2">
+                <Link to={`/creator/profile/${instructor.id}`}>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    View Profile
+                  </Button>
+                </Link>
+                <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <MessageCircle className="h-4 w-4 mr-1" />
+                    Send Message
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
