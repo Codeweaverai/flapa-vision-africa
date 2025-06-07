@@ -13,6 +13,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
 interface ContactRequest {
@@ -24,12 +25,32 @@ interface ContactRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  console.log('Contact form request received:', req.method);
+
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    console.log('Handling OPTIONS request');
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
+    // Check if RESEND_API_KEY is available
+    if (!Deno.env.get("RESEND_API_KEY")) {
+      console.error('RESEND_API_KEY is not configured');
+      return new Response(
+        JSON.stringify({ error: 'Email service not configured' }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
     const { firstName, lastName, email, subject, message }: ContactRequest = await req.json();
+    console.log('Contact form data received:', { firstName, lastName, email, subject });
 
     // Create Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -49,8 +70,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      throw new Error('Failed to store contact submission');
+      return new Response(
+        JSON.stringify({ error: 'Failed to store contact submission' }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
+
+    console.log('Contact submission stored successfully:', submission.id);
 
     // Render email template
     const html = await renderAsync(
