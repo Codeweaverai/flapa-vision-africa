@@ -103,9 +103,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             title = course?.title || 'Unknown Course';
             thumbnail_url = course?.thumbnail_url || '';
           } else if (item.item_type === 'event_ticket') {
+            // Fixed query using the foreign key relationship
             const { data: ticket } = await supabase
               .from('event_tickets')
-              .select('name, event_id, events(title, image_url)')
+              .select(`
+                name, 
+                event_id,
+                events (
+                  title,
+                  image_url
+                )
+              `)
               .eq('id', item.item_id)
               .single();
             
@@ -264,7 +272,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
-      setItems(items.map(item => 
+      setItems(prevItems => prevItems.map(item => 
         item.id === itemId ? { ...item, ticket_holder_names: holders } : item
       ));
       

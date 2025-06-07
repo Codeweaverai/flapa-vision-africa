@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -127,7 +126,7 @@ const UserOrders = () => {
         setEnrollments(enrollmentsData || []);
       }
 
-      // Fetch event bookings with proper joins
+      // Fetch event bookings with corrected query
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
