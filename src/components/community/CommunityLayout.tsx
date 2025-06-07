@@ -19,27 +19,27 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
 
   return (
     <Layout>
-      <div className="bg-light-purple min-h-screen pt-12 pb-16">
+      <div className="bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 min-h-screen pt-12 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <h1 className="text-3xl font-bold mb-2 text-gradient">Skillpulse Community</h1>
+            <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Skillpulse Community</h1>
             <p className="text-lg mb-8">Connect with fellow learners, share insights, and grow together</p>
 
             <Tabs defaultValue={activeTab} onValueChange={handleTabChange} className="mb-8">
-              <TabsList className="grid w-full grid-cols-4 mb-8">
-                <TabsTrigger value="feed" className="flex items-center gap-2">
+              <TabsList className="grid w-full grid-cols-4 mb-8 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                <TabsTrigger value="feed" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <Users className="h-4 w-4" />
                   <span>Community Feed</span>
                 </TabsTrigger>
-                <TabsTrigger value="chat" className="flex items-center gap-2">
+                <TabsTrigger value="chat" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <MessageCircle className="h-4 w-4" />
                   <span>Chat</span>
                 </TabsTrigger>
-                <TabsTrigger value="courses" className="flex items-center gap-2">
+                <TabsTrigger value="courses" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <BookOpen className="h-4 w-4" />
                   <span>Course Discussions</span>
                 </TabsTrigger>
-                <TabsTrigger value="notifications" className="flex items-center gap-2">
+                <TabsTrigger value="notifications" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <Bell className="h-4 w-4" />
                   <span>Notifications</span>
                 </TabsTrigger>

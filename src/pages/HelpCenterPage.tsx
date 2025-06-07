@@ -128,7 +128,7 @@ const HelpCenterPage = () => {
     : displayFaqs;
 
   return (
-    <div className="min-h-screen bg-light-purple">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <Layout>
         <div className="container mx-auto px-4 py-8">
           <div className="text-center mb-12">
@@ -146,7 +146,7 @@ const HelpCenterPage = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search for help articles..."
-                className="pl-10 h-12 text-lg"
+                className="pl-10 h-12 text-lg bg-white/80 backdrop-blur-sm border-0 shadow-lg"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -158,8 +158,8 @@ const HelpCenterPage = () => {
             {helpCategories.map((category, index) => (
               <Card 
                 key={index} 
-                className={`hover:shadow-lg transition-shadow cursor-pointer ${
-                  selectedCategory === category.title ? 'ring-2 ring-purple-500 bg-purple-50' : ''
+                className={`hover:shadow-lg transition-shadow cursor-pointer bg-white/80 backdrop-blur-sm border-0 shadow-xl ${
+                  selectedCategory === category.title ? 'ring-2 ring-purple-500 bg-purple-50/80' : ''
                 }`}
                 onClick={() => setSelectedCategory(selectedCategory === category.title ? null : category.title)}
               >
@@ -181,7 +181,7 @@ const HelpCenterPage = () => {
           {/* Selected Category Display */}
           {selectedCategory && (
             <div className="max-w-4xl mx-auto mb-8">
-              <Card className="bg-gradient-to-r from-purple-50 to-orange-50 border-purple-200">
+              <Card className="bg-gradient-to-r from-purple-100/80 to-orange-100/80 border-purple-200 backdrop-blur-sm shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-2xl text-center text-purple-800">
                     {selectedCategory}
@@ -201,18 +201,22 @@ const HelpCenterPage = () => {
                 <p className="text-muted-foreground">No FAQs found matching your search.</p>
               </div>
             ) : (
-              <Accordion type="single" collapsible className="w-full">
-                {filteredFaqs.map((faq, index) => (
-                  <AccordionItem key={index} value={`item-${index}`}>
-                    <AccordionTrigger className="text-left">
-                      {faq.question}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      {faq.answer}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardContent className="p-6">
+                  <Accordion type="single" collapsible className="w-full">
+                    {filteredFaqs.map((faq, index) => (
+                      <AccordionItem key={index} value={`item-${index}`}>
+                        <AccordionTrigger className="text-left">
+                          {faq.question}
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          {faq.answer}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </CardContent>
+              </Card>
             )}
           </div>
 
@@ -222,7 +226,7 @@ const HelpCenterPage = () => {
               <Button 
                 variant="outline" 
                 onClick={() => setSelectedCategory(null)}
-                className="border-purple-200 text-purple-600 hover:bg-purple-50"
+                className="border-purple-200 text-purple-600 hover:bg-purple-50 bg-white/80 backdrop-blur-sm"
               >
                 View All Categories
               </Button>
@@ -231,7 +235,7 @@ const HelpCenterPage = () => {
 
           {/* Contact Support */}
           <div className="max-w-2xl mx-auto mt-12">
-            <Card>
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
               <CardHeader className="text-center">
                 <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary" />
                 <CardTitle>Still need help?</CardTitle>
@@ -241,7 +245,7 @@ const HelpCenterPage = () => {
                   Can't find what you're looking for? Our support team is here to help.
                 </p>
                 <div className="space-y-2">
-                  <Button size="lg" className="w-full">
+                  <Button size="lg" className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
                     Contact Support
                   </Button>
                   <p className="text-sm text-muted-foreground">

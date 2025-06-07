@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -103,23 +102,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             title = course?.title || 'Unknown Course';
             thumbnail_url = course?.thumbnail_url || '';
           } else if (item.item_type === 'event_ticket') {
-            // Using explicit foreign key hint to resolve ambiguity
+            // First get the ticket details
             const { data: ticket } = await supabase
               .from('event_tickets')
-              .select(`
-                name, 
-                event_id,
-                events!fk_event_tickets_event_id (
-                  title,
-                  image_url
-                )
-              `)
+              .select('name, event_id')
               .eq('id', item.item_id)
               .single();
             
-            title = ticket?.name || 'Unknown Ticket';
-            thumbnail_url = ticket?.events?.image_url || '';
-            event_id = ticket?.event_id || '';
+            if (ticket) {
+              title = ticket.name || 'Unknown Ticket';
+              event_id = ticket.event_id || '';
+              
+              // Then get the event details separately
+              if (ticket.event_id) {
+                const { data: event } = await supabase
+                  .from('events')
+                  .select('title, image_url')
+                  .eq('id', ticket.event_id)
+                  .single();
+                
+                if (event) {
+                  thumbnail_url = event.image_url || '';
+                }
+              }
+            }
           }
 
           return {

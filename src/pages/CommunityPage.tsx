@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -357,7 +356,7 @@ const CommunityPage = () => {
   const renderFeed = () => (
     <div className="space-y-6">
       {user && (
-        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
           <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
             <CardTitle>Share with the Community</CardTitle>
           </CardHeader>
@@ -368,6 +367,7 @@ const CommunityPage = () => {
                 value={newPost.title}
                 onChange={(e) => setNewPost(prev => ({ ...prev, title: e.target.value }))}
                 required
+                className="bg-white/50"
               />
               <div className="relative">
                 <Textarea
@@ -376,6 +376,7 @@ const CommunityPage = () => {
                   onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
                   rows={4}
                   required
+                  className="bg-white/50"
                 />
                 <div className="absolute bottom-2 right-2">
                   <EmojiPicker onEmojiSelect={(emoji) => setNewPost(prev => ({ ...prev, content: prev.content + emoji }))} />
@@ -392,7 +393,7 @@ const CommunityPage = () => {
 
       <div className="space-y-4">
         {posts.map((post) => (
-          <Card key={post.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
+          <Card key={post.id} className="bg-white/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-shadow">
             <CardHeader>
               <div className="flex items-center space-x-3">
                 <Avatar>
@@ -470,11 +471,14 @@ const CommunityPage = () => {
                             placeholder="Write a comment..."
                             value={newComment[post.id] || ''}
                             onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
-                            onKeyPress={(e) => e.key === 'Enter' && addComment(post.id)}
-                            className="flex-1"
+                            className="flex-1 bg-white/50"
                           />
                           <EmojiPicker onEmojiSelect={(emoji) => setNewComment(prev => ({ ...prev, [post.id]: (prev[post.id] || '') + emoji }))} />
-                          <Button onClick={() => addComment(post.id)} size="sm">
+                          <Button
+                            onClick={() => addComment(post.id)}
+                            size="sm"
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                          >
                             <Send className="h-4 w-4" />
                           </Button>
                         </div>
@@ -482,46 +486,46 @@ const CommunityPage = () => {
                     </div>
                   )}
 
-                  {comments[post.id]?.map((comment) => (
-                    <div key={comment.id} className="flex space-x-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={comment.profiles?.avatar_url} />
-                        <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
-                          {comment.profiles?.full_name?.charAt(0) || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="space-y-3">
+                    {comments[post.id]?.map((comment) => (
+                      <div key={comment.id} className="flex space-x-3 bg-gray-50/80 backdrop-blur-sm p-3 rounded-lg">
+                        <Avatar className="w-6 h-6">
+                          <AvatarImage src={comment.profiles?.avatar_url} />
+                          <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200 text-xs">
+                            {comment.profiles?.full_name?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-medium text-sm">{comment.profiles?.full_name || 'Anonymous'}</span>
-                            <span className="text-xs text-gray-500">
+                            <p className="text-sm font-medium">{comment.profiles?.full_name || 'Anonymous'}</p>
+                            <p className="text-xs text-gray-500">
                               {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                            </span>
+                            </p>
                           </div>
                           <p className="text-sm">{comment.content}</p>
-                        </div>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs h-6"
-                          >
-                            <Heart className="h-3 w-3 mr-1" />
-                            {comment.likes_count || 0}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: comment.id }))}
-                            className="text-xs h-6"
-                          >
-                            <Reply className="h-3 w-3 mr-1" />
-                            Reply
-                          </Button>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                            >
+                              <Heart className="h-3 w-3 mr-1" />
+                              {comment.likes_count || 0}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: comment.id }))}
+                              className="h-6 px-2 text-xs"
+                            >
+                              <Reply className="h-3 w-3 mr-1" />
+                              Reply
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -532,84 +536,57 @@ const CommunityPage = () => {
   );
 
   const renderChat = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[600px]">
-      <div className="lg:col-span-1">
-        <Card className="h-full bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
-            <CardTitle className="flex items-center">
-              <Users className="h-5 w-5 mr-2" />
-              Channels
+    <div className="space-y-6">
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Community Chat
             </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 p-4">
-            {['general', 'courses', 'events', 'help'].map((channel) => (
-              <Button
-                key={channel}
-                variant={activeChannel === channel ? "default" : "ghost"}
-                className={`w-full justify-start ${activeChannel === channel ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white' : ''}`}
-                onClick={() => {
-                  setActiveChannel(channel);
-                  fetchMessages();
-                }}
-              >
-                # {channel}
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="lg:col-span-3">
-        <Card className="h-full flex flex-col bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-          <CardHeader className="border-b bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
-            <CardTitle># {activeChannel}</CardTitle>
-          </CardHeader>
-          
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
+            <Badge variant="outline" className="bg-white/50">
+              {activeChannel}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-96 overflow-y-auto space-y-3 mb-4 p-4 bg-gray-50/80 backdrop-blur-sm rounded-lg">
             {messages.map((message) => (
               <div key={message.id} className="flex space-x-3">
-                <Avatar className="h-8 w-8">
+                <Avatar className="w-8 h-8">
                   <AvatarImage src={message.profiles?.avatar_url} />
                   <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
                     {message.profiles?.full_name?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <p className="font-semibold text-sm">
-                      {message.profiles?.full_name || 'Anonymous'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <p className="text-sm font-medium">{message.profiles?.full_name || 'Anonymous'}</p>
+                    <p className="text-xs text-gray-500">
                       {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                     </p>
                   </div>
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <p className="text-sm bg-white/80 backdrop-blur-sm p-2 rounded">{message.content}</p>
                 </div>
               </div>
             ))}
           </div>
-
+          
           {user && (
-            <div className="p-4 border-t">
-              <form onSubmit={sendMessage} className="flex space-x-2">
-                <div className="flex-1 relative">
-                  <Input
-                    placeholder={`Message #${activeChannel}`}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                  />
-                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                    <EmojiPicker onEmojiSelect={(emoji) => setNewMessage(prev => prev + emoji)} />
-                  </div>
-                </div>
-                <Button type="submit" size="sm" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
+            <form onSubmit={sendMessage} className="flex space-x-2">
+              <Input
+                placeholder="Type your message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                className="flex-1 bg-white/50"
+              />
+              <Button type="submit" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
           )}
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 

@@ -75,7 +75,7 @@ const ContactPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-light-purple">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <Layout>
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto">
@@ -90,7 +90,7 @@ const ContactPage = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Contact Form */}
-              <Card>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                 <CardHeader>
                   <CardTitle>Send us a Message</CardTitle>
                 </CardHeader>
@@ -150,7 +150,7 @@ const ContactPage = () => {
                         required
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" disabled={isSubmitting}>
                       {isSubmitting ? 'Sending...' : 'Send Message'}
                     </Button>
                   </form>
@@ -159,7 +159,7 @@ const ContactPage = () => {
 
               {/* Contact Information */}
               <div className="space-y-6">
-                <Card>
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                   <CardHeader>
                     <CardTitle>Get in Touch</CardTitle>
                   </CardHeader>
@@ -204,7 +204,7 @@ const ContactPage = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                   <CardHeader>
                     <CardTitle>Frequently Asked Questions</CardTitle>
                   </CardHeader>
