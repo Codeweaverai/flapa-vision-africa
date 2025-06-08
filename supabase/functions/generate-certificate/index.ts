@@ -1,216 +1,276 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
+interface CertificateRequest {
+  certificateId: string;
+  userId: string;
+}
+
+const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
-  const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-
   try {
-    // Check if authenticated
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing Authorization header" }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
+    const { certificateId, userId }: CertificateRequest = await req.json();
 
-    const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseClient.auth.getUser(token);
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-
-    const { enrollmentId } = await req.json();
-    if (!enrollmentId) {
-      return new Response(
-        JSON.stringify({ error: "Enrollment ID is required" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-
-    // Get enrollment details
-    const { data: enrollment, error: enrollmentError } = await supabaseClient
-      .from("course_enrollments")
+    // Get certificate details
+    const { data: certificate, error: certError } = await supabase
+      .from('certificates')
       .select(`
-        id,
-        user_id,
-        course_id,
-        completion_date,
-        courses:course_id (title, certificate_enabled)
+        *,
+        course_enrollments!inner(
+          course:courses(title)
+        )
       `)
-      .eq("id", enrollmentId)
+      .eq('id', certificateId)
+      .eq('user_id', userId)
       .single();
 
-    if (enrollmentError || !enrollment) {
-      return new Response(
-        JSON.stringify({ error: "Enrollment not found" }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+    if (certError || !certificate) {
+      throw new Error('Certificate not found');
     }
 
-    // Verify that the requesting user owns the enrollment
-    if (enrollment.user_id !== user.id) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        {
-          status: 403,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+    // Get user details
+    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+    if (userError || !userData.user) {
+      throw new Error('User not found');
     }
 
-    // Check if course has certificates enabled
-    if (!enrollment.courses?.certificate_enabled) {
-      return new Response(
-        JSON.stringify({ error: "Certificates are not enabled for this course" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-
-    // Get user profile details
-    const { data: profile, error: profileError } = await supabaseClient
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
       .single();
 
     if (profileError) {
-      console.error("Error fetching user profile:", profileError);
+      throw new Error('Profile not found');
     }
 
-    // Check if certificate already exists
-    const { data: existingCert, error: certError } = await supabaseClient
-      .from("certificates")
-      .select("*")
-      .eq("enrollment_id", enrollmentId)
-      .maybeSingle();
+    // Generate certificate HTML
+    const certificateHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body {
+            font-family: 'Georgia', serif;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #f97316, #a855f7);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .certificate {
+            background: white;
+            padding: 60px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 800px;
+            position: relative;
+            border: 10px solid #f97316;
+          }
+          .certificate::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            border: 3px solid #a855f7;
+            border-radius: 10px;
+          }
+          .header {
+            margin-bottom: 40px;
+          }
+          .title {
+            font-size: 48px;
+            color: #a855f7;
+            margin-bottom: 10px;
+            font-weight: bold;
+          }
+          .subtitle {
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 40px;
+          }
+          .recipient {
+            font-size: 36px;
+            color: #f97316;
+            margin: 30px 0;
+            font-weight: bold;
+          }
+          .course-title {
+            font-size: 28px;
+            color: #333;
+            margin: 20px 0;
+            font-style: italic;
+          }
+          .completion-text {
+            font-size: 18px;
+            color: #666;
+            margin: 30px 0;
+            line-height: 1.6;
+          }
+          .verification {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+          }
+          .verification-code {
+            font-size: 16px;
+            color: #888;
+            font-family: monospace;
+          }
+          .date {
+            font-size: 16px;
+            color: #888;
+            margin-top: 10px;
+          }
+          .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 20px;
+          }
+          .signature {
+            text-align: center;
+            flex: 1;
+          }
+          .signature-line {
+            border-top: 2px solid #333;
+            width: 200px;
+            margin: 0 auto 10px;
+          }
+          .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #f97316, #a855f7);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="certificate">
+          <div class="header">
+            <div class="logo">MP</div>
+            <div class="title">Certificate of Completion</div>
+            <div class="subtitle">This is to certify that</div>
+          </div>
+          
+          <div class="recipient">${profile.full_name || 'Student'}</div>
+          
+          <div class="completion-text">
+            has successfully completed the course
+          </div>
+          
+          <div class="course-title">${certificate.course_enrollments?.course?.title || 'Course'}</div>
+          
+          <div class="completion-text">
+            and has demonstrated mastery of the subject matter through comprehensive assessment.
+            This achievement represents dedication to continuous learning and professional development.
+          </div>
+          
+          <div class="signatures">
+            <div class="signature">
+              <div class="signature-line"></div>
+              <div>Instructor</div>
+            </div>
+            <div class="signature">
+              <div class="signature-line"></div>
+              <div>Director</div>
+            </div>
+          </div>
+          
+          <div class="verification">
+            <div class="verification-code">
+              Verification Code: ${certificate.verification_code}
+            </div>
+            <div class="date">
+              Issued on ${new Date(certificate.issue_date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
 
-    if (certError) {
-      console.error("Error checking existing certificate:", certError);
+    // Convert HTML to PDF (using a simple HTML to PDF service or library)
+    // For now, we'll store the HTML and return a URL to it
+    const fileName = `certificate-${certificate.verification_code}.html`;
+    const filePath = `${userId}/${fileName}`;
+
+    // Upload to storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('certificates')
+      .upload(filePath, new Blob([certificateHTML], { type: 'text/html' }), {
+        contentType: 'text/html',
+        upsert: true
+      });
+
+    if (uploadError) {
+      throw uploadError;
     }
 
-    if (existingCert) {
-      return new Response(
-        JSON.stringify({ certificate: existingCert }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+    // Update certificate with file path
+    const { error: updateError } = await supabase
+      .from('certificates')
+      .update({ pdf_url: filePath })
+      .eq('id', certificateId);
+
+    if (updateError) {
+      throw updateError;
     }
 
-    // Generate verification code
-    const verificationCode = generateVerificationCode();
+    console.log("Certificate generated successfully:", uploadData);
 
-    // Create certificate record with student name and director signature
-    const studentName = profile?.full_name || user.user_metadata?.full_name || 'Student';
-    const directorName = "Mbolela Pule";
-    const directorTitle = "Director of Learning";
-    const courseName = enrollment.courses?.title || "Course";
-    
-    const { data: certificate, error: createError } = await supabaseClient
-      .from("certificates")
-      .insert({
-        enrollment_id: enrollmentId,
-        verification_code: verificationCode,
-        issue_date: new Date().toISOString(),
-        pdf_url: generateCertificatePDF(studentName, courseName, directorName, directorTitle, verificationCode)
-      })
-      .select()
-      .single();
-
-    if (createError) {
-      console.error("Error creating certificate:", createError);
-      return new Response(
-        JSON.stringify({ error: "Failed to create certificate" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-
+    return new Response(JSON.stringify({ 
+      success: true, 
+      filePath: filePath,
+      message: 'Certificate generated successfully' 
+    }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error generating certificate:", error);
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "Certificate generated successfully", 
-        certificate,
-        studentName,
-        directorName,
-        directorTitle
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
-  } catch (error) {
-    console.error("Error in generate-certificate function:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: error.message }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
   }
-});
+};
 
-// Helper function to generate a random verification code
-function generateVerificationCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let result = '';
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-// Helper function to generate certificate PDF URL/path
-function generateCertificatePDF(studentName: string, courseName: string, directorName: string, directorTitle: string, verificationCode: string): string {
-  // In a real implementation, this would generate an actual PDF
-  // For now, return a placeholder URL that includes all the certificate details
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
-  return `${supabaseUrl}/storage/v1/object/public/course-materials/certificates/${verificationCode}.pdf`;
-}
+serve(handler);

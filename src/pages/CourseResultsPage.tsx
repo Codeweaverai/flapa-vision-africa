@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +43,8 @@ interface Certificate {
   verification_code: string;
   issue_date: string;
   pdf_url?: string;
+  course_id: string;
+  course_title?: string;
 }
 
 const CourseResultsPage = () => {
@@ -76,24 +77,17 @@ const CourseResultsPage = () => {
 
       if (resultsError) throw resultsError;
       
-      // Transform the data to match our interface with proper type handling
+      // Transform the data to match our interface
       const transformedResults: ExamResult[] = [];
       
       if (resultsData) {
         for (const result of resultsData) {
-          const quizScores = result.quiz_scores;
-          let parsedQuizScores: number[] = [];
-          
-          if (Array.isArray(quizScores)) {
-            parsedQuizScores = quizScores.filter((score): score is number => typeof score === 'number');
-          }
-          
           transformedResults.push({
             id: result.id,
             score: result.score,
             percentage_score: result.percentage_score,
             passed: result.passed,
-            quiz_scores: parsedQuizScores,
+            quiz_scores: Array.isArray(result.quiz_scores) ? result.quiz_scores : [],
             final_grade: result.final_grade,
             completed_at: result.completed_at,
             course: {
@@ -110,15 +104,30 @@ const CourseResultsPage = () => {
       
       setExamResults(transformedResults);
 
-      // Fetch certificates
+      // Fetch certificates with course information
       const { data: certificatesData, error: certificatesError } = await supabase
         .from('certificates')
-        .select('*')
+        .select(`
+          *,
+          course_enrollments!inner(
+            course:courses(title)
+          )
+        `)
         .eq('user_id', user!.id)
         .order('issue_date', { ascending: false });
 
       if (certificatesError) throw certificatesError;
-      setCertificates(certificatesData || []);
+      
+      const transformedCertificates: Certificate[] = certificatesData?.map(cert => ({
+        id: cert.id,
+        verification_code: cert.verification_code,
+        issue_date: cert.issue_date,
+        pdf_url: cert.pdf_url,
+        course_id: cert.enrollment_id,
+        course_title: cert.course_enrollments?.course?.title || 'Course Certificate'
+      })) || [];
+      
+      setCertificates(transformedCertificates);
 
     } catch (error) {
       console.error('Error loading results:', error);
@@ -130,9 +139,33 @@ const CourseResultsPage = () => {
 
   const downloadCertificate = async (certificate: Certificate) => {
     if (certificate.pdf_url) {
-      window.open(certificate.pdf_url, '_blank');
+      // Download from storage
+      const { data } = supabase.storage
+        .from('certificates')
+        .getPublicUrl(certificate.pdf_url);
+      
+      if (data) {
+        window.open(data.publicUrl, '_blank');
+      }
     } else {
-      toast.info('Certificate is being generated. Please check back later.');
+      // Generate certificate if not exists
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-certificate', {
+          body: { 
+            certificateId: certificate.id,
+            userId: user!.id
+          }
+        });
+
+        if (error) throw error;
+        
+        toast.success('Certificate generated successfully!');
+        // Reload to get the updated certificate URL
+        loadResults();
+      } catch (error) {
+        console.error('Error generating certificate:', error);
+        toast.error('Failed to generate certificate');
+      }
     }
   };
 
@@ -271,7 +304,7 @@ const CourseResultsPage = () => {
                           <div className="flex items-center gap-3">
                             <GraduationCap className="h-8 w-8 text-orange-600" />
                             <div>
-                              <h3 className="font-semibold">Certificate of Completion</h3>
+                              <h3 className="font-semibold">{certificate.course_title}</h3>
                               <p className="text-sm text-gray-600">
                                 Verification: {certificate.verification_code}
                               </p>
@@ -283,7 +316,7 @@ const CourseResultsPage = () => {
                             className="bg-orange-600 hover:bg-orange-700"
                           >
                             <Download className="h-4 w-4 mr-2" />
-                            Download
+                            {certificate.pdf_url ? 'Download' : 'Generate'}
                           </Button>
                         </div>
                         

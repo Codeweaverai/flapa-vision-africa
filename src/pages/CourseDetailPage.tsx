@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
-import VideoPlayer from '@/components/video/VideoPlayer';
+import ReactPlayer from 'react-player';
 
 interface Course {
   id: string;
@@ -328,15 +327,25 @@ const CourseDetailPage = () => {
               <div className="lg:col-span-2">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
                   {/* Course Video Preview - Centered */}
-                  <div className="relative h-64 md:h-80 bg-black rounded-t-2xl overflow-hidden">
+                  <div className="relative h-80 md:h-96 bg-black rounded-t-2xl overflow-hidden">
                     {course.course_preview?.preview_video_url ? (
                       <div className="w-full h-full flex items-center justify-center">
-                        <VideoPlayer
-                          src={course.course_preview.preview_video_url}
-                          poster={course.thumbnail_url}
+                        <ReactPlayer
+                          url={course.course_preview.preview_video_url}
                           controls={true}
-                          autoplay={false}
-                          className="w-full h-full"
+                          playing={false}
+                          width="100%"
+                          height="100%"
+                          light={course.thumbnail_url}
+                          config={{
+                            file: {
+                              attributes: {
+                                controlsList: 'nodownload',
+                                disablePictureInPicture: true,
+                                onContextMenu: (e: React.MouseEvent) => e.preventDefault()
+                              }
+                            }
+                          }}
                         />
                       </div>
                     ) : course.thumbnail_url ? (
