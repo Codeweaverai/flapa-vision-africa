@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -110,40 +109,39 @@ const CourseResultsPage = () => {
       
       setExamResults(transformedResults);
 
-      // Fetch certificates with course information
+      // Fetch certificates - simplified query without joins
       const { data: certificatesData, error: certificatesError } = await supabase
         .from('certificates')
-        .select(`
-          id,
-          verification_code,
-          issue_date,
-          pdf_url,
-          enrollment_id
-        `)
+        .select('id, verification_code, issue_date, pdf_url, enrollment_id')
         .eq('user_id', user!.id)
         .order('issue_date', { ascending: false });
 
       if (certificatesError) throw certificatesError;
       
-      // Transform certificates data with simplified approach
+      // Get course titles for certificates
       const transformedCertificates: Certificate[] = [];
       
-      if (certificatesData) {
-        for (const cert of certificatesData) {
-          // Get course title from enrollment
-          const { data: enrollmentData } = await supabase
-            .from('course_enrollments')
-            .select('course:courses(title)')
-            .eq('id', cert.enrollment_id)
-            .single();
+      if (certificatesData && certificatesData.length > 0) {
+        // Get all enrollment IDs
+        const enrollmentIds = certificatesData.map(cert => cert.enrollment_id);
+        
+        // Fetch enrollments with course data
+        const { data: enrollmentsData } = await supabase
+          .from('course_enrollments')
+          .select('id, course_id, courses(title)')
+          .in('id', enrollmentIds);
 
+        // Map certificates with course titles
+        for (const cert of certificatesData) {
+          const enrollment = enrollmentsData?.find(e => e.id === cert.enrollment_id);
+          
           transformedCertificates.push({
             id: cert.id,
             verification_code: cert.verification_code,
             issue_date: cert.issue_date,
             pdf_url: cert.pdf_url || undefined,
             course_id: cert.enrollment_id,
-            course_title: enrollmentData?.course?.title || 'Course Certificate'
+            course_title: enrollment?.courses?.title || 'Course Certificate'
           });
         }
       }
