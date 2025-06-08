@@ -39,10 +39,14 @@ const CourseDetailPage = () => {
     const loadCourseDetails = async () => {
       setLoading(true);
       setError(null);
+      
       try {
         if (!courseId) {
-          throw new Error('Course ID is missing');
+          setError('Course ID is missing from the URL');
+          return;
         }
+
+        console.log('Loading course details for courseId:', courseId);
 
         // Fetch course with modules and lessons for enrolled users
         let courseData;
@@ -84,14 +88,19 @@ const CourseDetailPage = () => {
         setEnrollmentCount(stats.totalStudents || 0);
 
       } catch (err: any) {
+        console.error('Error loading course details:', err);
         setError(err.message || 'Failed to load course details');
-        console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    loadCourseDetails();
+    if (courseId) {
+      loadCourseDetails();
+    } else {
+      setError('Course ID is missing from the URL');
+      setLoading(false);
+    }
   }, [courseId, user]);
 
   const handleAddToCart = async () => {

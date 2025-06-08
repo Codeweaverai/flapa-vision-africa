@@ -1,11 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { launch } from "https://deno.land/x/puppeteer@16.2.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
 const supabase = createClient(
@@ -20,6 +20,8 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const { certificateId, userId } = await req.json();
+
+    console.log('Processing certificate generation for:', { certificateId, userId });
 
     // Get certificate details
     const { data: certificate, error: certError } = await supabase
@@ -36,6 +38,7 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (certError || !certificate) {
+      console.error('Certificate not found:', certError);
       throw new Error('Certificate not found');
     }
 
@@ -51,250 +54,18 @@ const handler = async (req: Request): Promise<Response> => {
     const completionDate = new Date(certificate.issue_date).toLocaleDateString();
     const grade = certificate.course_enrollments.final_exam_results?.[0]?.final_grade || 'Pass';
 
-    // Generate HTML certificate
-    const certificateHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Open+Sans:wght@400;600&display=swap');
-          
-          body {
-            margin: 0;
-            padding: 40px;
-            font-family: 'Open Sans', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          
-          .certificate {
-            width: 800px;
-            height: 600px;
-            background: white;
-            border: 20px solid #2c3e50;
-            border-image: linear-gradient(45deg, #3498db, #e74c3c, #f39c12, #27ae60) 1;
-            position: relative;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-          }
-          
-          .certificate::before {
-            content: '';
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
-            bottom: 15px;
-            border: 3px solid #34495e;
-          }
-          
-          .header {
-            text-align: center;
-            padding: 40px 0 20px 0;
-          }
-          
-          .title {
-            font-family: 'Playfair Display', serif;
-            font-size: 48px;
-            font-weight: 700;
-            color: #2c3e50;
-            margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-          }
-          
-          .subtitle {
-            font-size: 18px;
-            color: #7f8c8d;
-            margin: 10px 0;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-          }
-          
-          .content {
-            text-align: center;
-            padding: 20px 60px;
-          }
-          
-          .presented-to {
-            font-size: 16px;
-            color: #34495e;
-            margin-bottom: 10px;
-          }
-          
-          .student-name {
-            font-family: 'Playfair Display', serif;
-            font-size: 36px;
-            font-weight: 700;
-            color: #e74c3c;
-            margin: 10px 0 20px 0;
-            border-bottom: 3px solid #e74c3c;
-            padding-bottom: 10px;
-            display: inline-block;
-          }
-          
-          .course-info {
-            font-size: 18px;
-            color: #2c3e50;
-            margin: 20px 0;
-            line-height: 1.6;
-          }
-          
-          .course-name {
-            font-weight: 600;
-            color: #3498db;
-          }
-          
-          .grade {
-            font-size: 20px;
-            font-weight: 600;
-            color: #27ae60;
-            margin: 15px 0;
-          }
-          
-          .footer {
-            position: absolute;
-            bottom: 40px;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: space-between;
-            padding: 0 80px;
-            align-items: end;
-          }
-          
-          .date-section {
-            text-align: left;
-          }
-          
-          .signature-section {
-            text-align: right;
-          }
-          
-          .date, .signature-label {
-            font-size: 14px;
-            color: #7f8c8d;
-            margin-bottom: 5px;
-          }
-          
-          .date-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2c3e50;
-            border-bottom: 2px solid #bdc3c7;
-            padding-bottom: 5px;
-            min-width: 150px;
-            display: inline-block;
-          }
-          
-          .signature-image {
-            width: 150px;
-            height: 60px;
-            object-fit: contain;
-            margin-bottom: 5px;
-          }
-          
-          .director-label {
-            font-size: 14px;
-            color: #2c3e50;
-            font-weight: 600;
-            border-top: 2px solid #bdc3c7;
-            padding-top: 5px;
-            min-width: 150px;
-          }
-          
-          .verification {
-            position: absolute;
-            bottom: 10px;
-            right: 20px;
-            font-size: 10px;
-            color: #95a5a6;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="certificate">
-          <div class="header">
-            <h1 class="title">Certificate of Completion</h1>
-            <p class="subtitle">SkillPulse Academy</p>
-          </div>
-          
-          <div class="content">
-            <p class="presented-to">This is to certify that</p>
-            <h2 class="student-name">${studentName}</h2>
-            
-            <div class="course-info">
-              has successfully completed the course<br>
-              <span class="course-name">"${courseName}"</span><br>
-              and demonstrated proficiency in the subject matter.
-            </div>
-            
-            <div class="grade">Final Grade: ${grade}%</div>
-          </div>
-          
-          <div class="footer">
-            <div class="date-section">
-              <div class="date">Date of Completion</div>
-              <div class="date-value">${completionDate}</div>
-            </div>
-            
-            <div class="signature-section">
-              <img src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png" 
-                   alt="Director Signature" class="signature-image" />
-              <div class="director-label">Director, SkillPulse Academy<br>Authorized Signature</div>
-            </div>
-          </div>
-          
-          <div class="verification">
-            Verification Code: ${certificate.verification_code}
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    // Generate simple HTML certificate (since Puppeteer is not working)
+    const certificateHTML = createCertificateHTML(studentName, courseName, completionDate, grade, certificate.verification_code);
 
-    // Generate PDF using Puppeteer
-    const browser = await launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    
-    const page = await browser.newPage();
-    await page.setContent(certificateHTML);
-    
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      landscape: true,
-      printBackground: true,
-      margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' }
-    });
-    
-    await browser.close();
+    // For now, we'll return the HTML content directly since PDF generation is failing
+    // In production, you might want to use a different PDF generation service
+    const certificateUrl = `data:text/html;base64,${btoa(certificateHTML)}`;
 
-    // Upload to Supabase Storage
-    const fileName = `${userId}_${certificate.course_enrollments.course_id || 'course'}.pdf`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('certificates')
-      .upload(fileName, pdfBuffer, {
-        contentType: 'application/pdf',
-        upsert: true
-      });
-
-    if (uploadError) {
-      throw new Error(`Failed to upload certificate: ${uploadError.message}`);
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('certificates')
-      .getPublicUrl(fileName);
-
-    // Update certificate record with PDF URL
+    // Update certificate record with HTML URL
     const { error: updateError } = await supabase
       .from('certificates')
       .update({ 
-        pdf_url: urlData.publicUrl,
+        pdf_url: certificateUrl,
         user_id: userId,
         course_id: certificate.course_enrollments.course_id
       })
@@ -306,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      certificateUrl: urlData.publicUrl,
+      certificateUrl: certificateUrl,
       verificationCode: certificate.verification_code
     }), {
       status: 200,
@@ -327,5 +98,144 @@ const handler = async (req: Request): Promise<Response> => {
     );
   }
 };
+
+function createCertificateHTML(studentName: string, courseName: string, completionDate: string, grade: string, verificationCode: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>SkillPulse Certificate</title>
+      <style>
+        body {
+          font-family: 'Georgia', serif;
+          margin: 0;
+          padding: 40px;
+          background: linear-gradient(135deg, #f59e0b 0%, #8b5cf6 100%);
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .certificate {
+          background: white;
+          padding: 60px;
+          border-radius: 20px;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+          max-width: 800px;
+          width: 100%;
+          text-align: center;
+          border: 8px solid #f59e0b;
+          position: relative;
+        }
+        .certificate::before {
+          content: '';
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          right: 20px;
+          bottom: 20px;
+          border: 2px solid #8b5cf6;
+          border-radius: 12px;
+          pointer-events: none;
+        }
+        .logo {
+          font-size: 2.5rem;
+          font-weight: bold;
+          background: linear-gradient(45deg, #f59e0b, #8b5cf6);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin-bottom: 20px;
+        }
+        .title {
+          font-size: 3rem;
+          color: #1f2937;
+          margin: 20px 0;
+          font-weight: normal;
+        }
+        .subtitle {
+          font-size: 1.2rem;
+          color: #6b7280;
+          margin-bottom: 40px;
+        }
+        .recipient {
+          font-size: 2.5rem;
+          color: #f59e0b;
+          font-weight: bold;
+          margin: 30px 0;
+          text-decoration: underline;
+          text-decoration-color: #8b5cf6;
+        }
+        .course {
+          font-size: 1.8rem;
+          color: #1f2937;
+          margin: 30px 0;
+          font-style: italic;
+        }
+        .completion {
+          font-size: 1.1rem;
+          color: #6b7280;
+          margin: 20px 0;
+        }
+        .grade-badge {
+          display: inline-block;
+          background: linear-gradient(45deg, #f59e0b, #8b5cf6);
+          color: white;
+          padding: 10px 20px;
+          border-radius: 25px;
+          font-weight: bold;
+          margin: 20px 0;
+        }
+        .signature {
+          margin-top: 50px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+        }
+        .signature-line {
+          border-top: 2px solid #1f2937;
+          width: 200px;
+          text-align: center;
+          padding-top: 10px;
+          font-size: 0.9rem;
+          color: #6b7280;
+        }
+        .verification {
+          margin-top: 30px;
+          font-size: 0.8rem;
+          color: #9ca3af;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="certificate">
+        <div class="logo">🎓 SkillPulse</div>
+        <div class="title">Certificate of Completion</div>
+        <div class="subtitle">This is to certify that</div>
+        <div class="recipient">${studentName}</div>
+        <div class="completion">has successfully completed the course</div>
+        <div class="course">"${courseName}"</div>
+        <div class="grade-badge">Final Grade: ${grade}%</div>
+        <div class="completion">demonstrating professional competency and commitment to continuous learning</div>
+        <div class="signature">
+          <div class="signature-line">
+            <strong>SkillPulse Academy</strong><br>
+            Authorized Signature
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 0.9rem; color: #6b7280;">${completionDate}</div>
+            <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
+          </div>
+        </div>
+        <div class="verification">
+          Verification Code: ${verificationCode}<br>
+          This certificate can be verified at skillpulse.com/verify
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
 
 serve(handler);
