@@ -75,7 +75,16 @@ const CourseResultsPage = () => {
         .order('completed_at', { ascending: false });
 
       if (resultsError) throw resultsError;
-      setExamResults(resultsData || []);
+      
+      // Transform the data to match our interface
+      const transformedResults = resultsData?.map(result => ({
+        ...result,
+        quiz_scores: Array.isArray(result.quiz_scores) 
+          ? (result.quiz_scores as unknown as number[])
+          : []
+      })) || [];
+      
+      setExamResults(transformedResults);
 
       // Fetch certificates
       const { data: certificatesData, error: certificatesError } = await supabase

@@ -59,7 +59,9 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({
       }
 
       if (data && data.transcript_data) {
-        setTranscriptData(data.transcript_data as TranscriptSegment[]);
+        // Safely cast the Json type to TranscriptSegment[]
+        const transcripts = data.transcript_data as unknown as TranscriptSegment[];
+        setTranscriptData(transcripts);
       } else {
         // Mock transcript data for demonstration
         const mockTranscript: TranscriptSegment[] = [
