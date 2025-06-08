@@ -109,7 +109,7 @@ const CourseResultsPage = () => {
       
       setExamResults(transformedResults);
 
-      // Fetch certificates - simplified query without joins
+      // Fetch certificates - completely separate queries to avoid type issues
       const { data: certificatesData, error: certificatesError } = await supabase
         .from('certificates')
         .select('id, verification_code, issue_date, pdf_url, enrollment_id')
@@ -118,30 +118,40 @@ const CourseResultsPage = () => {
 
       if (certificatesError) throw certificatesError;
       
-      // Get course titles for certificates
+      // Transform certificates data with simplified approach
       const transformedCertificates: Certificate[] = [];
       
       if (certificatesData && certificatesData.length > 0) {
-        // Get all enrollment IDs
-        const enrollmentIds = certificatesData.map(cert => cert.enrollment_id);
-        
-        // Fetch enrollments with course data
-        const { data: enrollmentsData } = await supabase
-          .from('course_enrollments')
-          .select('id, course_id, courses(title)')
-          .in('id', enrollmentIds);
-
-        // Map certificates with course titles
+        // Get enrollment course data separately
         for (const cert of certificatesData) {
-          const enrollment = enrollmentsData?.find(e => e.id === cert.enrollment_id);
+          let courseTitle = 'Course Certificate';
           
+          // Fetch enrollment and course data separately
+          const { data: enrollmentData } = await supabase
+            .from('course_enrollments')
+            .select('course_id')
+            .eq('id', cert.enrollment_id)
+            .single();
+          
+          if (enrollmentData?.course_id) {
+            const { data: courseData } = await supabase
+              .from('courses')
+              .select('title')
+              .eq('id', enrollmentData.course_id)
+              .single();
+            
+            if (courseData?.title) {
+              courseTitle = courseData.title;
+            }
+          }
+
           transformedCertificates.push({
             id: cert.id,
             verification_code: cert.verification_code,
             issue_date: cert.issue_date,
             pdf_url: cert.pdf_url || undefined,
             course_id: cert.enrollment_id,
-            course_title: enrollment?.courses?.title || 'Course Certificate'
+            course_title: courseTitle
           });
         }
       }
