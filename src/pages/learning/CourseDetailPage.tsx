@@ -6,7 +6,7 @@ import { Clock, Users, BookOpen, CheckCircle, Download, Smartphone, Award, PlayC
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchCourseById, checkEnrollmentStatus, fetchCourseStats, Course, LearningOutcome } from '@/services/courseService';
+import { fetchCourseById, checkEnrollmentStatus, fetchCourseStats, fetchCreatorData, Course, LearningOutcome } from '@/services/courseService';
 import Layout from '@/components/layout/Layout';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviewsTab from '@/components/course/CourseReviewsTab';
@@ -14,10 +14,18 @@ import { toast } from 'sonner';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 
+interface CreatorProfile {
+  id: string;
+  full_name?: string;
+  bio?: string;
+  avatar_url?: string;
+}
+
 const CourseDetailPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
+  const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
   const [userEnrollment, setUserEnrollment] = useState<boolean>(false);
   const [enrollmentCount, setEnrollmentCount] = useState<number>(0);
@@ -48,6 +56,16 @@ const CourseDetailPage = () => {
           setLearningOutcomes(courseData.course_learning_outcomes);
         }
 
+        // Fetch creator data separately
+        if (courseData.creator_id) {
+          try {
+            const creatorData = await fetchCreatorData(courseData.creator_id);
+            setCreator(creatorData);
+          } catch (creatorError) {
+            console.error('Error loading creator:', creatorError);
+          }
+        }
+
         if (user) {
           const enrollmentStatus = await checkEnrollmentStatus(courseId);
           setUserEnrollment(enrollmentStatus);
@@ -74,11 +92,11 @@ const CourseDetailPage = () => {
     setIsAddingToCart(true);
     try {
       await addToCart({
-        name: course.title,
+        item_name: course.title,
         price: course.price || 0,
-        type: 'course',
+        item_type: 'course',
         quantity: 1,
-        course_id: course.id
+        item_id: course.id
       });
       toast.success('Course added to cart!');
     } catch (error) {
@@ -326,7 +344,7 @@ const CourseDetailPage = () => {
               )}
 
               {/* Course Content/Modules */}
-              <CourseModuleList courseId={course.id} isEnrolled={userEnrollment} />
+              <CourseModuleList courseId={course.id} />
 
               {/* Reviews Section */}
               <CourseReviewsTab 
@@ -385,27 +403,27 @@ const CourseDetailPage = () => {
               </Card>
 
               {/* Creator Info Card */}
-              {course.creator && (
+              {creator && (
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-4 mb-4">
-                      {course.creator.avatar_url ? (
+                      {creator.avatar_url ? (
                         <img
-                          src={course.creator.avatar_url}
-                          alt={course.creator.full_name}
+                          src={creator.avatar_url}
+                          alt={creator.full_name}
                           className="w-12 h-12 rounded-full object-cover"
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                          {course.creator.full_name?.charAt(0).toUpperCase() || 'U'}
+                          {creator.full_name?.charAt(0).toUpperCase() || 'U'}
                         </div>
                       )}
                       <div>
-                        <h4 className="font-semibold">{course.creator.full_name}</h4>
+                        <h4 className="font-semibold">{creator.full_name}</h4>
                         <p className="text-sm text-gray-500">Creator</p>
                       </div>
                     </div>
-                    <p className="text-gray-700">{course.creator.bio || 'No bio available.'}</p>
+                    <p className="text-gray-700">{creator.bio || 'No bio available.'}</p>
                   </CardContent>
                 </Card>
               )}
