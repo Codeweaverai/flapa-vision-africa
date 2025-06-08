@@ -89,7 +89,7 @@ const RegisterPage = () => {
           <div className="text-center mb-8">
             <Link to="/" className="inline-block mb-6">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Mbolela Pule
+                SkillPulse Marketplace
               </h1>
             </Link>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Create Your Account</h2>
