@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -5,12 +6,10 @@ import { Clock, Users, BookOpen, CheckCircle, Download, Smartphone, Award, PlayC
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchCourseById, fetchLearningOutcomes, fetchEnrollmentStatus, fetchCourseEnrollmentCount } from '@/services/courseService';
-import { Course, LearningOutcome } from '@/types/Course';
+import { fetchCourseById, checkEnrollmentStatus, fetchCourseStats, Course, LearningOutcome } from '@/services/courseService';
 import Layout from '@/components/layout/Layout';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviewsTab from '@/components/course/CourseReviewsTab';
-import CourseEnrollmentButton from '@/components/course/CourseEnrollmentButton';
 import { toast } from 'sonner';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -22,10 +21,12 @@ const CourseDetailPage = () => {
   const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
   const [userEnrollment, setUserEnrollment] = useState<boolean>(false);
   const [enrollmentCount, setEnrollmentCount] = useState<number>(0);
+  const [courseStats, setCourseStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addToCart } = useCart();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
 
   useEffect(() => {
     const loadCourseDetails = async () => {
@@ -42,16 +43,19 @@ const CourseDetailPage = () => {
         }
         setCourse(courseData);
 
-        const outcomesData = await fetchLearningOutcomes(courseId);
-        setLearningOutcomes(outcomesData);
+        // Set learning outcomes from course data
+        if (courseData.course_learning_outcomes) {
+          setLearningOutcomes(courseData.course_learning_outcomes);
+        }
 
         if (user) {
-          const enrollmentStatus = await fetchEnrollmentStatus(courseId, user.id);
+          const enrollmentStatus = await checkEnrollmentStatus(courseId);
           setUserEnrollment(enrollmentStatus);
         }
 
-        const count = await fetchCourseEnrollmentCount(courseId);
-        setEnrollmentCount(count);
+        const stats = await fetchCourseStats(courseId);
+        setCourseStats(stats);
+        setEnrollmentCount(stats.totalStudents || 0);
 
       } catch (err: any) {
         setError(err.message || 'Failed to load course details');
@@ -70,11 +74,11 @@ const CourseDetailPage = () => {
     setIsAddingToCart(true);
     try {
       await addToCart({
-        id: course.id,
         name: course.title,
         price: course.price || 0,
         type: 'course',
-        quantity: 1
+        quantity: 1,
+        course_id: course.id
       });
       toast.success('Course added to cart!');
     } catch (error) {
@@ -85,11 +89,50 @@ const CourseDetailPage = () => {
     }
   };
 
+  const handleEnroll = async () => {
+    if (!user) {
+      toast.error('Please log in to enroll in courses');
+      return;
+    }
+    
+    if (!course) return;
+    
+    setEnrolling(true);
+    
+    try {
+      // For free courses, enroll directly
+      if (course.is_free) {
+        const { supabase } = await import('@/lib/supabaseClient');
+        const { error } = await supabase
+          .from('course_enrollments')
+          .insert([{
+            user_id: user.id,
+            course_id: course.id,
+            payment_status: 'completed',
+            enrollment_date: new Date().toISOString()
+          }]);
+
+        if (error) throw error;
+
+        setUserEnrollment(true);
+        toast.success('Successfully enrolled in the course!');
+      } else {
+        // For paid courses, add to cart first
+        await handleAddToCart();
+      }
+    } catch (error) {
+      console.error('Enrollment error:', error);
+      toast.error('Failed to enroll in the course');
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
   const renderEnrollmentSection = () => {
     if (userEnrollment) {
       return (
         <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-          <Link to={`/learning/course/${course.id}`}>
+          <Link to={`/learning/course/${course?.id}`}>
             <BookOpen className="mr-2 h-5 w-5" />
             Continue Learning
           </Link>
@@ -97,33 +140,27 @@ const CourseDetailPage = () => {
       );
     }
 
-    if (course.is_free) {
+    if (course?.is_free) {
       return (
-        <CourseEnrollmentButton
-          courseId={course.id}
-          courseName={course.title}
-          isFree={true}
-          price={0}
-          currency="USD"
-          isUserEnrolled={!!userEnrollment}
-          creatorId={course.creator_id}
-          className="w-full"
-        />
+        <Button
+          onClick={handleEnroll}
+          disabled={enrolling}
+          className="w-full bg-green-600 hover:bg-green-700"
+        >
+          {enrolling ? 'Enrolling...' : 'Enroll for Free'}
+        </Button>
       );
     }
 
     return (
       <div className="space-y-3">
-        <CourseEnrollmentButton
-          courseId={course.id}
-          courseName={course.title}
-          isFree={false}
-          price={course.price || 0}
-          currency="USD"
-          isUserEnrolled={!!userEnrollment}
-          creatorId={course.creator_id}
+        <Button
+          onClick={handleEnroll}
+          disabled={enrolling}
           className="w-full"
-        />
+        >
+          {enrolling ? 'Processing...' : 'Enroll Now'}
+        </Button>
         
         <Button
           onClick={handleAddToCart}
@@ -160,6 +197,24 @@ const CourseDetailPage = () => {
             <div className="text-center">
               <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
               <p className="text-red-500">{error}</p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!course) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
+          <div className="container mx-auto px-4 py-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-4">Course Not Found</h2>
+              <p className="text-gray-600 mb-4">The course you are looking for might have been removed or doesn't exist.</p>
+              <Button asChild>
+                <Link to="/explore/courses">Browse Courses</Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -219,7 +274,7 @@ const CourseDetailPage = () => {
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
                     <h3 className="text-xl font-semibold mb-4">Course Preview</h3>
-                    <div className="aspect-video rounded-lg overflow-hidden">
+                    <div className="aspect-video rounded-lg overflow-hidden" style={{ minHeight: '500px' }}>
                       <ReactPlayer
                         url={course.thumbnail_url}
                         width="100%"
@@ -228,9 +283,14 @@ const CourseDetailPage = () => {
                         config={{
                           file: {
                             attributes: {
-                              controlsList: 'nodownload'
+                              controlsList: 'nodownload noremoteplayback',
+                              disablePictureInPicture: true,
+                              onContextMenu: (e: React.MouseEvent) => e.preventDefault()
                             }
                           }
+                        }}
+                        style={{
+                          minHeight: '500px'
                         }}
                       />
                     </div>
@@ -266,10 +326,14 @@ const CourseDetailPage = () => {
               )}
 
               {/* Course Content/Modules */}
-              <CourseModuleList courseId={course.id} />
+              <CourseModuleList courseId={course.id} isEnrolled={userEnrollment} />
 
               {/* Reviews Section */}
-              <CourseReviewsTab courseId={course.id} />
+              <CourseReviewsTab 
+                courseId={course.id} 
+                averageRating={courseStats?.averageRating || 0}
+                totalReviews={courseStats?.totalReviews || 0}
+              />
             </div>
 
             {/* Sidebar */}
