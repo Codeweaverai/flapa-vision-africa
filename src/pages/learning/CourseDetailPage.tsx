@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -92,11 +91,12 @@ const CourseDetailPage = () => {
     setIsAddingToCart(true);
     try {
       await addToCart({
-        item_name: course.title,
-        price: course.price || 0,
+        item_id: course.id,
         item_type: 'course',
+        price: course.price || 0,
         quantity: 1,
-        item_id: course.id
+        title: course.title,
+        thumbnail_url: course.thumbnail_url
       });
       toast.success('Course added to cart!');
     } catch (error) {
@@ -344,7 +344,7 @@ const CourseDetailPage = () => {
               )}
 
               {/* Course Content/Modules */}
-              <CourseModuleList courseId={course.id} />
+              <CourseModuleList course={course} />
 
               {/* Reviews Section */}
               <CourseReviewsTab 
