@@ -18,6 +18,7 @@ import QuizInstructionsModal from '@/components/course/QuizInstructionsModal';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
+import LessonNotesTab from '@/components/course/LessonNotesTab';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   PlayCircle, 
@@ -37,7 +38,8 @@ import {
   AlertCircle,
   RotateCcw,
   ArrowRight,
-  GraduationCap
+  GraduationCap,
+  StickyNote
 } from 'lucide-react';
 
 interface Course {
@@ -154,7 +156,6 @@ const CourseLearningPage = () => {
     }
   }, [courseId, user]);
 
-  // Update current module when lesson changes
   useEffect(() => {
     if (currentLesson && modules.length > 0) {
       const module = modules.find(m => 
@@ -169,7 +170,6 @@ const CourseLearningPage = () => {
     
     setLoading(true);
     try {
-      // Fetch course details
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select('*')
@@ -178,7 +178,6 @@ const CourseLearningPage = () => {
 
       if (courseError) throw courseError;
       
-      // Fetch user enrollment
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select('*')
@@ -192,7 +191,6 @@ const CourseLearningPage = () => {
         return;
       }
       
-      // Fetch creator profile
       if (courseData.creator_id) {
         const { data: creatorData } = await supabase
           .from('profiles')
@@ -205,7 +203,6 @@ const CourseLearningPage = () => {
         }
       }
       
-      // Fetch modules, lessons, and quizzes with progress
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
         .select(`
@@ -226,13 +223,11 @@ const CourseLearningPage = () => {
 
       if (modulesError) throw modulesError;
 
-      // Fetch quiz attempts to check completion status - using proper typing
       const { data: quizAttempts } = await supabase
         .from('quiz_attempts')
         .select('quiz_id, score, passed')
         .eq('user_id', user.id) as { data: { quiz_id: string; score: number; passed: boolean }[] | null };
 
-      // Load final exam
       const { data: examData } = await supabase
         .from('final_exams')
         .select('*')
@@ -244,7 +239,6 @@ const CourseLearningPage = () => {
         setFinalExam(examData);
       }
 
-      // Process modules and lessons with completion status
       const processedModules = modulesData?.map(module => ({
         ...module,
         lessons: module.lessons
@@ -267,14 +261,11 @@ const CourseLearningPage = () => {
       setEnrollment(enrollmentData);
       setModules(processedModules);
       
-      // Calculate blocked content based on quiz requirements
       const blocked = calculateBlockedContent(processedModules);
       setBlockedContent(blocked);
       
-      // Set the current lesson to the first available lesson
       setFirstAvailableLesson(processedModules, blocked);
       
-      // Calculate overall progress
       calculateProgress(processedModules);
       
     } catch (error) {
@@ -291,24 +282,20 @@ const CourseLearningPage = () => {
     for (let i = 0; i < modulesData.length; i++) {
       const module = modulesData[i];
       
-      // Check if previous module's quizzes are passed
       if (i > 0) {
         const prevModule = modulesData[i - 1];
         const hasUnpassedQuiz = prevModule.quizzes.some(quiz => !quiz.is_completed);
         
         if (hasUnpassedQuiz) {
-          // Block all content in this module and subsequent modules
           module.lessons.forEach(lesson => blocked.push(lesson.id));
           module.quizzes.forEach(quiz => blocked.push(quiz.id));
           continue;
         }
       }
       
-      // Within the module, check lesson-specific quizzes
       for (let j = 0; j < module.lessons.length; j++) {
         const lesson = module.lessons[j];
         
-        // Check if there are lesson-specific quizzes that need to be passed
         const lessonQuizzes = module.quizzes.filter(quiz => quiz.lesson_id === lesson.id);
         
         if (j > 0 && lessonQuizzes.length > 0) {
@@ -403,14 +390,12 @@ const CourseLearningPage = () => {
       module.lessons.forEach(lesson => {
         allContent.push({ type: 'lesson', content: lesson, moduleTitle: module.title });
         
-        // Add quizzes associated with this lesson
         const lessonQuizzes = module.quizzes.filter(quiz => quiz.lesson_id === lesson.id);
         lessonQuizzes.forEach(quiz => {
           allContent.push({ type: 'quiz', content: quiz, moduleTitle: module.title });
         });
       });
       
-      // Add module-level quizzes
       const moduleQuizzes = module.quizzes.filter(quiz => !quiz.lesson_id);
       moduleQuizzes.forEach(quiz => {
         allContent.push({ type: 'quiz', content: quiz, moduleTitle: module.title });
@@ -463,7 +448,6 @@ const CourseLearningPage = () => {
     if (!currentQuiz || !enrollment) return;
 
     try {
-      // Record quiz attempt - using proper insert with explicit typing
       const { error } = await supabase
         .from('quiz_attempts')
         .insert({
@@ -476,12 +460,10 @@ const CourseLearningPage = () => {
 
       if (error) throw error;
 
-      // Close quiz modal and show results
       setIsQuizModalOpen(false);
       setQuizResults({ quiz: currentQuiz, score, passed });
       setIsQuizResultsOpen(true);
       
-      // Reload course data to update blocked content
       await loadCourseData();
       
     } catch (error) {
@@ -510,11 +492,10 @@ const CourseLearningPage = () => {
     }
   };
 
-  const handleLessonComplete = async () => {
+  const handleNextLesson = async () => {
     if (!currentLesson || !enrollment) return;
 
     try {
-      // First check if lesson progress exists
       const { data: existingProgress } = await supabase
         .from('lesson_progress')
         .select('*')
@@ -523,7 +504,6 @@ const CourseLearningPage = () => {
         .single();
 
       if (existingProgress) {
-        // Update existing progress
         const { error } = await supabase
           .from('lesson_progress')
           .update({
@@ -534,7 +514,6 @@ const CourseLearningPage = () => {
 
         if (error) throw error;
       } else {
-        // Create new progress record
         const { error } = await supabase
           .from('lesson_progress')
           .insert({
@@ -547,10 +526,20 @@ const CourseLearningPage = () => {
         if (error) throw error;
       }
 
-      toast.success('Lesson marked as completed!');
+      toast.success('Lesson completed!');
       
-      // Reload course data to update progress and blocking
       await loadCourseData();
+      
+      if (nextContent) {
+        if (nextContent.type === 'lesson') {
+          setCurrentLesson(nextContent.content as Lesson);
+          setCurrentQuiz(null);
+        } else {
+          setCurrentQuiz(nextContent.content as Quiz);
+          setCurrentLesson(null);
+          setIsQuizInstructionsOpen(true);
+        }
+      }
       
     } catch (error) {
       console.error('Error marking lesson as complete:', error);
@@ -574,7 +563,6 @@ const CourseLearningPage = () => {
   const calculateFinalGrade = (examScore: number) => {
     const quizScores = [];
     
-    // Collect all quiz scores
     modules.forEach(module => {
       module.quizzes?.forEach(quiz => {
         if (quiz.last_score && quiz.last_score > 0) {
@@ -589,7 +577,6 @@ const CourseLearningPage = () => {
 
     const quizAverage = quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length;
     
-    // Weight: 60% quizzes, 40% final exam
     const finalGrade = Math.round((quizAverage * 0.6) + (examScore * 0.4));
     
     return { finalGrade, quizScores };
@@ -598,7 +585,6 @@ const CourseLearningPage = () => {
   const handleFinalExamStart = () => {
     if (!finalExam) return;
     
-    // Check if all modules and lessons are completed
     const allCompleted = modules.every(module => 
       module.lessons.every(lesson => lesson.is_completed) &&
       module.quizzes.every(quiz => quiz.is_completed)
@@ -623,7 +609,6 @@ const CourseLearningPage = () => {
       passed: overallPassed
     });
 
-    // Update course enrollment completion if passed
     if (overallPassed && enrollment) {
       try {
         await supabase
@@ -663,7 +648,6 @@ const CourseLearningPage = () => {
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 relative overflow-hidden">
-      {/* Animated Particles Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(40)].map((_, i) => (
           <div
@@ -682,7 +666,6 @@ const CourseLearningPage = () => {
       <Layout>
         <div className="container max-w-full py-6 relative z-10">
           <div className="flex flex-col gap-6">
-            {/* Course Header with Progress */}
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
               <CardContent className="p-6">
                 <div className="flex flex-col gap-4">
@@ -713,7 +696,6 @@ const CourseLearningPage = () => {
             </Card>
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Course Curriculum Sidebar */}
               <div className="lg:col-span-4">
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl sticky top-6">
                   <CardHeader>
@@ -808,7 +790,6 @@ const CourseLearningPage = () => {
                                 );
                               })}
                               
-                              {/* Module Quizzes */}
                               {module.quizzes.map((quiz, quizIndex) => {
                                 const isBlocked = blockedContent.includes(quiz.id);
                                 return (
@@ -863,12 +844,47 @@ const CourseLearningPage = () => {
                             </div>
                           </div>
                         ))}
+
+                        {finalExam && (
+                          <div className="mt-6 p-4 rounded-lg border-2 border-purple-200 bg-purple-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <GraduationCap className="h-6 w-6 text-purple-600" />
+                                <div>
+                                  <div className="font-semibold text-lg text-purple-800">
+                                    Final Exam: {finalExam.title}
+                                  </div>
+                                  {finalExam.description && (
+                                    <div className="text-sm text-purple-600 mt-1">
+                                      {finalExam.description}
+                                    </div>
+                                  )}
+                                  <div className="text-xs text-purple-500 mt-2">
+                                    Time Limit: {finalExam.time_limit_minutes} minutes • Passing Score: {finalExam.passing_score}%
+                                  </div>
+                                </div>
+                              </div>
+                              <Button
+                                onClick={handleFinalExamStart}
+                                className="bg-purple-600 hover:bg-purple-700 text-white"
+                                disabled={!modules.every(module => 
+                                  module.lessons.every(lesson => lesson.is_completed) &&
+                                  module.quizzes.every(quiz => quiz.is_completed)
+                                )}
+                              >
+                                {modules.every(module => 
+                                  module.lessons.every(lesson => lesson.is_completed) &&
+                                  module.quizzes.every(quiz => quiz.is_completed)
+                                ) ? 'Take Final Exam' : 'Complete Course First'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </ScrollArea>
                   </CardContent>
                 </Card>
 
-                {/* Creator Profile Card */}
                 {creator && (
                   <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl mt-6">
                     <CardHeader>
@@ -917,11 +933,9 @@ const CourseLearningPage = () => {
                 )}
               </div>
               
-              {/* Main Content Area */}
               <div className="lg:col-span-8">
                 {currentLesson ? (
                   <div className="space-y-6">
-                    {/* Lesson Navigation */}
                     <div className="flex justify-between items-center">
                       <Button
                         variant="outline"
@@ -933,19 +947,11 @@ const CourseLearningPage = () => {
                         {previousLesson ? `Previous: ${previousLesson.lesson.title}` : 'No Previous Lesson'}
                       </Button>
                       
-                      {/* Show Next Quiz or Lesson */}
                       {nextContent ? (
                         <Button
-                          variant="outline"
-                          onClick={() => {
-                            if (nextContent.type === 'quiz') {
-                              handleQuizStart(nextContent.content as Quiz);
-                            } else {
-                              setCurrentLesson(nextContent.content as Lesson);
-                            }
-                          }}
+                          onClick={handleNextLesson}
                           disabled={blockedContent.includes(nextContent.content.id)}
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
                         >
                           {nextContent.type === 'quiz' ? (
                             <>
@@ -1010,11 +1016,11 @@ const CourseLearningPage = () => {
                       </CardHeader>
                       
                       <CardContent className="p-6">
-                        <Tabs defaultValue="content" className="w-full">
+                        <Tabs defaultValue="lesson-notes" className="w-full">
                           <TabsList className="grid w-full grid-cols-3 bg-gray-100">
-                            <TabsTrigger value="content" className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              Content
+                            <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
+                              <StickyNote className="h-4 w-4" />
+                              Lesson Notes
                             </TabsTrigger>
                             <TabsTrigger value="discussion" className="flex items-center gap-2">
                               <MessageSquare className="h-4 w-4" />
@@ -1026,17 +1032,11 @@ const CourseLearningPage = () => {
                             </TabsTrigger>
                           </TabsList>
                           
-                          <TabsContent value="content" className="mt-6">
-                            <div className="prose max-w-none">
-                              {currentLesson.content ? (
-                                <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
-                              ) : (
-                                <div className="text-center py-8">
-                                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                  <p className="text-gray-500">No additional content for this lesson.</p>
-                                </div>
-                              )}
-                            </div>
+                          <TabsContent value="lesson-notes" className="mt-6">
+                            <LessonNotesTab 
+                              lessonId={currentLesson.id} 
+                              currentVideoTime={0}
+                            />
                           </TabsContent>
                           
                           <TabsContent value="discussion" className="mt-6">
@@ -1071,18 +1071,6 @@ const CourseLearningPage = () => {
                           </TabsContent>
                         </Tabs>
                       </CardContent>
-                      
-                      <CardFooter className="bg-gray-50 border-t">
-                        <Button 
-                          onClick={handleLessonComplete} 
-                          className="ml-auto bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-6"
-                          size="lg"
-                          disabled={currentLesson.is_completed}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          {currentLesson.is_completed ? 'Completed' : 'Mark as Completed'}
-                        </Button>
-                      </CardFooter>
                     </Card>
                   </div>
                 ) : (
@@ -1109,13 +1097,11 @@ const CourseLearningPage = () => {
         </div>
       </Layout>
 
-      {/* Floating AI Assistant */}
       <FloatingAIAssistant 
         lessonTitle={currentLesson?.title}
         lessonContent={currentLesson?.content as string}
       />
 
-      {/* Quiz Instructions Modal */}
       {currentQuiz && (
         <QuizInstructionsModal
           isOpen={isQuizInstructionsOpen}
@@ -1125,7 +1111,6 @@ const CourseLearningPage = () => {
         />
       )}
 
-      {/* Quiz Modal */}
       {currentQuiz && (
         <QuizModal
           isOpen={isQuizModalOpen}
@@ -1135,7 +1120,6 @@ const CourseLearningPage = () => {
         />
       )}
 
-      {/* Quiz Results Modal */}
       {quizResults && (
         <QuizResultsModal
           isOpen={isQuizResultsOpen}
@@ -1149,7 +1133,6 @@ const CourseLearningPage = () => {
         />
       )}
 
-      {/* Final Exam Modal */}
       {finalExam && (
         <FinalExamModal
           isOpen={isFinalExamModalOpen}
@@ -1160,7 +1143,6 @@ const CourseLearningPage = () => {
         />
       )}
 
-      {/* Final Exam Results Modal */}
       {finalExamResults && (
         <FinalExamResultsModal
           isOpen={isFinalExamResultsOpen}
