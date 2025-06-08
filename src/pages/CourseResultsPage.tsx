@@ -76,13 +76,37 @@ const CourseResultsPage = () => {
 
       if (resultsError) throw resultsError;
       
-      // Transform the data to match our interface
-      const transformedResults = resultsData?.map(result => ({
-        ...result,
-        quiz_scores: Array.isArray(result.quiz_scores) 
-          ? (result.quiz_scores as unknown as number[])
-          : []
-      })) || [];
+      // Transform the data to match our interface with proper type handling
+      const transformedResults: ExamResult[] = [];
+      
+      if (resultsData) {
+        for (const result of resultsData) {
+          const quizScores = result.quiz_scores;
+          let parsedQuizScores: number[] = [];
+          
+          if (Array.isArray(quizScores)) {
+            parsedQuizScores = quizScores.filter((score): score is number => typeof score === 'number');
+          }
+          
+          transformedResults.push({
+            id: result.id,
+            score: result.score,
+            percentage_score: result.percentage_score,
+            passed: result.passed,
+            quiz_scores: parsedQuizScores,
+            final_grade: result.final_grade,
+            completed_at: result.completed_at,
+            course: {
+              title: result.course?.title || 'Unknown Course',
+              thumbnail_url: result.course?.thumbnail_url
+            },
+            exam: {
+              title: result.exam?.title || 'Final Exam',
+              passing_score: result.exam?.passing_score || 70
+            }
+          });
+        }
+      }
       
       setExamResults(transformedResults);
 
