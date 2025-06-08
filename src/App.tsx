@@ -111,6 +111,8 @@ import CheckoutSuccessPage from '@/pages/CheckoutSuccessPage';
 
 import TicketPage from '@/pages/TicketPage';
 
+import CourseResultsPage from '@/pages/CourseResultsPage';
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -226,6 +228,7 @@ function App() {
             <Route path="/ticket/:ticketId" element={<TicketPage />} />
 
             {/* 404 Route */}
+            <Route path="/course-results" element={<CourseResultsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           <Toaster />

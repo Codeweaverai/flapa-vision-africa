@@ -1140,6 +1140,79 @@ export type Database = {
           },
         ]
       }
+      final_exam_results: {
+        Row: {
+          attempt_number: number
+          completed_at: string
+          course_id: string
+          created_at: string
+          enrollment_id: string
+          exam_id: string
+          final_grade: number
+          id: string
+          passed: boolean
+          percentage_score: number
+          quiz_scores: Json | null
+          score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          completed_at?: string
+          course_id: string
+          created_at?: string
+          enrollment_id: string
+          exam_id: string
+          final_grade?: number
+          id?: string
+          passed?: boolean
+          percentage_score?: number
+          quiz_scores?: Json | null
+          score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_number?: number
+          completed_at?: string
+          course_id?: string
+          created_at?: string
+          enrollment_id?: string
+          exam_id?: string
+          final_grade?: number
+          id?: string
+          passed?: boolean
+          percentage_score?: number
+          quiz_scores?: Json | null
+          score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "final_exam_results_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "final_exam_results_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "course_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "final_exam_results_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "final_exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       final_exams: {
         Row: {
           course_id: string
@@ -1586,6 +1659,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "lesson_resources_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_transcripts: {
+        Row: {
+          created_at: string
+          id: string
+          language: string
+          lesson_id: string
+          transcript_data: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          language?: string
+          lesson_id: string
+          transcript_data?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          language?: string
+          lesson_id?: string
+          transcript_data?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_transcripts_lesson_id_fkey"
             columns: ["lesson_id"]
             isOneToOne: false
             referencedRelation: "lessons"

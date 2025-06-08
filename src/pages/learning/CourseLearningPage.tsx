@@ -19,6 +19,7 @@ import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
+import VideoTranscripts from '@/components/course/VideoTranscripts';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   PlayCircle, 
@@ -136,6 +137,7 @@ const CourseLearningPage = () => {
     finalGrade: number;
     passed: boolean;
   } | null>(null);
+  const [examResults, setExamResults] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
@@ -268,6 +270,20 @@ const CourseLearningPage = () => {
       
       calculateProgress(processedModules);
       
+      // Load exam results if available
+      const { data: examResultsData } = await supabase
+        .from('final_exam_results')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (examResultsData) {
+        setExamResults(examResultsData);
+      }
+
     } catch (error) {
       console.error('Error loading course data:', error);
       toast.error('Failed to load course data');
@@ -602,6 +618,59 @@ const CourseLearningPage = () => {
     const { finalGrade, quizScores } = calculateFinalGrade(examScore);
     const overallPassed = finalGrade >= 70;
 
+    // Store exam results in database
+    try {
+      const { error: resultsError } = await supabase
+        .from('final_exam_results')
+        .insert({
+          user_id: user.id,
+          exam_id: finalExam?.id,
+          course_id: courseId,
+          enrollment_id: enrollment?.id,
+          score: examScore,
+          percentage_score: examScore,
+          passed: overallPassed,
+          quiz_scores: quizScores,
+          final_grade: finalGrade,
+          attempt_number: 1
+        });
+
+      if (resultsError) {
+        console.error('Error storing exam results:', resultsError);
+      }
+
+      // Send email notification
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-exam-notification', {
+          body: {
+            userId: user.id,
+            courseTitle: course?.title || '',
+            finalGrade,
+            passed: overallPassed,
+            examScore,
+            studentName: user?.user_metadata?.full_name || 'Student'
+          }
+        });
+
+        if (emailError) {
+          console.error('Error sending email notification:', emailError);
+        }
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+
+      setExamResults({
+        score: examScore,
+        percentage_score: examScore,
+        passed: overallPassed,
+        quiz_scores: quizScores,
+        final_grade: finalGrade
+      });
+
+    } catch (error) {
+      console.error('Error processing exam completion:', error);
+    }
+
     setFinalExamResults({
       examScore,
       quizScores,
@@ -697,6 +766,7 @@ const CourseLearningPage = () => {
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-4">
+                {/* Course Curriculum Sidebar */}
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl sticky top-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -847,7 +917,7 @@ const CourseLearningPage = () => {
 
                         {finalExam && (
                           <div className="mt-6 p-4 rounded-lg border-2 border-purple-200 bg-purple-50">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 <GraduationCap className="h-6 w-6 text-purple-600" />
                                 <div>
@@ -864,20 +934,56 @@ const CourseLearningPage = () => {
                                   </div>
                                 </div>
                               </div>
-                              <Button
-                                onClick={handleFinalExamStart}
-                                className="bg-purple-600 hover:bg-purple-700 text-white"
-                                disabled={!modules.every(module => 
-                                  module.lessons.every(lesson => lesson.is_completed) &&
-                                  module.quizzes.every(quiz => quiz.is_completed)
-                                )}
-                              >
-                                {modules.every(module => 
-                                  module.lessons.every(lesson => lesson.is_completed) &&
-                                  module.quizzes.every(quiz => quiz.is_completed)
-                                ) ? 'Take Final Exam' : 'Complete Course First'}
-                              </Button>
                             </div>
+
+                            {/* Exam Results Display */}
+                            {examResults && (
+                              <div className={`mb-4 p-3 rounded-lg border-2 ${
+                                examResults.passed 
+                                  ? 'bg-green-50 border-green-300' 
+                                  : 'bg-red-50 border-red-300'
+                              }`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-medium">Latest Result:</span>
+                                  <Badge variant={examResults.passed ? 'default' : 'destructive'}>
+                                    {examResults.passed ? 'PASSED' : 'FAILED'}
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div>
+                                    <span className="text-gray-600">Exam Score:</span>
+                                    <span className="font-bold ml-2">{examResults.percentage_score}%</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Final Grade:</span>
+                                    <span className="font-bold ml-2">{examResults.final_grade}%</span>
+                                  </div>
+                                </div>
+                                {examResults.passed && (
+                                  <Button
+                                    size="sm"
+                                    className="w-full mt-3 bg-green-600 hover:bg-green-700"
+                                    onClick={() => navigate('/course-results')}
+                                  >
+                                    View Results & Certificate
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+
+                            <Button
+                              onClick={handleFinalExamStart}
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                              disabled={!modules.every(module => 
+                                module.lessons.every(lesson => lesson.is_completed) &&
+                                module.quizzes.every(quiz => quiz.is_completed)
+                              )}
+                            >
+                              {modules.every(module => 
+                                module.lessons.every(lesson => lesson.is_completed) &&
+                                module.quizzes.every(quiz => quiz.is_completed)
+                              ) ? (examResults ? 'Retake Final Exam' : 'Take Final Exam') : 'Complete Course First'}
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -1017,10 +1123,14 @@ const CourseLearningPage = () => {
                       
                       <CardContent className="p-6">
                         <Tabs defaultValue="lesson-notes" className="w-full">
-                          <TabsList className="grid w-full grid-cols-3 bg-gray-100">
+                          <TabsList className="grid w-full grid-cols-4 bg-gray-100">
                             <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
                               <StickyNote className="h-4 w-4" />
                               Lesson Notes
+                            </TabsTrigger>
+                            <TabsTrigger value="transcripts" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              Video Transcripts
                             </TabsTrigger>
                             <TabsTrigger value="discussion" className="flex items-center gap-2">
                               <MessageSquare className="h-4 w-4" />
@@ -1034,9 +1144,29 @@ const CourseLearningPage = () => {
                           
                           <TabsContent value="lesson-notes" className="mt-6">
                             <LessonNotesTab 
-                              lessonId={currentLesson.id} 
+                              lessonId={currentLesson.id || ''} 
                               currentVideoTime={0}
                             />
+                          </TabsContent>
+                          
+                          <TabsContent value="transcripts" className="mt-6">
+                            {currentLesson ? (
+                              <VideoTranscripts 
+                                lessonId={currentLesson.id}
+                                currentVideoTime={0}
+                                onTimeSeek={(time) => {
+                                  // This would integrate with video player to seek to specific time
+                                  console.log('Seeking to time:', time);
+                                }}
+                              />
+                            ) : (
+                              <Card>
+                                <CardContent className="text-center py-8">
+                                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                  <p className="text-gray-500">Select a lesson to view transcripts</p>
+                                </CardContent>
+                              </Card>
+                            )}
                           </TabsContent>
                           
                           <TabsContent value="discussion" className="mt-6">
