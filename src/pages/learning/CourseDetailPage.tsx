@@ -5,7 +5,7 @@ import { Clock, Users, BookOpen, CheckCircle, Download, Smartphone, Award, PlayC
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchCourseById, checkEnrollmentStatus, fetchCourseStats, fetchCreatorData, Course, LearningOutcome } from '@/services/courseService';
+import { fetchCourseById, checkEnrollmentStatus, fetchCourseStats, fetchCreatorData, fetchCourseWithModulesAndLessons, Course, LearningOutcome, Lesson } from '@/services/courseService';
 import Layout from '@/components/layout/Layout';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviewsTab from '@/components/course/CourseReviewsTab';
@@ -44,7 +44,21 @@ const CourseDetailPage = () => {
           throw new Error('Course ID is missing');
         }
 
-        const courseData = await fetchCourseById(courseId);
+        // Fetch course with modules and lessons for enrolled users
+        let courseData;
+        if (user) {
+          const enrollmentStatus = await checkEnrollmentStatus(courseId);
+          setUserEnrollment(enrollmentStatus);
+          
+          if (enrollmentStatus) {
+            courseData = await fetchCourseWithModulesAndLessons(courseId);
+          } else {
+            courseData = await fetchCourseById(courseId);
+          }
+        } else {
+          courseData = await fetchCourseById(courseId);
+        }
+
         if (!courseData) {
           throw new Error('Course not found');
         }
@@ -63,11 +77,6 @@ const CourseDetailPage = () => {
           } catch (creatorError) {
             console.error('Error loading creator:', creatorError);
           }
-        }
-
-        if (user) {
-          const enrollmentStatus = await checkEnrollmentStatus(courseId);
-          setUserEnrollment(enrollmentStatus);
         }
 
         const stats = await fetchCourseStats(courseId);
@@ -143,6 +152,23 @@ const CourseDetailPage = () => {
       toast.error('Failed to enroll in the course');
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  const handleLessonSelect = (lesson: Lesson) => {
+    if (userEnrollment && courseId) {
+      // Navigate to course player with the selected lesson
+      window.location.href = `/learning/course/${courseId}?lesson=${lesson.id}`;
+    } else {
+      toast.error('Please enroll in the course to access lessons');
+    }
+  };
+
+  const handleQuizStart = (quizId: string) => {
+    if (userEnrollment) {
+      toast.info('Quiz functionality coming soon!');
+    } else {
+      toast.error('Please enroll in the course to take quizzes');
     }
   };
 
@@ -344,7 +370,19 @@ const CourseDetailPage = () => {
               )}
 
               {/* Course Content/Modules */}
-              <CourseModuleList course={course} />
+              {course.modules && course.modules.length > 0 && (
+                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardContent className="p-6">
+                    <h3 className="text-xl font-semibold mb-4">Course Content</h3>
+                    <CourseModuleList 
+                      modules={course.modules}
+                      onLessonSelect={handleLessonSelect}
+                      onQuizStart={handleQuizStart}
+                      completedLessons={[]}
+                    />
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Reviews Section */}
               <CourseReviewsTab 
