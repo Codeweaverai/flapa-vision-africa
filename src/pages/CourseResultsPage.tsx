@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,29 +79,34 @@ const CourseResultsPage = () => {
       if (resultsError) throw resultsError;
       
       // Transform the data to match our interface
-      const transformedResults: ExamResult[] = [];
-      
-      if (resultsData) {
-        for (const result of resultsData) {
-          transformedResults.push({
-            id: result.id,
-            score: result.score,
-            percentage_score: result.percentage_score,
-            passed: result.passed,
-            quiz_scores: Array.isArray(result.quiz_scores) ? result.quiz_scores : [],
-            final_grade: result.final_grade,
-            completed_at: result.completed_at,
-            course: {
-              title: result.course?.title || 'Unknown Course',
-              thumbnail_url: result.course?.thumbnail_url
-            },
-            exam: {
-              title: result.exam?.title || 'Final Exam',
-              passing_score: result.exam?.passing_score || 70
-            }
+      const transformedResults: ExamResult[] = resultsData?.map(result => {
+        // Safely convert quiz_scores from Json to number[]
+        let quizScores: number[] = [];
+        if (Array.isArray(result.quiz_scores)) {
+          quizScores = result.quiz_scores.map((score: any) => {
+            const numScore = Number(score);
+            return isNaN(numScore) ? 0 : numScore;
           });
         }
-      }
+
+        return {
+          id: result.id,
+          score: result.score,
+          percentage_score: result.percentage_score,
+          passed: result.passed,
+          quiz_scores: quizScores,
+          final_grade: result.final_grade,
+          completed_at: result.completed_at,
+          course: {
+            title: result.course?.title || 'Unknown Course',
+            thumbnail_url: result.course?.thumbnail_url
+          },
+          exam: {
+            title: result.exam?.title || 'Final Exam',
+            passing_score: result.exam?.passing_score || 70
+          }
+        };
+      }) || [];
       
       setExamResults(transformedResults);
 

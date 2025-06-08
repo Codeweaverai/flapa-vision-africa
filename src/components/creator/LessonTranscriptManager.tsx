@@ -48,11 +48,23 @@ const LessonTranscriptManager: React.FC<LessonTranscriptManagerProps> = ({
         throw error;
       }
 
-      if (data) {
-        setTranscript(data.transcript_data as TranscriptSegment[]);
+      if (data && data.transcript_data) {
+        // Safely convert Json to TranscriptSegment[]
+        const transcriptData = Array.isArray(data.transcript_data) 
+          ? data.transcript_data as any[]
+          : [];
+        
+        const parsedTranscript: TranscriptSegment[] = transcriptData.map((segment: any) => ({
+          start: Number(segment.start) || 0,
+          end: Number(segment.end) || 0,
+          text: String(segment.text) || '',
+          speaker: segment.speaker ? String(segment.speaker) : undefined
+        }));
+
+        setTranscript(parsedTranscript);
         setHasTranscript(true);
         // Convert transcript to manual text format
-        const textVersion = (data.transcript_data as TranscriptSegment[])
+        const textVersion = parsedTranscript
           .map(segment => `[${formatTime(segment.start)}] ${segment.text}`)
           .join('\n\n');
         setManualTranscript(textVersion);
@@ -116,11 +128,19 @@ const LessonTranscriptManager: React.FC<LessonTranscriptManagerProps> = ({
         transcriptData = parseManualTranscript(manualTranscript);
       }
 
+      // Convert to plain object format for Json compatibility
+      const transcriptForDb = transcriptData.map(segment => ({
+        start: segment.start,
+        end: segment.end,
+        text: segment.text,
+        speaker: segment.speaker
+      }));
+
       const { error } = await supabase
         .from('lesson_transcripts')
         .upsert({
           lesson_id: lessonId,
-          transcript_data: transcriptData,
+          transcript_data: transcriptForDb,
           language: 'en'
         });
 
