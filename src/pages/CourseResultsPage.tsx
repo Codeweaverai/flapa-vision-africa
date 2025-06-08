@@ -114,24 +114,39 @@ const CourseResultsPage = () => {
       const { data: certificatesData, error: certificatesError } = await supabase
         .from('certificates')
         .select(`
-          *,
-          course_enrollments!inner(
-            course:courses(title)
-          )
+          id,
+          verification_code,
+          issue_date,
+          pdf_url,
+          enrollment_id
         `)
         .eq('user_id', user!.id)
         .order('issue_date', { ascending: false });
 
       if (certificatesError) throw certificatesError;
       
-      const transformedCertificates: Certificate[] = certificatesData?.map(cert => ({
-        id: cert.id,
-        verification_code: cert.verification_code,
-        issue_date: cert.issue_date,
-        pdf_url: cert.pdf_url,
-        course_id: cert.enrollment_id,
-        course_title: cert.course_enrollments?.course?.title || 'Course Certificate'
-      })) || [];
+      // Transform certificates data with simplified approach
+      const transformedCertificates: Certificate[] = [];
+      
+      if (certificatesData) {
+        for (const cert of certificatesData) {
+          // Get course title from enrollment
+          const { data: enrollmentData } = await supabase
+            .from('course_enrollments')
+            .select('course:courses(title)')
+            .eq('id', cert.enrollment_id)
+            .single();
+
+          transformedCertificates.push({
+            id: cert.id,
+            verification_code: cert.verification_code,
+            issue_date: cert.issue_date,
+            pdf_url: cert.pdf_url || undefined,
+            course_id: cert.enrollment_id,
+            course_title: enrollmentData?.course?.title || 'Course Certificate'
+          });
+        }
+      }
       
       setCertificates(transformedCertificates);
 
