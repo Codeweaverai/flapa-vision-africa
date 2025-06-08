@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { toast } from 'sonner';
 import CreatorLayout from '@/components/layout/CreatorLayout';
 import { Course, fetchCreatorCourses, deleteCourse } from '@/services/courseService';
 import CoursePreviewDialog from '@/components/creator/CoursePreviewDialog';
+import CoursePublishButton from '@/components/creator/CoursePublishButton';
 
 const CreatorCourses = () => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -43,6 +45,14 @@ const CreatorCourses = () => {
     }
   };
 
+  const handlePublishStatusChange = (courseId: string, newStatus: boolean) => {
+    setCourses(prev => prev.map(course => 
+      course.id === courseId 
+        ? { ...course, is_published: newStatus }
+        : course
+    ));
+  };
+
   return (
     <CreatorLayout>
       <div className="space-y-6">
@@ -75,6 +85,15 @@ const CreatorCourses = () => {
                   <CardTitle>{course.title}</CardTitle>
                   <CardDescription>{course.summary}</CardDescription>
                 </CardHeader>
+                
+                {/* Publish Status */}
+                <div className="mb-4">
+                  <CoursePublishButton
+                    courseId={course.id}
+                    isPublished={course.is_published || false}
+                    onStatusChange={(newStatus) => handlePublishStatusChange(course.id, newStatus)}
+                  />
+                </div>
                 
                 <div className="flex flex-wrap gap-2 mt-4">
                   <Button asChild size="sm">

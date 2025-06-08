@@ -326,10 +326,10 @@ const CourseDetailPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-200">
-                  {/* Course Video Preview - Centered */}
-                  <div className="relative h-80 md:h-96 bg-black rounded-t-2xl overflow-hidden">
+                  {/* Course Video Preview - Increased height and no downloads */}
+                  <div className="relative h-96 md:h-[500px] bg-black rounded-t-2xl overflow-hidden">
                     {course.course_preview?.preview_video_url ? (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full h-full">
                         <ReactPlayer
                           url={course.course_preview.preview_video_url}
                           controls={true}
@@ -340,11 +340,14 @@ const CourseDetailPage = () => {
                           config={{
                             file: {
                               attributes: {
-                                controlsList: 'nodownload',
+                                controlsList: 'nodownload noremoteplayback',
                                 disablePictureInPicture: true,
                                 onContextMenu: (e: React.MouseEvent) => e.preventDefault()
                               }
                             }
+                          }}
+                          style={{
+                            minHeight: '500px'
                           }}
                         />
                       </div>

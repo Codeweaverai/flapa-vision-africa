@@ -43,7 +43,6 @@ interface Certificate {
   verification_code: string;
   issue_date: string;
   pdf_url?: string;
-  course_id: string;
   course_title?: string;
 }
 
@@ -109,54 +108,57 @@ const CourseResultsPage = () => {
       
       setExamResults(transformedResults);
 
-      // Fetch certificates - completely separate queries to avoid type issues
-      const { data: certificatesData, error: certificatesError } = await supabase
-        .from('certificates')
-        .select('id, verification_code, issue_date, pdf_url, enrollment_id')
-        .eq('user_id', user!.id)
-        .order('issue_date', { ascending: false });
+      // Fetch certificates using enrollments that belong to the user
+      const { data: userEnrollments, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('user_id', user!.id);
 
-      if (certificatesError) throw certificatesError;
-      
-      // Transform certificates data with simplified approach
-      const transformedCertificates: Certificate[] = [];
-      
-      if (certificatesData && certificatesData.length > 0) {
-        // Get enrollment course data separately
-        for (const cert of certificatesData) {
-          let courseTitle = 'Course Certificate';
-          
-          // Fetch enrollment and course data separately
-          const { data: enrollmentData } = await supabase
-            .from('course_enrollments')
-            .select('course_id')
-            .eq('id', cert.enrollment_id)
-            .single();
-          
-          if (enrollmentData?.course_id) {
-            const { data: courseData } = await supabase
-              .from('courses')
-              .select('title')
-              .eq('id', enrollmentData.course_id)
+      if (enrollmentError) throw enrollmentError;
+
+      if (userEnrollments && userEnrollments.length > 0) {
+        const enrollmentIds = userEnrollments.map(e => e.id);
+        
+        const { data: certificatesData, error: certificatesError } = await supabase
+          .from('certificates')
+          .select('*')
+          .in('enrollment_id', enrollmentIds)
+          .order('issue_date', { ascending: false });
+
+        if (certificatesError) throw certificatesError;
+        
+        // Get course titles for certificates
+        const transformedCertificates: Certificate[] = [];
+        
+        if (certificatesData && certificatesData.length > 0) {
+          for (const cert of certificatesData) {
+            let courseTitle = 'Course Certificate';
+            
+            // Find the enrollment and get course title
+            const { data: enrollmentData } = await supabase
+              .from('course_enrollments')
+              .select(`
+                course:courses(title)
+              `)
+              .eq('id', cert.enrollment_id)
               .single();
             
-            if (courseData?.title) {
-              courseTitle = courseData.title;
+            if (enrollmentData?.course?.title) {
+              courseTitle = enrollmentData.course.title;
             }
-          }
 
-          transformedCertificates.push({
-            id: cert.id,
-            verification_code: cert.verification_code,
-            issue_date: cert.issue_date,
-            pdf_url: cert.pdf_url || undefined,
-            course_id: cert.enrollment_id,
-            course_title: courseTitle
-          });
+            transformedCertificates.push({
+              id: cert.id,
+              verification_code: cert.verification_code,
+              issue_date: cert.issue_date,
+              pdf_url: cert.pdf_url || undefined,
+              course_title: courseTitle
+            });
+          }
         }
+        
+        setCertificates(transformedCertificates);
       }
-      
-      setCertificates(transformedCertificates);
 
     } catch (error) {
       console.error('Error loading results:', error);
