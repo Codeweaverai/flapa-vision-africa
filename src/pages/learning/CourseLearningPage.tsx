@@ -559,9 +559,9 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         {/* Quiz Modal */}
         {showQuizModal && quizData && (
           <QuizModal
+            isOpen={showQuizModal}
             quiz={quizData}
-            enrollmentId={enrollment?.id}
-            onComplete={() => {
+            onComplete={(score: number, passed: boolean) => {
               setShowQuizModal(false);
               if (!isCompleted) {
                 markLessonComplete();
