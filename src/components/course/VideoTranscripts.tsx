@@ -53,7 +53,13 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
         setSelectedLanguage(targetLanguage);
 
         const targetTranscript = allTranscripts.find(t => t.language === targetLanguage);
-        setTranscripts(targetTranscript?.transcript_data || []);
+        
+        // Type guard to ensure transcript_data is an array
+        if (targetTranscript?.transcript_data && Array.isArray(targetTranscript.transcript_data)) {
+          setTranscripts(targetTranscript.transcript_data as TranscriptSegment[]);
+        } else {
+          setTranscripts([]);
+        }
       } else {
         setAvailableLanguages([]);
         setTranscripts([]);

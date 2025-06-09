@@ -48,11 +48,15 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
       }
 
       if (data) {
-        setTranscript(data.transcript_data || []);
-        setLanguage(data.language || 'en');
-        setRawText(
-          data.transcript_data?.map((segment: TranscriptSegment) => segment.text).join('\n') || ''
-        );
+        // Type guard to ensure transcript_data is an array
+        if (Array.isArray(data.transcript_data)) {
+          const transcriptData = data.transcript_data as TranscriptSegment[];
+          setTranscript(transcriptData);
+          setLanguage(data.language || 'en');
+          setRawText(
+            transcriptData.map((segment: TranscriptSegment) => segment.text).join('\n') || ''
+          );
+        }
       }
     } catch (error) {
       console.error('Error loading transcript:', error);
@@ -79,7 +83,7 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
         .from('lesson_transcripts')
         .upsert({
           lesson_id: lessonId,
-          transcript_data: segments,
+          transcript_data: segments as any, // Cast to any to handle JSON type
           language,
           updated_at: new Date().toISOString()
         });

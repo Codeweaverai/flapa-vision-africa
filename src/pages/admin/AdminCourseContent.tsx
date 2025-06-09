@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { CalendarIcon } from "@radix-ui/react-icons"
+import { CalendarIcon } from "lucide-react"
 import LessonTranscriptManager from '@/components/creator/LessonTranscriptManager';
 
 interface Course {
@@ -553,7 +553,7 @@ const AdminCourseContent = () => {
               <Button onClick={handleAddModule}><Plus className="h-4 w-4 mr-2" />Add Module</Button>
             </div>
           </div>
-          <Accordion type="multiple" collapsible>
+          <Accordion type="multiple">
             {modules.map((module, moduleIndex) => (
               <AccordionItem key={module.id} value={module.id}>
                 <AccordionTrigger className="text-left">
