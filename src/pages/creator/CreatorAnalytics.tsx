@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
@@ -50,6 +50,17 @@ const CreatorAnalytics = () => {
   useEffect(() => {
     if (!user) return;
     
+    // For orders
+    const ordersChannel = supabase
+      .channel('creator-analytics-orders')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          fetchAnalyticsData();
+        }
+      )
+      .subscribe();
+      
     // For enrollments
     const enrollmentsChannel = supabase
       .channel('creator-analytics-enrollments')
@@ -61,11 +72,11 @@ const CreatorAnalytics = () => {
       )
       .subscribe();
       
-    // For registrations
-    const registrationsChannel = supabase
-      .channel('creator-analytics-registrations')
+    // For event bookings
+    const bookingsChannel = supabase
+      .channel('creator-analytics-bookings')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'registrations' },
+        { event: '*', schema: 'public', table: 'event_bookings' },
         () => {
           fetchAnalyticsData();
         }
@@ -73,8 +84,9 @@ const CreatorAnalytics = () => {
       .subscribe();
     
     return () => {
+      supabase.removeChannel(ordersChannel);
       supabase.removeChannel(enrollmentsChannel);
-      supabase.removeChannel(registrationsChannel);
+      supabase.removeChannel(bookingsChannel);
     };
   }, [user]);
 
@@ -84,78 +96,105 @@ const CreatorAnalytics = () => {
       // Get date range based on selected timeframe
       const { startDate, endDate } = getDateRange(timeframe);
 
-      // Fetch course enrollments
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('course_enrollments')
+      // Fetch orders for this creator's content with completed payment status
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
         .select(`
           id,
-          enrollment_date,
-          course_id,
-          course:courses!inner(id, title, price, is_free, creator_id)
-        `)
-        .eq('course.creator_id', user?.id)
-        .gte('enrollment_date', startDate.toISOString())
-        .lte('enrollment_date', endDate.toISOString());
-
-      if (enrollmentsError) throw enrollmentsError;
-
-      // Fetch event registrations
-      const { data: registrations, error: registrationsError } = await supabase
-        .from('registrations')
-        .select(`
-          id,
+          total_amount,
           created_at,
-          event_id,
-          event:events!inner(id, title, price, is_free, creator_id)
+          payment_status,
+          order_items!inner(
+            item_type,
+            item_id,
+            item_name,
+            quantity,
+            total_price
+          )
         `)
-        .eq('event.creator_id', user?.id)
+        .eq('payment_status', 'completed')
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
 
-      if (registrationsError) throw registrationsError;
+      if (ordersError) throw ordersError;
 
-      // Calculate revenue and enrollment summaries
-      const courseRevenue = enrollments
-        ?.filter(item => !item.course.is_free)
-        .reduce((sum, item) => sum + Number(item.course.price || 0), 0) || 0;
+      // Filter orders that contain items created by this user
+      const creatorOrders = [];
+      for (const order of orders || []) {
+        const creatorItems = [];
         
-      const eventRevenue = registrations
-        ?.filter(item => !item.event.is_free)
-        .reduce((sum, item) => sum + Number(item.event.price || 0), 0) || 0;
+        for (const item of order.order_items) {
+          if (item.item_type === 'course') {
+            // Check if this course belongs to the creator
+            const { data: course } = await supabase
+              .from('courses')
+              .select('creator_id')
+              .eq('id', item.item_id)
+              .eq('creator_id', user?.id)
+              .single();
+            
+            if (course) {
+              creatorItems.push(item);
+            }
+          } else if (item.item_type === 'event_ticket') {
+            // Check if this event belongs to the creator
+            const { data: eventTicket } = await supabase
+              .from('event_tickets')
+              .select('event:events(creator_id)')
+              .eq('id', item.item_id)
+              .single();
+            
+            if (eventTicket?.event?.creator_id === user?.id) {
+              creatorItems.push(item);
+            }
+          }
+        }
         
+        if (creatorItems.length > 0) {
+          creatorOrders.push({
+            ...order,
+            order_items: creatorItems
+          });
+        }
+      }
+
+      // Calculate revenue summaries
+      let courseRevenue = 0;
+      let eventRevenue = 0;
+      let totalEnrollments = 0;
+      let courseEnrollments = 0;
+      let eventRegistrations = 0;
+
+      for (const order of creatorOrders) {
+        for (const item of order.order_items) {
+          if (item.item_type === 'course') {
+            courseRevenue += Number(item.total_price || 0);
+            courseEnrollments += item.quantity;
+          } else if (item.item_type === 'event_ticket') {
+            eventRevenue += Number(item.total_price || 0);
+            eventRegistrations += item.quantity;
+          }
+          totalEnrollments += item.quantity;
+        }
+      }
+
       const totalRevenue = courseRevenue + eventRevenue;
       
-      const last30DaysStart = subDays(new Date(), 30).toISOString();
+      // Calculate last 30 days data
+      const last30DaysStart = subDays(new Date(), 30);
+      const last30DaysOrders = creatorOrders.filter(order => 
+        new Date(order.created_at) >= last30DaysStart
+      );
       
-      // Process enrollments for last 30 days revenue
-      const last30DaysEnrollmentRevenue = (enrollments || [])
-        .filter(item => 
-          new Date(item.enrollment_date) >= new Date(last30DaysStart) && 
-          !item.course.is_free
-        )
-        .reduce((sum, item) => sum + Number(item.course.price || 0), 0);
+      let last30DaysRevenue = 0;
+      let last30DaysEnrollments = 0;
       
-      // Process registrations for last 30 days revenue
-      const last30DaysRegistrationRevenue = (registrations || [])
-        .filter(item => 
-          new Date(item.created_at) >= new Date(last30DaysStart) && 
-          !item.event.is_free
-        )
-        .reduce((sum, item) => sum + Number(item.event.price || 0), 0);
-      
-      const last30DaysRevenue = last30DaysEnrollmentRevenue + last30DaysRegistrationRevenue;
-      
-      // Count enrollments in last 30 days
-      const last30DaysEnrollmentsCount = (enrollments || [])
-        .filter(item => new Date(item.enrollment_date) >= new Date(last30DaysStart))
-        .length;
-      
-      // Count registrations in last 30 days
-      const last30DaysRegistrationsCount = (registrations || [])
-        .filter(item => new Date(item.created_at) >= new Date(last30DaysStart))
-        .length;
-      
-      const last30DaysEnrollments = last30DaysEnrollmentsCount + last30DaysRegistrationsCount;
+      for (const order of last30DaysOrders) {
+        for (const item of order.order_items) {
+          last30DaysRevenue += Number(item.total_price || 0);
+          last30DaysEnrollments += item.quantity;
+        }
+      }
       
       setRevenueSummary({
         total: totalRevenue,
@@ -165,74 +204,30 @@ const CreatorAnalytics = () => {
       });
       
       setEnrollmentSummary({
-        total: (enrollments?.length || 0) + (registrations?.length || 0),
-        courses: enrollments?.length || 0,
-        events: registrations?.length || 0,
+        total: totalEnrollments,
+        courses: courseEnrollments,
+        events: eventRegistrations,
         last30Days: last30DaysEnrollments
       });
 
       // Process revenue data by day
-      const revenueData = [];
-      
-      // Add course revenue data
-      for (const item of (enrollments || [])) {
-        if (!item.course.is_free) {
-          revenueData.push({
-            date: item.enrollment_date,
-            amount: Number(item.course.price || 0),
-            type: 'course'
-          });
-        }
-      }
-      
-      // Add event revenue data
-      for (const item of (registrations || [])) {
-        if (!item.event.is_free) {
-          revenueData.push({
-            date: item.created_at,
-            amount: Number(item.event.price || 0),
-            type: 'event'
-          });
-        }
-      }
-      
-      const revenueByDay = processDataByDay(revenueData, startDate, endDate);
+      const revenueByDay = processOrdersByDay(creatorOrders, startDate, endDate);
       setRevenueData(revenueByDay);
 
       // Process enrollment data by day
-      const enrollmentData = [];
-      
-      // Add course enrollment data
-      for (const item of (enrollments || [])) {
-        enrollmentData.push({
-          date: item.enrollment_date,
-          count: 1,
-          type: 'course'
-        });
-      }
-      
-      // Add event registration data
-      for (const item of (registrations || [])) {
-        enrollmentData.push({
-          date: item.created_at,
-          count: 1,
-          type: 'event'
-        });
-      }
-      
-      const enrollmentByDay = processDataByDay(enrollmentData, startDate, endDate);
+      const enrollmentByDay = processEnrollmentsByDay(creatorOrders, startDate, endDate);
       setEnrollmentData(enrollmentByDay);
 
       // Process course performance
-      const coursesData = processCoursePerformance(enrollments || []);
+      const coursesData = processCoursePerformanceFromOrders(creatorOrders);
       setCoursePerformance(coursesData);
       
       // Process event performance
-      const eventsData = processEventPerformance(registrations || []);
+      const eventsData = processEventPerformanceFromOrders(creatorOrders);
       setEventPerformance(eventsData);
       
       // Fetch course completion rates
-      fetchCompletionRates();
+      await fetchCompletionRates();
       
       // Mock device data (in a real app, this would come from analytics)
       setDeviceData([
@@ -306,11 +301,11 @@ const CreatorAnalytics = () => {
         startDate = subDays(endDate, 90);
         break;
       case 'thisMonth':
-        startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+        startDate = startOfMonth(endDate);
         break;
       case 'lastMonth':
-        startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 1, 1);
-        endDate.setDate(0); // Last day of previous month
+        startDate = startOfMonth(subDays(endDate, 30));
+        endDate.setTime(startOfMonth(endDate).getTime() - 1);
         break;
       case 'thisYear':
         startDate = new Date(endDate.getFullYear(), 0, 1);
@@ -322,7 +317,7 @@ const CreatorAnalytics = () => {
     return { startDate, endDate };
   };
   
-  const processDataByDay = (data: any[], startDate: Date, endDate: Date) => {
+  const processOrdersByDay = (orders: any[], startDate: Date, endDate: Date) => {
     const result: {[key: string]: any} = {};
     const currentDate = new Date(startDate);
     
@@ -338,16 +333,19 @@ const CreatorAnalytics = () => {
       currentDate.setDate(currentDate.getDate() + 1);
     }
     
-    // Aggregate data by day
-    data.forEach(item => {
-      const dateKey = format(new Date(item.date), 'yyyy-MM-dd');
+    // Aggregate revenue by day
+    orders.forEach(order => {
+      const dateKey = format(new Date(order.created_at), 'yyyy-MM-dd');
       if (result[dateKey]) {
-        if (item.type === 'course') {
-          result[dateKey].courses += (item.amount || item.count || 0);
-        } else {
-          result[dateKey].events += (item.amount || item.count || 0);
+        for (const item of order.order_items) {
+          const revenue = Number(item.total_price || 0);
+          if (item.item_type === 'course') {
+            result[dateKey].courses += revenue;
+          } else {
+            result[dateKey].events += revenue;
+          }
+          result[dateKey].total += revenue;
         }
-        result[dateKey].total += (item.amount || item.count || 0);
       }
     });
     
@@ -355,49 +353,89 @@ const CreatorAnalytics = () => {
     return Object.values(result);
   };
   
-  const processCoursePerformance = (enrollments: any[]) => {
+  const processEnrollmentsByDay = (orders: any[], startDate: Date, endDate: Date) => {
+    const result: {[key: string]: any} = {};
+    const currentDate = new Date(startDate);
+    
+    // Initialize each date in the range
+    while (currentDate <= endDate) {
+      const dateKey = format(currentDate, 'yyyy-MM-dd');
+      result[dateKey] = {
+        date: dateKey,
+        courses: 0,
+        events: 0,
+        total: 0
+      };
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Aggregate enrollments by day
+    orders.forEach(order => {
+      const dateKey = format(new Date(order.created_at), 'yyyy-MM-dd');
+      if (result[dateKey]) {
+        for (const item of order.order_items) {
+          const quantity = item.quantity || 0;
+          if (item.item_type === 'course') {
+            result[dateKey].courses += quantity;
+          } else {
+            result[dateKey].events += quantity;
+          }
+          result[dateKey].total += quantity;
+        }
+      }
+    });
+    
+    // Convert to array
+    return Object.values(result);
+  };
+  
+  const processCoursePerformanceFromOrders = (orders: any[]) => {
     const courseMap: {[key: string]: any} = {};
     
-    enrollments.forEach(enrollment => {
-      const courseId = enrollment.course.id;
-      const courseTitle = enrollment.course.title;
-      
-      if (!courseMap[courseId]) {
-        courseMap[courseId] = {
-          name: courseTitle,
-          enrollments: 0,
-          revenue: 0
-        };
-      }
-      
-      courseMap[courseId].enrollments += 1;
-      if (!enrollment.course.is_free) {
-        courseMap[courseId].revenue += Number(enrollment.course.price || 0);
-      }
+    orders.forEach(order => {
+      order.order_items.forEach((item: any) => {
+        if (item.item_type === 'course') {
+          const courseId = item.item_id;
+          const courseName = item.item_name;
+          
+          if (!courseMap[courseId]) {
+            courseMap[courseId] = {
+              name: courseName,
+              enrollments: 0,
+              revenue: 0
+            };
+          }
+          
+          courseMap[courseId].enrollments += item.quantity;
+          courseMap[courseId].revenue += Number(item.total_price || 0);
+        }
+      });
     });
     
     return Object.values(courseMap).sort((a, b) => b.enrollments - a.enrollments);
   };
   
-  const processEventPerformance = (registrations: any[]) => {
+  const processEventPerformanceFromOrders = (orders: any[]) => {
     const eventMap: {[key: string]: any} = {};
     
-    registrations.forEach(registration => {
-      const eventId = registration.event.id;
-      const eventTitle = registration.event.title;
-      
-      if (!eventMap[eventId]) {
-        eventMap[eventId] = {
-          name: eventTitle,
-          registrations: 0,
-          revenue: 0
-        };
-      }
-      
-      eventMap[eventId].registrations += 1;
-      if (!registration.event.is_free) {
-        eventMap[eventId].revenue += Number(registration.event.price || 0);
-      }
+    orders.forEach(order => {
+      order.order_items.forEach((item: any) => {
+        if (item.item_type === 'event_ticket') {
+          const eventId = item.item_id;
+          const eventName = item.item_name;
+          
+          if (!eventMap[eventId]) {
+            eventMap[eventId] = {
+              name: eventName,
+              registrations: 0,
+              revenue: 0
+            };
+          }
+          
+          eventMap[eventId].registrations += item.quantity;
+          eventMap[eventId].revenue += Number(item.total_price || 0);
+        }
+      });
     });
     
     return Object.values(eventMap).sort((a, b) => b.registrations - a.registrations);
