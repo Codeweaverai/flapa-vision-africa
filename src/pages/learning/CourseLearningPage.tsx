@@ -39,7 +39,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
   const [hasQuiz, setHasQuiz] = useState(false);
   const [hasFinalExam, setHasFinalExam] = useState(false);
   const [showFinalExamModal, setShowFinalExamModal] = useState(false);
-  const [finalExamId, setFinalExamId] = useState<string | null>(null);
+  const [finalExam, setFinalExam] = useState<any>(null);
   const [allLessonsCompleted, setAllLessonsCompleted] = useState(false);
 
   useEffect(() => {
@@ -109,7 +109,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
 
       setHasFinalExam(!!finalExamData);
       if (finalExamData) {
-        setFinalExamId(finalExamData.id);
+        setFinalExam(finalExamData);
       }
 
       // Load last viewed lesson or default to first lesson
@@ -267,25 +267,23 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
     }
   };
 
-  const handleVideoProgress = (seconds: number) => {
+  const handleVideoProgress = async (seconds: number) => {
     // Save position periodically
     setLastPosition(seconds);
     
     // Only save to database every 10 seconds to avoid too many requests
     if (Math.floor(seconds) % 10 === 0 && enrollment && currentLesson) {
-      supabase
-        .from('lesson_progress')
-        .upsert({
-          lesson_id: currentLesson.id,
-          enrollment_id: enrollment.id,
-          last_position_seconds: Math.floor(seconds),
-        }, { onConflict: 'lesson_id,enrollment_id' })
-        .then(() => {
-          // No need to show a notification for periodic updates
-        })
-        .catch((error) => {
-          console.error('Error saving progress:', error);
-        });
+      try {
+        await supabase
+          .from('lesson_progress')
+          .upsert({
+            lesson_id: currentLesson.id,
+            enrollment_id: enrollment.id,
+            last_position_seconds: Math.floor(seconds),
+          }, { onConflict: 'lesson_id,enrollment_id' });
+      } catch (error) {
+        console.error('Error saving progress:', error);
+      }
     }
   };
 
@@ -461,7 +459,6 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
                     <div className="aspect-video relative">
                       <VideoPlayer
                         src={currentLesson.video_url}
-                        startTime={lastPosition}
                         onProgress={handleVideoProgress}
                       />
                     </div>
@@ -558,7 +555,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         {/* Quiz Modal */}
         {showQuizModal && quizId && (
           <QuizModal
-            quizId={quizId}
+            quiz={{ id: quizId }}
             enrollmentId={enrollment?.id}
             onComplete={() => {
               setShowQuizModal(false);
@@ -571,10 +568,10 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         )}
 
         {/* Final Exam Modal */}
-        {showFinalExamModal && finalExamId && (
+        {showFinalExamModal && finalExam && (
           <FinalExamModal
-            examId={finalExamId}
-            courseId={courseId!}
+            isOpen={showFinalExamModal}
+            exam={finalExam}
             enrollmentId={enrollment?.id}
             onClose={() => setShowFinalExamModal(false)}
             onComplete={() => setShowFinalExamModal(false)}
