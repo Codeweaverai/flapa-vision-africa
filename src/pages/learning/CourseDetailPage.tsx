@@ -443,7 +443,7 @@ const CourseDetailPage = () => {
                   {isEnrolled ? (
                     <Button 
                       className="w-full mb-4" 
-                      onClick={() => navigate(`/learning/courses/${course.id}`)}
+                      onClick={() => navigate(`/learning/course/${course.id}`)}
                     >
                       <BookOpen className="w-4 h-4 mr-2" />
                       Continue Learning
