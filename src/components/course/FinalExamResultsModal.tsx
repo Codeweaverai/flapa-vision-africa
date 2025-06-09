@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -106,35 +107,20 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
   };
 
   const downloadCertificate = () => {
-    if (certificate?.pdf_url) {
-      // If it's a data URL, download directly
-      if (certificate.pdf_url.startsWith('data:')) {
-        const link = document.createElement('a');
-        link.href = certificate.pdf_url;
-        link.download = `${courseName.replace(/\s+/g, '_')}_Certificate.html`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('Certificate downloaded successfully!');
-      } else {
-        window.open(certificate.pdf_url, '_blank');
-      }
-    } else {
-      // Fallback to creating HTML certificate
-      const certificateHTML = createCertificateHTML();
-      const blob = new Blob([certificateHTML], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${courseName.replace(/\s+/g, '_')}_Certificate.html`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast.success('Certificate downloaded successfully!');
-    }
+    // Create a simple HTML certificate for download
+    const certificateHTML = createCertificateHTML();
+    const blob = new Blob([certificateHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${courseName.replace(/\s+/g, '_')}_Certificate.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Certificate downloaded successfully!');
   };
 
   const createCertificateHTML = () => {
@@ -303,9 +289,6 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
             <GraduationCap className="h-6 w-6 text-orange-500" />
             Final Exam Results
           </DialogTitle>
-          <DialogDescription>
-            Your final exam results and certificate information for {courseName}
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

@@ -1,11 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { launch } from "https://deno.land/x/puppeteer@16.2.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
 const supabase = createClient(
@@ -13,71 +13,358 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+const generateQRCode = (data: string): string => {
+  // Simple QR code placeholder - in production, use a proper QR code library
+  return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(data)}`;
+};
+
+const generateTicketHTML = (ticketData: any): string => {
+  const qrData = JSON.stringify({
+    ticketCode: ticketData.ticket_code,
+    eventId: ticketData.event_id,
+    bookingId: ticketData.booking_id,
+    holderName: ticketData.ticket_holder_name
+  });
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+          margin: 0;
+          padding: 20px;
+          font-family: 'Inter', sans-serif;
+          background: #f8fafc;
+        }
+        
+        .ticket {
+          width: 600px;
+          background: white;
+          border-radius: 16px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+          overflow: hidden;
+          position: relative;
+        }
+        
+        .ticket::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 6px;
+          background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+        }
+        
+        .header {
+          background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+          color: white;
+          padding: 24px;
+          text-align: center;
+        }
+        
+        .event-title {
+          font-size: 24px;
+          font-weight: 700;
+          margin: 0 0 8px 0;
+        }
+        
+        .event-date {
+          font-size: 16px;
+          opacity: 0.9;
+          margin: 0;
+        }
+        
+        .content {
+          padding: 24px;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 24px;
+          align-items: center;
+        }
+        
+        .ticket-info {
+          display: grid;
+          gap: 16px;
+        }
+        
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .info-label {
+          font-size: 14px;
+          color: #64748b;
+          font-weight: 500;
+        }
+        
+        .info-value {
+          font-size: 16px;
+          color: #1e293b;
+          font-weight: 600;
+        }
+        
+        .qr-section {
+          text-align: center;
+        }
+        
+        .qr-code {
+          width: 120px;
+          height: 120px;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+        }
+        
+        .ticket-code {
+          font-size: 12px;
+          color: #64748b;
+          margin-top: 8px;
+          font-family: monospace;
+        }
+        
+        .footer {
+          background: #f8fafc;
+          padding: 16px 24px;
+          text-align: center;
+          font-size: 12px;
+          color: #64748b;
+          border-top: 1px solid #e2e8f0;
+        }
+        
+        .perforation {
+          position: relative;
+        }
+        
+        .perforation::before {
+          content: '';
+          position: absolute;
+          top: -1px;
+          left: 24px;
+          right: 24px;
+          height: 2px;
+          background: repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 8px,
+            #cbd5e1 8px,
+            #cbd5e1 12px
+          );
+        }
+      </style>
+    </head>
+    <body>
+      <div class="ticket">
+        <div class="header">
+          <h1 class="event-title">${ticketData.event_title}</h1>
+          <p class="event-date">${new Date(ticketData.event_start_time).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+        </div>
+        
+        <div class="content">
+          <div class="ticket-info">
+            <div class="info-row">
+              <span class="info-label">Ticket Holder</span>
+              <span class="info-value">${ticketData.ticket_holder_name}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="info-label">Venue</span>
+              <span class="info-value">${ticketData.event_location || 'Online Event'}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="info-label">Ticket Type</span>
+              <span class="info-value">${ticketData.ticket_type_name}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="info-label">Seat/Reference</span>
+              <span class="info-value">${ticketData.ticket_code}</span>
+            </div>
+          </div>
+          
+          <div class="qr-section">
+            <img src="${generateQRCode(qrData)}" alt="QR Code" class="qr-code" />
+            <div class="ticket-code">${ticketData.ticket_code}</div>
+          </div>
+        </div>
+        
+        <div class="footer perforation">
+          <p>Present this ticket at the venue entrance. Keep your ticket until the end of the event.</p>
+          <p>For questions, contact support@skillpulse.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { ticketId } = await req.json();
+    const { sessionId, bookingId } = await req.json();
 
-    console.log('Processing ticket generation for:', { ticketId });
+    let bookings = [];
 
-    // Get ticket details
-    const { data: ticket, error: ticketError } = await supabase
-      .from('generated_tickets')
-      .select(`
-        *,
-        event_bookings!inner(
-          user_id,
-          events!inner(
-            title,
-            start_time,
-            end_time,
-            location,
-            image_url
+    if (bookingId) {
+      // Generate ticket for specific booking
+      const { data, error } = await supabase
+        .from('generated_tickets')
+        .select(`
+          *,
+          event_bookings!inner(
+            id,
+            event_id,
+            user_id,
+            events!inner(title, start_time, location),
+            event_tickets!inner(name)
           )
-        )
-      `)
-      .eq('id', ticketId)
-      .single();
+        `)
+        .eq('booking_id', bookingId);
 
-    if (ticketError || !ticket) {
-      console.error('Ticket not found:', ticketError);
-      throw new Error('Ticket not found');
+      if (error) throw error;
+      bookings = data || [];
+    } else if (sessionId) {
+      // Find bookings from session
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('stripe_session_id', sessionId);
+
+      if (orders && orders.length > 0) {
+        const orderIds = orders.map(o => o.id);
+        
+        const { data, error } = await supabase
+          .from('generated_tickets')
+          .select(`
+            *,
+            event_bookings!inner(
+              id,
+              event_id,
+              user_id,
+              order_id,
+              events!inner(title, start_time, location),
+              event_tickets!inner(name)
+            )
+          `)
+          .in('event_bookings.order_id', orderIds);
+
+        if (error) throw error;
+        bookings = data || [];
+      }
     }
 
-    // Generate HTML ticket
-    const ticketHTML = createTicketHTML(ticket);
-
-    // Generate PDF using HTML data URL (placeholder for PDF service)
-    const pdfDataUrl = await generateTicketPDFFromHTML(ticketHTML);
-
-    // Update ticket record with PDF URL
-    const { error: updateError } = await supabase
-      .from('generated_tickets')
-      .update({ 
-        pdf_url: pdfDataUrl
-      })
-      .eq('id', ticketId);
-
-    if (updateError) {
-      console.error('Failed to update ticket record:', updateError);
+    if (bookings.length === 0) {
+      return new Response(JSON.stringify({ message: 'No tickets to generate' }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
+
+    const browser = await launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const results = [];
+
+    for (const ticket of bookings) {
+      try {
+        const ticketData = {
+          ticket_code: ticket.ticket_code,
+          ticket_holder_name: ticket.ticket_holder_name,
+          event_title: ticket.event_bookings.events.title,
+          event_start_time: ticket.event_bookings.events.start_time,
+          event_location: ticket.event_bookings.events.location,
+          ticket_type_name: ticket.event_bookings.event_tickets.name,
+          event_id: ticket.event_bookings.event_id,
+          booking_id: ticket.booking_id
+        };
+
+        const ticketHTML = generateTicketHTML(ticketData);
+        
+        const page = await browser.newPage();
+        await page.setContent(ticketHTML);
+        
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' }
+        });
+        
+        await page.close();
+
+        // Upload to storage
+        const fileName = `ticket_${ticket.id}_${Date.now()}.pdf`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('tickets')
+          .upload(fileName, pdfBuffer, {
+            contentType: 'application/pdf'
+          });
+
+        if (uploadError) {
+          console.error('Upload error for ticket:', ticket.id, uploadError);
+          continue;
+        }
+
+        // Get signed URL (valid for 1 year)
+        const { data: urlData } = await supabase.storage
+          .from('tickets')
+          .createSignedUrl(fileName, 31536000); // 1 year
+
+        // Update ticket record
+        const { error: updateError } = await supabase
+          .from('generated_tickets')
+          .update({
+            pdf_url: urlData?.signedUrl,
+            pdf_storage_path: fileName
+          })
+          .eq('id', ticket.id);
+
+        if (updateError) {
+          console.error('Update error for ticket:', ticket.id, updateError);
+        } else {
+          results.push({
+            ticketId: ticket.id,
+            ticketCode: ticket.ticket_code,
+            pdfUrl: urlData?.signedUrl
+          });
+        }
+
+      } catch (error) {
+        console.error('Error processing ticket:', ticket.id, error);
+      }
+    }
+
+    await browser.close();
 
     return new Response(JSON.stringify({ 
       success: true, 
-      ticketUrl: pdfDataUrl
+      ticketsGenerated: results.length,
+      tickets: results
     }), {
       status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
 
   } catch (error: any) {
-    console.error("Error generating ticket:", error);
+    console.error("Error generating tickets:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
@@ -87,253 +374,5 @@ const handler = async (req: Request): Promise<Response> => {
     );
   }
 };
-
-async function generateTicketPDFFromHTML(html: string): Promise<string> {
-  // For now, return HTML data URL since we can't use Puppeteer in Deno Deploy
-  // In production, you'd want to use a PDF service
-  const htmlDataUrl = `data:text/html;base64,${btoa(html)}`;
-  return htmlDataUrl;
-}
-
-function createTicketHTML(ticket: any): string {
-  const event = ticket.event_bookings.events;
-  const eventDate = new Date(event.start_time).toLocaleDateString();
-  const eventTime = new Date(event.start_time).toLocaleTimeString();
-  
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Event Ticket</title>
-      <style>
-        @page {
-          size: A4 portrait;
-          margin: 20px;
-        }
-        
-        body {
-          font-family: 'Arial', sans-serif;
-          margin: 0;
-          padding: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        
-        .ticket {
-          background: white;
-          border-radius: 20px;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-          max-width: 400px;
-          width: 100%;
-          overflow: hidden;
-          position: relative;
-        }
-        
-        .ticket::before {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: -10px;
-          width: 20px;
-          height: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          border-radius: 50%;
-          transform: translateY(-50%);
-        }
-        
-        .ticket::after {
-          content: '';
-          position: absolute;
-          top: 50%;
-          right: -10px;
-          width: 20px;
-          height: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          border-radius: 50%;
-          transform: translateY(-50%);
-        }
-        
-        .ticket-header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 30px 20px;
-          text-align: center;
-        }
-        
-        .ticket-title {
-          font-size: 1.5rem;
-          font-weight: bold;
-          margin-bottom: 10px;
-        }
-        
-        .ticket-subtitle {
-          font-size: 0.9rem;
-          opacity: 0.9;
-        }
-        
-        .ticket-body {
-          padding: 30px 20px;
-        }
-        
-        .event-image {
-          width: 100%;
-          height: 150px;
-          object-fit: cover;
-          border-radius: 10px;
-          margin-bottom: 20px;
-        }
-        
-        .event-title {
-          font-size: 1.3rem;
-          font-weight: bold;
-          color: #333;
-          margin-bottom: 15px;
-          text-align: center;
-        }
-        
-        .event-details {
-          space-y: 10px;
-        }
-        
-        .detail-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 0;
-          border-bottom: 1px solid #eee;
-        }
-        
-        .detail-label {
-          font-weight: 600;
-          color: #666;
-          font-size: 0.9rem;
-        }
-        
-        .detail-value {
-          color: #333;
-          font-size: 0.9rem;
-        }
-        
-        .ticket-code {
-          background: #f8f9fa;
-          padding: 15px;
-          border-radius: 10px;
-          text-align: center;
-          margin: 20px 0;
-          border: 2px dashed #667eea;
-        }
-        
-        .code-label {
-          font-size: 0.8rem;
-          color: #666;
-          margin-bottom: 5px;
-        }
-        
-        .code-value {
-          font-family: 'Courier New', monospace;
-          font-size: 1.1rem;
-          font-weight: bold;
-          color: #667eea;
-        }
-        
-        .qr-section {
-          text-align: center;
-          margin: 20px 0;
-        }
-        
-        .qr-code {
-          width: 120px;
-          height: 120px;
-          border: 2px solid #eee;
-          border-radius: 10px;
-          margin: 0 auto;
-          display: block;
-        }
-        
-        .instructions {
-          background: #fff3cd;
-          border: 1px solid #ffeaa7;
-          border-radius: 8px;
-          padding: 15px;
-          margin-top: 20px;
-        }
-        
-        .instructions-title {
-          font-weight: bold;
-          color: #856404;
-          margin-bottom: 5px;
-          font-size: 0.9rem;
-        }
-        
-        .instructions-text {
-          color: #856404;
-          font-size: 0.8rem;
-          line-height: 1.4;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="ticket">
-        <div class="ticket-header">
-          <div class="ticket-title">🎫 Event Ticket</div>
-          <div class="ticket-subtitle">Admit One</div>
-        </div>
-        
-        <div class="ticket-body">
-          ${event.image_url ? `<img src="${event.image_url}" alt="${event.title}" class="event-image">` : ''}
-          
-          <div class="event-title">${event.title}</div>
-          
-          <div class="event-details">
-            <div class="detail-row">
-              <span class="detail-label">📅 Date:</span>
-              <span class="detail-value">${eventDate}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">🕐 Time:</span>
-              <span class="detail-value">${eventTime}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">📍 Location:</span>
-              <span class="detail-value">${event.location || 'TBA'}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">🎫 Holder:</span>
-              <span class="detail-value">${ticket.ticket_holder_name}</span>
-            </div>
-          </div>
-          
-          <div class="ticket-code">
-            <div class="code-label">Ticket Code</div>
-            <div class="code-value">${ticket.ticket_code}</div>
-          </div>
-          
-          <div class="qr-section">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(ticket.qr_code_data)}" 
-                 alt="QR Code" class="qr-code">
-            <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">
-              Present this QR code at the event entrance
-            </p>
-          </div>
-          
-          <div class="instructions">
-            <div class="instructions-title">Important Instructions:</div>
-            <div class="instructions-text">
-              • Please arrive 30 minutes before the event starts<br>
-              • Keep this ticket safe - it's your proof of entry<br>
-              • No refunds or exchanges allowed<br>
-              • Contact support if you have any issues
-            </div>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
 
 serve(handler);
