@@ -439,6 +439,12 @@ const AccountPage = () => {
                     </a>
                   </Button>
                   <Button variant="outline" className="w-full justify-start" asChild>
+                    <a href="/course-results">
+                      My Course Results
+                      <ChevronRight className="h-4 w-4 ml-auto" />
+                    </a>
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start" asChild>
                     <a href="/community">
                       Community
                       <ChevronRight className="h-4 w-4 ml-auto" />
