@@ -191,15 +191,17 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         .eq('enrollment_id', enrollment.id)
         .maybeSingle();
 
+      const progressData = {
+        is_completed: true,
+        completion_date: new Date().toISOString(),
+        last_position_seconds: Math.floor(lastPosition)
+      };
+
       if (existingProgress) {
         // Update existing record
         await supabase
           .from('lesson_progress')
-          .update({
-            is_completed: true,
-            completion_date: new Date().toISOString(),
-            last_position_seconds: Math.floor(lastPosition)
-          })
+          .update(progressData)
           .eq('id', existingProgress.id);
       } else {
         // Create new record
@@ -207,9 +209,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
           {
             lesson_id: currentLesson.id,
             enrollment_id: enrollment.id,
-            is_completed: true,
-            completion_date: new Date().toISOString(),
-            last_position_seconds: Math.floor(lastPosition)
+            ...progressData
           }
         ]);
       }
@@ -460,7 +460,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
                   {currentLesson.video_url && (
                     <div className="aspect-video relative">
                       <VideoPlayer
-                        videoUrl={currentLesson.video_url}
+                        src={currentLesson.video_url}
                         startTime={lastPosition}
                         onProgress={handleVideoProgress}
                       />
@@ -558,26 +558,26 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         {/* Quiz Modal */}
         {showQuizModal && quizId && (
           <QuizModal
-            open={showQuizModal}
-            onOpenChange={setShowQuizModal}
             quizId={quizId}
             enrollmentId={enrollment?.id}
             onComplete={() => {
+              setShowQuizModal(false);
               if (!isCompleted) {
                 markLessonComplete();
               }
             }}
+            onClose={() => setShowQuizModal(false)}
           />
         )}
 
         {/* Final Exam Modal */}
         {showFinalExamModal && finalExamId && (
           <FinalExamModal
-            open={showFinalExamModal}
-            onOpenChange={setShowFinalExamModal}
             examId={finalExamId}
             courseId={courseId!}
             enrollmentId={enrollment?.id}
+            onClose={() => setShowFinalExamModal(false)}
+            onComplete={() => setShowFinalExamModal(false)}
           />
         )}
       </div>
