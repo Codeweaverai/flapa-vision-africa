@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import Layout from '@/components/layout/Layout';
-import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
+import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -267,11 +268,64 @@ const CourseDetailPage = () => {
 
       setIsEnrolled(true);
       toast.success('Successfully enrolled in the course!');
+      
+      // If free course, redirect to learning page immediately
+      if (course.is_free) {
+        navigate(`/learning/course/${courseId}`);
+      }
     } catch (error) {
       console.error('Enrollment error:', error);
       toast.error('Failed to enroll in the course');
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!course) return;
+
+    if (!user) {
+      // Store course in session storage for anonymous users
+      const sessionId = Math.random().toString(36).substring(7);
+      localStorage.setItem('session_id', sessionId);
+    }
+
+    try {
+      const { error } = await supabase
+        .from('carts')
+        .insert([{
+          user_id: user?.id || null,
+          session_id: user ? null : localStorage.getItem('session_id'),
+          item_type: 'course',
+          item_id: course.id,
+          price: course.price,
+          quantity: 1
+        }]);
+
+      if (error) throw error;
+
+      toast.success('Course added to cart!');
+    } catch (error) {
+      console.error('Add to cart error:', error);
+      toast.error('Failed to add course to cart');
+    }
+  };
+
+  const handleEnrollNow = async () => {
+    if (!user) {
+      toast.error('Please log in to enroll in courses');
+      navigate('/auth', { state: { from: `/courses/${courseId}` } });
+      return;
+    }
+
+    if (!course) return;
+
+    if (course.is_free) {
+      await handleEnroll();
+    } else {
+      // Add to cart and redirect to checkout
+      await handleAddToCart();
+      navigate('/checkout');
     }
   };
 
@@ -453,9 +507,9 @@ const CourseDetailPage = () => {
                       <Button 
                         className="w-full" 
                         onClick={handleEnrollNow}
-                        disabled={enrollmentLoading}
+                        disabled={enrolling}
                       >
-                        {enrollmentLoading ? (
+                        {enrolling ? (
                           'Enrolling...'
                         ) : course.is_free ? (
                           'Enroll for Free'
@@ -684,7 +738,7 @@ const CourseDetailPage = () => {
                           </p>
                           
                           <div className="flex gap-4">
-                            <Link to={`/creator/profile/${user.id}`}>
+                            <Link to={`/creator/profile/${creator.id}`}>
                             <Button variant="outline" size="sm">
                               <Globe className="h-4 w-4 mr-2" />
                               View Profile

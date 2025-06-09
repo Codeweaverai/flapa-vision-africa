@@ -21,6 +21,7 @@ import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
 import LessonFormDialog from '@/components/admin/LessonFormDialog';
 import QuizFormDialog from '@/components/admin/QuizFormDialog';
 import FinalExamFormDialog from '@/components/admin/FinalExamFormDialog';
+import LessonTranscriptManager from '@/components/creator/LessonTranscriptManager';
 import { supabase } from '@/lib/supabaseClient';
 
 interface FinalExam {
@@ -305,6 +306,117 @@ const CreatorCourseContent = () => {
     });
   };
 
+  // Enhanced ModuleAccordion component that includes transcript managers
+  const EnhancedModuleAccordion = ({ modules }: { modules: CourseModule[] }) => {
+    return (
+      <div className="space-y-4">
+        {modules.map((module, moduleIndex) => (
+          <Card key={module.id} className="border border-gray-200">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-lg">{module.title}</CardTitle>
+                  {module.description && (
+                    <CardDescription>{module.description}</CardDescription>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditModule(module)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteModule(module.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddLesson(module.id)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Lesson
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {module.lessons && module.lessons.length > 0 ? (
+                <div className="space-y-3">
+                  {module.lessons.map((lesson, lessonIndex) => (
+                    <div key={lesson.id} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-medium">{lesson.title}</h4>
+                          {lesson.description && (
+                            <p className="text-sm text-gray-600">{lesson.description}</p>
+                          )}
+                          <Badge variant="outline" className="mt-1">
+                            {lesson.content_type}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditLesson(lesson)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteLesson(lesson.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAddQuiz(lesson.id, module.id)}
+                          >
+                            Add Quiz
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Add LessonTranscriptManager for video lessons */}
+                      {lesson.content_type === 'video' && lesson.video_url && (
+                        <LessonTranscriptManager 
+                          lessonId={lesson.id} 
+                          lessonTitle={lesson.title}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No lessons in this module yet.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddLesson(module.id)}
+                    className="mt-2"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Lesson
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <CreatorLayout title="Course Content">
@@ -388,17 +500,7 @@ const CreatorCourseContent = () => {
                   </Button>
                 </div>
               ) : (
-                <ModuleAccordion
-                  modules={modules}
-                  onEditModule={handleEditModule}
-                  onDeleteModule={handleDeleteModule}
-                  onAddLesson={handleAddLesson}
-                  onEditLesson={handleEditLesson}
-                  onDeleteLesson={handleDeleteLesson}
-                  onAddQuiz={handleAddQuiz}
-                  onMoveUp={handleMoveModuleUp}
-                  onMoveDown={handleMoveModuleDown}
-                />
+                <EnhancedModuleAccordion modules={modules} />
               )}
             </CardContent>
           </Card>
