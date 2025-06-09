@@ -8,13 +8,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import Layout from '@/components/layout/Layout';
-import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
+import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
-import CourseEnrollmentButton from '@/components/payment/CourseEnrollmentButton';
+import { useCart } from '@/contexts/CartContext';
 
 interface Course {
   id: string;
@@ -83,6 +83,8 @@ const CourseDetailPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { addToCart } = useCart();
+  
   const [course, setCourse] = useState<Course | null>(null);
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -90,6 +92,7 @@ const CourseDetailPage = () => {
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [courseStats, setCourseStats] = useState<any>(null);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const faqs = [
     {
@@ -276,6 +279,64 @@ const CourseDetailPage = () => {
     }
   };
 
+  const handleDirectEnrollment = async () => {
+    if (!user) {
+      toast.error('Please log in to enroll in courses');
+      navigate('/auth', { state: { from: `/courses/${courseId}` } });
+      return;
+    }
+    
+    if (!course) return;
+    
+    if (course.is_free) {
+      // Direct enrollment for free courses
+      setEnrolling(true);
+      try {
+        const { error } = await supabase
+          .from('course_enrollments')
+          .insert([{
+            user_id: user.id,
+            course_id: course.id,
+            payment_status: 'completed'
+          }]);
+
+        if (error) throw error;
+
+        setIsEnrolled(true);
+        toast.success('Successfully enrolled in the course!');
+      } catch (error) {
+        console.error('Enrollment error:', error);
+        toast.error('Failed to enroll in the course');
+      } finally {
+        setEnrolling(false);
+      }
+    } else {
+      // For paid courses, redirect to checkout
+      navigate('/checkout');
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!course || course.is_free) return;
+    
+    setIsAddingToCart(true);
+    try {
+      await addToCart({
+        id: course.id,
+        name: course.title,
+        price: course.price || 0,
+        type: 'course',
+        quantity: 1
+      });
+      toast.success('Course added to cart!');
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add course to cart');
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
   const startCourse = () => {
     navigate(`/learning/course/${courseId}`);
   };
@@ -428,7 +489,7 @@ const CourseDetailPage = () => {
                 </div>
               </div>
               
-              {/* Enrollment Card */}
+              {/* Updated Enrollment Card */}
               <div className="lg:col-span-1">
                 <Card className="sticky top-24 bg-white/80 backdrop-blur-sm border-purple-200 shadow-xl">
                   <CardContent className="p-6">
@@ -454,14 +515,28 @@ const CourseDetailPage = () => {
                         </div>
                       </>
                     ) : (
-                      <Button
-                        className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={handleEnroll}
-                        disabled={enrolling}
-                        size="lg"
-                      >
-                        {enrolling ? 'Enrolling...' : 'Enroll Now'}
-                      </Button>
+                      <div className="space-y-3">
+                        <Button
+                          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                          onClick={handleDirectEnrollment}
+                          disabled={enrolling}
+                          size="lg"
+                        >
+                          {enrolling ? 'Enrolling...' : course.is_free ? 'Enroll Now' : 'Buy Now'}
+                        </Button>
+                        
+                        {!course.is_free && (
+                          <Button
+                            variant="outline"
+                            className="w-full border-purple-200 text-purple-600 hover:bg-purple-50"
+                            onClick={handleAddToCart}
+                            disabled={isAddingToCart}
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+                          </Button>
+                        )}
+                      </div>
                     )}
                     
                     <Button variant="outline" className="w-full mb-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>

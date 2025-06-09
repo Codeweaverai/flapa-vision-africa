@@ -715,6 +715,65 @@ const CourseLearningPage = () => {
   
   const { previous: previousLesson, next: nextLesson } = findAdjacentLessons();
   
+  const renderLessonContent = () => {
+    if (!currentLesson) return null;
+
+    return (
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        <Tabs defaultValue="content" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="transcript">Transcript</TabsTrigger>
+            <TabsTrigger value="notes">Notes</TabsTrigger>
+            <TabsTrigger value="discussion">Discussion</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="content" className="p-0">
+            <div className="aspect-video bg-black">
+              {currentLesson.video_url ? (
+                <ReactPlayer
+                  url={currentLesson.video_url}
+                  width="100%"
+                  height="100%"
+                  controls
+                  className="rounded-t-lg overflow-hidden"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-200 to-purple-200">
+                  <div className="text-center">
+                    <PlayCircle className="h-16 w-16 mx-auto mb-4 text-white/60" />
+                    <p className="text-white/80 font-medium">No video available for this lesson</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="transcript" className="p-6">
+            <VideoTranscripts 
+              lessonId={currentLesson.id}
+              onSeekTo={(time) => {
+                // Implement video seeking functionality
+                console.log('Seek to time:', time);
+              }}
+            />
+          </TabsContent>
+          
+          <TabsContent value="notes" className="p-6">
+            <LessonNotesTab 
+              lessonId={currentLesson.id || ''} 
+              currentVideoTime={0}
+            />
+          </TabsContent>
+          
+          <TabsContent value="discussion" className="p-6">
+            <LessonDiscussion lessonId={currentLesson.id} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -1080,127 +1139,7 @@ const CourseLearningPage = () => {
                     </div>
 
                     <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
-                      <div className="aspect-video bg-black">
-                        {currentLesson.video_url ? (
-                          <ReactPlayer
-                            url={currentLesson.video_url}
-                            width="100%"
-                            height="100%"
-                            controls
-                            className="rounded-t-lg overflow-hidden"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-200 to-purple-200">
-                            <div className="text-center">
-                              <PlayCircle className="h-16 w-16 mx-auto mb-4 text-white/60" />
-                              <p className="text-white/80 font-medium">No video available for this lesson</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <CardHeader className="bg-gradient-to-r from-orange-50 to-purple-50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-2xl text-gray-800">{currentLesson.title}</CardTitle>
-                            {currentModule && (
-                              <Badge variant="secondary" className="mt-2">
-                                {currentModule.title}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">5 min</span>
-                          </div>
-                        </div>
-                        {currentLesson.description && (
-                          <CardDescription className="text-gray-600 text-base mt-2">
-                            {currentLesson.description}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                      
-                      <CardContent className="p-6">
-                        <Tabs defaultValue="lesson-notes" className="w-full">
-                          <TabsList className="grid w-full grid-cols-4 bg-gray-100">
-                            <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
-                              <StickyNote className="h-4 w-4" />
-                              Lesson Notes
-                            </TabsTrigger>
-                            <TabsTrigger value="transcripts" className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              Video Transcripts
-                            </TabsTrigger>
-                            <TabsTrigger value="discussion" className="flex items-center gap-2">
-                              <MessageSquare className="h-4 w-4" />
-                              Discussion
-                            </TabsTrigger>
-                            <TabsTrigger value="materials" className="flex items-center gap-2">
-                              <BookOpen className="h-4 w-4" />
-                              Course Resource Materials
-                            </TabsTrigger>
-                          </TabsList>
-                          
-                          <TabsContent value="lesson-notes" className="mt-6">
-                            <LessonNotesTab 
-                              lessonId={currentLesson.id || ''} 
-                              currentVideoTime={0}
-                            />
-                          </TabsContent>
-                          
-                          <TabsContent value="transcripts" className="mt-6">
-                            {currentLesson ? (
-                              <VideoTranscripts 
-                                lessonId={currentLesson.id}
-                                currentVideoTime={0}
-                                onTimeSeek={(time) => {
-                                  // This would integrate with video player to seek to specific time
-                                  console.log('Seeking to time:', time);
-                                }}
-                              />
-                            ) : (
-                              <Card>
-                                <CardContent className="text-center py-8">
-                                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                  <p className="text-gray-500">Select a lesson to view transcripts</p>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </TabsContent>
-                          
-                          <TabsContent value="discussion" className="mt-6">
-                            <LessonDiscussion lessonId={currentLesson.id} />
-                          </TabsContent>
-                          
-                          <TabsContent value="materials" className="mt-6">
-                            {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 ? (
-                              <div className="space-y-3">
-                                {currentLesson.materials_urls.map((url: string, idx: number) => (
-                                  <Card key={idx} className="p-4 hover:shadow-md transition-shadow">
-                                    <div className="flex items-center gap-3">
-                                      <FileText className="h-5 w-5 text-purple-600" />
-                                      <a 
-                                        href={url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
-                                      >
-                                        Course Resource Material {idx + 1}
-                                      </a>
-                                    </div>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-8">
-                                <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                <p className="text-gray-500">No additional materials for this lesson.</p>
-                              </div>
-                            )}
-                          </TabsContent>
-                        </Tabs>
-                      </CardContent>
+                      {renderLessonContent()}
                     </Card>
                   </div>
                 ) : (
