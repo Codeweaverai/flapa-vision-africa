@@ -1,656 +1,522 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'sonner';
-import CreatorLayout from '@/components/creator/CreatorLayout';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Book, ArrowLeft, Plus, GraduationCap, Edit, Trash2, Eye, FileText } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  Course, 
-  CourseModule, 
-  Lesson, 
-  deleteModule, 
-  deleteLesson, 
-  fetchCourseWithModulesAndLessons,
-  updateModuleOrder
-} from '@/services/courseService';
-import ModuleAccordion from '@/components/admin/ModuleAccordion';
-import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
-import LessonFormDialog from '@/components/admin/LessonFormDialog';
-import QuizFormDialog from '@/components/admin/QuizFormDialog';
-import FinalExamFormDialog from '@/components/admin/FinalExamFormDialog';
-import LessonTranscriptDialog from '@/components/creator/LessonTranscriptDialog';
+  Plus, 
+  Edit, 
+  Trash2, 
+  GripVertical, 
+  BookOpen, 
+  Play, 
+  Award,
+  FileText,
+  Upload
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
+import CreatorLayout from '@/components/creator/CreatorLayout';
+import LessonTranscriptManager from '@/components/creator/LessonTranscriptManager';
 
-interface FinalExam {
+interface Course {
   id: string;
   title: string;
   description: string;
-  time_limit_minutes: number;
-  passing_score: number;
+  summary: string;
+  price: number;
+  is_free: boolean;
+  difficulty_level: string;
+  duration_minutes: number;
+  thumbnail_url?: string;
+  category: string;
+  tags?: string[];
   is_published: boolean;
-  question_count?: number;
+  certificate_enabled: boolean;
+  creator_id: string;
+  created_at: string;
+  updated_at: string;
+  course_modules?: CourseModule[];
+  course_learning_outcomes?: LearningOutcome[];
+}
+
+interface CourseModule {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  lessons?: Lesson[];
+  quizzes?: Quiz[];
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  video_url?: string;
+  content_type: string;
+}
+
+interface Quiz {
+  id: string;
+  title: string;
+  description?: string;
+  passing_score: number;
+}
+
+interface LearningOutcome {
+  id: string;
+  outcome: string;
+  order_index: number;
 }
 
 const CreatorCourseContent = () => {
+  const { id: courseId } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const [loading, setLoading] = useState(true);
-  const [course, setCourse] = useState<Course | null>(null);
-  const [modules, setModules] = useState<CourseModule[]>([]);
-  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
 
-  // Dialog states
-  const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
-  const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
-  const [quizDialogOpen, setQuizDialogOpen] = useState(false);
-  const [finalExamDialogOpen, setFinalExamDialogOpen] = useState(false);
-  const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
-  
-  // Selected items for editing
-  const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
-  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
-  const [editingFinalExam, setEditingFinalExam] = useState<FinalExam | null>(null);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [modules, setModules] = useState<CourseModule[]>([]);
+  const [outcomes, setOutcomes] = useState<LearningOutcome[]>([]);
+
+  const [newModuleTitle, setNewModuleTitle] = useState('');
+  const [newModuleDescription, setNewModuleDescription] = useState('');
+  const [isModuleDialogOpen, setIsModuleDialogOpen] = useState(false);
+
+  const [newLessonTitle, setNewLessonTitle] = useState('');
+  const [newLessonDescription, setNewLessonDescription] = useState('');
+  const [newLessonContentType, setNewLessonContentType] = useState('video');
+  const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
+  const [isLessonCreateDialogOpen, setIsLessonCreateDialogOpen] = useState(false);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+
+  const [newOutcomeText, setNewOutcomeText] = useState('');
+  const [isOutcomeDialogOpen, setIsOutcomeDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (!id) {
-      navigate('/creator/courses');
-      return;
-    }
+    const loadCourse = async () => {
+      if (!courseId) return;
 
-    const loadCourseData = async () => {
       setLoading(true);
       try {
-        const courseData = await fetchCourseWithModulesAndLessons(id);
-        if (courseData) {
-          setCourse(courseData);
-          setModules(courseData.modules || []);
-          await loadFinalExam(id);
-        } else {
-          toast.error('Course not found');
-          navigate('/creator/courses');
-        }
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select(`
+            *,
+            course_modules (
+              *,
+              lessons (*)
+            ),
+            course_learning_outcomes (*)
+          `)
+          .eq('id', courseId)
+          .single();
+
+        if (courseError) throw courseError;
+
+        setCourse(courseData);
+        setModules(courseData?.course_modules || []);
+        setOutcomes(courseData?.course_learning_outcomes || []);
       } catch (error) {
-        console.error('Error loading course content:', error);
-        toast.error('Failed to load course content');
+        console.error('Error loading course:', error);
+        toast.error('Failed to load course details');
       } finally {
         setLoading(false);
       }
     };
 
-    loadCourseData();
-  }, [id, navigate]);
+    loadCourse();
+  }, [courseId]);
 
-  const loadFinalExam = async (courseId: string) => {
+  const handleCreateModule = async () => {
+    if (!courseId || !newModuleTitle) return;
+
     try {
-      const { data: examData, error } = await supabase
-        .from('final_exams')
-        .select(`
-          *,
-          final_exam_questions(count)
-        `)
-        .eq('course_id', courseId)
+      const { data, error } = await supabase
+        .from('course_modules')
+        .insert({
+          course_id: courseId,
+          title: newModuleTitle,
+          description: newModuleDescription,
+          order_index: modules.length + 1
+        })
+        .select('*')
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      if (error) throw error;
 
-      if (examData) {
-        setFinalExam({
-          ...examData,
-          question_count: examData.final_exam_questions?.[0]?.count || 0
-        });
-      }
+      setModules([...modules, data]);
+      setNewModuleTitle('');
+      setNewModuleDescription('');
+      setIsModuleDialogOpen(false);
+      toast.success('Module created successfully');
     } catch (error) {
-      console.error('Error loading final exam:', error);
+      console.error('Error creating module:', error);
+      toast.error('Failed to create module');
     }
   };
 
-  // Module handlers
-  const handleAddModule = () => {
-    setEditingModule(null);
-    setModuleDialogOpen(true);
-  };
+  const handleCreateLesson = async () => {
+    if (!selectedModuleId || !newLessonTitle) return;
 
-  const handleEditModule = (module: CourseModule) => {
-    setEditingModule(module);
-    setModuleDialogOpen(true);
-  };
-
-  const handleModuleSaved = (moduleData: CourseModule) => {
-    if (editingModule) {
-      setModules(prevModules =>
-        prevModules.map(m => (m.id === moduleData.id ? moduleData : m))
-      );
-    } else {
-      setModules(prevModules => [...prevModules, moduleData]);
-    }
-    setModuleDialogOpen(false);
-  };
-
-  const handleDeleteModule = async (moduleId: string) => {
     try {
-      const success = await deleteModule(moduleId);
-      if (success) {
-        setModules(prevModules => prevModules.filter(m => m.id !== moduleId));
-        toast.success('Module deleted successfully');
-      } else {
-        toast.error('Failed to delete module');
-      }
-    } catch (error) {
-      console.error('Error deleting module:', error);
-      toast.error('Error deleting module');
-    }
-  };
+      const { data, error } = await supabase
+        .from('lessons')
+        .insert({
+          module_id: selectedModuleId,
+          title: newLessonTitle,
+          description: newLessonDescription,
+          content_type: newLessonContentType,
+          video_url: newLessonVideoUrl,
+          order_index: modules.find(m => m.id === selectedModuleId)?.lessons?.length || 0
+        })
+        .select('*')
+        .single();
 
-  // Lesson handlers
-  const handleAddLesson = (moduleId: string) => {
-    setEditingLesson(null);
-    setSelectedModuleId(moduleId);
-    setLessonDialogOpen(true);
-  };
+      if (error) throw error;
 
-  const handleEditLesson = (lesson: Lesson) => {
-    setEditingLesson(lesson);
-    setSelectedModuleId(lesson.module_id);
-    setLessonDialogOpen(true);
-  };
-
-  const handleLessonSaved = (lessonData: Lesson) => {
-    setModules(prevModules =>
-      prevModules.map(module => {
-        if (module.id === lessonData.module_id) {
-          const existingLessonIndex = module.lessons.findIndex(
-            l => l.id === lessonData.id
-          );
-
-          if (existingLessonIndex >= 0) {
-            const updatedLessons = [...module.lessons];
-            updatedLessons[existingLessonIndex] = lessonData;
-            return { ...module, lessons: updatedLessons };
-          } else {
-            return { ...module, lessons: [...module.lessons, lessonData] };
-          }
+      // Optimistically update the UI
+      setModules(modules.map(module => {
+        if (module.id === selectedModuleId) {
+          return {
+            ...module,
+            lessons: [...(module.lessons || []), data]
+          };
         }
         return module;
-      })
-    );
-    setLessonDialogOpen(false);
-  };
+      }));
 
-  const handleDeleteLesson = async (lessonId: string) => {
-    try {
-      const success = await deleteLesson(lessonId);
-      if (success) {
-        setModules(prevModules =>
-          prevModules.map(module => ({
-            ...module,
-            lessons: module.lessons.filter(lesson => lesson.id !== lessonId)
-          }))
-        );
-        toast.success('Lesson deleted successfully');
-      } else {
-        toast.error('Failed to delete lesson');
-      }
+      setNewLessonTitle('');
+      setNewLessonDescription('');
+      setNewLessonContentType('video');
+      setNewLessonVideoUrl('');
+      setIsLessonCreateDialogOpen(false);
+      toast.success('Lesson created successfully');
     } catch (error) {
-      console.error('Error deleting lesson:', error);
-      toast.error('Error deleting lesson');
+      console.error('Error creating lesson:', error);
+      toast.error('Failed to create lesson');
     }
   };
 
-  // Lesson transcript handlers
-  const handleManageTranscript = (lessonId: string) => {
-    setSelectedLessonId(lessonId);
-    setTranscriptDialogOpen(true);
-  };
-
-  // Quiz handlers
-  const handleAddQuiz = (lessonId: string, moduleId: string) => {
-    setSelectedLessonId(lessonId);
-    setSelectedModuleId(moduleId);
-    setQuizDialogOpen(true);
-  };
-
-  const handleQuizSaved = () => {
-    if (id) {
-      fetchCourseWithModulesAndLessons(id).then(courseData => {
-        if (courseData) {
-          setCourse(courseData);
-          setModules(courseData.modules || []);
-        }
-      });
-    }
-    setQuizDialogOpen(false);
-  };
-
-  // Final Exam handlers
-  const handleCreateFinalExam = () => {
-    setEditingFinalExam(null);
-    setFinalExamDialogOpen(true);
-  };
-
-  const handleEditFinalExam = () => {
-    setEditingFinalExam(finalExam);
-    setFinalExamDialogOpen(true);
-  };
-
-  const handleFinalExamSaved = (examData: FinalExam) => {
-    setFinalExam(examData);
-    setFinalExamDialogOpen(false);
-    // Reload to get question count
-    if (id) {
-      loadFinalExam(id);
-    }
-  };
-
-  const handleDeleteFinalExam = async () => {
-    if (!finalExam) return;
-
-    if (!confirm('Are you sure you want to delete this final exam? This action cannot be undone.')) {
-      return;
-    }
+  const handleCreateOutcome = async () => {
+    if (!courseId || !newOutcomeText) return;
 
     try {
-      const { error } = await supabase
-        .from('final_exams')
-        .delete()
-        .eq('id', finalExam.id);
+      const { data, error } = await supabase
+        .from('course_learning_outcomes')
+        .insert({
+          course_id: courseId,
+          outcome: newOutcomeText,
+          order_index: outcomes.length + 1
+        })
+        .select('*')
+        .single();
 
       if (error) throw error;
 
-      setFinalExam(null);
-      toast.success('Final exam deleted successfully');
+      setOutcomes([...outcomes, data]);
+      setNewOutcomeText('');
+      setIsOutcomeDialogOpen(false);
+      toast.success('Learning outcome created successfully');
     } catch (error) {
-      console.error('Error deleting final exam:', error);
-      toast.error('Failed to delete final exam');
+      console.error('Error creating learning outcome:', error);
+      toast.error('Failed to create learning outcome');
     }
   };
-
-  const handleToggleExamPublished = async () => {
-    if (!finalExam) return;
-
-    try {
-      const { error } = await supabase
-        .from('final_exams')
-        .update({ is_published: !finalExam.is_published })
-        .eq('id', finalExam.id);
-
-      if (error) throw error;
-
-      setFinalExam({ ...finalExam, is_published: !finalExam.is_published });
-      toast.success(`Final exam ${finalExam.is_published ? 'unpublished' : 'published'} successfully`);
-    } catch (error) {
-      console.error('Error updating final exam:', error);
-      toast.error('Failed to update final exam');
-    }
-  };
-
-  // Module ordering handlers
-  const handleMoveModuleUp = (index: number) => {
-    if (index <= 0) return;
-    const newModules = [...modules];
-    [newModules[index - 1], newModules[index]] = [newModules[index], newModules[index - 1]];
-    setModules(newModules);
-    
-    newModules.forEach((module, idx) => {
-      updateModuleOrder(module.id, idx);
-    });
-  };
-
-  const handleMoveModuleDown = (index: number) => {
-    if (index >= modules.length - 1) return;
-    const newModules = [...modules];
-    [newModules[index], newModules[index + 1]] = [newModules[index + 1], newModules[index]];
-    setModules(newModules);
-    
-    newModules.forEach((module, idx) => {
-      updateModuleOrder(module.id, idx);
-    });
-  };
-
-  if (loading) {
-    return (
-      <CreatorLayout title="Course Content">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </CreatorLayout>
-    );
-  }
-
-  const renderModuleAccordion = () => (
-    <div className="space-y-4">
-      {modules.map((module, moduleIndex) => (
-        <Card key={module.id} className="border-l-4 border-l-blue-500">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="flex items-center text-lg">
-                  Module {moduleIndex + 1}: {module.title}
-                </CardTitle>
-                {module.description && (
-                  <CardDescription>{module.description}</CardDescription>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleAddLesson(module.id)}>
-                  <Plus className="h-4 w-4 mr-1" /> Lesson
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleEditModule(module)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDeleteModule(module.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                {moduleIndex > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => handleMoveModuleUp(moduleIndex)}>
-                    ↑
-                  </Button>
-                )}
-                {moduleIndex < modules.length - 1 && (
-                  <Button variant="outline" size="sm" onClick={() => handleMoveModuleDown(moduleIndex)}>
-                    ↓
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {module.lessons && module.lessons.length > 0 ? (
-              <div className="space-y-3">
-                {module.lessons
-                  .sort((a, b) => a.order_index - b.order_index)
-                  .map((lesson, lessonIndex) => (
-                    <div key={lesson.id} className="bg-gray-50 p-3 rounded-md flex justify-between items-center">
-                      <div className="flex-1">
-                        <div className="font-medium">
-                          {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
-                        </div>
-                        {lesson.description && (
-                          <p className="text-sm text-gray-600 mt-1">{lesson.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="outline">
-                            {lesson.content_type || 'Content'}
-                          </Badge>
-                          {lesson.video_url && (
-                            <Badge variant="outline" className="bg-green-50 text-green-800">
-                              Video
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleManageTranscript(lesson.id)}>
-                          <FileText className="h-4 w-4 mr-1" /> Transcript
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleAddQuiz(lesson.id, module.id)}>
-                          <Plus className="h-4 w-4 mr-1" /> Quiz
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleEditLesson(lesson)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteLesson(lesson.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="text-center text-gray-500 py-4">
-                No lessons yet. Click "Lesson" to add one.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
 
   return (
-    <CreatorLayout title="Course Content">
-      <div className="mb-6">
-        <Button variant="outline" onClick={() => navigate('/creator/courses')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Courses
-        </Button>
+    <CreatorLayout>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold">Course Content</h1>
+          <p className="text-gray-500">Manage the modules, lessons, and learning outcomes for your course.</p>
+        </div>
+        
+        <Tabs defaultValue="modules" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="modules">Modules & Lessons</TabsTrigger>
+            <TabsTrigger value="outcomes">Learning Outcomes</TabsTrigger>
+            <TabsTrigger value="preview">Course Preview</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="modules" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Modules</h2>
+              <Button onClick={() => setIsModuleDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Module
+              </Button>
+            </div>
+            
+            <Dialog open={isModuleDialogOpen} onOpenChange={setIsModuleDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Module</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="moduleTitle" className="text-right">
+                      Title
+                    </Label>
+                    <Input
+                      id="moduleTitle"
+                      value={newModuleTitle}
+                      onChange={(e) => setNewModuleTitle(e.target.value)}
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="moduleDescription" className="text-right">
+                      Description
+                    </Label>
+                    <Textarea
+                      id="moduleDescription"
+                      value={newModuleDescription}
+                      onChange={(e) => setNewModuleDescription(e.target.value)}
+                      className="col-span-3"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit" onClick={handleCreateModule}>
+                    Create Module
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            
+            {course?.course_modules?.map((module, moduleIndex) => (
+              <Card key={module.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <GripVertical className="h-4 w-4 text-gray-400" />
+                      Module {moduleIndex + 1}: {module.title}
+                    </CardTitle>
+                    <div className="space-x-2">
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-red-500">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {module.description && (
+                    <p className="text-sm text-gray-600 mb-4">{module.description}</p>
+                  )}
+                  
+                  {/* Lessons */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Lessons</h4>
+                      <Button onClick={() => {
+                        setIsLessonCreateDialogOpen(true);
+                        setSelectedModuleId(module.id);
+                      }}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Lesson
+                      </Button>
+                    </div>
+                    
+                    {module.lessons?.map((lesson, lessonIndex) => (
+                      <Card key={lesson.id} className="border-l-4 border-l-blue-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <GripVertical className="h-4 w-4 text-gray-400" />
+                                <Play className="h-4 w-4 text-blue-500" />
+                                <span className="font-medium">
+                                  Lesson {lessonIndex + 1}: {lesson.title}
+                                </span>
+                                <Badge variant="outline">{lesson.content_type}</Badge>
+                              </div>
+                              {lesson.description && (
+                                <p className="text-sm text-gray-600 mb-2">{lesson.description}</p>
+                              )}
+                              {lesson.video_url && (
+                                <p className="text-xs text-blue-600">Video: {lesson.video_url}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm">
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-red-500">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {/* Add Video Transcript Manager */}
+                          {lesson.content_type === 'video' && (
+                            <LessonTranscriptManager 
+                              lessonId={lesson.id} 
+                              lessonTitle={lesson.title} 
+                            />
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  
+                  {/* Quizzes - To be implemented later */}
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+          
+          <TabsContent value="outcomes">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Learning Outcomes</h2>
+              <Button onClick={() => setIsOutcomeDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Outcome
+              </Button>
+            </div>
+
+            <Dialog open={isOutcomeDialogOpen} onOpenChange={setIsOutcomeDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Learning Outcome</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="outcomeText" className="text-right">
+                      Outcome Text
+                    </Label>
+                    <Input
+                      id="outcomeText"
+                      value={newOutcomeText}
+                      onChange={(e) => setNewOutcomeText(e.target.value)}
+                      className="col-span-3"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit" onClick={handleCreateOutcome}>
+                    Create Outcome
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <div className="space-y-4">
+              {outcomes.map((outcome, index) => (
+                <Card key={outcome.id}>
+                  <CardContent className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="h-4 w-4 text-gray-400" />
+                      {outcome.outcome}
+                    </div>
+                    <div className="space-x-2">
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-red-500">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="preview">
+            <div>
+              <h2 className="text-xl font-semibold">Course Preview</h2>
+              <p>This section is under development.</p>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Course Header */}
-      {course && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-2xl">{course.title}</CardTitle>
-                <CardDescription className="mt-2">
-                  {course.summary || course.description.substring(0, 100) + '...'}
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant={course.is_published ? "default" : "outline"}>
-                  {course.is_published ? "Published" : "Draft"}
-                </Badge>
-                {course.is_free ? (
-                  <Badge variant="secondary">Free</Badge>
-                ) : (
-                  <Badge variant="outline">${course.price}</Badge>
-                )}
-              </div>
+      {/* Create Lesson Dialog */}
+      <Dialog open={isLessonCreateDialogOpen} onOpenChange={setIsLessonCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Lesson</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lessonTitle" className="text-right">
+                Title
+              </Label>
+              <Input
+                id="lessonTitle"
+                value={newLessonTitle}
+                onChange={(e) => setNewLessonTitle(e.target.value)}
+                className="col-span-3"
+              />
             </div>
-          </CardHeader>
-        </Card>
-      )}
-
-      <Tabs defaultValue="modules" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="modules">Modules & Lessons</TabsTrigger>
-          <TabsTrigger value="final-exam">Final Exam</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="modules">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="flex items-center">
-                    <Book className="h-5 w-5 mr-2" />
-                    Course Content
-                  </CardTitle>
-                  <CardDescription>
-                    Organize your course into modules and lessons
-                  </CardDescription>
-                </div>
-                <Button onClick={handleAddModule}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Module
-                </Button>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lessonDescription" className="text-right">
+                Description
+              </Label>
+              <Textarea
+                id="lessonDescription"
+                value={newLessonDescription}
+                onChange={(e) => setNewLessonDescription(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lessonContentType" className="text-right">
+                Content Type
+              </Label>
+              <Select value={newLessonContentType} onValueChange={setNewLessonContentType}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select content type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="quiz">Quiz</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {newLessonContentType === 'video' && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="lessonVideoUrl" className="text-right">
+                  Video URL
+                </Label>
+                <Input
+                  id="lessonVideoUrl"
+                  value={newLessonVideoUrl}
+                  onChange={(e) => setNewLessonVideoUrl(e.target.value)}
+                  className="col-span-3"
+                />
               </div>
-            </CardHeader>
-            <CardContent>
-              {modules.length === 0 ? (
-                <div className="text-center py-12 border border-dashed rounded-md">
-                  <h3 className="text-lg font-medium mb-2">No modules yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Start building your course by adding modules
-                  </p>
-                  <Button onClick={handleAddModule}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Module
-                  </Button>
-                </div>
-              ) : renderModuleAccordion()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="final-exam">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="flex items-center">
-                    <GraduationCap className="h-5 w-5 mr-2 text-orange-500" />
-                    Final Exam
-                  </CardTitle>
-                  <CardDescription>
-                    Create a comprehensive final exam to test student understanding
-                  </CardDescription>
-                </div>
-                {!finalExam && (
-                  <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Final Exam
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!finalExam ? (
-                <div className="text-center py-12 border border-dashed rounded-md">
-                  <GraduationCap className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Final Exam Created</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create a comprehensive final exam with MCQ questions covering all course materials
-                  </p>
-                  <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Final Exam
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Card className="border-l-4 border-l-orange-500">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl">{finalExam.title}</CardTitle>
-                          {finalExam.description && (
-                            <CardDescription className="mt-2">{finalExam.description}</CardDescription>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge variant={finalExam.is_published ? "default" : "outline"}>
-                            {finalExam.is_published ? "Published" : "Draft"}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Questions</p>
-                          <p className="text-lg font-semibold">{finalExam.question_count || 0}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Time Limit</p>
-                          <p className="text-lg font-semibold">{finalExam.time_limit_minutes} min</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Passing Score</p>
-                          <p className="text-lg font-semibold">{finalExam.passing_score}%</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Status</p>
-                          <p className="text-lg font-semibold">{finalExam.is_published ? "Live" : "Draft"}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button onClick={handleEditFinalExam} variant="outline">
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                        <Button onClick={handleToggleExamPublished} variant="outline">
-                          <Eye className="h-4 w-4 mr-2" />
-                          {finalExam.is_published ? 'Unpublish' : 'Publish'}
-                        </Button>
-                        <Button onClick={handleDeleteFinalExam} variant="outline" className="text-red-600 hover:text-red-700">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="bg-gradient-to-r from-orange-50 to-purple-50">
-                    <CardContent className="pt-6">
-                      <h4 className="font-medium mb-2">Exam Guidelines</h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Recommended: 60% Easy/Moderate questions (recall & understanding)</li>
-                        <li>• 30% Application-based questions (practical knowledge)</li>
-                        <li>• 10% Advanced/Critical-thinking questions</li>
-                        <li>• Students must achieve 70% average (including all quizzes) to pass</li>
-                        <li>• Certificates are generated automatically upon successful completion</li>
-                      </ul>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Module Form Dialog */}
-      {moduleDialogOpen && (
-        <ModuleFormDialog
-          open={moduleDialogOpen}
-          onOpenChange={setModuleDialogOpen}
-          courseId={id!}
-          onModuleSaved={handleModuleSaved}
-          editingModule={editingModule}
-          modules={modules}
-        />
-      )}
-
-      {/* Lesson Form Dialog */}
-      {lessonDialogOpen && selectedModuleId && (
-        <LessonFormDialog
-          open={lessonDialogOpen}
-          onOpenChange={setLessonDialogOpen}
-          moduleId={selectedModuleId}
-          onLessonSaved={handleLessonSaved}
-          editingLesson={editingLesson}
-        />
-      )}
-
-      {/* Quiz Form Dialog */}
-      {quizDialogOpen && selectedLessonId && selectedModuleId && (
-        <QuizFormDialog
-          open={quizDialogOpen}
-          onOpenChange={setQuizDialogOpen}
-          lessonId={selectedLessonId}
-          moduleId={selectedModuleId}
-          onQuizSaved={handleQuizSaved}
-        />
-      )}
-
-      {/* Transcript Dialog */}
-      {transcriptDialogOpen && selectedLessonId && (
-        <LessonTranscriptDialog
-          open={transcriptDialogOpen}
-          onOpenChange={setTranscriptDialogOpen}
-          lessonId={selectedLessonId}
-        />
-      )}
-
-      {/* Final Exam Form Dialog */}
-      {finalExamDialogOpen && (
-        <FinalExamFormDialog
-          open={finalExamDialogOpen}
-          onOpenChange={setFinalExamDialogOpen}
-          courseId={id!}
-          onExamSaved={handleFinalExamSaved}
-          editingExam={editingFinalExam}
-        />
-      )}
+            )}
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" onClick={handleCreateLesson}>
+              Create Lesson
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </CreatorLayout>
   );
 };
