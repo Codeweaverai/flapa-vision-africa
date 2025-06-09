@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -35,7 +34,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
   const [lastPosition, setLastPosition] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
-  const [quizId, setQuizId] = useState<string | null>(null);
+  const [quizData, setQuizData] = useState<any>(null);
   const [hasQuiz, setHasQuiz] = useState(false);
   const [hasFinalExam, setHasFinalExam] = useState(false);
   const [showFinalExamModal, setShowFinalExamModal] = useState(false);
@@ -171,9 +170,14 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         const quiz = moduleToLoad.quizzes?.find((q: any) => q.lesson_id === lessonToLoad.id);
         setHasQuiz(!!quiz);
         if (quiz) {
-          setQuizId(quiz.id);
+          setQuizData({
+            id: quiz.id,
+            title: quiz.title || 'Lesson Quiz',
+            description: quiz.description,
+            passing_score: quiz.passing_score || 70
+          });
         } else {
-          setQuizId(null);
+          setQuizData(null);
         }
       }
     }
@@ -267,19 +271,19 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
     }
   };
 
-  const handleVideoProgress = async (seconds: number) => {
+  const handleVideoProgress = async (currentTime: number, duration: number) => {
     // Save position periodically
-    setLastPosition(seconds);
+    setLastPosition(currentTime);
     
     // Only save to database every 10 seconds to avoid too many requests
-    if (Math.floor(seconds) % 10 === 0 && enrollment && currentLesson) {
+    if (Math.floor(currentTime) % 10 === 0 && enrollment && currentLesson) {
       try {
         await supabase
           .from('lesson_progress')
           .upsert({
             lesson_id: currentLesson.id,
             enrollment_id: enrollment.id,
-            last_position_seconds: Math.floor(seconds),
+            last_position_seconds: Math.floor(currentTime),
           }, { onConflict: 'lesson_id,enrollment_id' });
       } catch (error) {
         console.error('Error saving progress:', error);
@@ -459,7 +463,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
                     <div className="aspect-video relative">
                       <VideoPlayer
                         src={currentLesson.video_url}
-                        onProgress={handleVideoProgress}
+                        onTimeUpdate={handleVideoProgress}
                       />
                     </div>
                   )}
@@ -490,7 +494,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
                           </Button>
                         )}
 
-                        {hasQuiz && quizId && (
+                        {hasQuiz && quizData && (
                           <Button onClick={handleStartQuiz} variant="default">
                             Start Quiz
                           </Button>
@@ -553,9 +557,9 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         </div>
 
         {/* Quiz Modal */}
-        {showQuizModal && quizId && (
+        {showQuizModal && quizData && (
           <QuizModal
-            quiz={{ id: quizId }}
+            quiz={quizData}
             enrollmentId={enrollment?.id}
             onComplete={() => {
               setShowQuizModal(false);
