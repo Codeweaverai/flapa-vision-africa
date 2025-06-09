@@ -116,10 +116,9 @@ const Navbar = () => {
     { name: 'My Learning', path: '/learning' },
     { name: 'Community', path: '/community' },
     { name: 'Media', path: '/media' },
-    { name: 'Contact', path: '/contact' },
     { name: 'Help Center', path: '/help' },
     { name: 'Become a Creator', path: '/become-creator' },
-    { name: 'Careers', path: '/careers' },
+  
   ];
 
   const exploreLinks = [
