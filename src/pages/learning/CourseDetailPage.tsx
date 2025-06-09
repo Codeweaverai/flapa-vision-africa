@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
-import CourseReviewForm from '@/components/course/CourseReviewForm';
+import CourseEnrollmentButton from '@/components/payment/CourseEnrollmentButton';
 
 interface Course {
   id: string;
@@ -90,7 +90,6 @@ const CourseDetailPage = () => {
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [courseStats, setCourseStats] = useState<any>(null);
-  const [refreshReviews, setRefreshReviews] = useState(0);
 
   const faqs = [
     {
@@ -116,7 +115,7 @@ const CourseDetailPage = () => {
   ];
 
   useEffect(() => {
-    const loadCourseData = async () => {
+    const loadCourse = async () => {
       if (!courseId) return;
       
       setLoading(true);
@@ -242,7 +241,7 @@ const CourseDetailPage = () => {
       }
     };
     
-    loadCourseData();
+    loadCourse();
   }, [courseId, user]);
 
   const handleEnroll = async () => {
@@ -279,29 +278,6 @@ const CourseDetailPage = () => {
 
   const startCourse = () => {
     navigate(`/learning/course/${courseId}`);
-  };
-
-  const handleReviewSubmitted = () => {
-    setRefreshReviews(prev => prev + 1);
-    // Refresh course stats
-    if (courseId) {
-      supabase
-        .from('course_reviews')
-        .select('rating')
-        .eq('course_id', courseId)
-        .then(({ data }) => {
-          if (data) {
-            const avgRating = data.length > 0 
-              ? data.reduce((sum, r) => sum + r.rating, 0) / data.length 
-              : 0;
-            setCourseStats(prev => ({
-              ...prev,
-              averageRating: Math.round(avgRating * 10) / 10,
-              totalReviews: data.length
-            }));
-          }
-        });
-    }
   };
 
   if (loading) {
@@ -401,7 +377,6 @@ const CourseDetailPage = () => {
                       </div>
                     )}
                   </div>
-                  
                   
                   <div className="p-8">
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -697,12 +672,12 @@ const CourseDetailPage = () => {
                           </p>
                           
                           <div className="flex gap-4">
-                            <Link to={`/creator/profile/${creator.id}`}>
-                              <Button variant="outline" size="sm">
-                                <Globe className="h-4 w-4 mr-2" />
-                                View Profile
-                              </Button>
-                            </Link>
+                            <Link to={`/creator/profile/${user.id}`}>
+                            <Button variant="outline" size="sm">
+                              <Globe className="h-4 w-4 mr-2" />
+                              View Profile
+                            </Button>
+                              </Link>
                             <Button variant="outline" size="sm">
                               <Mail className="h-4 w-4 mr-2" />
                               Contact
@@ -720,15 +695,7 @@ const CourseDetailPage = () => {
               </TabsContent>
               
               <TabsContent value="reviews">
-                <div className="space-y-6">
-                  {isEnrolled && (
-                    <CourseReviewForm 
-                      courseId={course.id} 
-                      onReviewSubmitted={handleReviewSubmitted}
-                    />
-                  )}
-                  <CourseReviews courseId={course.id} key={refreshReviews} />
-                </div>
+                <CourseReviews courseId={course.id} />
               </TabsContent>
               
               <TabsContent value="faq">

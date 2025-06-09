@@ -50,27 +50,40 @@ export type Database = {
       }
       certificates: {
         Row: {
+          course_id: string | null
           enrollment_id: string
           id: string
           issue_date: string | null
           pdf_url: string | null
+          user_id: string | null
           verification_code: string
         }
         Insert: {
+          course_id?: string | null
           enrollment_id: string
           id?: string
           issue_date?: string | null
           pdf_url?: string | null
+          user_id?: string | null
           verification_code: string
         }
         Update: {
+          course_id?: string | null
           enrollment_id?: string
           id?: string
           issue_date?: string | null
           pdf_url?: string | null
+          user_id?: string | null
           verification_code?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "certificates_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "certificates_enrollment_id_fkey"
             columns: ["enrollment_id"]
@@ -1295,6 +1308,8 @@ export type Database = {
           booking_id: string | null
           created_at: string | null
           id: string
+          pdf_storage_path: string | null
+          pdf_url: string | null
           qr_code_data: string
           ticket_code: string
           ticket_holder_name: string
@@ -1305,6 +1320,8 @@ export type Database = {
           booking_id?: string | null
           created_at?: string | null
           id?: string
+          pdf_storage_path?: string | null
+          pdf_url?: string | null
           qr_code_data: string
           ticket_code: string
           ticket_holder_name: string
@@ -1315,6 +1332,8 @@ export type Database = {
           booking_id?: string | null
           created_at?: string | null
           id?: string
+          pdf_storage_path?: string | null
+          pdf_url?: string | null
           qr_code_data?: string
           ticket_code?: string
           ticket_holder_name?: string
@@ -1966,6 +1985,7 @@ export type Database = {
           receipt_generated_at: string | null
           receipt_url: string | null
           stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
           tax_amount: number | null
           total_amount: number
           updated_at: string | null
@@ -1982,6 +2002,7 @@ export type Database = {
           receipt_generated_at?: string | null
           receipt_url?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           tax_amount?: number | null
           total_amount: number
           updated_at?: string | null
@@ -1998,6 +2019,7 @@ export type Database = {
           receipt_generated_at?: string | null
           receipt_url?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           tax_amount?: number | null
           total_amount?: number
           updated_at?: string | null
