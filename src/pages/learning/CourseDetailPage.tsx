@@ -427,41 +427,54 @@ const CourseDetailPage = () => {
                 </div>
               </div>
               
-              {/* Enrollment Card */}
-              <div className="lg:col-span-1">
-                <Card className="sticky top-24 bg-white/80 backdrop-blur-sm border-purple-200 shadow-xl">
-                  <CardContent className="p-6">
+               {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Price and Enrollment Card */}
+              <Card className="sticky top-6">
+                <CardContent className="p-6">
+                  <div className="text-center mb-6">
                     {course.is_free ? (
-                      <div className="text-3xl font-bold mb-4 text-green-600">Free</div>
+                      <div className="text-3xl font-bold text-green-600">Free</div>
                     ) : (
-                      <div className="text-3xl font-bold mb-4 text-purple-600">${course.price}</div>
+                      <div className="text-3xl font-bold text-gray-900">${course.price}</div>
                     )}
-                    
-                    {isEnrolled ? (
-                      <>
-                        <Button 
-                          className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" 
-                          onClick={startCourse}
-                          size="lg"
-                        >
-                          <Play className="h-5 w-5 mr-2" />
-                          Continue Learning
-                        </Button>
-                        <div className="flex items-center text-sm text-green-600 mb-4 bg-green-50 p-3 rounded-lg border border-green-200">
-                          <Check className="h-4 w-4 mr-2" />
-                          <span>You are enrolled in this course</span>
-                        </div>
-                      </>
-                    ) : (
-                      <Button
-                        className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={handleEnroll}
-                        disabled={enrolling}
-                        size="lg"
+                  </div>
+
+                  {isEnrolled ? (
+                    <Button 
+                      className="w-full mb-4" 
+                      onClick={() => navigate(`/learning/courses/${course.id}`)}
+                    >
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Continue Learning
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <Button 
+                        className="w-full" 
+                        onClick={handleEnrollNow}
+                        disabled={enrollmentLoading}
                       >
-                        {enrolling ? 'Enrolling...' : 'Enroll Now'}
+                        {enrollmentLoading ? (
+                          'Enrolling...'
+                        ) : course.is_free ? (
+                          'Enroll for Free'
+                        ) : (
+                          'Enroll Now'
+                        )}
                       </Button>
-                    )}
+                      {!course.is_free && (
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={handleAddToCart}
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          Add to Cart
+                        </Button>
+                      )}
+                    </div>
+                  )}
                     
                     <Button variant="outline" className="w-full mb-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
                       <Link to={`/community/courses?course=${courseId}`}>
