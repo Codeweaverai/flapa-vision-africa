@@ -136,12 +136,13 @@ const CreatorAnalytics = () => {
               creatorItems.push(item);
             }
           } else if (item.item_type === 'event_ticket') {
-            // Check if this event belongs to the creator
+            // Check if this event belongs to the creator - fix the relationship query
             const { data: eventTicket } = await supabase
               .from('event_tickets')
               .select(`
                 id,
-                events!inner(creator_id)
+                event_id,
+                events:event_id(creator_id)
               `)
               .eq('id', item.item_id)
               .single();
