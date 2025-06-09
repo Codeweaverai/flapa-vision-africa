@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -140,11 +139,14 @@ const CreatorAnalytics = () => {
             // Check if this event belongs to the creator
             const { data: eventTicket } = await supabase
               .from('event_tickets')
-              .select('event:events(creator_id)')
+              .select(`
+                id,
+                events!inner(creator_id)
+              `)
               .eq('id', item.item_id)
               .single();
             
-            if (eventTicket?.event?.creator_id === user?.id) {
+            if (eventTicket?.events?.creator_id === user?.id) {
               creatorItems.push(item);
             }
           }

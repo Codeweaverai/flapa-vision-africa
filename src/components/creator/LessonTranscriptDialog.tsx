@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,9 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
       }
 
       if (data && data.transcript_data) {
-        setTranscriptSegments(data.transcript_data as TranscriptSegment[]);
+        // Type-safe conversion from Json to TranscriptSegment[]
+        const segments = data.transcript_data as unknown as TranscriptSegment[];
+        setTranscriptSegments(Array.isArray(segments) ? segments : []);
       } else {
         setTranscriptSegments([]);
       }
@@ -67,6 +70,9 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
   const saveTranscript = async () => {
     setSaving(true);
     try {
+      // Convert TranscriptSegment[] to Json-compatible format
+      const transcriptData = transcriptSegments as unknown as any;
+
       // Check if transcript exists
       const { data: existing } = await supabase
         .from('lesson_transcripts')
@@ -79,7 +85,7 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
         const { error } = await supabase
           .from('lesson_transcripts')
           .update({
-            transcript_data: transcriptSegments,
+            transcript_data: transcriptData,
             updated_at: new Date().toISOString()
           })
           .eq('lesson_id', lessonId);
@@ -91,7 +97,7 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
           .from('lesson_transcripts')
           .insert({
             lesson_id: lessonId,
-            transcript_data: transcriptSegments,
+            transcript_data: transcriptData,
             language: 'en'
           });
 
