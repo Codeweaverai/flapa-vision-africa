@@ -28,6 +28,21 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Type guard function to validate transcript segment
+  const isValidTranscriptSegment = (obj: any): obj is TranscriptSegment => {
+    return obj && 
+           typeof obj.start === 'number' && 
+           typeof obj.end === 'number' && 
+           typeof obj.text === 'string';
+  };
+
+  // Function to safely convert JSON to TranscriptSegment array
+  const convertToTranscriptSegments = (data: any): TranscriptSegment[] => {
+    if (!Array.isArray(data)) return [];
+    
+    return data.filter(isValidTranscriptSegment);
+  };
+
   useEffect(() => {
     if (open) {
       loadTranscript();
@@ -48,9 +63,8 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
       }
 
       if (data) {
-        // Type guard to ensure transcript_data is an array
-        if (Array.isArray(data.transcript_data)) {
-          const transcriptData = data.transcript_data as TranscriptSegment[];
+        if (data.transcript_data) {
+          const transcriptData = convertToTranscriptSegments(data.transcript_data);
           setTranscript(transcriptData);
           setLanguage(data.language || 'en');
           setRawText(
@@ -83,7 +97,7 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
         .from('lesson_transcripts')
         .upsert({
           lesson_id: lessonId,
-          transcript_data: segments as any, // Cast to any to handle JSON type
+          transcript_data: segments as unknown as any, // Cast through unknown to satisfy TypeScript
           language,
           updated_at: new Date().toISOString()
         });

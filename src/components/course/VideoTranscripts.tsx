@@ -31,6 +31,21 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
     sw: 'Swahili'
   };
 
+  // Type guard function to validate transcript segment
+  const isValidTranscriptSegment = (obj: any): obj is TranscriptSegment => {
+    return obj && 
+           typeof obj.start === 'number' && 
+           typeof obj.end === 'number' && 
+           typeof obj.text === 'string';
+  };
+
+  // Function to safely convert JSON to TranscriptSegment array
+  const convertToTranscriptSegments = (data: any): TranscriptSegment[] => {
+    if (!Array.isArray(data)) return [];
+    
+    return data.filter(isValidTranscriptSegment);
+  };
+
   useEffect(() => {
     loadTranscripts();
   }, [lessonId, selectedLanguage]);
@@ -54,9 +69,9 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
 
         const targetTranscript = allTranscripts.find(t => t.language === targetLanguage);
         
-        // Type guard to ensure transcript_data is an array
-        if (targetTranscript?.transcript_data && Array.isArray(targetTranscript.transcript_data)) {
-          setTranscripts(targetTranscript.transcript_data as TranscriptSegment[]);
+        if (targetTranscript?.transcript_data) {
+          const segments = convertToTranscriptSegments(targetTranscript.transcript_data);
+          setTranscripts(segments);
         } else {
           setTranscripts([]);
         }
