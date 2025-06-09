@@ -8,12 +8,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import Layout from '@/components/layout/Layout';
-import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
+import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
+import AddToCartButton from '@/components/cart/AddToCartButton';
 
 interface Course {
   id: string;
@@ -49,6 +50,7 @@ interface Lesson {
   order_index: number;
   video_url?: string;
   content_type: string;
+  duration_minutes?: number;
 }
 
 interface Quiz {
@@ -228,7 +230,7 @@ const CourseDetailPage = () => {
             .select('id')
             .eq('course_id', courseId)
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
           
           setIsEnrolled(!!enrollment);
         }
@@ -243,7 +245,7 @@ const CourseDetailPage = () => {
     loadCourse();
   }, [courseId, user]);
 
-  const handleEnroll = async () => {
+  const handleEnrollNow = async () => {
     if (!user) {
       toast.error('Please log in to enroll in courses');
       navigate('/auth', { state: { from: `/courses/${courseId}` } });
@@ -252,26 +254,31 @@ const CourseDetailPage = () => {
     
     if (!course) return;
     
-    setEnrolling(true);
-    
-    try {
-      const { error } = await supabase
-        .from('course_enrollments')
-        .insert([{
-          user_id: user.id,
-          course_id: course.id,
-          payment_status: course.is_free ? 'completed' : 'pending'
-        }]);
+    if (course.is_free) {
+      // Handle free course enrollment
+      setEnrolling(true);
+      try {
+        const { error } = await supabase
+          .from('course_enrollments')
+          .insert([{
+            user_id: user.id,
+            course_id: course.id,
+            payment_status: 'completed'
+          }]);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setIsEnrolled(true);
-      toast.success('Successfully enrolled in the course!');
-    } catch (error) {
-      console.error('Enrollment error:', error);
-      toast.error('Failed to enroll in the course');
-    } finally {
-      setEnrolling(false);
+        setIsEnrolled(true);
+        toast.success('Successfully enrolled in the course!');
+      } catch (error) {
+        console.error('Enrollment error:', error);
+        toast.error('Failed to enroll in the course');
+      } finally {
+        setEnrolling(false);
+      }
+    } else {
+      // Redirect to checkout for paid courses
+      navigate('/checkout');
     }
   };
 
@@ -427,54 +434,53 @@ const CourseDetailPage = () => {
                 </div>
               </div>
               
-               {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Price and Enrollment Card */}
-              <Card className="sticky top-6">
-                <CardContent className="p-6">
-                  <div className="text-center mb-6">
-                    {course.is_free ? (
-                      <div className="text-3xl font-bold text-green-600">Free</div>
-                    ) : (
-                      <div className="text-3xl font-bold text-gray-900">${course.price}</div>
-                    )}
-                  </div>
-
-                  {isEnrolled ? (
-                    <Button 
-                      className="w-full mb-4" 
-                      onClick={() => navigate(`/learning/course/${course.id}`)}
-                    >
-                      <BookOpen className="w-4 h-4 mr-2" />
-                      Continue Learning
-                    </Button>
-                  ) : (
-                    <div className="space-y-3">
-                      <Button 
-                        className="w-full" 
-                        onClick={handleEnrollNow}
-                        disabled={enrollmentLoading}
-                      >
-                        {enrollmentLoading ? (
-                          'Enrolling...'
-                        ) : course.is_free ? (
-                          'Enroll for Free'
-                        ) : (
-                          'Enroll Now'
-                        )}
-                      </Button>
-                      {!course.is_free && (
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={handleAddToCart}
-                        >
-                          <ShoppingCart className="w-4 h-4 mr-2" />
-                          Add to Cart
-                        </Button>
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Price and Enrollment Card */}
+                <Card className="sticky top-6">
+                  <CardContent className="p-6">
+                    <div className="text-center mb-6">
+                      {course.is_free ? (
+                        <div className="text-3xl font-bold text-green-600">Free</div>
+                      ) : (
+                        <div className="text-3xl font-bold text-gray-900">${course.price}</div>
                       )}
                     </div>
-                  )}
+
+                    {isEnrolled ? (
+                      <Button 
+                        className="w-full mb-4" 
+                        onClick={() => navigate(`/learning/course/${course.id}`)}
+                      >
+                        <BookOpen className="w-4 h-4 mr-2" />
+                        Continue Learning
+                      </Button>
+                    ) : (
+                      <div className="space-y-3">
+                        <Button 
+                          className="w-full" 
+                          onClick={handleEnrollNow}
+                          disabled={enrolling}
+                        >
+                          {enrolling ? (
+                            'Enrolling...'
+                          ) : course.is_free ? (
+                            'Enroll for Free'
+                          ) : (
+                            'Enroll Now'
+                          )}
+                        </Button>
+                        {!course.is_free && (
+                          <AddToCartButton
+                            itemType="course"
+                            itemId={course.id}
+                            itemName={course.title}
+                            price={course.price}
+                            className="w-full"
+                          />
+                        )}
+                      </div>
+                    )}
                     
                     <Button variant="outline" className="w-full mb-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
                       <Link to={`/community/courses?course=${courseId}`}>
@@ -684,12 +690,12 @@ const CourseDetailPage = () => {
                           </p>
                           
                           <div className="flex gap-4">
-                            <Link to={`/creator/profile/${user.id}`}>
-                            <Button variant="outline" size="sm">
-                              <Globe className="h-4 w-4 mr-2" />
-                              View Profile
-                            </Button>
-                              </Link>
+                            <Link to={`/creator/profile/${creator.id}`}>
+                              <Button variant="outline" size="sm">
+                                <Globe className="h-4 w-4 mr-2" />
+                                View Profile
+                              </Button>
+                            </Link>
                             <Button variant="outline" size="sm">
                               <Mail className="h-4 w-4 mr-2" />
                               Contact

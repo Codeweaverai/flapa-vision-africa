@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Book, ArrowLeft, Plus, GraduationCap, Edit, Trash2, Eye } from 'lucide-react';
+import { Book, ArrowLeft, Plus, GraduationCap, Edit, Trash2, Eye, FileText } from 'lucide-react';
 import { 
   Course, 
   CourseModule, 
@@ -21,6 +21,7 @@ import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
 import LessonFormDialog from '@/components/admin/LessonFormDialog';
 import QuizFormDialog from '@/components/admin/QuizFormDialog';
 import FinalExamFormDialog from '@/components/admin/FinalExamFormDialog';
+import LessonTranscriptDialog from '@/components/creator/LessonTranscriptDialog';
 import { supabase } from '@/lib/supabaseClient';
 
 interface FinalExam {
@@ -46,6 +47,7 @@ const CreatorCourseContent = () => {
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
   const [quizDialogOpen, setQuizDialogOpen] = useState(false);
   const [finalExamDialogOpen, setFinalExamDialogOpen] = useState(false);
+  const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
   
   // Selected items for editing
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
@@ -201,6 +203,12 @@ const CreatorCourseContent = () => {
     }
   };
 
+  // Lesson transcript handlers
+  const handleManageTranscript = (lessonId: string) => {
+    setSelectedLessonId(lessonId);
+    setTranscriptDialogOpen(true);
+  };
+
   // Quiz handlers
   const handleAddQuiz = (lessonId: string, moduleId: string) => {
     setSelectedLessonId(lessonId);
@@ -315,6 +323,96 @@ const CreatorCourseContent = () => {
     );
   }
 
+  const renderModuleAccordion = () => (
+    <div className="space-y-4">
+      {modules.map((module, moduleIndex) => (
+        <Card key={module.id} className="border-l-4 border-l-blue-500">
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="flex items-center text-lg">
+                  Module {moduleIndex + 1}: {module.title}
+                </CardTitle>
+                {module.description && (
+                  <CardDescription>{module.description}</CardDescription>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleAddLesson(module.id)}>
+                  <Plus className="h-4 w-4 mr-1" /> Lesson
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleEditModule(module)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDeleteModule(module.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                {moduleIndex > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => handleMoveModuleUp(moduleIndex)}>
+                    ↑
+                  </Button>
+                )}
+                {moduleIndex < modules.length - 1 && (
+                  <Button variant="outline" size="sm" onClick={() => handleMoveModuleDown(moduleIndex)}>
+                    ↓
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {module.lessons && module.lessons.length > 0 ? (
+              <div className="space-y-3">
+                {module.lessons
+                  .sort((a, b) => a.order_index - b.order_index)
+                  .map((lesson, lessonIndex) => (
+                    <div key={lesson.id} className="bg-gray-50 p-3 rounded-md flex justify-between items-center">
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
+                        </div>
+                        {lesson.description && (
+                          <p className="text-sm text-gray-600 mt-1">{lesson.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline">
+                            {lesson.content_type || 'Content'}
+                          </Badge>
+                          {lesson.video_url && (
+                            <Badge variant="outline" className="bg-green-50 text-green-800">
+                              Video
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleManageTranscript(lesson.id)}>
+                          <FileText className="h-4 w-4 mr-1" /> Transcript
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleAddQuiz(lesson.id, module.id)}>
+                          <Plus className="h-4 w-4 mr-1" /> Quiz
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEditLesson(lesson)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteLesson(lesson.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-4">
+                No lessons yet. Click "Lesson" to add one.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
   return (
     <CreatorLayout title="Course Content">
       <div className="mb-6">
@@ -387,19 +485,7 @@ const CreatorCourseContent = () => {
                     Add First Module
                   </Button>
                 </div>
-              ) : (
-                <ModuleAccordion
-                  modules={modules}
-                  onEditModule={handleEditModule}
-                  onDeleteModule={handleDeleteModule}
-                  onAddLesson={handleAddLesson}
-                  onEditLesson={handleEditLesson}
-                  onDeleteLesson={handleDeleteLesson}
-                  onAddQuiz={handleAddQuiz}
-                  onMoveUp={handleMoveModuleUp}
-                  onMoveDown={handleMoveModuleDown}
-                />
-              )}
+              ) : renderModuleAccordion()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -543,6 +629,15 @@ const CreatorCourseContent = () => {
           lessonId={selectedLessonId}
           moduleId={selectedModuleId}
           onQuizSaved={handleQuizSaved}
+        />
+      )}
+
+      {/* Transcript Dialog */}
+      {transcriptDialogOpen && selectedLessonId && (
+        <LessonTranscriptDialog
+          open={transcriptDialogOpen}
+          onOpenChange={setTranscriptDialogOpen}
+          lessonId={selectedLessonId}
         />
       )}
 
