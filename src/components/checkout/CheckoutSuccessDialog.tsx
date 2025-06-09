@@ -39,7 +39,7 @@ const CheckoutSuccessDialog = ({ open, onOpenChange, orderId, orderData }: Check
   const loadTickets = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('generated_tickets')
         .select(`
           id,

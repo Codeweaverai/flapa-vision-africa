@@ -1307,7 +1307,10 @@ export type Database = {
         Row: {
           booking_id: string | null
           created_at: string | null
+          event_id: string | null
+          event_ticket_id: string | null
           id: string
+          order_id: string | null
           pdf_storage_path: string | null
           pdf_url: string | null
           qr_code_data: string
@@ -1319,7 +1322,10 @@ export type Database = {
         Insert: {
           booking_id?: string | null
           created_at?: string | null
+          event_id?: string | null
+          event_ticket_id?: string | null
           id?: string
+          order_id?: string | null
           pdf_storage_path?: string | null
           pdf_url?: string | null
           qr_code_data: string
@@ -1331,7 +1337,10 @@ export type Database = {
         Update: {
           booking_id?: string | null
           created_at?: string | null
+          event_id?: string | null
+          event_ticket_id?: string | null
           id?: string
+          order_id?: string | null
           pdf_storage_path?: string | null
           pdf_url?: string | null
           qr_code_data?: string
@@ -1346,6 +1355,27 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "event_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_tickets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_tickets_event_ticket_id_fkey"
+            columns: ["event_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "event_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_tickets_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1936,6 +1966,7 @@ export type Database = {
           item_id: string
           item_name: string
           item_type: string
+          metadata: Json | null
           order_id: string
           quantity: number
           total_price: number
@@ -1947,6 +1978,7 @@ export type Database = {
           item_id: string
           item_name: string
           item_type: string
+          metadata?: Json | null
           order_id: string
           quantity?: number
           total_price: number
@@ -1958,6 +1990,7 @@ export type Database = {
           item_id?: string
           item_name?: string
           item_type?: string
+          metadata?: Json | null
           order_id?: string
           quantity?: number
           total_price?: number

@@ -35,7 +35,7 @@ const CheckoutSuccessPage = () => {
       
       if (orderId) {
         // Direct order ID provided
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabase
           .from('orders')
           .select(`
             *,
@@ -55,7 +55,7 @@ const CheckoutSuccessPage = () => {
         if (!error) order = data;
       } else if (sessionId) {
         // Find order by payment provider ID (Stripe session)
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabase
           .from('orders')
           .select(`
             *,
