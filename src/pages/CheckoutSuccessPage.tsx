@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -7,6 +8,7 @@ import { Check, ArrowRight, Download, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useCart } from '@/contexts/CartContext';
+import CheckoutSuccessDialog from '@/components/checkout/CheckoutSuccessDialog';
 
 const CheckoutSuccessPage = () => {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ const CheckoutSuccessPage = () => {
   const { clearCart } = useCart();
   const [loading, setLoading] = useState(true);
   const [orderData, setOrderData] = useState<any>(null);
+  const [showDialog, setShowDialog] = useState(false);
   
   const sessionId = searchParams.get('session_id');
   const orderId = searchParams.get('order_id');
@@ -32,7 +35,7 @@ const CheckoutSuccessPage = () => {
       
       if (orderId) {
         // Direct order ID provided
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
           .from('orders')
           .select(`
             *,
@@ -52,7 +55,7 @@ const CheckoutSuccessPage = () => {
         if (!error) order = data;
       } else if (sessionId) {
         // Find order by payment provider ID (Stripe session)
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
           .from('orders')
           .select(`
             *,
@@ -78,6 +81,22 @@ const CheckoutSuccessPage = () => {
         // Clear cart on successful order
         if (order.payment_status === 'completed') {
           await clearCart();
+          
+          // Generate tickets for event purchases
+          const hasEventTickets = order.order_items?.some((item: any) => item.item_type === 'event_ticket');
+          
+          if (hasEventTickets) {
+            try {
+              await supabase.functions.invoke('generate-tickets', {
+                body: { orderId: order.id }
+              });
+            } catch (error) {
+              console.error('Failed to generate tickets:', error);
+              toast.error('Tickets will be generated shortly');
+            }
+          }
+          
+          setShowDialog(true);
           toast.success('Order completed successfully!');
         }
       } else {
@@ -191,6 +210,13 @@ const CheckoutSuccessPage = () => {
           </div>
         </div>
       </div>
+
+      <CheckoutSuccessDialog
+        open={showDialog}
+        onOpenChange={setShowDialog}
+        orderId={orderData?.id}
+        orderData={orderData}
+      />
     </Layout>
   );
 };
