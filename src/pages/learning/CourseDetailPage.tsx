@@ -8,12 +8,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import Layout from '@/components/layout/Layout';
-import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
+import { BookOpen, Clock, Award, Check, Users, Play, MessageCircle, Star, Globe, Mail, DollarSign, CheckCircle, PlayCircle, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
+import { useCart } from '@/contexts/CartContext';
 
 interface Course {
   id: string;
@@ -82,6 +83,7 @@ const CourseDetailPage = () => {
   const { id: courseId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { addToCart } = useCart();
   const [course, setCourse] = useState<Course | null>(null);
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -121,7 +123,7 @@ const CourseDetailPage = () => {
       try {
         console.log('Loading course data for:', courseId);
         
-        // Fetch course with modules, lessons, and quizzes
+        // Fetch course with modules, lessons, and quizzes - fixed query
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select(`
@@ -221,14 +223,15 @@ const CourseDetailPage = () => {
           });
         }
         
-        // Check enrollment status
+        // Check enrollment status - fixed query
         if (user && enrichedCourseData) {
           const { data: enrollment } = await supabase
             .from('course_enrollments')
             .select('id')
             .eq('course_id', courseId)
             .eq('user_id', user.id)
-            .single();
+            .eq('payment_status', 'completed')
+            .maybeSingle();
           
           setIsEnrolled(!!enrollment);
         }
@@ -243,7 +246,32 @@ const CourseDetailPage = () => {
     loadCourse();
   }, [courseId, user]);
 
-  const handleEnroll = async () => {
+  const handleAddToCart = async () => {
+    if (!course) return;
+    
+    if (!user) {
+      toast.error('Please log in to add courses to cart');
+      navigate('/auth', { state: { from: `/courses/${courseId}` } });
+      return;
+    }
+
+    try {
+      await addToCart({
+        item_type: 'course',
+        item_id: course.id,
+        title: course.title,
+        quantity: 1,
+        price: course.price,
+        ticket_holder_names: []
+      });
+      toast.success('Course added to cart!');
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add course to cart');
+    }
+  };
+
+  const handleEnrollNow = async () => {
     if (!user) {
       toast.error('Please log in to enroll in courses');
       navigate('/auth', { state: { from: `/courses/${courseId}` } });
@@ -252,26 +280,33 @@ const CourseDetailPage = () => {
     
     if (!course) return;
     
-    setEnrolling(true);
-    
-    try {
-      const { error } = await supabase
-        .from('course_enrollments')
-        .insert([{
-          user_id: user.id,
-          course_id: course.id,
-          payment_status: course.is_free ? 'completed' : 'pending'
-        }]);
+    if (course.is_free) {
+      // Handle free course enrollment
+      setEnrolling(true);
+      try {
+        const { error } = await supabase
+          .from('course_enrollments')
+          .insert([{
+            user_id: user.id,
+            course_id: course.id,
+            payment_status: 'completed'
+          }]);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setIsEnrolled(true);
-      toast.success('Successfully enrolled in the course!');
-    } catch (error) {
-      console.error('Enrollment error:', error);
-      toast.error('Failed to enroll in the course');
-    } finally {
-      setEnrolling(false);
+        setIsEnrolled(true);
+        toast.success('Successfully enrolled in the course!');
+        navigate(`/learning/course/${course.id}`);
+      } catch (error) {
+        console.error('Enrollment error:', error);
+        toast.error('Failed to enroll in the course');
+      } finally {
+        setEnrolling(false);
+      }
+    } else {
+      // Add to cart and redirect to checkout for paid courses
+      await handleAddToCart();
+      navigate('/checkout');
     }
   };
 
@@ -433,17 +468,17 @@ const CourseDetailPage = () => {
               <Card className="sticky top-6">
                 <CardContent className="p-6">
                   <div className="text-center mb-6">
-                    {course.is_free ? (
+                    {course?.is_free ? (
                       <div className="text-3xl font-bold text-green-600">Free</div>
                     ) : (
-                      <div className="text-3xl font-bold text-gray-900">${course.price}</div>
+                      <div className="text-3xl font-bold text-gray-900">${course?.price}</div>
                     )}
                   </div>
 
                   {isEnrolled ? (
                     <Button 
                       className="w-full mb-4" 
-                      onClick={() => navigate(`/learning/course/${course.id}`)}
+                      onClick={startCourse}
                     >
                       <BookOpen className="w-4 h-4 mr-2" />
                       Continue Learning
@@ -453,17 +488,17 @@ const CourseDetailPage = () => {
                       <Button 
                         className="w-full" 
                         onClick={handleEnrollNow}
-                        disabled={enrollmentLoading}
+                        disabled={enrolling}
                       >
-                        {enrollmentLoading ? (
+                        {enrolling ? (
                           'Enrolling...'
-                        ) : course.is_free ? (
+                        ) : course?.is_free ? (
                           'Enroll for Free'
                         ) : (
                           'Enroll Now'
                         )}
                       </Button>
-                      {!course.is_free && (
+                      {!course?.is_free && (
                         <Button 
                           variant="outline" 
                           className="w-full"
