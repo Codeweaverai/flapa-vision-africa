@@ -21,13 +21,13 @@ interface CourseResult {
   final_grade: number;
   passed: boolean;
   completed_at: string;
-  quiz_scores: any[];
+  quiz_scores: any[] | null;
   percentage_score: number;
   certificate?: {
     id: string;
     verification_code: string;
     pdf_url?: string;
-  };
+  } | null;
 }
 
 const CourseResultsPage = () => {
@@ -70,7 +70,21 @@ const CourseResultsPage = () => {
 
       if (error) throw error;
       
-      setResults(data || []);
+      // Transform the data to match our interface
+      const transformedResults: CourseResult[] = (data || []).map(item => ({
+        id: item.id,
+        final_grade: item.final_grade,
+        passed: item.passed,
+        completed_at: item.completed_at,
+        quiz_scores: Array.isArray(item.quiz_scores) ? item.quiz_scores : [],
+        percentage_score: item.percentage_score,
+        course: item.course,
+        certificate: Array.isArray(item.certificates) && item.certificates.length > 0 
+          ? item.certificates[0] 
+          : null
+      }));
+      
+      setResults(transformedResults);
     } catch (error) {
       console.error('Error loading course results:', error);
       toast.error('Failed to load course results');
