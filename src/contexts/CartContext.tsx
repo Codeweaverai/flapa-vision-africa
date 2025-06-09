@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,13 +159,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      // Check if item already exists
+      // Check if item already exists in cart
       const existingItem = items.find(
         (cartItem) => cartItem.item_id === item.item_id && cartItem.item_type === item.item_type
       );
 
       if (existingItem) {
+        // Update quantity instead of creating duplicate
         await updateQuantity(existingItem.id, existingItem.quantity + item.quantity);
+        toast.success('Item quantity updated in cart');
         return;
       }
 
@@ -186,7 +189,25 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          // Handle duplicate key error by updating existing item
+          const { data: existing } = await supabase
+            .from('carts')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('item_id', item.item_id)
+            .eq('item_type', item.item_type)
+            .single();
+
+          if (existing) {
+            await updateQuantity(existing.id, existing.quantity + item.quantity);
+            toast.success('Item quantity updated in cart');
+            return;
+          }
+        }
+        throw error;
+      }
 
       const newCartItem: CartItem = {
         id: data.id,
