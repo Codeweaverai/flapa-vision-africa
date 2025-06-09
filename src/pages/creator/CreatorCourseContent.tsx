@@ -47,12 +47,14 @@ const CreatorCourseContent = () => {
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
   const [quizDialogOpen, setQuizDialogOpen] = useState(false);
   const [finalExamDialogOpen, setFinalExamDialogOpen] = useState(false);
+  const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
   
   // Selected items for editing
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [editingFinalExam, setEditingFinalExam] = useState<FinalExam | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -201,8 +203,15 @@ const CreatorCourseContent = () => {
     }
   };
 
+  // Lesson transcript handlers
+  const handleManageTranscript = (lessonId: string) => {
+    setSelectedLessonId(lessonId);
+    setTranscriptDialogOpen(true);
+  };
+
   // Quiz handlers
   const handleAddQuiz = (lessonId: string, moduleId: string) => {
+    setSelectedLessonId(lessonId);
     setSelectedModuleId(moduleId);
     setQuizDialogOpen(true);
   };
@@ -375,18 +384,11 @@ const CreatorCourseContent = () => {
                             </Badge>
                           )}
                         </div>
-                        
-                        {/* Video Transcript Management */}
-                        {lesson.content_type === 'video' && (
-                          <div className="mt-2">
-                            <LessonTranscriptDialog 
-                              lessonId={lesson.id} 
-                              lessonTitle={lesson.title} 
-                            />
-                          </div>
-                        )}
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleManageTranscript(lesson.id)}>
+                          <FileText className="h-4 w-4 mr-1" /> Transcript
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleAddQuiz(lesson.id, module.id)}>
                           <Plus className="h-4 w-4 mr-1" /> Quiz
                         </Button>
@@ -620,13 +622,22 @@ const CreatorCourseContent = () => {
       )}
 
       {/* Quiz Form Dialog */}
-      {quizDialogOpen && selectedModuleId && (
+      {quizDialogOpen && selectedLessonId && selectedModuleId && (
         <QuizFormDialog
           open={quizDialogOpen}
           onOpenChange={setQuizDialogOpen}
-          lessonId=""
+          lessonId={selectedLessonId}
           moduleId={selectedModuleId}
           onQuizSaved={handleQuizSaved}
+        />
+      )}
+
+      {/* Transcript Dialog */}
+      {transcriptDialogOpen && selectedLessonId && (
+        <LessonTranscriptDialog
+          open={transcriptDialogOpen}
+          onOpenChange={setTranscriptDialogOpen}
+          lessonId={selectedLessonId}
         />
       )}
 

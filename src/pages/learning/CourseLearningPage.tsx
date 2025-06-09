@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -34,11 +35,11 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
   const [lastPosition, setLastPosition] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
-  const [quizData, setQuizData] = useState<any>(null);
+  const [quizId, setQuizId] = useState<string | null>(null);
   const [hasQuiz, setHasQuiz] = useState(false);
   const [hasFinalExam, setHasFinalExam] = useState(false);
   const [showFinalExamModal, setShowFinalExamModal] = useState(false);
-  const [finalExam, setFinalExam] = useState<any>(null);
+  const [finalExamId, setFinalExamId] = useState<string | null>(null);
   const [allLessonsCompleted, setAllLessonsCompleted] = useState(false);
 
   useEffect(() => {
@@ -108,7 +109,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
 
       setHasFinalExam(!!finalExamData);
       if (finalExamData) {
-        setFinalExam(finalExamData);
+        setFinalExamId(finalExamData.id);
       }
 
       // Load last viewed lesson or default to first lesson
@@ -170,14 +171,9 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         const quiz = moduleToLoad.quizzes?.find((q: any) => q.lesson_id === lessonToLoad.id);
         setHasQuiz(!!quiz);
         if (quiz) {
-          setQuizData({
-            id: quiz.id,
-            title: quiz.title || 'Lesson Quiz',
-            description: quiz.description,
-            passing_score: quiz.passing_score || 70
-          });
+          setQuizId(quiz.id);
         } else {
-          setQuizData(null);
+          setQuizId(null);
         }
       }
     }
@@ -195,17 +191,15 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         .eq('enrollment_id', enrollment.id)
         .maybeSingle();
 
-      const progressData = {
-        is_completed: true,
-        completion_date: new Date().toISOString(),
-        last_position_seconds: Math.floor(lastPosition)
-      };
-
       if (existingProgress) {
         // Update existing record
         await supabase
           .from('lesson_progress')
-          .update(progressData)
+          .update({
+            is_completed: true,
+            completion_date: new Date().toISOString(),
+            last_position_seconds: Math.floor(lastPosition)
+          })
           .eq('id', existingProgress.id);
       } else {
         // Create new record
@@ -213,7 +207,9 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
           {
             lesson_id: currentLesson.id,
             enrollment_id: enrollment.id,
-            ...progressData
+            is_completed: true,
+            completion_date: new Date().toISOString(),
+            last_position_seconds: Math.floor(lastPosition)
           }
         ]);
       }
@@ -271,23 +267,25 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
     }
   };
 
-  const handleVideoProgress = async (currentTime: number, duration: number) => {
+  const handleVideoProgress = (seconds: number) => {
     // Save position periodically
-    setLastPosition(currentTime);
+    setLastPosition(seconds);
     
     // Only save to database every 10 seconds to avoid too many requests
-    if (Math.floor(currentTime) % 10 === 0 && enrollment && currentLesson) {
-      try {
-        await supabase
-          .from('lesson_progress')
-          .upsert({
-            lesson_id: currentLesson.id,
-            enrollment_id: enrollment.id,
-            last_position_seconds: Math.floor(currentTime),
-          }, { onConflict: 'lesson_id,enrollment_id' });
-      } catch (error) {
-        console.error('Error saving progress:', error);
-      }
+    if (Math.floor(seconds) % 10 === 0 && enrollment && currentLesson) {
+      supabase
+        .from('lesson_progress')
+        .upsert({
+          lesson_id: currentLesson.id,
+          enrollment_id: enrollment.id,
+          last_position_seconds: Math.floor(seconds),
+        }, { onConflict: 'lesson_id,enrollment_id' })
+        .then(() => {
+          // No need to show a notification for periodic updates
+        })
+        .catch((error) => {
+          console.error('Error saving progress:', error);
+        });
     }
   };
 
@@ -462,8 +460,9 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
                   {currentLesson.video_url && (
                     <div className="aspect-video relative">
                       <VideoPlayer
-                        src={currentLesson.video_url}
-                        onTimeUpdate={handleVideoProgress}
+                        videoUrl={currentLesson.video_url}
+                        startTime={lastPosition}
+                        onProgress={handleVideoProgress}
                       />
                     </div>
                   )}
@@ -494,7 +493,7 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
                           </Button>
                         )}
 
-                        {hasQuiz && quizData && (
+                        {hasQuiz && quizId && (
                           <Button onClick={handleStartQuiz} variant="default">
                             Start Quiz
                           </Button>
@@ -557,28 +556,28 @@ const CourseLearningPage: React.FC<CourseLearningPageProps> = () => {
         </div>
 
         {/* Quiz Modal */}
-        {showQuizModal && quizData && (
+        {showQuizModal && quizId && (
           <QuizModal
-            isOpen={showQuizModal}
-            quiz={quizData}
-            onComplete={(score: number, passed: boolean) => {
-              setShowQuizModal(false);
+            open={showQuizModal}
+            onOpenChange={setShowQuizModal}
+            quizId={quizId}
+            enrollmentId={enrollment?.id}
+            onComplete={() => {
               if (!isCompleted) {
                 markLessonComplete();
               }
             }}
-            onClose={() => setShowQuizModal(false)}
           />
         )}
 
         {/* Final Exam Modal */}
-        {showFinalExamModal && finalExam && (
+        {showFinalExamModal && finalExamId && (
           <FinalExamModal
-            isOpen={showFinalExamModal}
-            exam={finalExam}
+            open={showFinalExamModal}
+            onOpenChange={setShowFinalExamModal}
+            examId={finalExamId}
+            courseId={courseId!}
             enrollmentId={enrollment?.id}
-            onClose={() => setShowFinalExamModal(false)}
-            onComplete={() => setShowFinalExamModal(false)}
           />
         )}
       </div>
