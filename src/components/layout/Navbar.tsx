@@ -115,7 +115,6 @@ const Navbar = () => {
     { name: 'About Us', path: '/about' },
     { name: 'My Learning', path: '/learning' },
     { name: 'Community', path: '/community' },
-    { name: 'Media', path: '/media' },
     { name: 'Help Center', path: '/help' },
     { name: 'Become a Creator', path: '/become-creator' },
   
