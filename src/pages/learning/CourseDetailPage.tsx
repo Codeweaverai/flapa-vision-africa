@@ -37,15 +37,17 @@ const CourseDetailPage = () => {
 
   useEffect(() => {
     const loadCourseDetails = async () => {
+      if (!courseId) {
+        console.error('Course ID is missing from URL parameters');
+        setError('Course ID is missing from the URL');
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       
       try {
-        if (!courseId) {
-          setError('Course ID is missing from the URL');
-          return;
-        }
-
         console.log('Loading course details for courseId:', courseId);
 
         // Fetch course with modules and lessons for enrolled users
@@ -95,16 +97,11 @@ const CourseDetailPage = () => {
       }
     };
 
-    if (courseId) {
-      loadCourseDetails();
-    } else {
-      setError('Course ID is missing from the URL');
-      setLoading(false);
-    }
+    loadCourseDetails();
   }, [courseId, user]);
 
   const handleAddToCart = async () => {
-    if (!course || course.is_free) return;
+    if (!course || course.is_free || !courseId) return;
     
     setIsAddingToCart(true);
     try {
@@ -131,7 +128,7 @@ const CourseDetailPage = () => {
       return;
     }
     
-    if (!course) return;
+    if (!course || !courseId) return;
     
     setEnrolling(true);
     
@@ -249,7 +246,10 @@ const CourseDetailPage = () => {
           <div className="container mx-auto px-4 py-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
-              <p className="text-red-500">{error}</p>
+              <p className="text-red-500 mb-4">{error}</p>
+              <Button asChild>
+                <Link to="/explore/courses">Browse Courses</Link>
+              </Button>
             </div>
           </div>
         </div>

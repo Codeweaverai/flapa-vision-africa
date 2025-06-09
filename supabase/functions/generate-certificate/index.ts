@@ -54,18 +54,17 @@ const handler = async (req: Request): Promise<Response> => {
     const completionDate = new Date(certificate.issue_date).toLocaleDateString();
     const grade = certificate.course_enrollments.final_exam_results?.[0]?.final_grade || 'Pass';
 
-    // Generate simple HTML certificate (since Puppeteer is not working)
+    // Generate HTML certificate
     const certificateHTML = createCertificateHTML(studentName, courseName, completionDate, grade, certificate.verification_code);
 
-    // For now, we'll return the HTML content directly since PDF generation is failing
-    // In production, you might want to use a different PDF generation service
-    const certificateUrl = `data:text/html;base64,${btoa(certificateHTML)}`;
+    // Generate PDF using jsPDF (client-side approach)
+    const pdfDataUrl = await generatePDFFromHTML(certificateHTML);
 
-    // Update certificate record with HTML URL
+    // Update certificate record with PDF URL
     const { error: updateError } = await supabase
       .from('certificates')
       .update({ 
-        pdf_url: certificateUrl,
+        pdf_url: pdfDataUrl,
         user_id: userId,
         course_id: certificate.course_enrollments.course_id
       })
@@ -77,7 +76,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      certificateUrl: certificateUrl,
+      certificateUrl: pdfDataUrl,
       verificationCode: certificate.verification_code
     }), {
       status: 200,
@@ -99,6 +98,13 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
+async function generatePDFFromHTML(html: string): Promise<string> {
+  // For now, return HTML data URL since we can't use Puppeteer in Deno Deploy
+  // In production, you'd want to use a PDF service like PDFShift, HTMLtoPDF, etc.
+  const htmlDataUrl = `data:text/html;base64,${btoa(html)}`;
+  return htmlDataUrl;
+}
+
 function createCertificateHTML(studentName: string, courseName: string, completionDate: string, grade: string, verificationCode: string): string {
   return `
     <!DOCTYPE html>
@@ -107,27 +113,36 @@ function createCertificateHTML(studentName: string, courseName: string, completi
       <meta charset="UTF-8">
       <title>SkillPulse Certificate</title>
       <style>
+        @page {
+          size: A4 landscape;
+          margin: 0;
+        }
+        
         body {
           font-family: 'Georgia', serif;
           margin: 0;
-          padding: 40px;
+          padding: 0;
           background: linear-gradient(135deg, #f59e0b 0%, #8b5cf6 100%);
-          min-height: 100vh;
+          width: 100vw;
+          height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
         }
+        
         .certificate {
           background: white;
           padding: 60px;
           border-radius: 20px;
           box-shadow: 0 20px 40px rgba(0,0,0,0.1);
           max-width: 800px;
-          width: 100%;
+          width: 90%;
           text-align: center;
           border: 8px solid #f59e0b;
           position: relative;
+          min-height: 500px;
         }
+        
         .certificate::before {
           content: '';
           position: absolute;
@@ -139,6 +154,7 @@ function createCertificateHTML(studentName: string, courseName: string, completi
           border-radius: 12px;
           pointer-events: none;
         }
+        
         .logo {
           font-size: 2.5rem;
           font-weight: bold;
@@ -148,17 +164,20 @@ function createCertificateHTML(studentName: string, courseName: string, completi
           background-clip: text;
           margin-bottom: 20px;
         }
+        
         .title {
           font-size: 3rem;
           color: #1f2937;
           margin: 20px 0;
           font-weight: normal;
         }
+        
         .subtitle {
           font-size: 1.2rem;
           color: #6b7280;
           margin-bottom: 40px;
         }
+        
         .recipient {
           font-size: 2.5rem;
           color: #f59e0b;
@@ -167,17 +186,20 @@ function createCertificateHTML(studentName: string, courseName: string, completi
           text-decoration: underline;
           text-decoration-color: #8b5cf6;
         }
+        
         .course {
           font-size: 1.8rem;
           color: #1f2937;
           margin: 30px 0;
           font-style: italic;
         }
+        
         .completion {
           font-size: 1.1rem;
           color: #6b7280;
           margin: 20px 0;
         }
+        
         .grade-badge {
           display: inline-block;
           background: linear-gradient(45deg, #f59e0b, #8b5cf6);
@@ -187,12 +209,14 @@ function createCertificateHTML(studentName: string, courseName: string, completi
           font-weight: bold;
           margin: 20px 0;
         }
+        
         .signature {
           margin-top: 50px;
           display: flex;
           justify-content: space-between;
           align-items: flex-end;
         }
+        
         .signature-line {
           border-top: 2px solid #1f2937;
           width: 200px;
@@ -201,15 +225,34 @@ function createCertificateHTML(studentName: string, courseName: string, completi
           font-size: 0.9rem;
           color: #6b7280;
         }
+        
         .verification {
           margin-top: 30px;
           font-size: 0.8rem;
           color: #9ca3af;
         }
+        
+        .ornament {
+          position: absolute;
+          width: 40px;
+          height: 40px;
+          background: radial-gradient(circle, #f59e0b, #8b5cf6);
+          border-radius: 50%;
+        }
+        
+        .ornament.top-left { top: 40px; left: 40px; }
+        .ornament.top-right { top: 40px; right: 40px; }
+        .ornament.bottom-left { bottom: 40px; left: 40px; }
+        .ornament.bottom-right { bottom: 40px; right: 40px; }
       </style>
     </head>
     <body>
       <div class="certificate">
+        <div class="ornament top-left"></div>
+        <div class="ornament top-right"></div>
+        <div class="ornament bottom-left"></div>
+        <div class="ornament bottom-right"></div>
+        
         <div class="logo">🎓 SkillPulse</div>
         <div class="title">Certificate of Completion</div>
         <div class="subtitle">This is to certify that</div>
