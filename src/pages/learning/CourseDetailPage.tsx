@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Course {
   id: string;
@@ -438,7 +438,9 @@ const CourseDetailPage = () => {
                       {course.is_free ? (
                         <Badge className="bg-green-100 text-green-800">Free</Badge>
                       ) : (
-                        <Badge className="bg-blue-100 text-blue-800 border-blue-200">${course.price}</Badge>
+                        <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                          <PriceDisplay amount={course.price} originalCurrency="USD" />
+                        </Badge>
                       )}
                       {courseStats && courseStats.averageRating > 0 && (
                         <div className="flex items-center gap-1">
@@ -490,7 +492,9 @@ const CourseDetailPage = () => {
                     {course.is_free ? (
                       <div className="text-3xl font-bold text-green-600">Free</div>
                     ) : (
-                      <div className="text-3xl font-bold text-gray-900">${course.price}</div>
+                      <div className="text-3xl font-bold text-gray-900">
+                        <PriceDisplay amount={course.price} originalCurrency="USD" />
+                      </div>
                     )}
                   </div>
 
@@ -796,3 +800,5 @@ const CourseDetailPage = () => {
 };
 
 export default CourseDetailPage;
+
+</edits_to_apply>

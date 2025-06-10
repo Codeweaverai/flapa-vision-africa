@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -18,6 +19,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import EventRegistrationForm from '@/components/EventRegistrationForm';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -133,262 +135,309 @@ const EventsPage = () => {
 
   return (
     <Layout>
-      <div className="section-container bg-light-purple">
-        <h1 className="heading-lg mb-2 text-gradient text-center">Events</h1>
-        <p className="text-center mb-12 max-w-3xl mx-auto">
-          Join me at upcoming events, webinars, and workshops to learn about technology, 
-          entrepreneurship, and innovation.
-        </p>
-        
-        <Tabs defaultValue="upcoming" className="w-full max-w-5xl mx-auto">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="upcoming">Upcoming Events</TabsTrigger>
-            <TabsTrigger value="past">Past Events</TabsTrigger>
-          </TabsList>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="section-container">
+          <div className="text-center mb-12">
+            <h1 className="heading-lg mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              Events & Workshops
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              Join me at upcoming events, webinars, and workshops to learn about technology, 
+              entrepreneurship, and innovation. Connect with like-minded individuals and expand your knowledge.
+            </p>
+          </div>
           
-          <TabsContent value="upcoming">
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : upcomingEvents.length === 0 ? (
-              <div className="text-center py-12 border rounded-lg bg-background/60">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-medium mb-2">No Upcoming Events</h3>
-                <p className="text-muted-foreground mb-6">Check back soon for new events</p>
-              </div>
-            ) : (
-              <div className="grid gap-8">
-                {upcomingEvents.map(event => (
-                  <Card key={event.id} className="overflow-hidden bg-background/95 shadow-md">
-                    <div className="grid md:grid-cols-3 gap-6">
-                      <div className="md:col-span-2 p-6">
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          <Badge variant="outline" className="bg-primary/10 text-primary">
-                            {getEventTypeLabel(event.event_type)}
-                          </Badge>
-                          {event.is_free ? (
-                            <Badge variant="secondary">Free</Badge>
-                          ) : (
-                            <Badge variant="secondary">
-                              {event.currency} {event.price}
+          <Tabs defaultValue="upcoming" className="w-full max-w-6xl mx-auto">
+            <TabsList className="grid w-full grid-cols-2 mb-8 bg-white/80 backdrop-blur-sm border border-orange-200">
+              <TabsTrigger 
+                value="upcoming" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+              >
+                Upcoming Events
+              </TabsTrigger>
+              <TabsTrigger 
+                value="past"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+              >
+                Past Events
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="upcoming">
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-600"></div>
+                </div>
+              ) : upcomingEvents.length === 0 ? (
+                <div className="text-center py-16 bg-white/80 backdrop-blur-sm rounded-2xl border border-orange-200 shadow-xl">
+                  <div className="w-24 h-24 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <AlertCircle className="h-12 w-12 text-orange-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    No Upcoming Events
+                  </h3>
+                  <p className="text-muted-foreground text-lg">Check back soon for exciting new events and workshops</p>
+                </div>
+              ) : (
+                <div className="grid gap-8">
+                  {upcomingEvents.map(event => (
+                    <Card key={event.id} className="overflow-hidden bg-white/90 backdrop-blur-sm shadow-xl border border-orange-200 hover:shadow-2xl transition-all duration-300">
+                      <div className="grid lg:grid-cols-3 gap-0">
+                        <div className="lg:col-span-2 p-8">
+                          <div className="flex flex-wrap gap-3 mb-6">
+                            <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 px-4 py-2">
+                              {getEventTypeLabel(event.event_type)}
                             </Badge>
-                          )}
-                        </div>
-                        
-                        <h2 className="text-2xl font-bold mb-2">{event.title}</h2>
-                        
-                        <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                          <div className="flex items-start space-x-2">
-                            <CalendarIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                            <div>
-                              <p className="font-medium text-sm">Date & Time</p>
-                              <p>{formatDateTime(event.start_time)}</p>
-                              {event.end_time && (
-                                <p className="text-muted-foreground text-sm">
-                                  Until {formatTime(event.end_time)}
-                                </p>
+                            {event.is_free ? (
+                              <Badge className="bg-green-100 text-green-800 border-green-200 px-4 py-2">Free Event</Badge>
+                            ) : (
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-4 py-2">
+                                <PriceDisplay amount={event.price} originalCurrency={event.currency} />
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                            {event.title}
+                          </h2>
+                          
+                          <div className="grid sm:grid-cols-2 gap-6 mb-6">
+                            <div className="flex items-start space-x-3">
+                              <div className="w-10 h-10 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center">
+                                <CalendarIcon className="h-5 w-5 text-orange-600" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-800 mb-1">Date & Time</p>
+                                <p className="text-gray-600">{formatDateTime(event.start_time)}</p>
+                                {event.end_time && (
+                                  <p className="text-muted-foreground text-sm">
+                                    Until {formatTime(event.end_time)}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-start space-x-3">
+                              {event.event_type === 'webinar' ? (
+                                <>
+                                  <div className="w-10 h-10 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center">
+                                    <VideoIcon className="h-5 w-5 text-purple-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-gray-800 mb-1">Location</p>
+                                    <p className="text-gray-600">Online Webinar</p>
+                                    {isRegistered(event.id) && event.online_meeting_link && (
+                                      <a 
+                                        href={event.online_meeting_link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-orange-600 hover:text-orange-800 hover:underline text-sm font-medium"
+                                      >
+                                        Join Meeting →
+                                      </a>
+                                    )}
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="w-10 h-10 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center">
+                                    <MapPin className="h-5 w-5 text-purple-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-gray-800 mb-1">Location</p>
+                                    <p className="text-gray-600">{event.location || 'To be announced'}</p>
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>
                           
-                          <div className="flex items-start space-x-2">
-                            {event.event_type === 'webinar' ? (
-                              <>
-                                <VideoIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                                <div>
-                                  <p className="font-medium text-sm">Location</p>
-                                  <p>Online Webinar</p>
-                                  {isRegistered(event.id) && event.online_meeting_link && (
-                                    <a 
-                                      href={event.online_meeting_link} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline text-sm"
-                                    >
-                                      Join Meeting
-                                    </a>
-                                  )}
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                                <div>
-                                  <p className="font-medium text-sm">Location</p>
-                                  <p>{event.location || 'To be announced'}</p>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                          {event.description && (
+                            <div className="mb-8">
+                              <p className="text-gray-600 leading-relaxed">{event.description}</p>
+                            </div>
+                          )}
+                          
+                          {isRegistered(event.id) ? (
+                            <div className="flex items-center space-x-4">
+                              <Badge className="bg-green-100 text-green-800 border-green-200 px-4 py-2">
+                                ✓ Registered
+                              </Badge>
+                              {getRegistration(event.id)?.status === 'confirmed' && (
+                                <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700 px-4 py-2">
+                                  Confirmed
+                                </Badge>
+                              )}
+                              {getRegistration(event.id)?.status === 'pending' && (
+                                <Badge variant="outline" className="bg-yellow-50 border-yellow-200 text-yellow-700 px-4 py-2">
+                                  Pending
+                                </Badge>
+                              )}
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="border-red-200 text-red-600 hover:bg-red-50"
+                                onClick={() => {
+                                  const reg = getRegistration(event.id);
+                                  if (reg) handleCancelRegistration(reg.id);
+                                }}
+                              >
+                                Cancel Registration
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button 
+                              onClick={() => handleRegister(event)}
+                              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold"
+                            >
+                              Register Now
+                            </Button>
+                          )}
                         </div>
                         
-                        {event.description && (
-                          <div className="mb-6">
-                            <p className="text-muted-foreground">{event.description}</p>
-                          </div>
-                        )}
-                        
-                        {isRegistered(event.id) ? (
-                          <div className="flex items-center space-x-4">
-                            <Badge variant="secondary" className="bg-green-100 text-green-800">
-                              Registered
-                            </Badge>
-                            {getRegistration(event.id)?.status === 'confirmed' && (
-                              <Badge variant="outline" className="bg-green-50">
-                                Confirmed
-                              </Badge>
-                            )}
-                            {getRegistration(event.id)?.status === 'pending' && (
-                              <Badge variant="outline" className="bg-yellow-50">
-                                Pending
-                              </Badge>
-                            )}
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                const reg = getRegistration(event.id);
-                                if (reg) handleCancelRegistration(reg.id);
-                              }}
-                            >
-                              Cancel Registration
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button onClick={() => handleRegister(event)}>
-                            Register Now
-                          </Button>
-                        )}
-                      </div>
-                      
-                      <CardContent className="p-0 bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center relative">
-                        {event.image_url ? (
-                          <div className="w-full h-full absolute inset-0">
-                            <img 
-                              src={event.image_url} 
-                              alt={event.title}
-                              className="w-full h-full object-cover" 
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-4">
-                              <div className="text-center text-white">
-                                <div className="text-4xl font-bold">
-                                  {format(parseISO(event.start_time), 'dd')}
-                                </div>
-                                <div className="text-xl font-medium">
-                                  {format(parseISO(event.start_time), 'MMM')}
-                                </div>
-                                <div className="mt-2 flex items-center justify-center">
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  <span className="text-sm">
-                                    {format(parseISO(event.start_time), 'p')}
-                                  </span>
+                        <div className="bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center relative overflow-hidden">
+                          {event.image_url ? (
+                            <div className="w-full h-full relative">
+                              <img 
+                                src={event.image_url} 
+                                alt={event.title}
+                                className="w-full h-full object-cover" 
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-6">
+                                <div className="text-center text-white">
+                                  <div className="text-4xl font-bold">
+                                    {format(parseISO(event.start_time), 'dd')}
+                                  </div>
+                                  <div className="text-xl font-medium">
+                                    {format(parseISO(event.start_time), 'MMM')}
+                                  </div>
+                                  <div className="mt-3 flex items-center justify-center">
+                                    <Clock className="h-4 w-4 mr-2" />
+                                    <span className="text-sm">
+                                      {format(parseISO(event.start_time), 'p')}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="text-center p-6">
-                            <div className="text-4xl font-bold text-primary">
-                              {format(parseISO(event.start_time), 'dd')}
+                          ) : (
+                            <div className="text-center p-8">
+                              <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <div className="text-3xl font-bold text-white">
+                                  {format(parseISO(event.start_time), 'dd')}
+                                </div>
+                              </div>
+                              <div className="text-xl font-medium text-purple-600">
+                                {format(parseISO(event.start_time), 'MMM')}
+                              </div>
+                              <div className="mt-4 flex items-center justify-center">
+                                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">
+                                  {format(parseISO(event.start_time), 'p')}
+                                </span>
+                              </div>
                             </div>
-                            <div className="text-xl font-medium text-primary/80">
-                              {format(parseISO(event.start_time), 'MMM')}
-                            </div>
-                            <div className="mt-4 flex items-center justify-center">
-                              <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
-                              <span className="text-sm text-muted-foreground">
-                                {format(parseISO(event.start_time), 'p')}
-                              </span>
-                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="past">
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-600"></div>
+                </div>
+              ) : pastEvents.length === 0 ? (
+                <div className="text-center py-16 bg-white/80 backdrop-blur-sm rounded-2xl border border-orange-200 shadow-xl">
+                  <div className="w-24 h-24 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <AlertCircle className="h-12 w-12 text-orange-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    No Past Events
+                  </h3>
+                  <p className="text-muted-foreground text-lg">Check the upcoming events tab for future opportunities</p>
+                </div>
+              ) : (
+                <div className="grid gap-6">
+                  {pastEvents.map(event => (
+                    <Card key={event.id} className="bg-white/80 backdrop-blur-sm overflow-hidden border border-orange-200 hover:shadow-lg transition-all duration-300">
+                      <div className="lg:grid lg:grid-cols-4 gap-6">
+                        {event.image_url && (
+                          <div className="col-span-1">
+                            <AspectRatio ratio={1}>
+                              <img 
+                                src={event.image_url} 
+                                alt={event.title} 
+                                className="w-full h-full object-cover"
+                              />
+                            </AspectRatio>
                           </div>
                         )}
-                      </CardContent>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="past">
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : pastEvents.length === 0 ? (
-              <div className="text-center py-12 border rounded-lg bg-background/60">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-medium mb-2">No Past Events</h3>
-                <p className="text-muted-foreground mb-6">Check the upcoming events tab</p>
-              </div>
-            ) : (
-              <div className="grid gap-6">
-                {pastEvents.map(event => (
-                  <Card key={event.id} className="bg-background/80 overflow-hidden">
-                    <div className="md:grid md:grid-cols-4 gap-4">
-                      {event.image_url && (
-                        <div className="col-span-1">
-                          <AspectRatio ratio={1}>
-                            <img 
-                              src={event.image_url} 
-                              alt={event.title} 
-                              className="w-full h-full object-cover"
-                            />
-                          </AspectRatio>
-                        </div>
-                      )}
-                      <div className={`p-6 ${event.image_url ? 'col-span-3' : 'col-span-4'}`}>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          <Badge variant="outline">{getEventTypeLabel(event.event_type)}</Badge>
-                          <Badge variant="secondary" className="bg-muted/50">Past Event</Badge>
-                        </div>
-                        
-                        <h2 className="text-xl font-bold mb-2">{event.title}</h2>
-                        
-                        <div className="grid sm:grid-cols-2 gap-3 mb-4">
-                          <div className="flex items-center space-x-2">
-                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                            <span>{formatDateTime(event.start_time)}</span>
-                          </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            {event.event_type === 'webinar' ? (
-                              <>
-                                <VideoIcon className="h-4 w-4 text-muted-foreground" />
-                                <span>Online Webinar</span>
-                              </>
-                            ) : (
-                              <>
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <span>{event.location || 'Location not specified'}</span>
-                              </>
+                        <div className={`p-6 ${event.image_url ? 'col-span-3' : 'col-span-4'}`}>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
+                              {getEventTypeLabel(event.event_type)}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-muted/50">Past Event</Badge>
+                            {!event.is_free && (
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                <PriceDisplay amount={event.price} originalCurrency={event.currency} />
+                              </Badge>
                             )}
                           </div>
+                          
+                          <h2 className="text-2xl font-bold mb-3 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                            {event.title}
+                          </h2>
+                          
+                          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                            <div className="flex items-center space-x-2">
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{formatDateTime(event.start_time)}</span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              {event.event_type === 'webinar' ? (
+                                <>
+                                  <VideoIcon className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm">Online Webinar</span>
+                                </>
+                              ) : (
+                                <>
+                                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm">{event.location || 'Location not specified'}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {event.description && (
+                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{event.description}</p>
+                          )}
+                          
+                          {isRegistered(event.id) && (
+                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                              ✓ You attended this event
+                            </Badge>
+                          )}
                         </div>
-                        
-                        {event.description && (
-                          <p className="text-sm text-muted-foreground mb-4">{event.description}</p>
-                        )}
-                        
-                        {isRegistered(event.id) && (
-                          <Badge variant="outline" className="bg-muted">
-                            You attended this event
-                          </Badge>
-                        )}
                       </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
       
       {/* Registration Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] border border-orange-200">
           {selectedEvent && (
             <EventRegistrationForm 
               event={selectedEvent} 

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import EventRegistrationButton from '@/components/payment/EventRegistrationButton';
 import { fetchEventSpeakers, fetchEventAgenda, KeynoteSpeaker, EventAgenda } from '@/services/eventManagementService';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Event {
   id: string;
@@ -579,7 +580,9 @@ const EventDetailPage = () => {
                 <CardContent className="p-6 space-y-6">
                   <div className="space-y-2">
                     <p className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      {event.is_free ? 'Free' : `${event.currency} ${event.price?.toFixed(2)}`}
+                      {event.is_free ? 'Free' : (
+                        <PriceDisplay amount={event.price} originalCurrency={event.currency} />
+                      )}
                     </p>
                     
                     {event.capacity > 0 && (
@@ -706,3 +709,5 @@ const EventDetailPage = () => {
 };
 
 export default EventDetailPage;
+
+</edits_to_apply>
