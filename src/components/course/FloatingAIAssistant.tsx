@@ -1,13 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Send, User, X, MessageCircle } from 'lucide-react';
+import { Bot, Send, User, X, MessageCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { saveChatMessage, loadChatHistory, clearChatHistory } from '@/services/aiChatService';
 
 interface Message {
   id: string;
@@ -20,28 +21,67 @@ interface FloatingAIAssistantProps {
   lessonTitle?: string;
   lessonContent?: string;
   courseId?: string;
+  lessonId?: string;
 }
 
 const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({ 
   lessonTitle, 
   lessonContent, 
-  courseId 
+  courseId,
+  lessonId
 }) => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Load chat history when component mounts or context changes
+  useEffect(() => {
+    if (user && isOpen) {
+      loadExistingChatHistory();
+    }
+  }, [user, isOpen, lessonId, courseId]);
+
+  const loadExistingChatHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const history = await loadChatHistory(lessonId, courseId);
+      
+      if (history.length > 0) {
+        // Convert database messages to component format
+        const convertedMessages: Message[] = history.map(msg => ({
+          id: msg.id,
+          type: msg.message_type,
+          content: msg.content,
+          timestamp: new Date(msg.created_at)
+        }));
+        setMessages(convertedMessages);
+      } else {
+        // Set initial welcome message if no history exists
+        setInitialWelcomeMessage();
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      setInitialWelcomeMessage();
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const setInitialWelcomeMessage = () => {
+    const welcomeMessage: Message = {
+      id: 'welcome-1',
       type: 'assistant',
       content: `Hi! I'm your AI learning assistant. I'm here to help you understand ${lessonTitle ? `"${lessonTitle}"` : 'this lesson'} better. Feel free to ask me any questions about the content, concepts, or how to apply what you're learning!`,
       timestamp: new Date()
-    }
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+    };
+    setMessages([welcomeMessage]);
+  };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !user) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -53,6 +93,18 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
+
+    // Save user message to database
+    await saveChatMessage(
+      'user', 
+      inputMessage, 
+      lessonId, 
+      courseId, 
+      { 
+        lessonTitle,
+        timestamp: new Date().toISOString()
+      }
+    );
 
     try {
       console.log('Sending message to AI assistant:', {
@@ -90,6 +142,18 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
 
       setMessages(prev => [...prev, assistantMessage]);
 
+      // Save assistant response to database
+      await saveChatMessage(
+        'assistant', 
+        data.response, 
+        lessonId, 
+        courseId, 
+        { 
+          lessonTitle,
+          timestamp: new Date().toISOString()
+        }
+      );
+
     } catch (error) {
       console.error('Error sending message to AI:', error);
       toast.error('Failed to get AI response. Please try again.');
@@ -104,6 +168,21 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      const success = await clearChatHistory(lessonId, courseId);
+      if (success) {
+        setInitialWelcomeMessage();
+        toast.success('Chat history cleared');
+      } else {
+        toast.error('Failed to clear chat history');
+      }
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+      toast.error('Failed to clear chat history');
     }
   };
 
@@ -137,14 +216,25 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
                   <Bot className="h-5 w-5 text-purple-600" />
                   AI Learning Assistant
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsOpen(false)}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearHistory}
+                    className="h-8 w-8 p-0"
+                    title="Clear chat history"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsOpen(false)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               {lessonTitle && (
                 <p className="text-xs text-muted-foreground">
@@ -155,56 +245,62 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
             
             <CardContent className="flex flex-col h-[calc(100%-80px)] p-4">
               <ScrollArea className="flex-1 pr-4 mb-4">
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex items-start gap-3 ${
-                        message.type === 'user' ? 'flex-row-reverse' : ''
-                      }`}
-                    >
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                        message.type === 'user' 
-                          ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white' 
-                          : 'bg-purple-100 text-purple-600'
-                      }`}>
-                        {message.type === 'user' ? (
-                          <User className="h-4 w-4" />
-                        ) : (
-                          <Bot className="h-4 w-4" />
-                        )}
-                      </div>
-                      
-                      <div className={`flex-1 ${message.type === 'user' ? 'text-right' : ''}`}>
-                        <div className={`inline-block max-w-[85%] p-3 rounded-lg text-sm ${
-                          message.type === 'user'
-                            ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-800'
+                {isLoadingHistory ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex items-start gap-3 ${
+                          message.type === 'user' ? 'flex-row-reverse' : ''
+                        }`}
+                      >
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                          message.type === 'user' 
+                            ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white' 
+                            : 'bg-purple-100 text-purple-600'
                         }`}>
-                          {message.content}
+                          {message.type === 'user' ? (
+                            <User className="h-4 w-4" />
+                          ) : (
+                            <Bot className="h-4 w-4" />
+                          )}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {formatTime(message.timestamp)}
+                        
+                        <div className={`flex-1 ${message.type === 'user' ? 'text-right' : ''}`}>
+                          <div className={`inline-block max-w-[85%] p-3 rounded-lg text-sm ${
+                            message.type === 'user'
+                              ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {message.content}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {formatTime(message.timestamp)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                  
-                  {isLoading && (
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                      <div className="bg-gray-100 p-3 rounded-lg text-sm">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    ))}
+                    
+                    {isLoading && (
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                          <Bot className="h-4 w-4" />
+                        </div>
+                        <div className="bg-gray-100 p-3 rounded-lg text-sm">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </ScrollArea>
               
               <div className="flex gap-2">

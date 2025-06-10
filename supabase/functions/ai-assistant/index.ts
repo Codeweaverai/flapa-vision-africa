@@ -19,9 +19,9 @@ serve(async (req) => {
   }
 
   try {
-    const { message, lessonTitle, lessonContent, courseId, userId } = await req.json();
+    const { message, lessonTitle, lessonContent, courseId, lessonId, userId } = await req.json();
 
-    console.log('AI Assistant request:', { message, lessonTitle, courseId, userId });
+    console.log('AI Assistant request:', { message, lessonTitle, courseId, lessonId, userId });
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -39,14 +39,59 @@ serve(async (req) => {
       }
     }
 
+    // Get lesson context if lesson ID is provided
+    let lessonContext = '';
+    if (lessonId) {
+      const { data: lessonData } = await supabase
+        .from('lessons')
+        .select('title, description, content')
+        .eq('id', lessonId)
+        .single();
+
+      if (lessonData) {
+        lessonContext = `\nLesson Details:\nTitle: ${lessonData.title}\nDescription: ${lessonData.description || 'No description available'}`;
+        if (lessonData.content && typeof lessonData.content === 'object') {
+          lessonContext += `\nContent: ${JSON.stringify(lessonData.content)}`;
+        }
+      }
+    }
+
+    // Get recent chat history for context (last 10 messages)
+    let chatContext = '';
+    if (userId && (lessonId || courseId)) {
+      let historyQuery = supabase
+        .from('ai_chat_history')
+        .select('message_type, content, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (lessonId) {
+        historyQuery = historyQuery.eq('lesson_id', lessonId);
+      } else if (courseId) {
+        historyQuery = historyQuery.eq('course_id', courseId);
+      }
+
+      const { data: chatHistory } = await historyQuery;
+      
+      if (chatHistory && chatHistory.length > 0) {
+        const recentMessages = chatHistory.reverse().slice(-5); // Get last 5 messages for context
+        chatContext = '\n\nRecent conversation:\n' + 
+          recentMessages.map(msg => `${msg.message_type}: ${msg.content}`).join('\n');
+      }
+    }
+
     // Create system prompt with platform context
     const systemPrompt = `You are an AI learning assistant for a comprehensive learning platform. You help students understand course content and answer questions related to their learning journey.
 
 Context about the current lesson:
 ${lessonTitle ? `Lesson Title: ${lessonTitle}` : ''}
 ${lessonContent ? `Lesson Content: ${lessonContent}` : ''}
+${lessonContext}
 
 ${courseContext}
+
+${chatContext}
 
 Your role:
 - Help students understand the lesson content
@@ -55,6 +100,7 @@ Your role:
 - Suggest practical applications
 - Encourage learning and engagement
 - Stay focused on educational content
+- Reference previous parts of our conversation when relevant
 
 Guidelines:
 - Be encouraging and supportive
@@ -62,7 +108,8 @@ Guidelines:
 - Use examples when helpful
 - Keep responses concise but informative
 - If you don't know something about the specific lesson, say so
-- Always relate your answers back to the learning objectives`;
+- Always relate your answers back to the learning objectives
+- Build upon previous conversation context when appropriate`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
