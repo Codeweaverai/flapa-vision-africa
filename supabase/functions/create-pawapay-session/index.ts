@@ -37,6 +37,9 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Unauthorized');
     }
 
+    const requestBody = await req.json();
+    console.log('Request body received:', requestBody);
+
     const {
       amount,
       currency,
@@ -47,7 +50,7 @@ const handler = async (req: Request): Promise<Response> => {
       tax_amount,
       discount_amount,
       promo_code
-    } = await req.json();
+    } = requestBody;
 
     console.log('Request payload:', { amount, currency, msisdn, country, itemsCount: items?.length });
 
@@ -56,23 +59,36 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('PawaPay token not configured');
     }
 
+    if (!amount || !currency || !msisdn || !country || !items) {
+      console.error('Missing required fields:', { amount, currency, msisdn, country, items: !!items });
+      throw new Error('Missing required payment fields');
+    }
+
     // Generate unique deposit ID
     const depositId = crypto.randomUUID();
     console.log('Generated deposit ID:', depositId);
 
-    // Create order record in Supabase with only existing columns
+    // Create order record in Supabase
+    const orderData = {
+      user_id: user.id,
+      total_amount: amount / 100, // Convert back from cents
+      currency: currency || 'USD',
+      status: 'pending',
+      payment_method: 'mobile_money',
+      payment_status: 'pending',
+      tax_amount: tax_amount || 0,
+    };
+
+    // Only add promo_code if it exists
+    if (promo_code) {
+      orderData.promo_code = promo_code;
+    }
+
+    console.log('Creating order with data:', orderData);
+
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .insert({
-        user_id: user.id,
-        total_amount: amount / 100, // Convert back from cents
-        currency: currency || 'USD',
-        status: 'pending',
-        payment_method: 'mobile_money',
-        payment_status: 'pending',
-        tax_amount: tax_amount || 0,
-        promo_code: promo_code || null
-      })
+      .insert(orderData)
       .select()
       .single();
 

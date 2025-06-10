@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -137,6 +137,9 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
             <Smartphone className="h-5 w-5" />
             Mobile Money Payment
           </DialogTitle>
+          <DialogDescription>
+            Complete your payment using mobile money. Select your country and enter your mobile number to proceed.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">
