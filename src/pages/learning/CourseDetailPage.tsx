@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -526,37 +527,36 @@ const CourseDetailPage = () => {
                     </div>
                   )}
                     
-                    <Button variant="outline" className="w-full mb-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
-                      <Link to={`/community/courses?course=${courseId}`}>
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        Join Discussion
-                      </Link>
-                    </Button>
+                  <Button variant="outline" className="w-full mb-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
+                    <Link to={`/community/courses?course=${courseId}`}>
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Join Discussion
+                    </Link>
+                  </Button>
                     
-                    <div className="space-y-3">
-                      <div className="flex items-center text-green-600">
-                        <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">{formatDuration(course?.duration_minutes || 0)} of content</span>
-                      </div>
-                      <div className="flex items-center text-green-600">
-                        <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">{course.modules?.length || 0} modules</span>
-                      </div>
-                      <div className="flex items-center text-green-600">
-                        <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">Full lifetime access</span>
-                      </div>
-                      <div className="flex items-center text-green-600">
-                        <Check className="h-5 w-5 mr-3" />
-                        <span className="text-sm">Access on mobile and desktop</span>
-                      </div>
-                      {course?.certificate_enabled && (
-                        <div className="flex items-center text-green-600">
-                          <Check className="h-5 w-5 mr-3" />
-                          <span className="text-sm">Certificate of completion</span>
-                        </div>
-                      )}
+                  <div className="space-y-3">
+                    <div className="flex items-center text-green-600">
+                      <Check className="h-5 w-5 mr-3" />
+                      <span className="text-sm">{formatDuration(course?.duration_minutes || 0)} of content</span>
                     </div>
+                    <div className="flex items-center text-green-600">
+                      <Check className="h-5 w-5 mr-3" />
+                      <span className="text-sm">{course.modules?.length || 0} modules</span>
+                    </div>
+                    <div className="flex items-center text-green-600">
+                      <Check className="h-5 w-5 mr-3" />
+                      <span className="text-sm">Full lifetime access</span>
+                    </div>
+                    <div className="flex items-center text-green-600">
+                      <Check className="h-5 w-5 mr-3" />
+                      <span className="text-sm">Access on mobile and desktop</span>
+                    </div>
+                    {course?.certificate_enabled && (
+                      <div className="flex items-center text-green-600">
+                        <Check className="h-5 w-5 mr-3" />
+                        <span className="text-sm">Certificate of completion</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -790,5 +790,3 @@ const CourseDetailPage = () => {
 };
 
 export default CourseDetailPage;
-
-</edits_to_apply>
