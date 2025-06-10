@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,23 +14,53 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { CreditCard, Smartphone, Plus, Minus, Trash2 } from 'lucide-react';
+import { CreditCard, Smartphone, Plus, Minus, Trash2, Users } from 'lucide-react';
+import PriceDisplay from '@/components/currency/PriceDisplay';
+import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
 
 const CheckoutPage = () => {
   const { items, getTotalPrice, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
+  const { currentCurrency, convertPrice, formatPrice } = useCurrency();
   const navigate = useNavigate();
   
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'mobile_money'>('card');
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
+  const [convertedTotalAmount, setConvertedTotalAmount] = useState(0);
+  const [convertedTaxAmount, setConvertedTaxAmount] = useState(0);
+  const [convertedDiscount, setConvertedDiscount] = useState(0);
   
   const totalAmount = getTotalPrice();
   const TAX_RATE = 0.1; // 10% tax
   const taxAmount = totalAmount * TAX_RATE;
   const finalAmount = totalAmount + taxAmount - discount;
+
+  // Convert amounts to current currency
+  useEffect(() => {
+    const convertAmounts = async () => {
+      try {
+        const [convertedTotal, convertedTax, convertedDiscountAmount] = await Promise.all([
+          convertPrice(totalAmount, 'USD'),
+          convertPrice(taxAmount, 'USD'),
+          convertPrice(discount, 'USD')
+        ]);
+        
+        setConvertedTotalAmount(convertedTotal);
+        setConvertedTaxAmount(convertedTax);
+        setConvertedDiscount(convertedDiscountAmount);
+      } catch (error) {
+        console.error('Error converting amounts:', error);
+        setConvertedTotalAmount(totalAmount);
+        setConvertedTaxAmount(taxAmount);
+        setConvertedDiscount(discount);
+      }
+    };
+
+    convertAmounts();
+  }, [totalAmount, taxAmount, discount, convertPrice]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -99,12 +130,13 @@ const CheckoutPage = () => {
             item_name: item.title,
             quantity: item.quantity,
             price: item.price,
+            ticket_holder_names: item.ticket_holder_names || []
           })),
           total_amount: finalAmount,
           tax_amount: taxAmount,
           discount_amount: discount,
           promo_code: promoCode || null,
-          currency: 'USD',
+          currency: currentCurrency,
           success_url: `${window.location.origin}/checkout/success`,
           cancel_url: `${window.location.origin}/checkout`,
         }
@@ -121,41 +153,6 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleMobileMoneyPayment = async () => {
-    if (!phoneNumber.trim()) {
-      toast.error('Please enter your phone number');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('initiate-mobile-money-payment', {
-        body: {
-          phone_number: phoneNumber,
-          amount: finalAmount,
-          currency: 'USD',
-          items: items.map(item => ({
-            item_type: item.item_type,
-            item_id: item.item_id,
-            item_name: item.title,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          tax_amount: taxAmount,
-          discount_amount: discount,
-          promo_code: promoCode || null,
-        }
-      });
-
-      if (error) throw error;
-
-      toast.success('Payment initiated! Please complete the payment on your phone.');
-      // You can redirect to a payment status page or poll for payment status
-    } catch (error) {
-      console.error('Error initiating mobile money payment:', error);
-      toast.error('Failed to initiate mobile money payment');
-    }
-  };
-
   const handleCheckout = async () => {
     if (!user) {
       navigate('/auth', { state: { redirectTo: '/checkout' } });
@@ -167,7 +164,7 @@ const CheckoutPage = () => {
       if (paymentMethod === 'card') {
         await handleStripeCheckout();
       } else {
-        await handleMobileMoneyPayment();
+        setShowMobileMoneyDialog(true);
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -176,9 +173,39 @@ const CheckoutPage = () => {
     }
   };
 
+  const renderTicketHolderSummary = (item: any) => {
+    if (item.item_type !== 'event_ticket' || !item.ticket_holder_names?.length) {
+      return null;
+    }
+
+    const filledHolders = item.ticket_holder_names.filter((holder: any) => holder.name?.trim());
+    
+    return (
+      <div className="mt-2 p-2 bg-blue-50 rounded border">
+        <div className="flex items-center gap-2 mb-1">
+          <Users className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-800">Ticket Holders:</span>
+        </div>
+        {filledHolders.length > 0 ? (
+          <div className="text-sm text-blue-700">
+            {filledHolders.map((holder: any, index: number) => (
+              <div key={index}>• {holder.name}</div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-orange-600">
+            ⚠️ Please add ticket holder names before checkout
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (items.length === 0) {
     return null;
   }
+
+  const convertedFinalAmount = convertedTotalAmount + convertedTaxAmount - convertedDiscount;
 
   return (
     <Layout>
@@ -196,49 +223,59 @@ const CheckoutPage = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{item.title}</h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="secondary">
-                              {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
-                            </Badge>
+                      <div key={item.id} className="flex flex-col p-4 border rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{item.title}</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="secondary">
+                                {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
+                              </Badge>
+                            </div>
+                            <div className="mt-2">
+                              <PriceDisplay 
+                                amount={item.price} 
+                                originalCurrency="USD"
+                                className="text-lg font-semibold"
+                              />
+                            </div>
                           </div>
-                          <p className="text-lg font-semibold mt-2">${item.price.toFixed(2)}</p>
+                          
+                          <div className="flex items-center gap-4">
+                            {item.item_type === 'event_ticket' && (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         
-                        <div className="flex items-center gap-4">
-                          {item.item_type === 'event_ticket' && (
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFromCart(item.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {renderTicketHolderSummary(item)}
                       </div>
                     ))}
                   </CardContent>
@@ -284,23 +321,10 @@ const CheckoutPage = () => {
                         <RadioGroupItem value="mobile_money" id="mobile_money" />
                         <Label htmlFor="mobile_money" className="flex items-center gap-2">
                           <Smartphone className="h-4 w-4" />
-                          Mobile Money
+                          Mobile Money (PawaPay)
                         </Label>
                       </div>
                     </RadioGroup>
-
-                    {paymentMethod === 'mobile_money' && (
-                      <div className="mt-4">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          placeholder="+1234567890"
-                          value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
 
@@ -312,22 +336,22 @@ const CheckoutPage = () => {
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>${totalAmount.toFixed(2)}</span>
+                      <PriceDisplay amount={totalAmount} originalCurrency="USD" />
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>
-                      <span>${taxAmount.toFixed(2)}</span>
+                      <PriceDisplay amount={taxAmount} originalCurrency="USD" />
                     </div>
                     {discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount:</span>
-                        <span>-${discount.toFixed(2)}</span>
+                        <span>-<PriceDisplay amount={discount} originalCurrency="USD" /></span>
                       </div>
                     )}
                     <Separator />
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total:</span>
-                      <span>${finalAmount.toFixed(2)}</span>
+                      <PriceDisplay amount={finalAmount} originalCurrency="USD" />
                     </div>
                     
                     <Button 
@@ -335,7 +359,9 @@ const CheckoutPage = () => {
                       disabled={loading}
                       className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                     >
-                      {loading ? 'Processing...' : `Pay $${finalAmount.toFixed(2)}`}
+                      {loading ? 'Processing...' : (
+                        <>Pay <PriceDisplay amount={finalAmount} originalCurrency="USD" /></>
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
@@ -344,6 +370,17 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      <MobileMoneyPaymentDialog
+        isOpen={showMobileMoneyDialog}
+        onClose={() => setShowMobileMoneyDialog(false)}
+        amount={finalAmount}
+        currency={currentCurrency}
+        items={items}
+        discount={discount}
+        taxAmount={taxAmount}
+        promoCode={promoCode}
+      />
     </Layout>
   );
 };

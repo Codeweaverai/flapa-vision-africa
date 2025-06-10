@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { toast } from 'sonner';
 
 interface TicketHolder {
@@ -31,6 +31,7 @@ interface CartContextType {
   clearCart: () => Promise<void>;
   getTotalPrice: () => number;
   getItemCount: () => number;
+  getConvertedTotalPrice: () => Promise<number>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -64,6 +65,7 @@ const convertToTicketHolders = (jsonData: any): TicketHolder[] => {
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { convertPrice } = useCurrency();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -336,6 +338,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return items.reduce((total, item) => total + item.quantity, 0);
   };
 
+  const getConvertedTotalPrice = async () => {
+    try {
+      const totalUSD = getTotalPrice();
+      return await convertPrice(totalUSD, 'USD');
+    } catch (error) {
+      console.error('Error converting total price:', error);
+      return getTotalPrice();
+    }
+  };
+
   return (
     <CartContext.Provider value={{
       items,
@@ -346,9 +358,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateTicketHolders,
       clearCart,
       getTotalPrice,
-      getItemCount
+      getItemCount,
+      getConvertedTotalPrice
     }}>
       {children}
     </CartContext.Provider>
   );
 };
+
+export default CartProvider;
