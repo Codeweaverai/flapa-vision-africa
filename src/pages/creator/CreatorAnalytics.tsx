@@ -136,19 +136,25 @@ const CreatorAnalytics = () => {
               creatorItems.push(item);
             }
           } else if (item.item_type === 'event_ticket') {
-            // Check if this event belongs to the creator - fix the relationship query
+            // Check if this event belongs to the creator - fetch event ticket first, then event
             const { data: eventTicket } = await supabase
               .from('event_tickets')
-              .select(`
-                id,
-                event_id,
-                events:event_id(creator_id)
-              `)
+              .select('event_id')
               .eq('id', item.item_id)
               .single();
             
-            if (eventTicket?.events?.creator_id === user?.id) {
-              creatorItems.push(item);
+            if (eventTicket) {
+              // Now fetch the event to check creator_id
+              const { data: event } = await supabase
+                .from('events')
+                .select('creator_id')
+                .eq('id', eventTicket.event_id)
+                .eq('creator_id', user?.id)
+                .single();
+              
+              if (event) {
+                creatorItems.push(item);
+              }
             }
           }
         }
