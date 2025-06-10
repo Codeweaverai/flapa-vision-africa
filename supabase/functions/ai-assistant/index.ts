@@ -23,7 +23,14 @@ serve(async (req) => {
 
     console.log('AI Assistant request:', { message, lessonTitle, courseId, lessonId, userId });
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Get the authorization header
+    const authHeader = req.headers.get('authorization');
+    
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {}
+      }
+    });
 
     // Get additional course context
     let courseContext = '';

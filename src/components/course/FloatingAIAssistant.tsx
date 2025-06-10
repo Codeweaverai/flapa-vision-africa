@@ -45,6 +45,8 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
   }, [user, isOpen, lessonId, courseId]);
 
   const loadExistingChatHistory = async () => {
+    if (!user) return;
+    
     setIsLoadingHistory(true);
     try {
       const history = await loadChatHistory(lessonId, courseId);
@@ -111,6 +113,7 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
         message: inputMessage,
         lessonTitle,
         courseId,
+        lessonId,
         userId: user?.id
       });
 
@@ -120,6 +123,7 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
           lessonTitle,
           lessonContent,
           courseId,
+          lessonId,
           userId: user?.id
         }
       });
@@ -172,6 +176,8 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
   };
 
   const handleClearHistory = async () => {
+    if (!user) return;
+    
     try {
       const success = await clearChatHistory(lessonId, courseId);
       if (success) {
@@ -192,6 +198,11 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
       minute: '2-digit'
     });
   };
+
+  // Don't render if user is not logged in
+  if (!user) {
+    return null;
+  }
 
   return (
     <>

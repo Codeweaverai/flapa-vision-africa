@@ -21,9 +21,18 @@ export const saveChatMessage = async (
   contextData: Record<string, any> = {}
 ): Promise<AIChatMessage | null> => {
   try {
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('ai_chat_history')
       .insert({
+        user_id: user.id,
         message_type: messageType,
         content,
         lesson_id: lessonId,
@@ -34,7 +43,7 @@ export const saveChatMessage = async (
       .single();
 
     if (error) throw error;
-    return data;
+    return data as AIChatMessage;
   } catch (error) {
     console.error('Error saving chat message:', error);
     return null;
@@ -47,9 +56,18 @@ export const loadChatHistory = async (
   limit: number = 50
 ): Promise<AIChatMessage[]> => {
   try {
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      return [];
+    }
+
     let query = supabase
       .from('ai_chat_history')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: true })
       .limit(limit);
 
@@ -62,7 +80,7 @@ export const loadChatHistory = async (
     const { data, error } = await query;
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as AIChatMessage[];
   } catch (error) {
     console.error('Error loading chat history:', error);
     return [];
@@ -74,7 +92,18 @@ export const clearChatHistory = async (
   courseId?: string
 ): Promise<boolean> => {
   try {
-    let query = supabase.from('ai_chat_history').delete();
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      return false;
+    }
+
+    let query = supabase
+      .from('ai_chat_history')
+      .delete()
+      .eq('user_id', user.id);
 
     if (lessonId) {
       query = query.eq('lesson_id', lessonId);
