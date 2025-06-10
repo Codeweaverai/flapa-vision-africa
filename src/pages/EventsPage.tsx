@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -20,6 +19,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import EventRegistrationForm from '@/components/EventRegistrationForm';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
 
 const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -29,6 +29,13 @@ const EventsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Helper function to safely convert currency string to CurrencyCode
+  const getCurrencyCode = (currency?: string): CurrencyCode => {
+    if (!currency) return 'USD';
+    const upperCurrency = currency.toUpperCase() as CurrencyCode;
+    return SUPPORTED_CURRENCIES[upperCurrency] ? upperCurrency : 'USD';
+  };
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -192,7 +199,7 @@ const EventsPage = () => {
                               <Badge className="bg-green-100 text-green-800 border-green-200 px-4 py-2">Free Event</Badge>
                             ) : (
                               <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-4 py-2">
-                                <PriceDisplay amount={event.price} originalCurrency={event.currency} />
+                                <PriceDisplay amount={event.price} originalCurrency={getCurrencyCode(event.currency)} />
                               </Badge>
                             )}
                           </div>
@@ -385,7 +392,7 @@ const EventsPage = () => {
                             <Badge variant="secondary" className="bg-muted/50">Past Event</Badge>
                             {!event.is_free && (
                               <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                <PriceDisplay amount={event.price} originalCurrency={event.currency} />
+                                <PriceDisplay amount={event.price} originalCurrency={getCurrencyCode(event.currency)} />
                               </Badge>
                             )}
                           </div>

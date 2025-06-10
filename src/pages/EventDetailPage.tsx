@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -18,6 +17,7 @@ import AddToCartButton from '@/components/cart/AddToCartButton';
 import EventRegistrationButton from '@/components/payment/EventRegistrationButton';
 import { fetchEventSpeakers, fetchEventAgenda, KeynoteSpeaker, EventAgenda } from '@/services/eventManagementService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
 
 interface Event {
   id: string;
@@ -69,6 +69,13 @@ const EventDetailPage = () => {
   const [reviews, setReviews] = useState<EventReview[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const { user } = useAuth();
+
+  // Helper function to safely convert currency string to CurrencyCode
+  const getCurrencyCode = (currency?: string): CurrencyCode => {
+    if (!currency) return 'USD';
+    const upperCurrency = currency.toUpperCase() as CurrencyCode;
+    return SUPPORTED_CURRENCIES[upperCurrency] ? upperCurrency : 'USD';
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -582,7 +589,7 @@ const EventDetailPage = () => {
                   <div className="space-y-2">
                     <p className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                       {event.is_free ? 'Free' : (
-                        <PriceDisplay amount={event.price} originalCurrency={event.currency} />
+                        <PriceDisplay amount={event.price} originalCurrency={getCurrencyCode(event.currency)} />
                       )}
                     </p>
                     
@@ -629,7 +636,7 @@ const EventDetailPage = () => {
                         eventName={event.title}
                         isFree={event.is_free}
                         price={event.price}
-                        currency={event.currency}
+                        currency={getCurrencyCode(event.currency)}
                         isUserRegistered={isUserRegistered}
                         className="w-full"
                         variant="outline"
@@ -710,3 +717,5 @@ const EventDetailPage = () => {
 };
 
 export default EventDetailPage;
+
+}
