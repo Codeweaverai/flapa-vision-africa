@@ -1,888 +1,427 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import CreatorLayout from '@/components/creator/CreatorLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabaseClient';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
-import { 
-  LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
-} from 'recharts';
-import { Download, Calendar, BarChart as BarChartIcon, PieChart as PieChartIcon } from 'lucide-react';
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F'];
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import CreatorLayout from '@/components/layout/CreatorLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+import { 
+  TrendingUp, 
+  Users, 
+  DollarSign, 
+  BookOpen, 
+  Calendar,
+  Download,
+  Eye,
+  Star,
+  Clock
+} from 'lucide-react';
+import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import PriceDisplay from '@/components/currency/PriceDisplay';
+
+interface AnalyticsData {
+  totalRevenue: number;
+  totalEnrollments: number;
+  totalStudents: number;
+  coursePerformance: any[];
+  eventPerformance: any[];
+  revenueOverTime: any[];
+  enrollmentsByMonth: any[];
+  topPerformingCourses: any[];
+}
 
 const CreatorAnalytics = () => {
   const { user } = useAuth();
+  const [analytics, setAnalytics] = useState<AnalyticsData>({
+    totalRevenue: 0,
+    totalEnrollments: 0,
+    totalStudents: 0,
+    coursePerformance: [],
+    eventPerformance: [],
+    revenueOverTime: [],
+    enrollmentsByMonth: [],
+    topPerformingCourses: []
+  });
   const [loading, setLoading] = useState(true);
-  const [revenueSummary, setRevenueSummary] = useState({
-    total: 0,
-    coursesRevenue: 0,
-    eventsRevenue: 0,
-    last30Days: 0,
-  });
-  const [enrollmentSummary, setEnrollmentSummary] = useState({
-    total: 0,
-    courses: 0,
-    events: 0,
-    last30Days: 0,
-  });
+  const [timeRange, setTimeRange] = useState('30d');
 
-  const [revenueData, setRevenueData] = useState<any[]>([]);
-  const [enrollmentData, setEnrollmentData] = useState<any[]>([]);
-  const [coursePerformance, setCoursePerformance] = useState<any[]>([]);
-  const [eventPerformance, setEventPerformance] = useState<any[]>([]);
-  const [completionRates, setCompletionRates] = useState<any[]>([]);
-  const [deviceData, setDeviceData] = useState<any[]>([]);
-  const [timeframe, setTimeframe] = useState('thisMonth');
-  
   useEffect(() => {
     if (user) {
       fetchAnalyticsData();
     }
-  }, [user, timeframe]);
-  
-  // Set up realtime listeners
-  useEffect(() => {
-    if (!user) return;
-    
-    // For orders
-    const ordersChannel = supabase
-      .channel('creator-analytics-orders')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'orders' },
-        () => {
-          fetchAnalyticsData();
-        }
-      )
-      .subscribe();
-      
-    // For enrollments
-    const enrollmentsChannel = supabase
-      .channel('creator-analytics-enrollments')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'course_enrollments' },
-        () => {
-          fetchAnalyticsData();
-        }
-      )
-      .subscribe();
-      
-    // For event bookings
-    const bookingsChannel = supabase
-      .channel('creator-analytics-bookings')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'event_bookings' },
-        () => {
-          fetchAnalyticsData();
-        }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(ordersChannel);
-      supabase.removeChannel(enrollmentsChannel);
-      supabase.removeChannel(bookingsChannel);
-    };
-  }, [user]);
+  }, [user, timeRange]);
 
   const fetchAnalyticsData = async () => {
-    setLoading(true);
     try {
-      // Get date range based on selected timeframe
-      const { startDate, endDate } = getDateRange(timeframe);
+      // Calculate date range
+      let startDate = new Date();
+      switch (timeRange) {
+        case '7d':
+          startDate = subDays(new Date(), 7);
+          break;
+        case '30d':
+          startDate = subDays(new Date(), 30);
+          break;
+        case '90d':
+          startDate = subDays(new Date(), 90);
+          break;
+        case 'month':
+          startDate = startOfMonth(new Date());
+          break;
+        default:
+          startDate = subDays(new Date(), 30);
+      }
 
-      // Fetch orders for this creator's content with completed payment status
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
+      // Fetch course enrollments with course details
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
         .select(`
-          id,
-          total_amount,
-          created_at,
-          payment_status,
-          order_items!inner(
-            item_type,
-            item_id,
-            item_name,
-            quantity,
-            total_price
-          )
+          *,
+          courses!inner(title, price, is_free, creator_id, category)
         `)
+        .eq('courses.creator_id', user?.id)
         .eq('payment_status', 'completed')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .gte('created_at', startDate.toISOString());
 
-      if (ordersError) throw ordersError;
+      if (enrollmentsError) throw enrollmentsError;
 
-      // Filter orders that contain items created by this user
-      const creatorOrders = [];
-      for (const order of orders || []) {
-        const creatorItems = [];
-        
-        for (const item of order.order_items) {
-          if (item.item_type === 'course') {
-            // Check if this course belongs to the creator
-            const { data: course } = await supabase
-              .from('courses')
-              .select('creator_id')
-              .eq('id', item.item_id)
-              .eq('creator_id', user?.id)
-              .single();
-            
-            if (course) {
-              creatorItems.push(item);
-            }
-          } else if (item.item_type === 'event_ticket') {
-            // Check if this event belongs to the creator - fetch event ticket first, then event
-            const { data: eventTicket } = await supabase
-              .from('event_tickets')
-              .select('event_id')
-              .eq('id', item.item_id)
-              .single();
-            
-            if (eventTicket) {
-              // Now fetch the event to check creator_id
-              const { data: event } = await supabase
-                .from('events')
-                .select('creator_id')
-                .eq('id', eventTicket.event_id)
-                .eq('creator_id', user?.id)
-                .single();
-              
-              if (event) {
-                creatorItems.push(item);
-              }
-            }
-          }
-        }
-        
-        if (creatorItems.length > 0) {
-          creatorOrders.push({
-            ...order,
-            order_items: creatorItems
-          });
-        }
-      }
+      // Fetch event registrations with event details
+      const { data: registrations, error: registrationsError } = await supabase
+        .from('event_registrations')
+        .select(`
+          *,
+          events!inner(title, price, is_free, creator_id, event_type)
+        `)
+        .eq('events.creator_id', user?.id)
+        .eq('payment_status', 'completed')
+        .gte('created_at', startDate.toISOString());
 
-      // Calculate revenue summaries
-      let courseRevenue = 0;
-      let eventRevenue = 0;
-      let totalEnrollments = 0;
-      let courseEnrollments = 0;
-      let eventRegistrations = 0;
+      if (registrationsError) throw registrationsError;
 
-      for (const order of creatorOrders) {
-        for (const item of order.order_items) {
-          if (item.item_type === 'course') {
-            courseRevenue += Number(item.total_price || 0);
-            courseEnrollments += item.quantity;
-          } else if (item.item_type === 'event_ticket') {
-            eventRevenue += Number(item.total_price || 0);
-            eventRegistrations += item.quantity;
-          }
-          totalEnrollments += item.quantity;
-        }
-      }
+      // Calculate analytics
+      const courseRevenue = enrollments?.reduce((sum, e) => 
+        sum + (e.courses?.is_free ? 0 : e.courses?.price || 0), 0) || 0;
+      
+      const eventRevenue = registrations?.reduce((sum, r) => 
+        sum + (r.events?.is_free ? 0 : r.events?.price || 0), 0) || 0;
 
       const totalRevenue = courseRevenue + eventRevenue;
+      const totalEnrollments = (enrollments?.length || 0) + (registrations?.length || 0);
       
-      // Calculate last 30 days data
-      const last30DaysStart = subDays(new Date(), 30);
-      const last30DaysOrders = creatorOrders.filter(order => 
-        new Date(order.created_at) >= last30DaysStart
-      );
-      
-      let last30DaysRevenue = 0;
-      let last30DaysEnrollments = 0;
-      
-      for (const order of last30DaysOrders) {
-        for (const item of order.order_items) {
-          last30DaysRevenue += Number(item.total_price || 0);
-          last30DaysEnrollments += item.quantity;
-        }
-      }
-      
-      setRevenueSummary({
-        total: totalRevenue,
-        coursesRevenue: courseRevenue,
-        eventsRevenue: eventRevenue,
-        last30Days: last30DaysRevenue
-      });
-      
-      setEnrollmentSummary({
-        total: totalEnrollments,
-        courses: courseEnrollments,
-        events: eventRegistrations,
-        last30Days: last30DaysEnrollments
-      });
-
-      // Process revenue data by day
-      const revenueByDay = processOrdersByDay(creatorOrders, startDate, endDate);
-      setRevenueData(revenueByDay);
-
-      // Process enrollment data by day
-      const enrollmentByDay = processEnrollmentsByDay(creatorOrders, startDate, endDate);
-      setEnrollmentData(enrollmentByDay);
-
-      // Process course performance
-      const coursesData = processCoursePerformanceFromOrders(creatorOrders);
-      setCoursePerformance(coursesData);
-      
-      // Process event performance
-      const eventsData = processEventPerformanceFromOrders(creatorOrders);
-      setEventPerformance(eventsData);
-      
-      // Fetch course completion rates
-      await fetchCompletionRates();
-      
-      // Mock device data (in a real app, this would come from analytics)
-      setDeviceData([
-        { name: 'Mobile', value: 55 },
-        { name: 'Desktop', value: 35 },
-        { name: 'Tablet', value: 10 }
+      const uniqueStudents = new Set([
+        ...(enrollments?.map(e => e.user_id) || []),
+        ...(registrations?.map(r => r.user_id) || [])
       ]);
-      
+
+      // Group by course for performance data
+      const coursePerformance = enrollments?.reduce((acc, enrollment) => {
+        const courseTitle = enrollment.courses?.title || 'Unknown';
+        if (!acc[courseTitle]) {
+          acc[courseTitle] = {
+            title: courseTitle,
+            enrollments: 0,
+            revenue: 0,
+            category: enrollment.courses?.category || 'Other'
+          };
+        }
+        acc[courseTitle].enrollments += 1;
+        acc[courseTitle].revenue += enrollment.courses?.is_free ? 0 : (enrollment.courses?.price || 0);
+        return acc;
+      }, {} as any) || {};
+
+      // Group by event for performance data
+      const eventPerformance = registrations?.reduce((acc, registration) => {
+        const eventTitle = registration.events?.title || 'Unknown';
+        if (!acc[eventTitle]) {
+          acc[eventTitle] = {
+            title: eventTitle,
+            registrations: 0,
+            revenue: 0,
+            type: registration.events?.event_type || 'Other'
+          };
+        }
+        acc[eventTitle].registrations += 1;
+        acc[eventTitle].revenue += registration.events?.is_free ? 0 : (registration.events?.price || 0);
+        return acc;
+      }, {} as any) || {};
+
+      // Revenue over time (daily)
+      const revenueByDay = [...(enrollments || []), ...(registrations || [])].reduce((acc, item) => {
+        const date = format(new Date(item.created_at), 'MMM dd');
+        const revenue = item.courses ? 
+          (item.courses.is_free ? 0 : item.courses.price || 0) :
+          (item.events.is_free ? 0 : item.events.price || 0);
+        
+        if (!acc[date]) {
+          acc[date] = { date, revenue: 0, enrollments: 0 };
+        }
+        acc[date].revenue += revenue;
+        acc[date].enrollments += 1;
+        return acc;
+      }, {} as any);
+
+      setAnalytics({
+        totalRevenue,
+        totalEnrollments,
+        totalStudents: uniqueStudents.size,
+        coursePerformance: Object.values(coursePerformance),
+        eventPerformance: Object.values(eventPerformance),
+        revenueOverTime: Object.values(revenueByDay),
+        enrollmentsByMonth: Object.values(revenueByDay),
+        topPerformingCourses: Object.values(coursePerformance)
+          .sort((a: any, b: any) => b.revenue - a.revenue)
+          .slice(0, 5)
+      });
+
     } catch (error) {
       console.error('Error fetching analytics data:', error);
     } finally {
       setLoading(false);
     }
   };
-  
-  const fetchCompletionRates = async () => {
-    try {
-      // Get courses by this creator
-      const { data: courses, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, title')
-        .eq('creator_id', user?.id);
-        
-      if (coursesError) throw coursesError;
-      
-      const completionData = await Promise.all((courses || []).map(async (course) => {
-        // Get total enrollments for this course
-        const { count: totalCount, error: totalError } = await supabase
-          .from('course_enrollments')
-          .select('id', { count: 'exact', head: true })
-          .eq('course_id', course.id);
-          
-        if (totalError) throw totalError;
-        
-        // Get completed enrollments for this course
-        const { count: completedCount, error: completedError } = await supabase
-          .from('course_enrollments')
-          .select('id', { count: 'exact', head: true })
-          .eq('course_id', course.id)
-          .eq('is_completed', true);
-          
-        if (completedError) throw completedError;
-        
-        const completionRate = totalCount ? Math.round((completedCount || 0) * 100 / totalCount) : 0;
-        
-        return {
-          name: course.title,
-          completionRate: completionRate,
-          enrollments: totalCount || 0
-        };
-      }));
-      
-      setCompletionRates(completionData);
-    } catch (error) {
-      console.error('Error fetching completion rates:', error);
-    }
-  };
-  
-  const getDateRange = (timeframe: string) => {
-    const endDate = new Date();
-    let startDate: Date;
-    
-    switch(timeframe) {
-      case 'last7Days':
-        startDate = subDays(endDate, 7);
-        break;
-      case 'last30Days':
-        startDate = subDays(endDate, 30);
-        break;
-      case 'last90Days':
-        startDate = subDays(endDate, 90);
-        break;
-      case 'thisMonth':
-        startDate = startOfMonth(endDate);
-        break;
-      case 'lastMonth':
-        startDate = startOfMonth(subDays(endDate, 30));
-        endDate.setTime(startOfMonth(endDate).getTime() - 1);
-        break;
-      case 'thisYear':
-        startDate = new Date(endDate.getFullYear(), 0, 1);
-        break;
-      default:
-        startDate = subDays(endDate, 30);
-    }
-    
-    return { startDate, endDate };
-  };
-  
-  const processOrdersByDay = (orders: any[], startDate: Date, endDate: Date) => {
-    const result: {[key: string]: any} = {};
-    const currentDate = new Date(startDate);
-    
-    // Initialize each date in the range
-    while (currentDate <= endDate) {
-      const dateKey = format(currentDate, 'yyyy-MM-dd');
-      result[dateKey] = {
-        date: dateKey,
-        courses: 0,
-        events: 0,
-        total: 0
-      };
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    
-    // Aggregate revenue by day
-    orders.forEach(order => {
-      const dateKey = format(new Date(order.created_at), 'yyyy-MM-dd');
-      if (result[dateKey]) {
-        for (const item of order.order_items) {
-          const revenue = Number(item.total_price || 0);
-          if (item.item_type === 'course') {
-            result[dateKey].courses += revenue;
-          } else {
-            result[dateKey].events += revenue;
-          }
-          result[dateKey].total += revenue;
-        }
-      }
-    });
-    
-    // Convert to array
-    return Object.values(result);
-  };
-  
-  const processEnrollmentsByDay = (orders: any[], startDate: Date, endDate: Date) => {
-    const result: {[key: string]: any} = {};
-    const currentDate = new Date(startDate);
-    
-    // Initialize each date in the range
-    while (currentDate <= endDate) {
-      const dateKey = format(currentDate, 'yyyy-MM-dd');
-      result[dateKey] = {
-        date: dateKey,
-        courses: 0,
-        events: 0,
-        total: 0
-      };
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    
-    // Aggregate enrollments by day
-    orders.forEach(order => {
-      const dateKey = format(new Date(order.created_at), 'yyyy-MM-dd');
-      if (result[dateKey]) {
-        for (const item of order.order_items) {
-          const quantity = item.quantity || 0;
-          if (item.item_type === 'course') {
-            result[dateKey].courses += quantity;
-          } else {
-            result[dateKey].events += quantity;
-          }
-          result[dateKey].total += quantity;
-        }
-      }
-    });
-    
-    // Convert to array
-    return Object.values(result);
-  };
-  
-  const processCoursePerformanceFromOrders = (orders: any[]) => {
-    const courseMap: {[key: string]: any} = {};
-    
-    orders.forEach(order => {
-      order.order_items.forEach((item: any) => {
-        if (item.item_type === 'course') {
-          const courseId = item.item_id;
-          const courseName = item.item_name;
-          
-          if (!courseMap[courseId]) {
-            courseMap[courseId] = {
-              name: courseName,
-              enrollments: 0,
-              revenue: 0
-            };
-          }
-          
-          courseMap[courseId].enrollments += item.quantity;
-          courseMap[courseId].revenue += Number(item.total_price || 0);
-        }
-      });
-    });
-    
-    return Object.values(courseMap).sort((a, b) => b.enrollments - a.enrollments);
-  };
-  
-  const processEventPerformanceFromOrders = (orders: any[]) => {
-    const eventMap: {[key: string]: any} = {};
-    
-    orders.forEach(order => {
-      order.order_items.forEach((item: any) => {
-        if (item.item_type === 'event_ticket') {
-          const eventId = item.item_id;
-          const eventName = item.item_name;
-          
-          if (!eventMap[eventId]) {
-            eventMap[eventId] = {
-              name: eventName,
-              registrations: 0,
-              revenue: 0
-            };
-          }
-          
-          eventMap[eventId].registrations += item.quantity;
-          eventMap[eventId].revenue += Number(item.total_price || 0);
-        }
-      });
-    });
-    
-    return Object.values(eventMap).sort((a, b) => b.registrations - a.registrations);
-  };
 
-  const formatRevenueValue = (value: number) => {
-    return `$${value.toFixed(2)}`;
-  };
-  
+  const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe'];
+
+  if (loading) {
+    return (
+      <CreatorLayout>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="pb-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </CreatorLayout>
+    );
+  }
+
   return (
-    <CreatorLayout title="Analytics">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Track your business performance and growth</p>
+    <CreatorLayout>
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics</h1>
+            <p className="text-gray-600">Track your performance and growth</p>
+          </div>
+          <div className="flex items-center gap-4 mt-4 sm:mt-0">
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="month">This month</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
         </div>
-        <Button variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Export Report
-        </Button>
-      </div>
-      
-      {/* Timeframe selector */}
-      <div className="mb-6">
-        <div className="inline-flex rounded-md border p-1">
-          <Button 
-            variant={timeframe === 'last7Days' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setTimeframe('last7Days')}
-          >
-            7 Days
-          </Button>
-          <Button 
-            variant={timeframe === 'last30Days' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setTimeframe('last30Days')}
-          >
-            30 Days
-          </Button>
-          <Button 
-            variant={timeframe === 'thisMonth' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setTimeframe('thisMonth')}
-          >
-            This Month
-          </Button>
-          <Button 
-            variant={timeframe === 'lastMonth' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setTimeframe('lastMonth')}
-          >
-            Last Month
-          </Button>
-          <Button 
-            variant={timeframe === 'thisYear' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setTimeframe('thisYear')}
-          >
-            This Year
-          </Button>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center">
+                <DollarSign className="h-5 w-5 mr-2" />
+                Total Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                <PriceDisplay amount={analytics.totalRevenue} originalCurrency="USD" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Total Students
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{analytics.totalStudents}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center">
+                <BookOpen className="h-5 w-5 mr-2" />
+                Total Enrollments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{analytics.totalEnrollments}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2" />
+                Avg. Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                <PriceDisplay 
+                  amount={analytics.totalEnrollments > 0 ? analytics.totalRevenue / analytics.totalEnrollments : 0} 
+                  originalCurrency="USD" 
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
-      
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-2">
-              <p className="text-muted-foreground">Total Revenue</p>
-              <Badge variant="outline">{timeframe === 'last30Days' ? '30 Days' : timeframe}</Badge>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <h3 className="text-2xl font-bold">${loading ? '-' : revenueSummary.total.toFixed(2)}</h3>
-              <span className="text-xs text-muted-foreground">USD</span>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-2">
-              <p className="text-muted-foreground">Total Enrollments</p>
-              <Badge variant="outline">{timeframe === 'last30Days' ? '30 Days' : timeframe}</Badge>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <h3 className="text-2xl font-bold">{loading ? '-' : enrollmentSummary.total}</h3>
-              <span className="text-xs text-muted-foreground">enrollments</span>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-2">
-              <p className="text-muted-foreground">Course Revenue</p>
-              <Badge variant="outline">{timeframe === 'last30Days' ? '30 Days' : timeframe}</Badge>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <h3 className="text-2xl font-bold">${loading ? '-' : revenueSummary.coursesRevenue.toFixed(2)}</h3>
-              <span className="text-xs text-muted-foreground">USD</span>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-2">
-              <p className="text-muted-foreground">Event Revenue</p>
-              <Badge variant="outline">{timeframe === 'last30Days' ? '30 Days' : timeframe}</Badge>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <h3 className="text-2xl font-bold">${loading ? '-' : revenueSummary.eventsRevenue.toFixed(2)}</h3>
-              <span className="text-xs text-muted-foreground">USD</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Main Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center">
-              <BarChartIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Revenue Over Time */}
+          <Card>
+            <CardHeader>
               <CardTitle>Revenue Over Time</CardTitle>
-            </div>
-            <CardDescription>Daily revenue breakdown for courses and events</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0 h-80">
-            {loading ? (
-              <div className="flex justify-center items-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
-                  <defs>
-                    <linearGradient id="colorCourses" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#82ca9d" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analytics.revenueOverTime}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => {
-                      const date = new Date(value);
-                      return format(date, 'MM/dd');
-                    }} 
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => `$${value}`}
-                  />
+                  <XAxis dataKey="date" />
+                  <YAxis />
                   <Tooltip 
-                    formatter={(value, name) => [formatRevenueValue(Number(value)), name === 'courses' ? 'Courses' : 'Events']}
-                    labelFormatter={(label) => format(new Date(label), 'PPP')}
+                    formatter={(value) => [
+                      <PriceDisplay amount={Number(value)} originalCurrency="USD" />, 
+                      'Revenue'
+                    ]}
                   />
                   <Legend />
-                  <Area 
-                    type="monotone"
-                    name="Courses"
-                    dataKey="courses"
-                    stroke="#8884d8"
-                    fillOpacity={1}
-                    fill="url(#colorCourses)"
-                  />
-                  <Area 
-                    type="monotone"
-                    name="Events"
-                    dataKey="events"
-                    stroke="#82ca9d"
-                    fillOpacity={1}
-                    fill="url(#colorEvents)"
-                  />
-                </AreaChart>
+                  <Line type="monotone" dataKey="revenue" stroke="#8884d8" strokeWidth={2} />
+                </LineChart>
               </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <div className="flex items-center">
-              <BarChartIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-              <CardTitle>Enrollment Activity</CardTitle>
-            </div>
-            <CardDescription>Daily enrollment and registration data</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0 h-80">
-            {loading ? (
-              <div className="flex justify-center items-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={enrollmentData}>
+            </CardContent>
+          </Card>
+
+          {/* Enrollments Over Time */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Enrollments Over Time</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.enrollmentsByMonth}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => {
-                      const date = new Date(value);
-                      return format(date, 'MM/dd');
-                    }} 
-                  />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    labelFormatter={(label) => format(new Date(label), 'PPP')}
-                  />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
                   <Legend />
-                  <Bar 
-                    dataKey="courses" 
-                    name="Course Enrollments" 
-                    stackId="a" 
-                    fill="#8884d8" 
-                  />
-                  <Bar 
-                    dataKey="events" 
-                    name="Event Registrations" 
-                    stackId="a" 
-                    fill="#82ca9d" 
-                  />
+                  <Bar dataKey="enrollments" fill="#82ca9d" />
                 </BarChart>
               </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      
-      <Tabs defaultValue="coursePerformance">
-        <TabsList className="mb-4">
-          <TabsTrigger value="coursePerformance">Course Performance</TabsTrigger>
-          <TabsTrigger value="eventPerformance">Event Performance</TabsTrigger>
-          <TabsTrigger value="completionRates">Completion Rates</TabsTrigger>
-          <TabsTrigger value="demographics">User Demographics</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="coursePerformance">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Performing Courses</CardTitle>
-              <CardDescription>Courses ranked by enrollments and revenue</CardDescription>
-            </CardHeader>
-            <CardContent className="h-96">
-              {loading ? (
-                <div className="flex justify-center items-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : coursePerformance.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No course enrollment data available.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={coursePerformance.slice(0, 5)}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      tick={{ fontSize: 12 }}
-                      width={80}
-                    />
-                    <Tooltip />
-                    <Legend />
-                    <Bar 
-                      dataKey="enrollments" 
-                      name="Enrollments" 
-                      fill="#8884d8" 
-                    />
-                    <Bar 
-                      dataKey="revenue" 
-                      name="Revenue ($)" 
-                      fill="#82ca9d" 
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="eventPerformance">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Performing Events</CardTitle>
-              <CardDescription>Events ranked by registrations and revenue</CardDescription>
-            </CardHeader>
-            <CardContent className="h-96">
-              {loading ? (
-                <div className="flex justify-center items-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : eventPerformance.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No event registration data available.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={eventPerformance.slice(0, 5)}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      tick={{ fontSize: 12 }}
-                      width={80}
-                    />
-                    <Tooltip />
-                    <Legend />
-                    <Bar 
-                      dataKey="registrations" 
-                      name="Registrations" 
-                      fill="#8884d8" 
-                    />
-                    <Bar 
-                      dataKey="revenue" 
-                      name="Revenue ($)" 
-                      fill="#82ca9d" 
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="completionRates">
-          <Card>
-            <CardHeader>
-              <CardTitle>Course Completion Rates</CardTitle>
-              <CardDescription>Percentage of students who completed each course</CardDescription>
-            </CardHeader>
-            <CardContent className="h-96">
-              {loading ? (
-                <div className="flex justify-center items-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : completionRates.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No completion data available.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={completionRates}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} unit="%" />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      tick={{ fontSize: 12 }}
-                      width={80}
-                    />
-                    <Tooltip formatter={(value) => [`${value}%`, 'Completion Rate']} />
-                    <Bar 
-                      dataKey="completionRate" 
-                      name="Completion Rate" 
-                      fill="#8884d8"
-                    >
-                      {completionRates.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="demographics">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Top Performing Courses */}
+          <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <div className="flex items-center">
-                  <PieChartIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <CardTitle>Device Usage</CardTitle>
-                </div>
-                <CardDescription>Breakdown of devices used to access content</CardDescription>
+                <CardTitle>Top Performing Courses</CardTitle>
               </CardHeader>
-              <CardContent className="pt-0 h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={deviceData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {deviceData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [`${value}%`, name]} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Demographics Data</CardTitle>
-                <CardDescription>
-                  User demographics will be displayed here when available.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex items-center justify-center h-80 text-muted-foreground">
-                <div className="text-center">
-                  <BarChartIcon className="h-16 w-16 mx-auto mb-4 text-muted" />
-                  <p>Demographics data will be available soon.</p>
-                </div>
+              <CardContent>
+                {analytics.topPerformingCourses.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No course data available</p>
+                ) : (
+                  <div className="space-y-4">
+                    {analytics.topPerformingCourses.map((course: any, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="bg-blue-100 text-blue-600 p-2 rounded-full mr-3">
+                            <BookOpen className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{course.title}</p>
+                            <p className="text-sm text-gray-500">{course.enrollments} enrollments</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">
+                            <PriceDisplay amount={course.revenue} originalCurrency="USD" />
+                          </p>
+                          <Badge variant="outline">{course.category}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-      </Tabs>
+
+          {/* Course Performance Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Course Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {analytics.coursePerformance.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No data available</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={analytics.coursePerformance}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="enrollments"
+                      label={({ title, enrollments }) => `${title}: ${enrollments}`}
+                    >
+                      {analytics.coursePerformance.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </CreatorLayout>
   );
 };
