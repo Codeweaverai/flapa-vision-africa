@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { 
   DropdownMenu, 
@@ -37,12 +38,36 @@ import {
   Heart,
   DollarSign,
   BarChart3,
-  Shield
+  Shield,
+  Compass
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/lib/supabaseClient';
 import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
+import CartIcon from '@/components/cart/CartIcon';
+import InboxIcon from '@/components/inbox/InboxIcon';
+import { 
+  initializeNotificationSound, 
+  setupNotificationListener, 
+  setupInboxMessageListener 
+} from '@/services/notificationService';
+
+// Add missing notification service function
+const fetchUserNotifications = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+
+  return data || [];
+};
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
