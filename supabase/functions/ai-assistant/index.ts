@@ -23,6 +23,18 @@ serve(async (req) => {
 
     console.log('AI Assistant request:', { message, lessonTitle, courseId, lessonId, userId });
 
+    // Check if OpenAI API key is available
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is not configured');
+      return new Response(JSON.stringify({ 
+        error: 'OpenAI API key not configured',
+        success: false 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Get the authorization header
     const authHeader = req.headers.get('authorization');
     
@@ -125,7 +137,7 @@ Guidelines:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
@@ -136,10 +148,18 @@ Guidelines:
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`OpenAI API error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Invalid OpenAI response structure:', data);
+      throw new Error('Invalid response from OpenAI API');
+    }
+
     const aiResponse = data.choices[0].message.content;
 
     console.log('AI response generated successfully');
@@ -154,7 +174,7 @@ Guidelines:
   } catch (error) {
     console.error('Error in AI assistant function:', error);
     return new Response(JSON.stringify({ 
-      error: 'Failed to get AI response',
+      error: error.message || 'Failed to get AI response',
       success: false 
     }), {
       status: 500,
