@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,6 +50,7 @@ import {
   PaymentBreakdown
 } from '@/services/enhancedPaymentService';
 import WithdrawDialog from '@/components/creator/WithdrawDialog';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 const CreatorPayments: React.FC = () => {
   const [payments, setPayments] = useState<PaymentTransaction[]>([]);
@@ -247,7 +247,7 @@ const CreatorPayments: React.FC = () => {
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  USD {enhancedBalance.available_balance.toFixed(2)}
+                  <PriceDisplay amount={enhancedBalance.available_balance} originalCurrency="USD" />
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
@@ -275,7 +275,7 @@ const CreatorPayments: React.FC = () => {
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  USD {enhancedBalance.pending_balance.toFixed(2)}
+                  <PriceDisplay amount={enhancedBalance.pending_balance} originalCurrency="USD" />
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
@@ -294,7 +294,7 @@ const CreatorPayments: React.FC = () => {
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  USD {enhancedBalance.total_earnings.toFixed(2)}
+                  <PriceDisplay amount={enhancedBalance.total_earnings} originalCurrency="USD" />
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
@@ -313,7 +313,7 @@ const CreatorPayments: React.FC = () => {
                 <Skeleton className="h-7 w-24" />
               ) : (
                 <div className="text-2xl font-bold">
-                  USD {enhancedBalance.total_platform_fees.toFixed(2)}
+                  <PriceDisplay amount={enhancedBalance.total_platform_fees} originalCurrency="USD" />
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
@@ -332,7 +332,7 @@ const CreatorPayments: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                USD {paymentBreakdown.course_revenue.toFixed(2)}
+                <PriceDisplay amount={paymentBreakdown.course_revenue} originalCurrency="USD" />
               </div>
             </CardContent>
           </Card>
@@ -344,7 +344,7 @@ const CreatorPayments: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                USD {paymentBreakdown.event_revenue.toFixed(2)}
+                <PriceDisplay amount={paymentBreakdown.event_revenue} originalCurrency="USD" />
               </div>
             </CardContent>
           </Card>
@@ -437,13 +437,13 @@ const CreatorPayments: React.FC = () => {
                               <TableCell>{payment.user_email || 'Unknown'}</TableCell>
                               <TableCell>{getPaymentTypeLabel(payment.reference_type)}</TableCell>
                               <TableCell>
-                                {payment.currency.toUpperCase()} {payment.amount.toFixed(2)}
+                                <PriceDisplay amount={payment.amount} originalCurrency={payment.currency as any} />
                               </TableCell>
                               <TableCell className="text-green-600 font-medium">
-                                USD {(payment.amount * 0.92).toFixed(2)}
+                                <PriceDisplay amount={payment.amount * 0.92} originalCurrency="USD" />
                               </TableCell>
                               <TableCell className="text-gray-500">
-                                USD {(payment.amount * 0.08).toFixed(2)}
+                                <PriceDisplay amount={payment.amount * 0.08} originalCurrency="USD" />
                               </TableCell>
                               <TableCell>{getStatusBadge(payment.status)}</TableCell>
                             </TableRow>
@@ -504,7 +504,7 @@ const CreatorPayments: React.FC = () => {
                               <TableCell className="capitalize">{payout.method}</TableCell>
                               <TableCell>{payout.destination}</TableCell>
                               <TableCell>
-                                {payout.currency.toUpperCase()} {payout.amount.toFixed(2)}
+                                <PriceDisplay amount={payout.amount} originalCurrency={payout.currency as any} />
                               </TableCell>
                               <TableCell>{getStatusBadge(payout.status)}</TableCell>
                             </TableRow>

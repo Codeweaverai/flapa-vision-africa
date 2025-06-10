@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -19,6 +18,7 @@ import { ChevronDown, Users, BookOpen, Calendar, DollarSign } from 'lucide-react
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import CreatorLayout from '@/components/creator/CreatorLayout';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 // Fix the specific function causing the error
 const calculateMonthlyRevenue = (enrollments: EnrollmentType[]) => {
@@ -341,7 +341,9 @@ const CreatorDashboard: React.FC = () => {
                 <DollarSign className="h-10 w-10 text-blue-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <h3 className="text-2xl font-bold">${revenueMetrics.totalRevenue.toFixed(2)}</h3>
+                  <h3 className="text-2xl font-bold">
+                    <PriceDisplay amount={revenueMetrics.totalRevenue} originalCurrency="USD" />
+                  </h3>
                 </div>
               </div>
             </Card>
@@ -408,7 +410,9 @@ const CreatorDashboard: React.FC = () => {
                 <Card className="p-6">
                   <h3 className="text-lg font-medium mb-4">Course Revenue</h3>
                   <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold">${revenueMetrics.courseRevenue.toFixed(2)}</p>
+                    <p className="text-3xl font-bold">
+                      <PriceDisplay amount={revenueMetrics.courseRevenue} originalCurrency="USD" />
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {
                         revenueMetrics.totalRevenue > 0 
@@ -422,7 +426,9 @@ const CreatorDashboard: React.FC = () => {
                 <Card className="p-6">
                   <h3 className="text-lg font-medium mb-4">Event Revenue</h3>
                   <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold">${revenueMetrics.eventRevenue.toFixed(2)}</p>
+                    <p className="text-3xl font-bold">
+                      <PriceDisplay amount={revenueMetrics.eventRevenue} originalCurrency="USD" />
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {
                         revenueMetrics.totalRevenue > 0

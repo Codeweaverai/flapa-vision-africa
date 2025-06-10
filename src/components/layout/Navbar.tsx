@@ -1,31 +1,47 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Bell, Compass, Menu } from 'lucide-react';
+import { 
+  Search, 
+  Menu, 
+  ShoppingCart, 
+  Bell, 
+  User, 
+  Settings, 
+  LogOut, 
+  BookOpen, 
+  Calendar, 
+  Users, 
+  MessageSquare,
+  Home,
+  GraduationCap,
+  Briefcase,
+  Mic,
+  UserCheck,
+  Camera,
+  Play,
+  Building,
+  HelpCircle,
+  FileText,
+  Heart,
+  DollarSign,
+  BarChart3,
+  Shield
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/lib/supabaseClient';
-import { fetchUserNotifications } from '@/services/communityService';
-import InboxIcon from '@/components/inbox/InboxIcon';
-import { initializeNotificationSound, setupNotificationListener, setupInboxMessageListener } from '@/services/notificationService';
-import CartIcon from '@/components/cart/CartIcon';
 import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
 
 const Navbar = () => {

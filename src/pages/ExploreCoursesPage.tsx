@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -10,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { BookOpen, Clock, Search, Filter, Star, Users, TrendingUp, Play } from 'lucide-react';
 import { Course, fetchPublishedCourses, VALID_CATEGORIES } from '@/services/courseService';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 const COURSES_PER_PAGE = 20;
 
@@ -264,7 +264,7 @@ const ExploreCoursesPage = () => {
                         </Badge>
                       ) : (
                         <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 shadow-lg">
-                          ${course.price}
+                          <PriceDisplay amount={course.price} originalCurrency="USD" />
                         </Badge>
                       )}
                     </div>

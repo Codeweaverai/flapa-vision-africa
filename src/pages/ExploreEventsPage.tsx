@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -11,6 +10,7 @@ import { Calendar, Clock, Search, MapPin, Users, Video, Filter, ArrowRight, Star
 import { Event, fetchEvents, VALID_EVENT_TYPES } from '@/services/eventService';
 import { format, parseISO, isAfter } from 'date-fns';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 const ExploreEventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -282,7 +282,7 @@ const ExploreEventsPage = () => {
                             : 'bg-gradient-to-r from-orange-500 to-purple-600'
                         } text-white border-0 font-semibold`}
                       >
-                        {event.is_free ? "Free" : `${event.currency || 'ZMW'} ${event.price}`}
+                        {event.is_free ? "Free" : <PriceDisplay amount={event.price || 0} originalCurrency="USD" />}
                       </Badge>
                     </div>
 
