@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { BookOpen, Clock, Users, Star, DollarSign } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Course {
   id: string;
@@ -122,7 +122,7 @@ const CoursesSection = () => {
                     </Badge>
                   ) : (
                     <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                      ${course.price}
+                      <PriceDisplay amount={course.price} originalCurrency="USD" />
                     </Badge>
                   )}
                 </div>

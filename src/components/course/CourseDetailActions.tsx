@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, Users, Award, Star } from 'lucide-react';
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import { useAuth } from '@/contexts/AuthContext';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface CourseDetailActionsProps {
   course: {
@@ -47,7 +47,7 @@ const CourseDetailActions: React.FC<CourseDetailActionsProps> = ({
               <div className="text-2xl font-bold text-green-600 mb-4">Free</div>
             ) : (
               <div className="text-3xl font-bold text-primary mb-4">
-                ${course.price}
+                <PriceDisplay amount={course.price} originalCurrency="USD" />
               </div>
             )}
 

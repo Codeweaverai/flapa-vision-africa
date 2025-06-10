@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface CourseEnrollmentButtonProps {
   courseId: string;
@@ -123,7 +123,11 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
       className={className}
       variant={variant}
     >
-      {loading ? "Processing..." : `Enroll Now - ${currency} ${price.toFixed(2)}`}
+      {loading ? "Processing..." : (
+        <>
+          Enroll Now - <PriceDisplay amount={price} originalCurrency={currency as any} />
+        </>
+      )}
     </Button>
   );
 };

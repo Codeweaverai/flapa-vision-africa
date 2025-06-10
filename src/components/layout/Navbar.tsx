@@ -26,6 +26,7 @@ import { fetchUserNotifications } from '@/services/communityService';
 import InboxIcon from '@/components/inbox/InboxIcon';
 import { initializeNotificationSound, setupNotificationListener, setupInboxMessageListener } from '@/services/notificationService';
 import CartIcon from '@/components/cart/CartIcon';
+import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -177,6 +178,7 @@ const Navbar = () => {
             <>
               <CartIcon />
               <InboxIcon />
+              <CurrencySwitcher />
               
               <Button 
                 variant="ghost" 
@@ -252,9 +254,12 @@ const Navbar = () => {
               </DropdownMenu>
             </>
           ) : (
-            <Button asChild>
-              <Link to="/auth">Sign In</Link>
-            </Button>
+            <>
+              <CurrencySwitcher />
+              <Button asChild>
+                <Link to="/auth">Sign In</Link>
+              </Button>
+            </>
           )}
 
           <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>

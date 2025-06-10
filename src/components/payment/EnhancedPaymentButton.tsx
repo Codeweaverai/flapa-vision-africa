@@ -1,10 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { createStripeCheckoutSession } from '@/services/enhancedPaymentService';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface EnhancedPaymentButtonProps {
   referenceType: 'course' | 'event';
@@ -30,6 +31,7 @@ const EnhancedPaymentButton: React.FC<EnhancedPaymentButtonProps> = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const { currentCurrency, convertPrice } = useCurrency();
 
   const handlePayment = async () => {
     if (!user) {
@@ -39,6 +41,7 @@ const EnhancedPaymentButton: React.FC<EnhancedPaymentButtonProps> = ({
 
     setLoading(true);
     try {
+      // Convert amount to current currency for display, but send original for processing
       const checkoutUrl = await createStripeCheckoutSession(
         referenceType,
         referenceId,
@@ -75,7 +78,7 @@ const EnhancedPaymentButton: React.FC<EnhancedPaymentButtonProps> = ({
       ) : (
         <>
           <CreditCard className="mr-2 h-4 w-4" />
-          Pay {currency} {amount.toFixed(2)}
+          Pay <PriceDisplay amount={amount} originalCurrency={currency as any} />
         </>
       )}
     </Button>
