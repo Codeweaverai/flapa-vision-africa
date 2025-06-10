@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, Send, User, X, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Message {
   id: string;
@@ -17,15 +19,21 @@ interface Message {
 interface FloatingAIAssistantProps {
   lessonTitle?: string;
   lessonContent?: string;
+  courseId?: string;
 }
 
-const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({ lessonTitle, lessonContent }) => {
+const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({ 
+  lessonTitle, 
+  lessonContent, 
+  courseId 
+}) => {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       type: 'assistant',
-      content: `Hi! I'm your AI learning assistant. I'm here to help you understand "${lessonTitle || 'this lesson'}" better. Feel free to ask me any questions!`,
+      content: `Hi! I'm your AI learning assistant. I'm here to help you understand ${lessonTitle ? `"${lessonTitle}"` : 'this lesson'} better. Feel free to ask me any questions about the content, concepts, or how to apply what you're learning!`,
       timestamp: new Date()
     }
   ]);
@@ -47,37 +55,54 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({ lessonTitle, 
     setIsLoading(true);
 
     try {
-      const context = `Lesson: ${lessonTitle}\nContent: ${lessonContent || 'No additional content provided'}`;
-      
-      const generateResponse = (question: string) => {
-        const lowerQuestion = question.toLowerCase();
-        
-        if (lowerQuestion.includes('summary') || lowerQuestion.includes('summarize')) {
-          return `Based on the lesson "${lessonTitle}", here's a summary: This lesson covers important concepts that will help you understand the topic better. The key points include practical applications and theoretical foundations.`;
-        } else if (lowerQuestion.includes('example') || lowerQuestion.includes('examples')) {
-          return `Great question! Here are some examples related to "${lessonTitle}": These concepts can be applied in real-world scenarios to solve practical problems.`;
-        } else if (lowerQuestion.includes('help') || lowerQuestion.includes('explain')) {
-          return `I'd be happy to help explain concepts from "${lessonTitle}". The lesson focuses on building your understanding through step-by-step explanations and practical examples.`;
-        } else {
-          return `That's an interesting question about "${lessonTitle}". Based on the lesson content, I can help you understand this topic better. Could you be more specific about what aspect you'd like me to explain?`;
+      console.log('Sending message to AI assistant:', {
+        message: inputMessage,
+        lessonTitle,
+        courseId,
+        userId: user?.id
+      });
+
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          message: inputMessage,
+          lessonTitle,
+          lessonContent,
+          courseId,
+          userId: user?.id
         }
+      });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to get AI response');
+      }
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: data.response,
+        timestamp: new Date()
       };
 
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: 'assistant',
-          content: generateResponse(inputMessage),
-          timestamp: new Date()
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsLoading(false);
-      }, 1000);
+      setMessages(prev => [...prev, assistantMessage]);
 
     } catch (error) {
       console.error('Error sending message to AI:', error);
-      toast.error('Failed to get AI response');
+      toast.error('Failed to get AI response. Please try again.');
+      
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: "I'm sorry, I'm having trouble connecting right now. Please try asking your question again in a moment.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -121,6 +146,11 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({ lessonTitle, 
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+              {lessonTitle && (
+                <p className="text-xs text-muted-foreground">
+                  Currently helping with: {lessonTitle}
+                </p>
+              )}
             </CardHeader>
             
             <CardContent className="flex flex-col h-[calc(100%-80px)] p-4">

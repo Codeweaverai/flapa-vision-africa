@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient';
 import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
 
 interface Course {
   id: string;
@@ -784,9 +784,18 @@ const CourseDetailPage = () => {
             </TabsContent>
           </Tabs>
         </div>
+        
+        {/* Add FloatingAIAssistant at the end before closing Layout */}
+        <FloatingAIAssistant 
+          lessonTitle={`Course: ${course?.title}`}
+          lessonContent={course?.description}
+          courseId={course?.id}
+        />
       </div>
     </Layout>
   );
 };
 
 export default CourseDetailPage;
+
+</edits_to_apply>
