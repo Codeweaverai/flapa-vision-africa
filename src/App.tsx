@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes, Route, BrowserRouter as Router } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -120,7 +121,7 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <Router>
-      <QueryClient client={queryClient}>
+      <QueryClientProvider client={queryClient}>
         <Toaster />
         <AuthProvider>
           <CurrencyProvider>
@@ -237,7 +238,7 @@ function App() {
             </Routes>
           </CurrencyProvider>
         </AuthProvider>
-      </QueryClient>
+      </QueryClientProvider>
     </Router>
   );
 }
