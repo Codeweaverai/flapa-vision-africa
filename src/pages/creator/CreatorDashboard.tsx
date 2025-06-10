@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -308,10 +309,10 @@ const CreatorDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-light-purple">
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
         <CreatorLayout title="Dashboard">
           <div className="flex justify-center items-center h-64">
-            <p>Loading dashboard data...</p>
+            <p className="text-white">Loading dashboard data...</p>
           </div>
         </CreatorLayout>
       </div>
@@ -320,10 +321,10 @@ const CreatorDashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-light-purple">
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
         <CreatorLayout title="Dashboard">
           <div className="flex justify-center items-center h-64">
-            <p className="text-red-500">{error}</p>
+            <p className="text-red-300">{error}</p>
           </div>
         </CreatorLayout>
       </div>
@@ -331,7 +332,7 @@ const CreatorDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-light-purple">
+    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
       <CreatorLayout title="Dashboard">
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

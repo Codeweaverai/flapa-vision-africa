@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -201,12 +202,12 @@ const AccountPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-light-purple">
+    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
       <Layout>
         <div className="container mx-auto py-8 px-4 max-w-6xl">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-4">My Account</h1>
-            <p className="text-xl text-muted-foreground">
+            <h1 className="text-4xl font-bold mb-4 text-white">My Account</h1>
+            <p className="text-xl text-white/80">
               Manage your profile and account settings.
             </p>
           </div>

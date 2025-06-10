@@ -7,8 +7,9 @@ import { FileText, Languages } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 interface TranscriptSegment {
-  start: number;
-  end: number;
+  id: string;
+  start_time: number;
+  end_time: number;
   text: string;
 }
 
@@ -22,6 +23,7 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const languageNames: Record<string, string> = {
     en: 'English',
@@ -34,8 +36,9 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
   // Type guard function to validate transcript segment
   const isValidTranscriptSegment = (obj: any): obj is TranscriptSegment => {
     return obj && 
-           typeof obj.start === 'number' && 
-           typeof obj.end === 'number' && 
+           typeof obj.id === 'string' && 
+           typeof obj.start_time === 'number' && 
+           typeof obj.end_time === 'number' && 
            typeof obj.text === 'string';
   };
 
@@ -47,17 +50,30 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
   };
 
   useEffect(() => {
-    loadTranscripts();
+    if (lessonId) {
+      loadTranscripts();
+    }
   }, [lessonId, selectedLanguage]);
 
   const loadTranscripts = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
+      console.log('Loading transcripts for lesson:', lessonId);
+      
       // First, get all available languages for this lesson
-      const { data: allTranscripts } = await supabase
+      const { data: allTranscripts, error: transcriptError } = await supabase
         .from('lesson_transcripts')
         .select('language, transcript_data')
         .eq('lesson_id', lessonId);
+
+      if (transcriptError) {
+        console.error('Error fetching transcripts:', transcriptError);
+        throw transcriptError;
+      }
+
+      console.log('Fetched transcripts:', allTranscripts);
 
       if (allTranscripts && allTranscripts.length > 0) {
         const languages = allTranscripts.map(t => t.language);
@@ -70,26 +86,38 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
         const targetTranscript = allTranscripts.find(t => t.language === targetLanguage);
         
         if (targetTranscript?.transcript_data) {
+          console.log('Processing transcript data:', targetTranscript.transcript_data);
           const segments = convertToTranscriptSegments(targetTranscript.transcript_data);
+          console.log('Converted segments:', segments);
           setTranscripts(segments);
         } else {
+          console.log('No transcript data found for language:', targetLanguage);
           setTranscripts([]);
         }
       } else {
+        console.log('No transcripts found for lesson:', lessonId);
         setAvailableLanguages([]);
         setTranscripts([]);
       }
     } catch (error) {
       console.error('Error loading transcripts:', error);
+      setError('Failed to load transcripts. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSegmentClick = (segment: TranscriptSegment) => {
+    console.log('Seeking to time:', segment.start_time);
     if (onSeekTo) {
-      onSeekTo(segment.start);
+      onSeekTo(segment.start_time);
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -102,7 +130,34 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Loading transcript...</p>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="ml-3 text-muted-foreground">Loading transcript...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Video Transcript
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button 
+              onClick={loadTranscripts}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+            >
+              Retry
+            </button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -118,7 +173,10 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No transcript available for this lesson.</p>
+          <div className="text-center py-8">
+            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-muted-foreground">No transcript available for this lesson.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -154,13 +212,13 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
           <div className="space-y-2">
             {transcripts.map((segment, index) => (
               <div
-                key={index}
+                key={segment.id || index}
                 className="p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                 onClick={() => handleSegmentClick(segment)}
               >
                 <div className="flex items-start gap-3">
                   <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
-                    {Math.floor(segment.start / 60)}:{(segment.start % 60).toString().padStart(2, '0')}
+                    {formatTime(segment.start_time)}
                   </span>
                   <p className="text-sm leading-relaxed flex-1">{segment.text}</p>
                 </div>
@@ -168,6 +226,9 @@ const VideoTranscripts = ({ lessonId, onSeekTo }: VideoTranscriptsProps) => {
             ))}
           </div>
         </ScrollArea>
+        <div className="mt-4 text-xs text-muted-foreground">
+          {transcripts.length} transcript segments • Click any segment to jump to that time
+        </div>
       </CardContent>
     </Card>
   );
