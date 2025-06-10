@@ -17,8 +17,11 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('Starting PawaPay session creation...');
+    
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
+      console.error('Missing authorization header');
       throw new Error('Missing authorization header');
     }
 
@@ -30,6 +33,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
+      console.error('Authentication error:', userError);
       throw new Error('Unauthorized');
     }
 
@@ -45,14 +49,18 @@ const handler = async (req: Request): Promise<Response> => {
       promo_code
     } = await req.json();
 
+    console.log('Request payload:', { amount, currency, msisdn, country, itemsCount: items?.length });
+
     if (!PAWAPAY_TOKEN) {
+      console.error('PawaPay token not configured');
       throw new Error('PawaPay token not configured');
     }
 
     // Generate unique deposit ID
     const depositId = crypto.randomUUID();
+    console.log('Generated deposit ID:', depositId);
 
-    // Create order record in Supabase
+    // Create order record in Supabase with only existing columns
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
       .insert({
@@ -62,17 +70,18 @@ const handler = async (req: Request): Promise<Response> => {
         status: 'pending',
         payment_method: 'mobile_money',
         payment_status: 'pending',
-        promo_code: promo_code,
-        discount_amount: discount_amount || 0,
         tax_amount: tax_amount || 0,
+        promo_code: promo_code || null
       })
       .select()
       .single();
 
     if (orderError) {
       console.error('Error creating order:', orderError);
-      throw new Error('Failed to create order');
+      throw new Error('Failed to create order: ' + orderError.message);
     }
+
+    console.log('Order created successfully:', order.id);
 
     // Create order items
     const orderItems = items.map((item: any) => ({
@@ -91,8 +100,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (itemsError) {
       console.error('Error creating order items:', itemsError);
-      throw new Error('Failed to create order items');
+      throw new Error('Failed to create order items: ' + itemsError.message);
     }
+
+    console.log('Order items created successfully');
 
     // Prepare statement description
     const statementDescription = items.length === 1 
@@ -147,13 +158,23 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify(pawapayPayload),
     });
 
+    const responseText = await pawapayResponse.text();
+    console.log('PawaPay API response status:', pawapayResponse.status);
+    console.log('PawaPay API response:', responseText);
+
     if (!pawapayResponse.ok) {
-      const errorText = await pawapayResponse.text();
-      console.error('PawaPay API error:', pawapayResponse.status, errorText);
-      throw new Error(`PawaPay API error: ${pawapayResponse.status}`);
+      console.error('PawaPay API error:', pawapayResponse.status, responseText);
+      throw new Error(`PawaPay API error: ${pawapayResponse.status} - ${responseText}`);
     }
 
-    const pawapayData = await pawapayResponse.json();
+    let pawapayData;
+    try {
+      pawapayData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse PawaPay response:', parseError);
+      throw new Error('Invalid response from PawaPay API');
+    }
+
     console.log('PawaPay session created successfully:', pawapayData);
 
     // Update order with PawaPay session info
@@ -178,9 +199,14 @@ const handler = async (req: Request): Promise<Response> => {
 
   } catch (error) {
     console.error('Error in create-pawapay-session:', error);
+    
+    // Return more detailed error information
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    
     return new Response(JSON.stringify({
-      error: error.message || 'Internal server error',
-      success: false
+      error: errorMessage,
+      success: false,
+      details: error instanceof Error ? error.stack : undefined
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

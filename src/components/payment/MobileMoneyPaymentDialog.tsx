@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PAWAPAY_COUNTRY_CODES, PawapayCountryCode } from '@/constants/pawapayCountries';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { Smartphone, CreditCard } from 'lucide-react';
+import { Smartphone, AlertCircle } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface MobileMoneyPaymentDialogProps {
@@ -35,6 +35,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
   const [selectedCountry, setSelectedCountry] = useState<PawapayCountryCode>('Zambia');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePayment = async () => {
     if (!phoneNumber.trim()) {
@@ -42,6 +43,8 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
       return;
     }
 
+    setError(null);
+    
     // Remove any non-digit characters except the leading + if present
     const cleanPhone = phoneNumber.replace(/[^\d+]/g, '');
     
@@ -63,6 +66,14 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
     setLoading(true);
     
     try {
+      console.log('Initiating PawaPay payment with:', {
+        amount: Math.round(amount * 100),
+        currency,
+        msisdn: formattedPhone,
+        country: countryInfo.code,
+        itemsCount: items.length
+      });
+
       const hasEventTickets = items.some(item => item.item_type === 'event_ticket');
       const returnUrl = hasEventTickets 
         ? `${window.location.origin}/account/orders`
@@ -89,16 +100,28 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
         }
       });
 
-      if (error) throw error;
+      console.log('PawaPay response:', { data, error });
+
+      if (error) {
+        console.error('PawaPay function error:', error);
+        setError(error.message || 'Failed to initiate payment');
+        toast.error('Failed to initiate mobile money payment: ' + (error.message || 'Unknown error'));
+        return;
+      }
 
       if (data?.redirectUrl) {
+        console.log('Redirecting to PawaPay:', data.redirectUrl);
         window.location.href = data.redirectUrl;
       } else {
-        throw new Error('No redirect URL returned from PawaPay');
+        console.error('No redirect URL in response:', data);
+        setError('No redirect URL returned from payment provider');
+        toast.error('Failed to get payment link from provider');
       }
     } catch (error) {
       console.error('Error initiating PawaPay payment:', error);
-      toast.error('Failed to initiate mobile money payment');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
+      toast.error('Failed to initiate mobile money payment: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -117,6 +140,14 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
         </DialogHeader>
         
         <div className="space-y-6">
+          {/* Error Display */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-red-700">{error}</div>
+            </div>
+          )}
+
           {/* Amount Summary */}
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="text-center">
@@ -168,6 +199,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className="rounded-l-none"
+                disabled={loading}
               />
             </div>
             <p className="text-xs text-gray-500">
@@ -177,7 +209,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose} className="flex-1">
+            <Button variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
               Cancel
             </Button>
             <Button 
