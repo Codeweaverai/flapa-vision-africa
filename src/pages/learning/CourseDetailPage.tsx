@@ -797,5 +797,3 @@ const CourseDetailPage = () => {
 };
 
 export default CourseDetailPage;
-
-</edits_to_apply>
