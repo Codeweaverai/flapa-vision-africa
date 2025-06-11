@@ -736,7 +736,6 @@ const CourseLearningPage = () => {
                 width="100%"
                 height="100%"
                 controls
-                playing={false} // waits for user to click play
                 className="rounded-t-lg overflow-hidden"
                  config={{
                  file: {
