@@ -249,15 +249,18 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
             <div class="title">Certificate of Completion</div>
             <div class="subtitle">This is to certify that</div>
             <div class="recipient">${studentName}</div>
-            <div class="completion">has successfully completed the course</div>
+            <div class="completion">Has successfully completed the course</div>
             <div class="course">"${courseName}"</div>
             <div class="grade-badge">Final Grade: ${finalGrade}%</div>
-            <div class="completion">demonstrating professional competency and commitment to continuous learning</div>
-            <div class="signature">
-                <div class="signature-line">
-                    <strong>SkillPulse Academy</strong><br>
-                    Authorized Signature
-                </div>
+            <div class="completion">Demonstrating professional competency and commitment to continuous learning</div>           
+        <div class="signature">
+          <div class="signature-line">
+            <img src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png" 
+                 alt="Authorized Signature" class="signature-image" />
+            <div class="signature-line"></div>
+            <div class="signature-title">Director Learning, SkillPulse Technologies Limited</div>
+            <div class="signature-title">Authorized Signature</div>
+          </div>
                 <div style="text-align: center;">
                     <div style="font-size: 0.9rem; color: #6b7280;">${currentDate}</div>
                     <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
@@ -265,7 +268,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
             </div>
             <div class="verification">
                 Verification Code: ${certificate?.verification_code || 'SP-GENERATING'}<br>
-                This certificate can be verified at skillpulse.com/verify
+                This certificate can be verified at skillpulse.cloud/verify
             </div>
         </div>
     </body>
@@ -463,7 +466,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
               </Button>
             )}
             <Button onClick={onClose}>
-              {passed ? 'Continue Learning' : 'Close'}
+              {passed ? 'Proceed To Course Results' : 'Close'}
             </Button>
           </div>
         </div>
