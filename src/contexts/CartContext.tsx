@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -392,5 +393,3 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export default CartProvider;
-
-</edits_to_apply>
