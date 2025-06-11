@@ -469,9 +469,17 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 Retake Exam
               </Button>
             )}
-            <Button onClick={onClose}>
-              {passed ? 'Proceed To Course Results' : 'Close'}
-            </Button>
+           <Button
+      onClick={() => {
+        if (passed) {
+          navigate('/course-results');
+        } else {
+          onClose();
+        }
+      }}
+    >
+      {passed ? 'Proceed To Course Results' : 'Close'}
+    </Button>
           </div>
         </div>
       </DialogContent>
