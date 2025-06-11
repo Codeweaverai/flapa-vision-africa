@@ -205,7 +205,7 @@ const MediaForm = () => {
                       <SelectValue placeholder="Select post type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="news">News</SelectItem>
+                      <SelectItem value="news">News Article</SelectItem>
                       <SelectItem value="podcast">Podcast Episode</SelectItem>
                       <SelectItem value="resource">Resource</SelectItem>
                     </SelectContent>
