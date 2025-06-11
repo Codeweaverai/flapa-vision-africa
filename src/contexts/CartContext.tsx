@@ -96,38 +96,63 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           let event_id = '';
 
           if (item.item_type === 'course') {
-            const { data: course } = await supabase
-              .from('courses')
-              .select('title, thumbnail_url')
-              .eq('id', item.item_id)
-              .single();
-            
-            title = course?.title || 'Unknown Course';
-            thumbnail_url = course?.thumbnail_url || '';
-          } else if (item.item_type === 'event_ticket') {
-            // First get the ticket details
-            const { data: ticket } = await supabase
-              .from('event_tickets')
-              .select('name, event_id')
-              .eq('id', item.item_id)
-              .single();
-            
-            if (ticket) {
-              title = ticket.name || 'Unknown Ticket';
-              event_id = ticket.event_id || '';
+            try {
+              const { data: course, error: courseError } = await supabase
+                .from('courses')
+                .select('title, thumbnail_url')
+                .eq('id', item.item_id)
+                .maybeSingle();
               
-              // Then get the event details separately
-              if (ticket.event_id) {
-                const { data: event } = await supabase
-                  .from('events')
-                  .select('title, image_url')
-                  .eq('id', ticket.event_id)
-                  .single();
-                
-                if (event) {
-                  thumbnail_url = event.image_url || '';
-                }
+              if (courseError) {
+                console.error('Error fetching course:', courseError);
+              } else if (course) {
+                title = course.title || 'Unknown Course';
+                thumbnail_url = course.thumbnail_url || '';
               }
+            } catch (err) {
+              console.error('Error in course query:', err);
+              title = 'Unknown Course';
+            }
+          } else if (item.item_type === 'event_ticket') {
+            try {
+              // First get the ticket details
+              const { data: ticket, error: ticketError } = await supabase
+                .from('event_tickets')
+                .select('name, event_id')
+                .eq('id', item.item_id)
+                .maybeSingle();
+              
+              if (ticketError) {
+                console.error('Error fetching ticket:', ticketError);
+                title = 'Unknown Ticket';
+              } else if (ticket) {
+                title = ticket.name || 'Unknown Ticket';
+                event_id = ticket.event_id || '';
+                
+                // Then get the event details if we have an event_id
+                if (ticket.event_id) {
+                  try {
+                    const { data: event, error: eventError } = await supabase
+                      .from('events')
+                      .select('title, image_url')
+                      .eq('id', ticket.event_id)
+                      .maybeSingle();
+                    
+                    if (eventError) {
+                      console.error('Error fetching event:', eventError);
+                    } else if (event) {
+                      thumbnail_url = event.image_url || '';
+                    }
+                  } catch (err) {
+                    console.error('Error in event query:', err);
+                  }
+                }
+              } else {
+                title = 'Unknown Ticket';
+              }
+            } catch (err) {
+              console.error('Error in ticket query:', err);
+              title = 'Unknown Ticket';
             }
           }
 
@@ -367,3 +392,5 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export default CartProvider;
+
+</edits_to_apply>

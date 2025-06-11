@@ -68,21 +68,16 @@ const handler = async (req: Request): Promise<Response> => {
     const depositId = crypto.randomUUID();
     console.log('Generated deposit ID:', depositId);
 
-    // Create order record in Supabase
+    // Create order record in Supabase - only include fields that exist in the table
     const orderData = {
       user_id: user.id,
       total_amount: amount / 100, // Convert back from cents
       currency: currency || 'USD',
-      status: 'pending',
       payment_method: 'mobile_money',
       payment_status: 'pending',
       tax_amount: tax_amount || 0,
+      email: user.email || ''
     };
-
-    // Only add promo_code if it exists
-    if (promo_code) {
-      orderData.promo_code = promo_code;
-    }
 
     console.log('Creating order with data:', orderData);
 
@@ -104,10 +99,13 @@ const handler = async (req: Request): Promise<Response> => {
       order_id: order.id,
       item_id: item.item_id,
       item_type: item.item_type,
+      item_name: item.item_name || item.title || 'Unknown Item',
       quantity: item.quantity,
       unit_price: item.price,
       total_price: item.price * item.quantity,
-      ticket_holder_names: item.ticket_holder_names || null
+      metadata: {
+        ticket_holder_names: item.ticket_holder_names || null
+      }
     }));
 
     const { error: itemsError } = await supabaseClient
@@ -123,7 +121,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Prepare statement description
     const statementDescription = items.length === 1 
-      ? items[0].item_name 
+      ? items[0].item_name || items[0].title || 'SkillPulse Purchase'
       : `${items.length} items from SkillPulse`;
 
     // Determine reason based on items
@@ -197,9 +195,8 @@ const handler = async (req: Request): Promise<Response> => {
     await supabaseClient
       .from('orders')
       .update({
-        provider_transaction_id: depositId,
-        provider: 'pawapay',
-        metadata: pawapayData
+        payment_provider_id: depositId,
+        receipt_url: pawapayData.redirectUrl
       })
       .eq('id', order.id);
 

@@ -68,7 +68,10 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
     try {
       console.log('Initiating PawaPay payment with:', {
         amount: Math.round(amount * 100),
-        currency,
+        currency: countryInfo.code === 'ZMB' ? 'ZMW' : 
+                  countryInfo.code === 'NGA' ? 'NGN' : 
+                  countryInfo.code === 'KEN' ? 'KES' : 
+                  countryInfo.code === 'UGA' ? 'UGX' : 'USD',
         msisdn: formattedPhone,
         country: countryInfo.code,
         itemsCount: items.length
@@ -79,10 +82,16 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
         ? `${window.location.origin}/account/orders`
         : `${window.location.origin}/payment/success`;
 
+      // Map country code to currency
+      const paymentCurrency = countryInfo.code === 'ZMB' ? 'ZMW' : 
+                            countryInfo.code === 'NGA' ? 'NGN' : 
+                            countryInfo.code === 'KEN' ? 'KES' : 
+                            countryInfo.code === 'UGA' ? 'UGX' : 'USD';
+
       const { data, error } = await supabase.functions.invoke('create-pawapay-session', {
         body: {
           amount: Math.round(amount * 100), // Convert to cents
-          currency,
+          currency: paymentCurrency,
           msisdn: formattedPhone,
           country: countryInfo.code,
           returnUrl,
@@ -90,6 +99,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
             item_type: item.item_type,
             item_id: item.item_id,
             item_name: item.title,
+            title: item.title,
             quantity: item.quantity,
             price: item.price,
             ticket_holder_names: item.ticket_holder_names || []
