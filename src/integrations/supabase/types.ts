@@ -1360,45 +1360,54 @@ export type Database = {
           created_at: string | null
           event_id: string | null
           event_ticket_id: string | null
+          generated_at: string | null
           id: string
           order_id: string | null
           pdf_storage_path: string | null
           pdf_url: string | null
           qr_code_data: string
           ticket_code: string
+          ticket_holder_email: string | null
           ticket_holder_name: string
           ticket_status: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           booking_id?: string | null
           created_at?: string | null
           event_id?: string | null
           event_ticket_id?: string | null
+          generated_at?: string | null
           id?: string
           order_id?: string | null
           pdf_storage_path?: string | null
           pdf_url?: string | null
           qr_code_data: string
           ticket_code: string
+          ticket_holder_email?: string | null
           ticket_holder_name: string
           ticket_status?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           booking_id?: string | null
           created_at?: string | null
           event_id?: string | null
           event_ticket_id?: string | null
+          generated_at?: string | null
           id?: string
           order_id?: string | null
           pdf_storage_path?: string | null
           pdf_url?: string | null
           qr_code_data?: string
           ticket_code?: string
+          ticket_holder_email?: string | null
           ticket_holder_name?: string
           ticket_status?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
