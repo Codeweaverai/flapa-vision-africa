@@ -106,13 +106,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
               
               if (courseError) {
                 console.error('Error fetching course:', courseError);
+                title = 'Course';
               } else if (course) {
-                title = course.title || 'Unknown Course';
+                title = course.title || 'Course';
                 thumbnail_url = course.thumbnail_url || '';
+              } else {
+                title = 'Course';
               }
             } catch (err) {
               console.error('Error in course query:', err);
-              title = 'Unknown Course';
+              title = 'Course';
             }
           } else if (item.item_type === 'event_ticket') {
             try {
@@ -125,12 +128,27 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
               
               if (ticketError) {
                 console.error('Error fetching ticket:', ticketError);
-                title = 'Unknown Ticket';
+                // Try to get event directly if ticket fetch fails
+                try {
+                  const { data: event, error: eventError } = await supabase
+                    .from('events')
+                    .select('title, image_url')
+                    .limit(1)
+                    .maybeSingle();
+                  
+                  if (event && !eventError) {
+                    title = event.title || 'Event';
+                    thumbnail_url = event.image_url || '';
+                  } else {
+                    title = 'Event';
+                  }
+                } catch (err) {
+                  title = 'Event';
+                }
               } else if (ticket) {
-                title = ticket.name || 'Unknown Ticket';
                 event_id = ticket.event_id || '';
                 
-                // Then get the event details if we have an event_id
+                // Get the event details to use event title instead of ticket name
                 if (ticket.event_id) {
                   try {
                     const { data: event, error: eventError } = await supabase
@@ -141,19 +159,26 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     
                     if (eventError) {
                       console.error('Error fetching event:', eventError);
+                      title = ticket.name || 'Event';
                     } else if (event) {
+                      title = event.title || ticket.name || 'Event';
                       thumbnail_url = event.image_url || '';
+                    } else {
+                      title = ticket.name || 'Event';
                     }
                   } catch (err) {
                     console.error('Error in event query:', err);
+                    title = ticket.name || 'Event';
                   }
+                } else {
+                  title = ticket.name || 'Event';
                 }
               } else {
-                title = 'Unknown Ticket';
+                title = 'Event';
               }
             } catch (err) {
               console.error('Error in ticket query:', err);
-              title = 'Unknown Ticket';
+              title = 'Event';
             }
           }
 

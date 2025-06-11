@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -144,9 +143,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
         {isRegistered ? (
           <div className="text-center">
             <Badge className="bg-green-100 text-green-800 mb-4">Registered</Badge>
-            <Button className="w-full" disabled>
-              You're Registered!
-            </Button>
+            <div className="text-sm text-gray-600">You're already registered for this event!</div>
           </div>
         ) : (
           <>
@@ -242,7 +239,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                             key={ticket.id}
                             itemType="event_ticket"
                             itemId={ticket.id}
-                            itemName={ticket.name}
+                            itemName={event.title}
                             price={ticket.price}
                             ticketType={ticket.ticket_type}
                             eventId={event.id}

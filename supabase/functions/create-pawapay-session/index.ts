@@ -59,16 +59,26 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('PawaPay token not configured');
     }
 
-    if (!amount || !currency || !msisdn || !country || !items) {
-      console.error('Missing required fields:', { amount, currency, msisdn, country, items: !!items });
+    if (!amount || !currency || !msisdn || !country || !items || !returnUrl) {
+      console.error('Missing required fields:', { amount, currency, msisdn, country, items: !!items, returnUrl: !!returnUrl });
       throw new Error('Missing required payment fields');
+    }
+
+    // Validate amount is positive
+    if (amount <= 0) {
+      throw new Error('Amount must be greater than 0');
+    }
+
+    // Validate phone number format
+    if (!msisdn.match(/^\d{10,15}$/)) {
+      throw new Error('Invalid phone number format');
     }
 
     // Generate unique deposit ID
     const depositId = crypto.randomUUID();
     console.log('Generated deposit ID:', depositId);
 
-    // Create order record in Supabase - only include fields that exist in the table
+    // Create order record in Supabase
     const orderData = {
       user_id: user.id,
       total_amount: amount / 100, // Convert back from cents
@@ -99,7 +109,7 @@ const handler = async (req: Request): Promise<Response> => {
       order_id: order.id,
       item_id: item.item_id,
       item_type: item.item_type,
-      item_name: item.item_name || item.title || 'Unknown Item',
+      item_name: item.item_name || item.title || 'Item',
       quantity: item.quantity,
       unit_price: item.price,
       total_price: item.price * item.quantity,
@@ -119,46 +129,48 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Order items created successfully');
 
-    // Prepare statement description
-    const statementDescription = items.length === 1 
-      ? items[0].item_name || items[0].title || 'SkillPulse Purchase'
-      : `${items.length} items from SkillPulse`;
+    // Prepare statement description (4-22 characters as per PawaPay docs)
+    let statementDescription = 'SkillPulse Purchase';
+    if (items.length === 1 && items[0].item_name) {
+      const itemName = items[0].item_name.substring(0, 18);
+      statementDescription = itemName.length >= 4 ? itemName : 'SkillPulse Purchase';
+    }
 
     // Determine reason based on items
     const hasEvents = items.some((item: any) => item.item_type === 'event_ticket');
     const hasCourses = items.some((item: any) => item.item_type === 'course');
     const reason = hasEvents && hasCourses ? 'Course & Event' : hasEvents ? 'Event' : 'Course';
 
-    // Prepare metadata
+    // Prepare metadata as per PawaPay documentation
     const metadata = [
       {
-        isPII: false,
-        fieldName: 'order_id',
-        fieldValue: order.id
+        fieldName: 'orderId',
+        fieldValue: order.id,
+        isPII: false
       },
       {
-        isPII: false,
-        fieldName: 'user_id',
-        fieldValue: user.id
+        fieldName: 'userId',
+        fieldValue: user.id,
+        isPII: false
       },
       {
-        isPII: false,
-        fieldName: 'deposit_id',
-        fieldValue: depositId
+        fieldName: 'depositId',
+        fieldValue: depositId,
+        isPII: false
       }
     ];
 
-    // Create PawaPay session
+    // Create PawaPay session with exact format from documentation
     const pawapayPayload = {
-      metadata,
-      returnUrl,
       depositId,
+      returnUrl,
       statementDescription,
       amount: amount.toString(),
       msisdn,
       language: 'EN',
       country,
-      reason
+      reason,
+      metadata
     };
 
     console.log('Creating PawaPay session with payload:', pawapayPayload);
@@ -178,7 +190,33 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!pawapayResponse.ok) {
       console.error('PawaPay API error:', pawapayResponse.status, responseText);
-      throw new Error(`PawaPay API error: ${pawapayResponse.status} - ${responseText}`);
+      
+      // Handle specific error responses as per documentation
+      let errorMessage = 'Payment service error';
+      
+      try {
+        const errorData = JSON.parse(responseText);
+        
+        if (pawapayResponse.status === 400) {
+          // 400 error format: {"errorId": "...", "errorCode": 1, "errorMessage": "INVALID_INPUT: ..."}
+          errorMessage = `Invalid request: ${errorData.errorMessage || 'Bad request'}`;
+        } else if (pawapayResponse.status === 401) {
+          // 401 error format: {"message": "Unauthorized"}
+          errorMessage = 'Authentication failed with payment provider';
+        } else if (pawapayResponse.status === 403) {
+          // 403 error format: {"message": "Missing Authentication Token"}
+          errorMessage = 'Access denied by payment provider';
+        } else if (pawapayResponse.status === 500) {
+          // 500 error format: {"errorId": "...", "errorCode": 0, "errorMessage": "Internal error"}
+          errorMessage = 'Payment service temporarily unavailable';
+        }
+        
+        console.error('Parsed error data:', errorData);
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError);
+      }
+      
+      throw new Error(errorMessage);
     }
 
     let pawapayData;
@@ -186,7 +224,13 @@ const handler = async (req: Request): Promise<Response> => {
       pawapayData = JSON.parse(responseText);
     } catch (parseError) {
       console.error('Failed to parse PawaPay response:', parseError);
-      throw new Error('Invalid response from PawaPay API');
+      throw new Error('Invalid response from payment provider');
+    }
+
+    // Validate response format: {"redirectUrl": "https://paywith.pawapay.io/?token=..."}
+    if (!pawapayData.redirectUrl) {
+      console.error('Missing redirectUrl in response:', pawapayData);
+      throw new Error('Payment provider did not return a valid payment URL');
     }
 
     console.log('PawaPay session created successfully:', pawapayData);
@@ -213,13 +257,11 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error) {
     console.error('Error in create-pawapay-session:', error);
     
-    // Return more detailed error information
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     
     return new Response(JSON.stringify({
       error: errorMessage,
-      success: false,
-      details: error instanceof Error ? error.stack : undefined
+      success: false
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

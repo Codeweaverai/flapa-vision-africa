@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,38 +28,11 @@ const CheckoutPage = () => {
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
-  const [convertedTotalAmount, setConvertedTotalAmount] = useState(0);
-  const [convertedTaxAmount, setConvertedTaxAmount] = useState(0);
-  const [convertedDiscount, setConvertedDiscount] = useState(0);
   
   const totalAmount = getTotalPrice();
   const TAX_RATE = 0.1; // 10% tax
   const taxAmount = totalAmount * TAX_RATE;
   const finalAmount = totalAmount + taxAmount - discount;
-
-  // Convert amounts to current currency
-  useEffect(() => {
-    const convertAmounts = async () => {
-      try {
-        const [convertedTotal, convertedTax, convertedDiscountAmount] = await Promise.all([
-          convertPrice(totalAmount, 'USD'),
-          convertPrice(taxAmount, 'USD'),
-          convertPrice(discount, 'USD')
-        ]);
-        
-        setConvertedTotalAmount(convertedTotal);
-        setConvertedTaxAmount(convertedTax);
-        setConvertedDiscount(convertedDiscountAmount);
-      } catch (error) {
-        console.error('Error converting amounts:', error);
-        setConvertedTotalAmount(totalAmount);
-        setConvertedTaxAmount(taxAmount);
-        setConvertedDiscount(discount);
-      }
-    };
-
-    convertAmounts();
-  }, [totalAmount, taxAmount, discount, convertPrice]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -205,8 +177,6 @@ const CheckoutPage = () => {
     return null;
   }
 
-  const convertedFinalAmount = convertedTotalAmount + convertedTaxAmount - convertedDiscount;
-
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
@@ -232,12 +202,18 @@ const CheckoutPage = () => {
                                 {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
                               </Badge>
                             </div>
-                            <div className="mt-2">
-                              <PriceDisplay 
-                                amount={item.price} 
-                                originalCurrency="USD"
-                                className="text-lg font-semibold"
-                              />
+                            <div className="mt-2 space-y-1">
+                              <div className="text-lg font-semibold">
+                                <PriceDisplay 
+                                  amount={item.price} 
+                                  originalCurrency="USD"
+                                />
+                              </div>
+                              {currentCurrency !== 'USD' && (
+                                <div className="text-sm text-gray-500">
+                                  Original: ${item.price.toFixed(2)} USD
+                                </div>
+                              )}
                             </div>
                           </div>
                           
@@ -336,22 +312,42 @@ const CheckoutPage = () => {
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <PriceDisplay amount={totalAmount} originalCurrency="USD" />
+                      <div className="text-right">
+                        <div><PriceDisplay amount={totalAmount} originalCurrency="USD" /></div>
+                        {currentCurrency !== 'USD' && (
+                          <div className="text-xs text-gray-500">${totalAmount.toFixed(2)} USD</div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>
-                      <PriceDisplay amount={taxAmount} originalCurrency="USD" />
+                      <div className="text-right">
+                        <div><PriceDisplay amount={taxAmount} originalCurrency="USD" /></div>
+                        {currentCurrency !== 'USD' && (
+                          <div className="text-xs text-gray-500">${taxAmount.toFixed(2)} USD</div>
+                        )}
+                      </div>
                     </div>
                     {discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount:</span>
-                        <span>-<PriceDisplay amount={discount} originalCurrency="USD" /></span>
+                        <div className="text-right">
+                          <div>-<PriceDisplay amount={discount} originalCurrency="USD" /></div>
+                          {currentCurrency !== 'USD' && (
+                            <div className="text-xs text-gray-500">-${discount.toFixed(2)} USD</div>
+                          )}
+                        </div>
                       </div>
                     )}
                     <Separator />
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total:</span>
-                      <PriceDisplay amount={finalAmount} originalCurrency="USD" />
+                      <div className="text-right">
+                        <div><PriceDisplay amount={finalAmount} originalCurrency="USD" /></div>
+                        {currentCurrency !== 'USD' && (
+                          <div className="text-sm text-gray-600">${finalAmount.toFixed(2)} USD</div>
+                        )}
+                      </div>
                     </div>
                     
                     <Button 
