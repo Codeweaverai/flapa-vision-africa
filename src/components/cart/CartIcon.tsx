@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingCart, X, Plus, Minus, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCart } from '@/contexts/CartContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 import {
   Sheet,
   SheetContent,
@@ -18,12 +20,33 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 
 const CartIcon = () => {
-  const { items, getItemCount, getTotalPrice, removeFromCart, updateQuantity, updateTicketHolders } = useCart();
+  const { items, getItemCount, updateQuantity, removeFromCart, updateTicketHolders } = useCart();
+  const { convertPrice, formatPrice, currentCurrency } = useCurrency();
   const [isOpen, setIsOpen] = useState(false);
+  const [convertedTotal, setConvertedTotal] = useState(0);
   const navigate = useNavigate();
 
   const totalItems = getItemCount();
-  const totalAmount = getTotalPrice();
+
+  // Calculate converted total
+  useEffect(() => {
+    const calculateConvertedTotal = async () => {
+      const totalUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      try {
+        const converted = await convertPrice(totalUSD, 'USD');
+        setConvertedTotal(converted);
+      } catch (error) {
+        console.error('Error converting total price:', error);
+        setConvertedTotal(totalUSD);
+      }
+    };
+
+    if (items.length > 0) {
+      calculateConvertedTotal();
+    } else {
+      setConvertedTotal(0);
+    }
+  }, [items, convertPrice, currentCurrency]);
 
   const handleCheckout = () => {
     // Validate that all event tickets have names
@@ -90,7 +113,18 @@ const CartIcon = () => {
                           <p className="text-xs text-gray-500">
                             {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
                           </p>
-                          <p className="text-sm font-semibold">${item.price.toFixed(2)}</p>
+                          <div className="mt-1">
+                            <PriceDisplay 
+                              amount={item.price} 
+                              originalCurrency="USD" 
+                              className="text-sm font-semibold"
+                            />
+                            {currentCurrency !== 'USD' && (
+                              <p className="text-xs text-gray-500">
+                                Original: ${item.price.toFixed(2)} USD
+                              </p>
+                            )}
+                          </div>
                         </div>
                         <Button
                           variant="ghost"
@@ -153,7 +187,16 @@ const CartIcon = () => {
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center mb-4">
                   <span className="font-semibold">Total:</span>
-                  <span className="text-xl font-bold">${totalAmount.toFixed(2)}</span>
+                  <div className="text-right">
+                    <div className="text-xl font-bold">
+                      {formatPrice(convertedTotal, currentCurrency)}
+                    </div>
+                    {currentCurrency !== 'USD' && (
+                      <div className="text-sm text-gray-500">
+                        ${items.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)} USD
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 <Button 

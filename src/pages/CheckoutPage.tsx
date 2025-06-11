@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +19,7 @@ import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
 
 const CheckoutPage = () => {
-  const { items, getTotalPrice, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { items, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
   const { currentCurrency, convertPrice, formatPrice } = useCurrency();
   const navigate = useNavigate();
@@ -28,17 +29,61 @@ const CheckoutPage = () => {
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
+  const [convertedAmounts, setConvertedAmounts] = useState<{
+    total: number;
+    tax: number;
+    final: number;
+    discount: number;
+  }>({
+    total: 0,
+    tax: 0,
+    final: 0,
+    discount: 0
+  });
   
-  const totalAmount = getTotalPrice();
+  const totalAmountUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
   const TAX_RATE = 0.1; // 10% tax
-  const taxAmount = totalAmount * TAX_RATE;
-  const finalAmount = totalAmount + taxAmount - discount;
+  const taxAmountUSD = totalAmountUSD * TAX_RATE;
+  const finalAmountUSD = totalAmountUSD + taxAmountUSD - discount;
 
   useEffect(() => {
     if (items.length === 0) {
       navigate('/');
     }
   }, [items, navigate]);
+
+  // Convert amounts to current currency
+  useEffect(() => {
+    const convertAmounts = async () => {
+      try {
+        const [convertedTotal, convertedTax, convertedDiscount] = await Promise.all([
+          convertPrice(totalAmountUSD, 'USD'),
+          convertPrice(taxAmountUSD, 'USD'),
+          convertPrice(discount, 'USD')
+        ]);
+        
+        const convertedFinal = convertedTotal + convertedTax - convertedDiscount;
+        
+        setConvertedAmounts({
+          total: convertedTotal,
+          tax: convertedTax,
+          final: convertedFinal,
+          discount: convertedDiscount
+        });
+      } catch (error) {
+        console.error('Error converting amounts:', error);
+        // Fallback to USD amounts
+        setConvertedAmounts({
+          total: totalAmountUSD,
+          tax: taxAmountUSD,
+          final: finalAmountUSD,
+          discount: discount
+        });
+      }
+    };
+
+    convertAmounts();
+  }, [totalAmountUSD, taxAmountUSD, finalAmountUSD, discount, convertPrice, currentCurrency]);
 
   const applyPromoCode = async () => {
     if (!promoCode.trim()) return;
@@ -71,7 +116,7 @@ const CheckoutPage = () => {
         return;
       }
 
-      if (totalAmount < data.min_order_amount) {
+      if (totalAmountUSD < data.min_order_amount) {
         toast.error(`Minimum order amount for this promo code is $${data.min_order_amount}`);
         return;
       }
@@ -79,12 +124,12 @@ const CheckoutPage = () => {
       // Calculate discount
       let discountAmount = 0;
       if (data.discount_type === 'percentage') {
-        discountAmount = totalAmount * (data.discount_value / 100);
+        discountAmount = totalAmountUSD * (data.discount_value / 100);
       } else {
         discountAmount = data.discount_value;
       }
 
-      setDiscount(Math.min(discountAmount, totalAmount));
+      setDiscount(Math.min(discountAmount, totalAmountUSD));
       toast.success('Promo code applied successfully!');
     } catch (error) {
       console.error('Error applying promo code:', error);
@@ -104,8 +149,8 @@ const CheckoutPage = () => {
             price: item.price,
             ticket_holder_names: item.ticket_holder_names || []
           })),
-          total_amount: finalAmount,
-          tax_amount: taxAmount,
+          total_amount: finalAmountUSD,
+          tax_amount: taxAmountUSD,
           discount_amount: discount,
           promo_code: promoCode || null,
           currency: currentCurrency,
@@ -313,26 +358,26 @@ const CheckoutPage = () => {
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
                       <div className="text-right">
-                        <div><PriceDisplay amount={totalAmount} originalCurrency="USD" /></div>
+                        <div>{formatPrice(convertedAmounts.total, currentCurrency)}</div>
                         {currentCurrency !== 'USD' && (
-                          <div className="text-xs text-gray-500">${totalAmount.toFixed(2)} USD</div>
+                          <div className="text-xs text-gray-500">${totalAmountUSD.toFixed(2)} USD</div>
                         )}
                       </div>
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>
                       <div className="text-right">
-                        <div><PriceDisplay amount={taxAmount} originalCurrency="USD" /></div>
+                        <div>{formatPrice(convertedAmounts.tax, currentCurrency)}</div>
                         {currentCurrency !== 'USD' && (
-                          <div className="text-xs text-gray-500">${taxAmount.toFixed(2)} USD</div>
+                          <div className="text-xs text-gray-500">${taxAmountUSD.toFixed(2)} USD</div>
                         )}
                       </div>
                     </div>
-                    {discount > 0 && (
+                    {convertedAmounts.discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount:</span>
                         <div className="text-right">
-                          <div>-<PriceDisplay amount={discount} originalCurrency="USD" /></div>
+                          <div>-{formatPrice(convertedAmounts.discount, currentCurrency)}</div>
                           {currentCurrency !== 'USD' && (
                             <div className="text-xs text-gray-500">-${discount.toFixed(2)} USD</div>
                           )}
@@ -343,9 +388,9 @@ const CheckoutPage = () => {
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total:</span>
                       <div className="text-right">
-                        <div><PriceDisplay amount={finalAmount} originalCurrency="USD" /></div>
+                        <div>{formatPrice(convertedAmounts.final, currentCurrency)}</div>
                         {currentCurrency !== 'USD' && (
-                          <div className="text-sm text-gray-600">${finalAmount.toFixed(2)} USD</div>
+                          <div className="text-sm text-gray-600">${finalAmountUSD.toFixed(2)} USD</div>
                         )}
                       </div>
                     </div>
@@ -356,7 +401,7 @@ const CheckoutPage = () => {
                       className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                     >
                       {loading ? 'Processing...' : (
-                        <>Pay <PriceDisplay amount={finalAmount} originalCurrency="USD" /></>
+                        <>Pay {formatPrice(convertedAmounts.final, currentCurrency)}</>
                       )}
                     </Button>
                   </CardContent>
@@ -370,11 +415,11 @@ const CheckoutPage = () => {
       <MobileMoneyPaymentDialog
         isOpen={showMobileMoneyDialog}
         onClose={() => setShowMobileMoneyDialog(false)}
-        amount={finalAmount}
+        amount={finalAmountUSD}
         currency={currentCurrency}
         items={items}
         discount={discount}
-        taxAmount={taxAmount}
+        taxAmount={taxAmountUSD}
         promoCode={promoCode}
       />
     </Layout>
