@@ -99,27 +99,8 @@ const CreatorCourseEdit = () => {
     }
   };
 
-  const handleThumbnailUpload = async (file: File) => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${courseId}-${Date.now()}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('course-thumbnails')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('course-thumbnails')
-        .getPublicUrl(fileName);
-
-      setCourse(prev => prev ? { ...prev, thumbnail_url: publicUrl } : null);
-      toast.success('Thumbnail uploaded successfully!');
-    } catch (error) {
-      console.error('Error uploading thumbnail:', error);
-      toast.error('Failed to upload thumbnail');
-    }
+  const handleThumbnailUpload = (url: string, path: string) => {
+    setCourse(prev => prev ? { ...prev, thumbnail_url: url } : null);
   };
 
   if (loading) {
@@ -247,21 +228,15 @@ const CreatorCourseEdit = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Course Thumbnail</Label>
               <FileUpload
-                onFileSelect={handleThumbnailUpload}
+                bucket="course-thumbnails"
+                path="thumbnails"
                 accept="image/*"
-                buttonText="Upload Thumbnail"
+                maxSize={5}
+                onUploadComplete={handleThumbnailUpload}
+                existingUrl={course.thumbnail_url}
+                label="Course Thumbnail"
               />
-              {course.thumbnail_url && (
-                <div className="mt-2">
-                  <img
-                    src={course.thumbnail_url}
-                    alt="Course thumbnail"
-                    className="w-32 h-32 object-cover rounded-lg"
-                  />
-                </div>
-              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -14,32 +14,8 @@ import {
   Play,
   UserCheck
 } from 'lucide-react';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import AdminLayout from '@/components/layout/AdminLayout';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
 
 interface DashboardStats {
   totalUsers: number;
@@ -132,77 +108,28 @@ const AdminDashboard = () => {
     }
   };
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-      },
-    },
-  };
+  const enrollmentData = [
+    { name: 'Jan', enrollments: 65 },
+    { name: 'Feb', enrollments: 78 },
+    { name: 'Mar', enrollments: 90 },
+    { name: 'Apr', enrollments: 81 },
+    { name: 'May', enrollments: 95 },
+    { name: 'Jun', enrollments: 120 },
+  ];
 
-  const enrollmentData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        label: 'Course Enrollments',
-        data: [65, 78, 90, 81, 95, 120],
-        borderColor: 'rgb(249, 115, 22)',
-        backgroundColor: 'rgba(249, 115, 22, 0.1)',
-        tension: 0.4,
-      },
-    ],
-  };
+  const courseCompletionData = [
+    { category: 'Technology', completions: 85 },
+    { category: 'Business', completions: 72 },
+    { category: 'Design', completions: 68 },
+    { category: 'Marketing', completions: 91 },
+    { category: 'Photography', completions: 45 },
+  ];
 
-  const courseCompletionData = {
-    labels: ['Technology', 'Business', 'Design', 'Marketing', 'Photography'],
-    datasets: [
-      {
-        label: 'Completions',
-        data: [85, 72, 68, 91, 45],
-        backgroundColor: [
-          'rgba(249, 115, 22, 0.8)',
-          'rgba(168, 85, 247, 0.8)',
-          'rgba(249, 115, 22, 0.6)',
-          'rgba(168, 85, 247, 0.6)',
-          'rgba(249, 115, 22, 0.4)',
-        ],
-        borderColor: [
-          'rgb(249, 115, 22)',
-          'rgb(168, 85, 247)',
-          'rgb(249, 115, 22)',
-          'rgb(168, 85, 247)',
-          'rgb(249, 115, 22)',
-        ],
-        borderWidth: 2,
-      },
-    ],
-  };
-
-  const userEngagementData = {
-    labels: ['Active Users', 'Inactive Users', 'New Users'],
-    datasets: [
-      {
-        data: [stats.activeEnrollments, stats.totalUsers - stats.activeEnrollments, stats.recentRegistrations],
-        backgroundColor: [
-          'rgba(249, 115, 22, 0.8)',
-          'rgba(168, 85, 247, 0.8)',
-          'rgba(249, 115, 22, 0.6)',
-        ],
-        borderColor: [
-          'rgb(249, 115, 22)',
-          'rgb(168, 85, 247)',
-          'rgb(249, 115, 22)',
-        ],
-        borderWidth: 2,
-      },
-    ],
-  };
+  const userEngagementData = [
+    { name: 'Active Users', value: stats.activeEnrollments, color: '#f97316' },
+    { name: 'Inactive Users', value: stats.totalUsers - stats.activeEnrollments, color: '#a855f7' },
+    { name: 'New Users', value: stats.recentRegistrations, color: '#fb923c' },
+  ];
 
   if (loading) {
     return (
@@ -341,7 +268,16 @@ const AdminDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Line data={enrollmentData} options={chartOptions} />
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={enrollmentData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="enrollments" stroke="#f97316" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
@@ -352,7 +288,16 @@ const AdminDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Bar data={courseCompletionData} options={chartOptions} />
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={courseCompletionData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="category" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="completions" fill="#a855f7" />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
@@ -366,7 +311,24 @@ const AdminDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Doughnut data={userEngagementData} />
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={userEngagementData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {userEngagementData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 

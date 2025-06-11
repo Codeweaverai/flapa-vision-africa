@@ -41,8 +41,6 @@ const AdminMediaForm = () => {
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
-  const [uploadingMedia, setUploadingMedia] = useState(false);
 
   useEffect(() => {
     if (postId && postId !== 'new') {
@@ -111,56 +109,12 @@ const AdminMediaForm = () => {
     }
   };
 
-  const handleThumbnailUpload = async (file: File) => {
-    setUploadingThumbnail(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `thumbnail-${Date.now()}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('course-thumbnails')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('course-thumbnails')
-        .getPublicUrl(fileName);
-
-      setPost(prev => ({ ...prev, image_url: publicUrl }));
-      toast.success('Thumbnail uploaded successfully!');
-    } catch (error) {
-      console.error('Error uploading thumbnail:', error);
-      toast.error('Failed to upload thumbnail');
-    } finally {
-      setUploadingThumbnail(false);
-    }
+  const handleThumbnailUpload = (url: string, path: string) => {
+    setPost(prev => ({ ...prev, image_url: url }));
   };
 
-  const handleMediaUpload = async (file: File) => {
-    setUploadingMedia(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `media-${Date.now()}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('course-thumbnails')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('course-thumbnails')
-        .getPublicUrl(fileName);
-
-      setPost(prev => ({ ...prev, media_url: publicUrl }));
-      toast.success('Media file uploaded successfully!');
-    } catch (error) {
-      console.error('Error uploading media:', error);
-      toast.error('Failed to upload media file');
-    } finally {
-      setUploadingMedia(false);
-    }
+  const handleMediaUpload = (url: string, path: string) => {
+    setPost(prev => ({ ...prev, media_url: url }));
   };
 
   if (loading) {
@@ -285,40 +239,28 @@ const AdminMediaForm = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Thumbnail Image</Label>
                   <FileUpload
-                    onFileSelect={handleThumbnailUpload}
+                    bucket="course-thumbnails"
+                    path="thumbnails"
                     accept="image/*"
-                    buttonText={uploadingThumbnail ? "Uploading..." : "Upload Thumbnail"}
-                    disabled={uploadingThumbnail}
+                    maxSize={5}
+                    onUploadComplete={handleThumbnailUpload}
+                    existingUrl={post.image_url}
+                    label="Thumbnail Image"
                   />
-                  {post.image_url && (
-                    <div className="mt-2">
-                      <img
-                        src={post.image_url}
-                        alt="Post thumbnail"
-                        className="w-32 h-32 object-cover rounded-lg border-2 border-orange-200"
-                      />
-                    </div>
-                  )}
                 </div>
 
                 {(post.post_type === 'video' || post.post_type === 'podcast') && (
                   <div className="space-y-2">
-                    <Label>Media File</Label>
                     <FileUpload
-                      onFileSelect={handleMediaUpload}
+                      bucket="course-thumbnails"
+                      path="media"
                       accept={post.post_type === 'video' ? 'video/*' : 'audio/*'}
-                      buttonText={uploadingMedia ? "Uploading..." : `Upload ${post.post_type === 'video' ? 'Video' : 'Audio'}`}
-                      disabled={uploadingMedia}
+                      maxSize={100}
+                      onUploadComplete={handleMediaUpload}
+                      existingUrl={post.media_url}
+                      label={`Media File (${post.post_type === 'video' ? 'Video' : 'Audio'})`}
                     />
-                    {post.media_url && (
-                      <div className="mt-2">
-                        <p className="text-sm text-green-600 bg-green-50 p-2 rounded">
-                          ✓ Media file uploaded successfully
-                        </p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
