@@ -701,53 +701,6 @@ const CourseLearningPage = () => {
     setIsFinalExamModalOpen(true);
   };
 
-  const handleMarkAllComplete = async () => {
-    if (!enrollment || !modules.length) return;
-
-    try {
-      // Get all lessons from all modules
-      const allLessons = modules.flatMap(module => module.lessons);
-      
-      // Mark all lessons as complete
-      const updates = allLessons.map(async (lesson) => {
-        const { data: existingProgress } = await supabase
-          .from('lesson_progress')
-          .select('*')
-          .eq('lesson_id', lesson.id)
-          .eq('enrollment_id', enrollment.id)
-          .single();
-
-        if (existingProgress) {
-          return supabase
-            .from('lesson_progress')
-            .update({
-              is_completed: true,
-              completion_date: new Date().toISOString()
-            })
-            .eq('id', existingProgress.id);
-        } else {
-          return supabase
-            .from('lesson_progress')
-            .insert({
-              lesson_id: lesson.id,
-              enrollment_id: enrollment.id,
-              is_completed: true,
-              completion_date: new Date().toISOString()
-            });
-        }
-      });
-
-      await Promise.all(updates);
-      
-      toast.success('All lessons marked as complete!');
-      await loadCourseData(); // Reload to update progress
-      
-    } catch (error) {
-      console.error('Error marking all lessons complete:', error);
-      toast.error('Failed to mark all lessons as complete');
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
@@ -807,22 +760,6 @@ const CourseLearningPage = () => {
                 </div>
               )}
             </div>
-
-            {/* Mark all lessons complete button - only show if course is not 100% complete */}
-            {progress < 100 && (
-              <div className="p-4 bg-gray-50 border-t">
-                <div className="flex justify-center">
-                  <Button
-                    onClick={handleMarkAllComplete}
-                    variant="outline"
-                    className="flex items-center gap-2 border-orange-300 text-orange-600 hover:bg-orange-50"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    Mark All Lessons Complete
-                  </Button>
-                </div>
-              </div>
-            )}
           </TabsContent>
           
           <TabsContent value="transcript" className="p-6">
