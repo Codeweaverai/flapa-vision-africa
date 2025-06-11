@@ -731,13 +731,22 @@ const CourseLearningPage = () => {
           <TabsContent value="content" className="p-0">
             <div className="aspect-video bg-black">
               {currentLesson.video_url ? (
-                <ReactPlayer
-                  url={currentLesson.video_url}
-                  width="100%"
-                  height="100%"
-                  controls
-                  className="rounded-t-lg overflow-hidden"
-                />
+               <ReactPlayer
+               url={currentLesson.video_url}
+                width="100%"
+                height="100%"
+                controls
+                className="rounded-t-lg overflow-hidden"
+                 config={{
+                 file: {
+                attributes: {
+                 controlsList: 'nodownload noremoteplayback',
+                disablePictureInPicture: true,
+                 }
+               }
+             }}
+             onContextMenu={(e) => e.preventDefault()}
+            />
               ) : (
                 <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-200 to-purple-200">
                   <div className="text-center">
