@@ -169,11 +169,11 @@ const AdminMediaForm = () => {
                     <SelectValue placeholder="Select post type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="article">Article</SelectItem>
+                    <SelectItem value="news">News</SelectItem>
                     <SelectItem value="video">Video</SelectItem>
                     <SelectItem value="podcast">Podcast</SelectItem>
                     <SelectItem value="infographic">Infographic</SelectItem>
-                    <SelectItem value="news">News</SelectItem>
+                    <SelectItem value="article">article</SelectItem>
                     <SelectItem value="resource">Resource</SelectItem>
                   </SelectContent>
                 </Select>
