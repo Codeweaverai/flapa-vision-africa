@@ -37,16 +37,16 @@ interface CourseDetails {
   id: string;
   title: string;
   description: string;
-  duration: string;
-  level: string;
+  duration_minutes: number;
+  difficulty_level: string;
 }
 
 interface EventDetails {
   id: string;
   title: string;
   description: string;
-  start_date: string;
-  end_date: string;
+  start_time: string;
+  end_time: string;
   location: string;
   event_type: string;
 }
@@ -91,55 +91,67 @@ const UserOrders = () => {
 
   const fetchItemDetails = async (orders: Order[]) => {
     const courseIds = new Set<string>();
-    const eventIds = new Set<string>();
+    const eventTicketIds = new Set<string>();
 
     orders.forEach(order => {
       order.order_items.forEach(item => {
         if (item.item_type === 'course' && item.item_id) {
           courseIds.add(item.item_id);
         } else if (item.item_type === 'event_ticket' && item.item_id) {
-          // For event tickets, we need to get the event_id from the ticket
-          eventIds.add(item.item_id);
+          eventTicketIds.add(item.item_id);
         }
       });
     });
 
     // Fetch course details
     if (courseIds.size > 0) {
-      const { data: courses } = await supabase
-        .from('courses')
-        .select('id, title, description, duration, level')
-        .in('id', Array.from(courseIds));
-      
-      if (courses) {
-        const courseMap: {[key: string]: CourseDetails} = {};
-        courses.forEach(course => {
-          courseMap[course.id] = course;
-        });
-        setCourseDetails(courseMap);
+      try {
+        const { data: courses, error } = await supabase
+          .from('courses')
+          .select('id, title, description, duration_minutes, difficulty_level')
+          .in('id', Array.from(courseIds));
+        
+        if (error) {
+          console.error('Error fetching courses:', error);
+        } else if (courses) {
+          const courseMap: {[key: string]: CourseDetails} = {};
+          courses.forEach(course => {
+            courseMap[course.id] = course;
+          });
+          setCourseDetails(courseMap);
+        }
+      } catch (error) {
+        console.error('Error fetching course details:', error);
       }
     }
 
     // Fetch event details from tickets
-    if (eventIds.size > 0) {
-      const { data: tickets } = await supabase
-        .from('event_tickets')
-        .select(`
-          id,
-          events (
-            id, title, description, start_date, end_date, location, event_type
-          )
-        `)
-        .in('id', Array.from(eventIds));
-      
-      if (tickets) {
-        const eventMap: {[key: string]: EventDetails} = {};
-        tickets.forEach(ticket => {
-          if (ticket.events) {
-            eventMap[ticket.id] = ticket.events as EventDetails;
-          }
-        });
-        setEventDetails(eventMap);
+    if (eventTicketIds.size > 0) {
+      try {
+        const { data: tickets, error } = await supabase
+          .from('event_tickets')
+          .select(`
+            id,
+            event_id,
+            events!event_tickets_event_id_fkey (
+              id, title, description, start_time, end_time, location, event_type
+            )
+          `)
+          .in('id', Array.from(eventTicketIds));
+        
+        if (error) {
+          console.error('Error fetching events:', error);
+        } else if (tickets) {
+          const eventMap: {[key: string]: EventDetails} = {};
+          tickets.forEach(ticket => {
+            if (ticket.events) {
+              eventMap[ticket.id] = ticket.events as EventDetails;
+            }
+          });
+          setEventDetails(eventMap);
+        }
+      } catch (error) {
+        console.error('Error fetching event details:', error);
       }
     }
   };
@@ -293,7 +305,8 @@ const UserOrders = () => {
                         {order.order_items?.map((item, index) => {
                           const isEvent = item.item_type === 'event_ticket';
                           const isCourse = item.item_type === 'course';
-                          const details = isEvent ? eventDetails[item.item_id!] : courseDetails[item.item_id!];
+                          const eventDetail = isEvent ? eventDetails[item.item_id!] : null;
+                          const courseDetail = isCourse ? courseDetails[item.item_id!] : null;
                           
                           return (
                             <div 
@@ -326,50 +339,50 @@ const UserOrders = () => {
                                   </div>
 
                                   {/* Event Specific Details */}
-                                  {isEvent && details && (
+                                  {isEvent && eventDetail && (
                                     <div className="bg-white/60 rounded-lg p-4 space-y-3 border border-orange-200">
-                                      <h5 className="font-semibold text-orange-800 text-lg">{details.title}</h5>
+                                      <h5 className="font-semibold text-orange-800 text-lg">{eventDetail.title}</h5>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                                         <div className="flex items-center gap-2">
                                           <Calendar className="h-4 w-4 text-orange-600" />
-                                          <span>{new Date(details.start_date).toLocaleDateString()}</span>
+                                          <span>{new Date(eventDetail.start_time).toLocaleDateString()}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <Clock className="h-4 w-4 text-orange-600" />
-                                          <span>{new Date(details.start_date).toLocaleTimeString()}</span>
+                                          <span>{new Date(eventDetail.start_time).toLocaleTimeString()}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <MapPin className="h-4 w-4 text-orange-600" />
-                                          <span>{details.location}</span>
+                                          <span>{eventDetail.location}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <Badge variant="outline" className="border-orange-300 text-orange-700">
-                                            {details.event_type}
+                                            {eventDetail.event_type}
                                           </Badge>
                                         </div>
                                       </div>
-                                      {details.description && (
-                                        <p className="text-gray-700 text-sm">{details.description}</p>
+                                      {eventDetail.description && (
+                                        <p className="text-gray-700 text-sm">{eventDetail.description}</p>
                                       )}
                                     </div>
                                   )}
 
                                   {/* Course Specific Details */}
-                                  {isCourse && details && (
+                                  {isCourse && courseDetail && (
                                     <div className="bg-white/60 rounded-lg p-4 space-y-3 border border-green-200">
-                                      <h5 className="font-semibold text-green-800 text-lg">{details.title}</h5>
+                                      <h5 className="font-semibold text-green-800 text-lg">{courseDetail.title}</h5>
                                       <div className="flex flex-wrap gap-4 text-sm">
                                         <div className="flex items-center gap-2">
                                           <Clock className="h-4 w-4 text-green-600" />
-                                          <span>{details.duration}</span>
+                                          <span>{Math.floor(courseDetail.duration_minutes / 60)}h {courseDetail.duration_minutes % 60}m</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <BookOpen className="h-4 w-4 text-green-600" />
-                                          <span>{details.level}</span>
+                                          <span>{courseDetail.difficulty_level}</span>
                                         </div>
                                       </div>
-                                      {details.description && (
-                                        <p className="text-gray-700 text-sm">{details.description}</p>
+                                      {courseDetail.description && (
+                                        <p className="text-gray-700 text-sm">{courseDetail.description}</p>
                                       )}
                                     </div>
                                   )}
@@ -422,21 +435,23 @@ const UserOrders = () => {
                                           <Printer className="h-4 w-4 mr-2" />
                                           Print Ticket
                                         </Button>
-                                        <Button
-                                          onClick={() => window.open(`/event/${details?.id}`, '_blank')}
-                                          variant="outline"
-                                          size="sm"
-                                          className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                                        >
-                                          <ExternalLink className="h-4 w-4 mr-2" />
-                                          Event Details
-                                        </Button>
+                                        {eventDetail && (
+                                          <Button
+                                            onClick={() => window.open(`/event/${eventDetail.id}`, '_blank')}
+                                            variant="outline"
+                                            size="sm"
+                                            className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                                          >
+                                            <ExternalLink className="h-4 w-4 mr-2" />
+                                            Event Details
+                                          </Button>
+                                        )}
                                       </>
                                     )}
                                     
-                                    {isCourse && details && (
+                                    {isCourse && courseDetail && (
                                       <Button
-                                        onClick={() => navigateToCourse(details.id)}
+                                        onClick={() => navigateToCourse(courseDetail.id)}
                                         className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
                                         size="sm"
                                       >
