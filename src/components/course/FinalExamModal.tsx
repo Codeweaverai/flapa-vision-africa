@@ -187,12 +187,14 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
 
       if (error) throw error;
 
-      // Get course and student info for results
+      // Get course and student info for results - Fixed query
       const { data: enrollmentData } = await supabase
         .from('course_enrollments')
         .select(`
-          courses:course_id (title),
-          profiles:user_id (full_name)
+          course_id,
+          user_id,
+          courses!course_enrollments_course_id_fkey (title),
+          profiles!course_enrollments_user_id_fkey (full_name)
         `)
         .eq('id', enrollmentId)
         .single();

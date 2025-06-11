@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -124,6 +125,7 @@ interface FinalExam {
   title: string;
   description: string;
   passing_score: number;
+  time_limit_minutes: number;
   created_at: string;
   updated_at: string;
 }
@@ -482,7 +484,7 @@ const CourseLearningPage = () => {
                     </Button>
                   )}
                   
-                  {/* Next Exam Button */}
+                  {/* Take Final Exam Button */}
                   {(!hasLessons || progressPercentage === 100) && finalExam && (
                     <Button
                       onClick={handleTakeExam}
