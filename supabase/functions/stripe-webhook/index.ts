@@ -114,45 +114,26 @@ serve(async (req) => {
 
             if (bookingError) {
               console.error("Error creating booking:", bookingError);
-            } else {
-              // Generate tickets
-              const ticketHolders = item.metadata?.ticket_holder_names || [];
-              
-              for (let i = 0; i < item.quantity; i++) {
-                const ticketCode = `TKT-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
-                const holderName = ticketHolders[i]?.name || `Ticket Holder ${i + 1}`;
-                
-                const qrData = JSON.stringify({
-                  ticket_code: ticketCode,
-                  booking_id: booking.id,
-                  event_id: ticket.event_id,
-                  holder_name: holderName,
-                  generated_at: new Date().toISOString()
-                });
-
-                await supabaseClient
-                  .from('generated_tickets')
-                  .insert({
-                    booking_id: booking.id,
-                    order_id: orderId,
-                    event_id: ticket.event_id,
-                    event_ticket_id: item.item_id,
-                    ticket_code: ticketCode,
-                    ticket_holder_name: holderName,
-                    qr_code_data: qrData,
-                    ticket_status: 'active'
-                  });
-              }
-
-              // Update ticket quantity sold
-              await supabaseClient
-                .from('event_tickets')
-                .update({ 
-                  quantity_sold: supabaseClient.sql`quantity_sold + ${item.quantity}` 
-                })
-                .eq('id', item.item_id);
             }
           }
+        }
+      }
+
+      // Generate tickets for event orders
+      const hasEventTickets = order.order_items.some(item => item.item_type === 'event_ticket');
+      if (hasEventTickets) {
+        try {
+          const { data: ticketResponse, error: ticketError } = await supabaseClient.functions.invoke('generate-tickets', {
+            body: { orderId: orderId }
+          });
+
+          if (ticketError) {
+            console.error("Error generating tickets:", ticketError);
+          } else {
+            console.log("Tickets generated successfully:", ticketResponse);
+          }
+        } catch (ticketGenerationError) {
+          console.error("Error invoking ticket generation:", ticketGenerationError);
         }
       }
 
