@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -187,17 +186,34 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
 
       if (error) throw error;
 
-      // Get course and student info for results - Fixed query
+      // Get course and student info for results - Simplified approach
       const { data: enrollmentData } = await supabase
         .from('course_enrollments')
-        .select(`
-          course_id,
-          user_id,
-          courses!course_enrollments_course_id_fkey (title),
-          profiles!course_enrollments_user_id_fkey (full_name)
-        `)
+        .select('course_id, user_id')
         .eq('id', enrollmentId)
         .single();
+
+      let courseName = 'Course';
+      let studentName = 'Student';
+
+      if (enrollmentData) {
+        // Get course name
+        const { data: courseData } = await supabase
+          .from('courses')
+          .select('title')
+          .eq('id', enrollmentData.course_id)
+          .single();
+
+        // Get student name
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', enrollmentData.user_id)
+          .single();
+
+        courseName = courseData?.title || 'Course';
+        studentName = profileData?.full_name || 'Student';
+      }
 
       // Get quiz scores (placeholder for now)
       const quizScores: number[] = [];
@@ -207,8 +223,8 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         passed,
         quizScores,
         finalGrade: score, // For now, just use exam score
-        courseName: enrollmentData?.courses?.title || 'Course',
-        studentName: enrollmentData?.profiles?.full_name || 'Student'
+        courseName,
+        studentName
       });
 
       setShowResults(true);
