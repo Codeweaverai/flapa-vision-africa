@@ -385,10 +385,10 @@ const CheckoutPage = () => {
         onClose={() => setShowMobileMoneyDialog(false)}
         amount={finalAmountUSD}
         currency="USD"
-        onSuccess={() => {
-          setShowMobileMoneyDialog(false);
-          navigate('/checkout/success');
-        }}
+        items={items}
+        discount={discount}
+        taxAmount={taxAmountUSD}
+        promoCode={promoCode}
       />
     </Layout>
   );
