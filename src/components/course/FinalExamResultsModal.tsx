@@ -222,16 +222,20 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 justify-content: space-between;
                 align-items: flex-end;
                 flex-wrap: wrap;
-                gap: 20px;
+                gap: 30px;
             }
             .signature-section {
                 flex: 1;
                 min-width: 200px;
                 text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }
             .signature-line {
                 border-top: 2px solid #1f2937;
                 width: 100%;
+                max-width: 200px;
                 text-align: center;
                 padding-top: 10px;
                 font-size: 0.9rem;
@@ -244,6 +248,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 text-align: center;
                 display: flex;
                 flex-direction: column;
+                align-items: center;
                 justify-content: flex-end;
             }
             .verification {
@@ -262,13 +267,26 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 margin: 20px 0;
             }
             @media (max-width: 768px) {
+                .certificate {
+                    padding: 40px 30px;
+                }
                 .signature {
                     flex-direction: column;
                     align-items: center;
+                    gap: 20px;
                 }
                 .signature-section, .date-section {
                     min-width: 100%;
-                    margin-bottom: 20px;
+                    margin-bottom: 15px;
+                }
+                .title {
+                    font-size: 2.5rem;
+                }
+                .recipient {
+                    font-size: 2rem;
+                }
+                .course {
+                    font-size: 1.5rem;
                 }
             }
         </style>
@@ -317,6 +335,24 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
     } else {
       onClose();
     }
+  };
+
+  const calculateGradeBreakdown = () => {
+    const quizAverage = quizScores.length > 0 
+      ? quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length 
+      : 0;
+    
+    // Weight: 60% quizzes, 40% final exam (adjust as needed)
+    const quizWeight = 0.6;
+    const examWeight = 0.4;
+    
+    return {
+      quizAverage: Math.round(quizAverage),
+      examScore,
+      weightedQuizScore: Math.round(quizAverage * quizWeight),
+      weightedExamScore: Math.round(examScore * examWeight),
+      finalGrade: Math.round((quizAverage * quizWeight) + (examScore * examWeight))
+    };
   };
 
   const breakdown = calculateGradeBreakdown();

@@ -20,7 +20,8 @@ import {
   Target,
   CheckCircle,
   StickyNote,
-  CheckCircle2
+  CheckCircle2,
+  GraduationCap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
@@ -28,6 +29,7 @@ import CourseReviews from '@/components/course/CourseReviews';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
+import FinalExamModal from '@/components/course/FinalExamModal';
 
 interface Course {
   id?: string;
@@ -149,6 +151,7 @@ const CourseLearningPage = () => {
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
   const [instructor, setInstructor] = useState<Profile | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
+  const [showExamModal, setShowExamModal] = useState(false);
 
   useEffect(() => {
     if (courseId) {
@@ -320,7 +323,7 @@ const CourseLearningPage = () => {
   };
 
   const markAllLessonsComplete = async () => {
-    if (!user || !courseId || !modules.length) {
+    if (!user || !courseId || !modules.length || !enrollment) {
       toast.error('Unable to mark lessons complete');
       return;
     }
@@ -332,17 +335,17 @@ const CourseLearningPage = () => {
         module.lessons.map(lesson => lesson.id)
       );
 
-      // Mark all lessons as complete
+      // Mark all lessons as complete using enrollment_id instead of user_id
       for (const lessonId of allLessonIds) {
         const { error } = await supabase
           .from('lesson_progress')
           .upsert({
-            user_id: user.id,
+            enrollment_id: enrollment.id,
             lesson_id: lessonId,
-            completed: true,
-            completed_at: new Date().toISOString()
+            is_completed: true,
+            completion_date: new Date().toISOString()
           }, {
-            onConflict: 'user_id,lesson_id'
+            onConflict: 'enrollment_id,lesson_id'
           });
 
         if (error) {
@@ -384,9 +387,14 @@ const CourseLearningPage = () => {
     }
   };
 
+  const handleTakeExam = () => {
+    setShowExamModal(true);
+  };
+
   const enrolledUser = enrollment && enrollment.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
   const isNotComplete = progressPercentage < 100;
+  const hasLessons = modules.some(module => module.lessons.length > 0);
 
   if (loading) {
     return (
@@ -456,22 +464,36 @@ const CourseLearningPage = () => {
                 <p className="text-sm text-gray-600">
                   Keep going! You're doing great.
                 </p>
-                {/* Mark All Lessons Complete Button */}
-                {isNotComplete && (
-                  <Button
-                    onClick={markAllLessonsComplete}
-                    disabled={markingComplete}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {markingComplete ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                    )}
-                    {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
-                  </Button>
-                )}
+                <div className="flex gap-2">
+                  {/* Mark All Lessons Complete Button */}
+                  {isNotComplete && hasLessons && (
+                    <Button
+                      onClick={markAllLessonsComplete}
+                      disabled={markingComplete}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {markingComplete ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                      )}
+                      {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
+                    </Button>
+                  )}
+                  
+                  {/* Next Exam Button */}
+                  {(!hasLessons || progressPercentage === 100) && finalExam && (
+                    <Button
+                      onClick={handleTakeExam}
+                      size="sm"
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      <GraduationCap className="h-4 w-4 mr-2" />
+                      Take Final Exam
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -517,7 +539,7 @@ const CourseLearningPage = () => {
                       <Button 
                         size="sm" 
                         className="mt-3 bg-orange-600 hover:bg-orange-700"
-                        onClick={() => window.location.href = `/course/${courseId}/exam/${finalExam.id}`}
+                        onClick={handleTakeExam}
                       >
                         Take Final Exam
                       </Button>
@@ -673,6 +695,16 @@ const CourseLearningPage = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Final Exam Modal */}
+        {finalExam && (
+          <FinalExamModal
+            isOpen={showExamModal}
+            onClose={() => setShowExamModal(false)}
+            exam={finalExam}
+            enrollmentId={enrollment?.id || ''}
+          />
         )}
       </div>
     </div>

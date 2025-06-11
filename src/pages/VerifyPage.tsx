@@ -32,11 +32,16 @@ const VerifyPage = () => {
 
     setLoading(true);
     try {
+      console.log('Verifying certificate with code:', verificationCode.trim());
+      
       const { data, error } = await supabase.functions.invoke('verify-certificate', {
         body: { code: verificationCode.trim() }
       });
 
+      console.log('Function response:', { data, error });
+
       if (error) {
+        console.error('Function error:', error);
         throw error;
       }
 
@@ -45,11 +50,11 @@ const VerifyPage = () => {
       if (data.valid) {
         toast.success('Certificate verified successfully!');
       } else {
-        toast.error('Certificate not found or invalid');
+        toast.error(data.error || 'Certificate not found or invalid');
       }
     } catch (error) {
       console.error('Error verifying certificate:', error);
-      toast.error('Failed to verify certificate');
+      toast.error('Failed to verify certificate. Please check the code and try again.');
       setVerificationResult({
         valid: false,
         error: 'Failed to verify certificate'

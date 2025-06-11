@@ -14,20 +14,50 @@ serve(async (req) => {
   }
 
   try {
-    // Get verification code from request
-    const url = new URL(req.url)
-    const verificationCode = url.searchParams.get('code')
+    let verificationCode: string | null = null;
+
+    // Handle both GET and POST requests
+    if (req.method === 'GET') {
+      const url = new URL(req.url)
+      verificationCode = url.searchParams.get('code')
+    } else if (req.method === 'POST') {
+      const body = await req.json()
+      verificationCode = body.code
+    }
+
+    console.log('Verification code received:', verificationCode)
 
     if (!verificationCode) {
       return new Response(
-        JSON.stringify({ error: 'Verification code is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        JSON.stringify({ 
+          valid: false, 
+          error: 'Verification code is required' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 400 
+        }
       )
     }
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') as string
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase environment variables')
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          error: 'Server configuration error' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 500 
+        }
+      )
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Verify certificate
@@ -36,6 +66,7 @@ serve(async (req) => {
       .select(`
         id,
         issue_date,
+        verification_code,
         course_enrollments:enrollment_id (
           courses:course_id (title),
           profiles:user_id (full_name)
@@ -44,29 +75,61 @@ serve(async (req) => {
       .eq('verification_code', verificationCode)
       .single()
     
+    console.log('Database query result:', { data, error })
+    
     if (error || !data) {
+      console.log('Certificate not found:', error)
       return new Response(
-        JSON.stringify({ valid: false, error: 'Certificate not found' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+        JSON.stringify({ 
+          valid: false, 
+          error: 'Certificate not found or invalid' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 200 
+        }
       )
     }
     
+    // Format the response
+    const response = {
+      valid: true,
+      details: {
+        studentName: data.course_enrollments?.profiles?.full_name || 'Student',
+        courseName: data.course_enrollments?.courses?.title || 'Course',
+        issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }) : new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        verificationCode: verificationCode
+      }
+    }
+
+    console.log('Returning response:', response)
+    
     return new Response(
-      JSON.stringify({
-        valid: true,
-        details: {
-          studentName: data.course_enrollments?.profiles?.full_name || 'Student',
-          courseName: data.course_enrollments?.courses?.title || 'Course',
-          issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString() : 'Unknown',
-          verificationCode: verificationCode
-        }
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      JSON.stringify(response),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+        status: 200 
+      }
     )
   } catch (error) {
+    console.error('Error in verify-certificate function:', error)
     return new Response(
-      JSON.stringify({ valid: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ 
+        valid: false, 
+        error: 'Internal server error' 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+        status: 500 
+      }
     )
   }
 })
