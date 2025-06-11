@@ -1,144 +1,74 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ArrowRight, Download, Calendar } from 'lucide-react';
+import { CheckCircle, Package, Ticket, BookOpen } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { useCart } from '@/contexts/CartContext';
-import CheckoutSuccessDialog from '@/components/checkout/CheckoutSuccessDialog';
 
 const CheckoutSuccessPage = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { clearCart } = useCart();
+  const { user } = useAuth();
+  const [orderDetails, setOrderDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [orderData, setOrderData] = useState<any>(null);
-  const [showDialog, setShowDialog] = useState(false);
-  
+
   const sessionId = searchParams.get('session_id');
-  const orderId = searchParams.get('order_id');
 
   useEffect(() => {
-    if (sessionId || orderId) {
-      verifyOrderAndClearCart();
-    } else {
-      setLoading(false);
-    }
-  }, [sessionId, orderId]);
-
-  const verifyOrderAndClearCart = async () => {
-    try {
-      let order = null;
-      
-      if (orderId) {
-        // Direct order ID provided
-        const { data, error } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            order_items (
-              *,
-              courses:item_id (title),
-              event_tickets:item_id (
-                name, 
-                event_id,
-                events (title, start_time)
-              )
-            )
-          `)
-          .eq('id', orderId)
-          .single();
-          
-        if (!error) order = data;
-      } else if (sessionId) {
-        // Find order by payment provider ID (Stripe session)
-        const { data, error } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            order_items (
-              *,
-              courses:item_id (title),
-              event_tickets:item_id (
-                name, 
-                event_id,
-                events (title, start_time)
-              )
-            )
-          `)
-          .eq('payment_provider_id', sessionId)
-          .single();
-          
-        if (!error) order = data;
+    const handleSuccess = async () => {
+      if (!user) {
+        navigate('/auth');
+        return;
       }
 
-      if (order) {
-        setOrderData(order);
-        
-        // Clear cart on successful order
-        if (order.payment_status === 'completed') {
-          await clearCart();
-          
-          // Generate tickets for event purchases
-          const hasEventTickets = order.order_items?.some((item: any) => item.item_type === 'event_ticket');
-          
-          if (hasEventTickets) {
-            try {
-              await supabase.functions.invoke('generate-tickets', {
-                body: { orderId: order.id }
-              });
-            } catch (error) {
-              console.error('Failed to generate tickets:', error);
-              toast.error('Tickets will be generated shortly');
-            }
+      try {
+        // Clear the cart immediately
+        await clearCart();
+
+        if (sessionId) {
+          // Fetch order details using the session ID
+          const { data: order, error } = await supabase
+            .from('orders')
+            .select(`
+              *,
+              order_items (
+                *
+              )
+            `)
+            .eq('stripe_session_id', sessionId)
+            .eq('user_id', user.id)
+            .single();
+
+          if (error) {
+            console.error('Error fetching order:', error);
+          } else {
+            setOrderDetails(order);
           }
-          
-          setShowDialog(true);
-          toast.success('Order completed successfully!');
         }
-      } else {
-        toast.error('Order not found');
-      }
-    } catch (error) {
-      console.error('Error verifying order:', error);
-      toast.error('Error verifying order');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const downloadReceipt = () => {
-    if (orderData?.receipt_url) {
-      window.open(orderData.receipt_url, '_blank');
-    } else {
-      toast.error('Receipt not available');
-    }
-  };
+        toast.success('Payment successful! Your order has been confirmed.');
+      } catch (error) {
+        console.error('Error handling success:', error);
+        toast.error('There was an issue processing your order. Please contact support.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleSuccess();
+  }, [sessionId, user, navigate, clearCart]);
 
   if (loading) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!orderData) {
-    return (
-      <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <Card className="max-w-md text-center">
-            <CardContent className="pt-6">
-              <h2 className="text-xl font-semibold mb-4">Order Not Found</h2>
-              <p className="text-gray-600 mb-4">We couldn't find your order. Please check your email for confirmation details.</p>
-              <Button onClick={() => navigate('/')}>Return Home</Button>
-            </CardContent>
-          </Card>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
         </div>
       </Layout>
     );
@@ -148,61 +78,82 @@ const CheckoutSuccessPage = () => {
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto">
-            <Card className="text-center mb-8">
-              <CardHeader>
-                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                  <Check className="w-8 h-8 text-green-600" />
+          <div className="max-w-2xl mx-auto">
+            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+              <CardHeader className="text-center bg-gradient-to-r from-green-100 to-emerald-100">
+                <div className="flex justify-center mb-4">
+                  <CheckCircle className="h-16 w-16 text-green-600" />
                 </div>
-                <CardTitle className="text-2xl text-green-600">Payment Successful!</CardTitle>
-                <p className="text-gray-600">Order #{orderData.id.slice(-8)}</p>
+                <CardTitle className="text-2xl text-green-800">
+                  Payment Successful!
+                </CardTitle>
+                <p className="text-green-700">
+                  Thank you for your purchase. Your order has been confirmed.
+                </p>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-center space-x-2 text-green-800">
-                    <Check className="w-5 h-5" />
-                    <span className="font-medium">Your order has been confirmed!</span>
-                  </div>
-                </div>
-
-                <div className="text-left space-y-4">
-                  <h3 className="font-semibold text-lg">Order Summary</h3>
-                  {orderData.order_items?.map((item: any) => (
-                    <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <h4 className="font-medium">
-                          {item.item_type === 'course' ? item.courses?.title : item.event_tickets?.name}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {item.item_type === 'course' ? 'Course' : `Event Ticket (${item.quantity}x)`}
-                        </p>
-                        {item.event_tickets?.events && (
-                          <p className="text-sm text-gray-600 flex items-center mt-1">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            {new Date(item.event_tickets.events.start_time).toLocaleDateString()}
-                          </p>
-                        )}
+              
+              <CardContent className="p-6 space-y-6">
+                {orderDetails && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">Order Details</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Order ID:</span>
+                        <span className="font-mono">{orderDetails.id.slice(-8).toUpperCase()}</span>
                       </div>
-                      <span className="font-semibold">${item.total_price}</span>
+                      <div className="flex justify-between">
+                        <span>Total Amount:</span>
+                        <span className="font-semibold">${orderDetails.total_amount.toFixed(2)} USD</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Payment Status:</span>
+                        <span className="text-green-600 font-semibold">
+                          {orderDetails.payment_status.toUpperCase()}
+                        </span>
+                      </div>
                     </div>
-                  ))}
-                  
-                  <div className="flex justify-between items-center text-lg font-bold pt-4 border-t">
-                    <span>Total:</span>
-                    <span>${orderData.total_amount}</span>
                   </div>
-                </div>
+                )}
 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  {orderData.receipt_url && (
-                    <Button onClick={downloadReceipt} variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Receipt
+                <div className="text-center space-y-4">
+                  <p className="text-gray-600">
+                    You will receive a confirmation email shortly with your receipt and order details.
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button 
+                      onClick={() => navigate('/account/orders')}
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      View My Orders
                     </Button>
-                  )}
-                  <Button onClick={() => navigate('/account/orders')}>
-                    View My Orders
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    
+                    <Button 
+                      onClick={() => navigate('/my-courses')}
+                      variant="outline"
+                      className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                    >
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      My Courses
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => navigate('/my-events')}
+                      variant="outline"
+                      className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                    >
+                      <Ticket className="h-4 w-4 mr-2" />
+                      My Events
+                    </Button>
+                  </div>
+
+                  <Button 
+                    onClick={() => navigate('/')}
+                    variant="ghost"
+                    className="text-gray-600 hover:text-gray-800"
+                  >
+                    Continue Shopping
                   </Button>
                 </div>
               </CardContent>
@@ -210,13 +161,6 @@ const CheckoutSuccessPage = () => {
           </div>
         </div>
       </div>
-
-      <CheckoutSuccessDialog
-        open={showDialog}
-        onOpenChange={setShowDialog}
-        orderId={orderData?.id}
-        orderData={orderData}
-      />
     </Layout>
   );
 };

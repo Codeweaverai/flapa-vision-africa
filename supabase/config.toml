@@ -10,39 +10,51 @@ max_rows = 1000
 
 [auth]
 enabled = true
+port = 54322
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://preview--flapa-vision-africa.lovable.app", "https://skillpulse.cloud"]
+additional_redirect_urls = ["https://rxqoczksnddbxcdwobnw.supabase.co"]
 jwt_expiry = 3600
-refresh_token_rotation_enabled = true
-refresh_token_reuse_interval = 10
 enable_signup = true
 
-[functions]
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[db]
+port = 54323
+
+[storage]
 enabled = true
+port = 54324
+file_size_limit = "50MiB"
 
-[functions.send-contact-email]
-verify_jwt = false
+[edge_runtime]
+enabled = true
+port = 54325
 
-[functions.create-stripe-checkout]
+[functions.create-checkout-session]
 verify_jwt = true
-
-[functions.stripe-webhook-handler]
-verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
 
-[db]
-port = 54322
+[functions.pawapay-webhook]
+verify_jwt = false
 
-[realtime]
-enabled = true
-port = 54323
+[functions.generate-tickets]
+verify_jwt = true
 
-[studio]
-enabled = true
-port = 54324
+[functions.initiate-payment]
+verify_jwt = true
 
-[inbucket]
-enabled = true
-port = 54325
+[functions.send-order-confirmation]
+verify_jwt = true
+
+[functions.send-payment-confirmation]
+verify_jwt = true
+
+[functions.send-event-confirmation]
+verify_jwt = true
+
+[supabase]
+port = 54326

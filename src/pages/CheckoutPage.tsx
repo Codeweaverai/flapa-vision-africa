@@ -24,7 +24,7 @@ const CheckoutPage = () => {
   const { currentCurrency, convertPrice, formatPrice } = useCurrency();
   const navigate = useNavigate();
   
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mobile_money'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay'>('stripe');
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -72,7 +72,6 @@ const CheckoutPage = () => {
         });
       } catch (error) {
         console.error('Error converting amounts:', error);
-        // Fallback to USD amounts
         setConvertedAmounts({
           total: totalAmountUSD,
           tax: taxAmountUSD,
@@ -137,39 +136,6 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleStripeCheckout = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: {
-          items: items.map(item => ({
-            item_type: item.item_type,
-            item_id: item.item_id,
-            item_name: item.title,
-            quantity: item.quantity,
-            price: item.price,
-            ticket_holder_names: item.ticket_holder_names || []
-          })),
-          total_amount: finalAmountUSD,
-          tax_amount: taxAmountUSD,
-          discount_amount: discount,
-          promo_code: promoCode || null,
-          currency: currentCurrency,
-          success_url: `${window.location.origin}/checkout/success`,
-          cancel_url: `${window.location.origin}/checkout`,
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      toast.error('Failed to initialize payment');
-    }
-  };
-
   const handleCheckout = async () => {
     if (!user) {
       navigate('/auth', { state: { redirectTo: '/checkout' } });
@@ -178,13 +144,28 @@ const CheckoutPage = () => {
 
     setLoading(true);
     try {
-      if (paymentMethod === 'card') {
-        await handleStripeCheckout();
+      if (paymentMethod === 'stripe') {
+        const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+          body: {
+            payment_method: 'stripe',
+            success_url: `${window.location.origin}/checkout/success`,
+            cancel_url: `${window.location.origin}/checkout`,
+          }
+        });
+
+        if (error) throw error;
+
+        if (data?.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error('No checkout URL returned');
+        }
       } else {
         setShowMobileMoneyDialog(true);
       }
     } catch (error) {
       console.error('Checkout error:', error);
+      toast.error('Failed to initialize payment');
     } finally {
       setLoading(false);
     }
@@ -330,19 +311,22 @@ const CheckoutPage = () => {
                     <CardTitle>Payment Method</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <RadioGroup value={paymentMethod} onValueChange={(value: 'card' | 'mobile_money') => setPaymentMethod(value)}>
+                    <RadioGroup 
+                      value={paymentMethod} 
+                      onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay')}
+                    >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="card" id="card" />
-                        <Label htmlFor="card" className="flex items-center gap-2">
+                        <RadioGroupItem value="stripe" id="stripe" />
+                        <Label htmlFor="stripe" className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4" />
                           Credit/Debit Card
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="mobile_money" id="mobile_money" />
-                        <Label htmlFor="mobile_money" className="flex items-center gap-2">
+                        <RadioGroupItem value="pawapay" id="pawapay" />
+                        <Label htmlFor="pawapay" className="flex items-center gap-2">
                           <Smartphone className="h-4 w-4" />
-                          Mobile Money (PawaPay)
+                          Mobile Money
                         </Label>
                       </div>
                     </RadioGroup>
@@ -356,56 +340,40 @@ const CheckoutPage = () => {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <div className="text-right">
-                        <div>{formatPrice(convertedAmounts.total, currentCurrency)}</div>
-                        {currentCurrency !== 'USD' && (
-                          <div className="text-xs text-gray-500">${totalAmountUSD.toFixed(2)} USD</div>
-                        )}
-                      </div>
+                      <span>Subtotal</span>
+                      <PriceDisplay amount={convertedAmounts.total} originalCurrency={currentCurrency as any} />
                     </div>
-                    <div className="flex justify-between">
-                      <span>Tax:</span>
-                      <div className="text-right">
-                        <div>{formatPrice(convertedAmounts.tax, currentCurrency)}</div>
-                        {currentCurrency !== 'USD' && (
-                          <div className="text-xs text-gray-500">${taxAmountUSD.toFixed(2)} USD</div>
-                        )}
-                      </div>
-                    </div>
-                    {convertedAmounts.discount > 0 && (
+                    {discount > 0 && (
                       <div className="flex justify-between text-green-600">
-                        <span>Discount:</span>
-                        <div className="text-right">
-                          <div>-{formatPrice(convertedAmounts.discount, currentCurrency)}</div>
-                          {currentCurrency !== 'USD' && (
-                            <div className="text-xs text-gray-500">-${discount.toFixed(2)} USD</div>
-                          )}
-                        </div>
+                        <span>Discount</span>
+                        <span>-<PriceDisplay amount={convertedAmounts.discount} originalCurrency={currentCurrency as any} /></span>
                       </div>
                     )}
-                    <Separator />
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Total:</span>
-                      <div className="text-right">
-                        <div>{formatPrice(convertedAmounts.final, currentCurrency)}</div>
-                        {currentCurrency !== 'USD' && (
-                          <div className="text-sm text-gray-600">${finalAmountUSD.toFixed(2)} USD</div>
-                        )}
-                      </div>
+                    <div className="flex justify-between">
+                      <span>Tax (10%)</span>
+                      <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
                     </div>
-                    
-                    <Button 
-                      onClick={handleCheckout}
-                      disabled={loading}
-                      className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                    >
-                      {loading ? 'Processing...' : (
-                        <>Pay {formatPrice(convertedAmounts.final, currentCurrency)}</>
-                      )}
-                    </Button>
+                    <Separator />
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total</span>
+                      <PriceDisplay amount={convertedAmounts.final} originalCurrency={currentCurrency as any} />
+                    </div>
+                    {currentCurrency !== 'USD' && (
+                      <div className="text-sm text-gray-500 text-right">
+                        Original: ${finalAmountUSD.toFixed(2)} USD
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
+
+                <Button
+                  onClick={handleCheckout}
+                  disabled={loading || finalAmountUSD <= 0}
+                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white py-3"
+                  size="lg"
+                >
+                  {loading ? "Processing..." : paymentMethod === 'stripe' ? "Pay with Card" : "Pay with Mobile Money"}
+                </Button>
               </div>
             </div>
           </div>
@@ -416,11 +384,11 @@ const CheckoutPage = () => {
         isOpen={showMobileMoneyDialog}
         onClose={() => setShowMobileMoneyDialog(false)}
         amount={finalAmountUSD}
-        currency={currentCurrency}
-        items={items}
-        discount={discount}
-        taxAmount={taxAmountUSD}
-        promoCode={promoCode}
+        currency="USD"
+        onSuccess={() => {
+          setShowMobileMoneyDialog(false);
+          navigate('/checkout/success');
+        }}
       />
     </Layout>
   );

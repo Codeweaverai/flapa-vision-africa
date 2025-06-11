@@ -1,11 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2023-10-16",
-});
 
 const supabaseClient = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
@@ -14,29 +9,39 @@ const supabaseClient = createClient(
 );
 
 serve(async (req) => {
-  const signature = req.headers.get("stripe-signature");
-  const body = await req.text();
-
-  if (!signature) {
-    return new Response("No signature", { status: 400 });
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
   }
 
   try {
-    const event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      Deno.env.get("STRIPE_WEBHOOK_SECRET") || ""
-    );
+    const payload = await req.json();
+    console.log("Received PawaPay webhook:", payload);
 
-    console.log("Received Stripe event:", event.type);
+    // Verify PawaPay webhook signature here if needed
+    // const signature = req.headers.get("x-pawapay-signature");
 
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const orderId = session.metadata?.order_id;
+    // Extract payment information from PawaPay payload
+    const { 
+      depositId, 
+      status, 
+      amount, 
+      currency,
+      referenceId, // This should contain our order_id
+      payer,
+      timestamp 
+    } = payload;
 
-      if (!orderId) {
-        console.error("No order_id in session metadata");
-        return new Response("No order_id", { status: 400 });
+    if (status === "COMPLETED" || status === "ACCEPTED") {
+      // Find the order using referenceId or another identifier
+      const { data: order, error: orderError } = await supabaseClient
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('id', referenceId)
+        .single();
+
+      if (orderError || !order) {
+        console.error("Order not found:", referenceId);
+        return new Response("Order not found", { status: 404 });
       }
 
       // Update order status
@@ -44,31 +49,35 @@ serve(async (req) => {
         .from('orders')
         .update({
           payment_status: 'completed',
-          stripe_payment_intent_id: session.payment_intent as string,
-          receipt_url: session.receipt_email ? `Receipt sent to ${session.receipt_email}` : null,
+          payment_provider_id: depositId,
           receipt_generated_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', orderId);
+        .eq('id', referenceId);
 
       if (orderUpdateError) {
         console.error("Error updating order:", orderUpdateError);
         return new Response("Error updating order", { status: 500 });
       }
 
-      // Get order details
-      const { data: order, error: orderError } = await supabaseClient
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('id', orderId)
-        .single();
+      // Create payment transaction record
+      await supabaseClient
+        .from('payment_transactions')
+        .insert({
+          user_id: order.user_id,
+          reference_type: 'order',
+          reference_id: referenceId,
+          amount: parseFloat(amount),
+          currency: currency,
+          status: 'completed',
+          provider: 'pawapay',
+          provider_transaction_id: depositId,
+          phone_number: payer?.msisdn,
+          correspondent: payer?.correspondent,
+          metadata: payload
+        });
 
-      if (orderError || !order) {
-        console.error("Error fetching order:", orderError);
-        return new Response("Error fetching order", { status: 500 });
-      }
-
-      // Process order items
+      // Process order items (same as Stripe webhook)
       for (const item of order.order_items) {
         if (item.item_type === 'course') {
           // Create course enrollment
@@ -78,7 +87,7 @@ serve(async (req) => {
               user_id: order.user_id,
               course_id: item.item_id,
               payment_status: 'completed',
-              order_id: orderId,
+              order_id: referenceId,
               enrollment_date: new Date().toISOString()
             });
 
@@ -104,9 +113,9 @@ serve(async (req) => {
                 status: 'confirmed',
                 payment_status: 'completed',
                 payment_amount: item.total_price,
-                payment_currency: 'USD',
+                payment_currency: currency,
                 ticket_quantity: item.quantity,
-                order_id: orderId,
+                order_id: referenceId,
                 booking_date: new Date().toISOString()
               })
               .select()
@@ -134,7 +143,7 @@ serve(async (req) => {
                   .from('generated_tickets')
                   .insert({
                     booking_id: booking.id,
-                    order_id: orderId,
+                    order_id: referenceId,
                     event_id: ticket.event_id,
                     event_ticket_id: item.item_id,
                     ticket_code: ticketCode,
@@ -162,16 +171,16 @@ serve(async (req) => {
         .delete()
         .eq('user_id', order.user_id);
 
-      console.log("Successfully processed order:", orderId);
+      console.log("Successfully processed PawaPay order:", referenceId);
     }
 
-    return new Response(JSON.stringify({ received: true }), {
+    return new Response(JSON.stringify({ status: "received" }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
 
   } catch (error) {
-    console.error("Webhook error:", error);
+    console.error("PawaPay webhook error:", error);
     return new Response("Webhook error", { status: 400 });
   }
 });
