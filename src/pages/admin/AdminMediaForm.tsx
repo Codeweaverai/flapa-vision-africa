@@ -129,155 +129,153 @@ const AdminMediaForm = () => {
 
   return (
     <AdminLayout title={postId && postId !== 'new' ? 'Edit Media Post' : 'Create Media Post'}>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="space-y-6 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => navigate('/admin/media')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Media
-              </Button>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                {postId && postId !== 'new' ? 'Edit Media Post' : 'Create Media Post'}
-              </h1>
-            </div>
-            <Button onClick={handleSave} disabled={saving} className="bg-gradient-to-r from-orange-500 to-purple-600">
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : 'Save'}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => navigate('/admin/media')} className="hover:bg-orange-100">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Media
             </Button>
           </div>
+          <Button onClick={handleSave} disabled={saving} className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
 
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Media Post Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="bg-gradient-to-br from-white to-orange-50/30 border-orange-200/50 shadow-xl">
+          <CardHeader className="bg-gradient-to-r from-orange-500/10 to-purple-500/10 border-b border-orange-200/50">
+            <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              Media Post Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6 p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-orange-700 font-medium">Title *</Label>
+                <Input
+                  id="title"
+                  value={post.title}
+                  onChange={(e) => setPost({ ...post, title: e.target.value })}
+                  placeholder="Enter post title"
+                  className="border-orange-300 focus:border-orange-500 focus:ring-orange-200"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="post_type" className="text-purple-700 font-medium">Post Type</Label>
+                <Select value={post.post_type} onValueChange={(value) => setPost({ ...post, post_type: value })}>
+                  <SelectTrigger className="border-purple-300 focus:border-purple-500 focus:ring-purple-200">
+                    <SelectValue placeholder="Select post type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="article">Article</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="podcast">Podcast</SelectItem>
+                    <SelectItem value="infographic">Infographic</SelectItem>
+                    <SelectItem value="news">News</SelectItem>
+                    <SelectItem value="resource">Resource</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category" className="text-orange-700 font-medium">Category</Label>
+                <Select value={post.category || ''} onValueChange={(value) => setPost({ ...post, category: value })}>
+                  <SelectTrigger className="border-orange-300 focus:border-orange-500 focus:ring-orange-200">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Technology">Technology</SelectItem>
+                    <SelectItem value="Business">Business</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Education">Education</SelectItem>
+                    <SelectItem value="Health">Health</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(post.post_type === 'video' || post.post_type === 'podcast') && (
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title *</Label>
+                  <Label htmlFor="duration" className="text-purple-700 font-medium">Duration (minutes)</Label>
                   <Input
-                    id="title"
-                    value={post.title}
-                    onChange={(e) => setPost({ ...post, title: e.target.value })}
-                    placeholder="Enter post title"
-                    className="border-orange-200 focus:border-orange-500"
+                    id="duration"
+                    type="number"
+                    value={post.duration_minutes || ''}
+                    onChange={(e) => setPost({ ...post, duration_minutes: parseInt(e.target.value) || undefined })}
+                    placeholder="Duration in minutes"
+                    className="border-purple-300 focus:border-purple-500 focus:ring-purple-200"
                   />
                 </div>
+              )}
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="post_type">Post Type</Label>
-                  <Select value={post.post_type} onValueChange={(value) => setPost({ ...post, post_type: value })}>
-                    <SelectTrigger className="border-orange-200 focus:border-orange-500">
-                      <SelectValue placeholder="Select post type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="article">Article</SelectItem>
-                      <SelectItem value="video">Video</SelectItem>
-                      <SelectItem value="podcast">Podcast</SelectItem>
-                      <SelectItem value="infographic">Infographic</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="summary" className="text-orange-700 font-medium">Summary</Label>
+              <Textarea
+                id="summary"
+                value={post.summary}
+                onChange={(e) => setPost({ ...post, summary: e.target.value })}
+                placeholder="Brief summary of the post"
+                rows={3}
+                className="border-orange-300 focus:border-orange-500 focus:ring-orange-200"
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={post.category || ''} onValueChange={(value) => setPost({ ...post, category: value })}>
-                    <SelectTrigger className="border-purple-200 focus:border-purple-500">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Technology">Technology</SelectItem>
-                      <SelectItem value="Business">Business</SelectItem>
-                      <SelectItem value="Design">Design</SelectItem>
-                      <SelectItem value="Marketing">Marketing</SelectItem>
-                      <SelectItem value="Education">Education</SelectItem>
-                      <SelectItem value="Health">Health</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="content" className="text-purple-700 font-medium">Content *</Label>
+              <Textarea
+                id="content"
+                value={post.content}
+                onChange={(e) => setPost({ ...post, content: e.target.value })}
+                placeholder="Full content of the post"
+                rows={8}
+                className="border-purple-300 focus:border-purple-500 focus:ring-purple-200"
+              />
+            </div>
 
-                {(post.post_type === 'video' || post.post_type === 'podcast') && (
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">Duration (minutes)</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      value={post.duration_minutes || ''}
-                      onChange={(e) => setPost({ ...post, duration_minutes: parseInt(e.target.value) || undefined })}
-                      placeholder="Duration in minutes"
-                      className="border-orange-200 focus:border-orange-500"
-                    />
-                  </div>
-                )}
-              </div>
-
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="summary">Summary</Label>
-                <Textarea
-                  id="summary"
-                  value={post.summary}
-                  onChange={(e) => setPost({ ...post, summary: e.target.value })}
-                  placeholder="Brief summary of the post"
-                  rows={3}
-                  className="border-purple-200 focus:border-purple-500"
+                <FileUpload
+                  bucket="course-thumbnails"
+                  path="thumbnails"
+                  accept="image/*"
+                  maxSize={5}
+                  onUploadComplete={handleThumbnailUpload}
+                  existingUrl={post.image_url}
+                  label="Thumbnail Image"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="content">Content *</Label>
-                <Textarea
-                  id="content"
-                  value={post.content}
-                  onChange={(e) => setPost({ ...post, content: e.target.value })}
-                  placeholder="Full content of the post"
-                  rows={8}
-                  className="border-orange-200 focus:border-orange-500"
-                />
-              </div>
-
-              <div className="space-y-4">
+              {(post.post_type === 'video' || post.post_type === 'podcast') && (
                 <div className="space-y-2">
                   <FileUpload
                     bucket="course-thumbnails"
-                    path="thumbnails"
-                    accept="image/*"
-                    maxSize={5}
-                    onUploadComplete={handleThumbnailUpload}
-                    existingUrl={post.image_url}
-                    label="Thumbnail Image"
+                    path="media"
+                    accept={post.post_type === 'video' ? 'video/*' : 'audio/*'}
+                    maxSize={100}
+                    onUploadComplete={handleMediaUpload}
+                    existingUrl={post.media_url}
+                    label={`Media File (${post.post_type === 'video' ? 'Video' : 'Audio'})`}
                   />
                 </div>
+              )}
+            </div>
 
-                {(post.post_type === 'video' || post.post_type === 'podcast') && (
-                  <div className="space-y-2">
-                    <FileUpload
-                      bucket="course-thumbnails"
-                      path="media"
-                      accept={post.post_type === 'video' ? 'video/*' : 'audio/*'}
-                      maxSize={100}
-                      onUploadComplete={handleMediaUpload}
-                      existingUrl={post.media_url}
-                      label={`Media File (${post.post_type === 'video' ? 'Video' : 'Audio'})`}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_published"
-                  checked={post.is_published}
-                  onCheckedChange={(checked) => setPost({ ...post, is_published: checked })}
-                />
-                <Label htmlFor="is_published" className="font-medium">
-                  Publish Post
-                </Label>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200/50">
+              <Switch
+                id="is_published"
+                checked={post.is_published}
+                onCheckedChange={(checked) => setPost({ ...post, is_published: checked })}
+                className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-orange-500 data-[state=checked]:to-purple-600"
+              />
+              <Label htmlFor="is_published" className="font-medium text-orange-700">
+                Publish Post
+              </Label>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AdminLayout>
   );

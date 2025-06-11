@@ -31,27 +31,36 @@ const AdminSidebar = () => {
   ];
 
   return (
-    <div className="h-screen w-64 border-r bg-gray-50 dark:bg-gray-900 dark:border-gray-800">
+    <div className="h-screen w-64 bg-gradient-to-b from-orange-500 via-purple-500 to-purple-600 shadow-xl">
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b dark:border-gray-800">
-          <h1 className="text-xl font-bold">Admin Panel</h1>
+        <div className="p-6 border-b border-white/20">
+          <h1 className="text-xl font-bold text-white">Admin Panel</h1>
+          <p className="text-orange-100 text-sm mt-1">Management Dashboard</p>
         </div>
         
-        <div className="p-4 space-y-1 flex-1 overflow-y-auto">
+        <div className="p-4 space-y-2 flex-1 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center px-4 py-2 rounded-md ${
+              className={`flex items-center px-4 py-3 rounded-lg transition-all duration-200 ${
                 isActive(item.path)
-                  ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
-                  : 'text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-800'
+                  ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
+                  : 'text-orange-100 hover:bg-white/10 hover:text-white hover:shadow-md'
               }`}
             >
-              {item.icon}
-              {item.name}
+              <span className={isActive(item.path) ? 'text-white' : 'text-orange-200'}>
+                {item.icon}
+              </span>
+              <span className="font-medium">{item.name}</span>
             </Link>
           ))}
+        </div>
+
+        <div className="p-4 border-t border-white/20">
+          <div className="text-orange-100 text-xs text-center">
+            © 2024 Learning Platform
+          </div>
         </div>
       </div>
     </div>
