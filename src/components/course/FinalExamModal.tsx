@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Clock, AlertCircle, CheckCircle, GraduationCap } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import FinalExamResultsModal from './FinalExamResultsModal';
 
 interface FinalExam {
   id: string;
@@ -37,15 +38,13 @@ interface FinalExamModalProps {
   onClose: () => void;
   exam: FinalExam;
   enrollmentId: string;
-  onComplete: (score: number, passed: boolean) => void;
 }
 
 const FinalExamModal: React.FC<FinalExamModalProps> = ({
   isOpen,
   onClose,
   exam,
-  enrollmentId,
-  onComplete
+  enrollmentId
 }) => {
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -54,6 +53,15 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [examStarted, setExamStarted] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [examResults, setExamResults] = useState<{
+    score: number;
+    passed: boolean;
+    quizScores: number[];
+    finalGrade: number;
+    courseName: string;
+    studentName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen && !examStarted) {
@@ -179,9 +187,30 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
 
       if (error) throw error;
 
+      // Get course and student info for results
+      const { data: enrollmentData } = await supabase
+        .from('course_enrollments')
+        .select(`
+          courses:course_id (title),
+          profiles:user_id (full_name)
+        `)
+        .eq('id', enrollmentId)
+        .single();
+
+      // Get quiz scores (placeholder for now)
+      const quizScores: number[] = [];
+      
+      setExamResults({
+        score,
+        passed,
+        quizScores,
+        finalGrade: score, // For now, just use exam score
+        courseName: enrollmentData?.courses?.title || 'Course',
+        studentName: enrollmentData?.profiles?.full_name || 'Student'
+      });
+
+      setShowResults(true);
       toast.success(`Exam completed! Score: ${score}%`);
-      onComplete(score, passed);
-      onClose();
     } catch (error) {
       console.error('Error submitting exam:', error);
       toast.error('Failed to submit exam');
@@ -208,6 +237,19 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     return 'text-green-600';
   };
 
+  const handleResultsClose = () => {
+    setShowResults(false);
+    onClose();
+  };
+
+  const handleRetake = () => {
+    setShowResults(false);
+    setExamStarted(false);
+    setAnswers({});
+    setCurrentQuestionIndex(0);
+    setTimeLeft(exam.time_limit_minutes * 60);
+  };
+
   if (loading) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -217,6 +259,23 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+    );
+  }
+
+  if (showResults && examResults) {
+    return (
+      <FinalExamResultsModal
+        isOpen={showResults}
+        onClose={handleResultsClose}
+        examScore={examResults.score}
+        quizScores={examResults.quizScores}
+        finalGrade={examResults.finalGrade}
+        passed={examResults.passed}
+        courseName={examResults.courseName}
+        studentName={examResults.studentName}
+        enrollmentId={enrollmentId}
+        onRetake={handleRetake}
+      />
     );
   }
 

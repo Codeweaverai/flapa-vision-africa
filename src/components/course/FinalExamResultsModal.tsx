@@ -337,24 +337,6 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
     }
   };
 
-  const calculateGradeBreakdown = () => {
-    const quizAverage = quizScores.length > 0 
-      ? quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length 
-      : 0;
-    
-    // Weight: 60% quizzes, 40% final exam (adjust as needed)
-    const quizWeight = 0.6;
-    const examWeight = 0.4;
-    
-    return {
-      quizAverage: Math.round(quizAverage),
-      examScore,
-      weightedQuizScore: Math.round(quizAverage * quizWeight),
-      weightedExamScore: Math.round(examScore * examWeight),
-      finalGrade: Math.round((quizAverage * quizWeight) + (examScore * examWeight))
-    };
-  };
-
   const breakdown = calculateGradeBreakdown();
 
   return (
