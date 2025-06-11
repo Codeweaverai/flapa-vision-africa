@@ -741,7 +741,7 @@ const CourseLearningPage = () => {
                  file: {
                 attributes: {
                  controlsList: 'nodownload noremoteplayback',
-                disablePictureInPicture: true,
+                 // disablePictureInPicture is removed to allow PiP
                  }
                }
              }}
