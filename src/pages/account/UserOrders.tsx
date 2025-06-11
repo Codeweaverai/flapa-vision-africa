@@ -221,7 +221,7 @@ const UserOrders = () => {
         </div>
       </Layout>
     );
-  };
+  }
 
   return (
     <Layout>
@@ -483,18 +483,6 @@ const UserOrders = () => {
                               >
                                 <Download className="h-4 w-4 mr-2" />
                                 Receipt
-                              </Button>
-                            )}
-                            {/* Check if order has event tickets */}
-                            {order.order_items?.some(item => item.item_type === 'event_ticket') && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.location.href = `/ticket-details/${order.id}`}
-                                className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Tickets
                               </Button>
                             )}
                             <Button
