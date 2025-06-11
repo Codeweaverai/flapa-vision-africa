@@ -733,21 +733,24 @@ const CourseLearningPage = () => {
               {currentLesson.video_url ? (
                <ReactPlayer
                url={currentLesson.video_url}
-                width="100%"
-                height="100%"
-                playing={false}
-                controls
-                className="rounded-t-lg overflow-hidden"
-                 config={{
-                 file: {
-                attributes: {
-                 controlsList: 'nodownload noremoteplayback',
-                 // disablePictureInPicture is removed to allow PiP
-                 }
-               }
-             }}
-             onContextMenu={(e) => e.preventDefault()}
-            />
+                controls={true}
+                          playing={false}
+                          width="100%"
+                          height="100%"
+                          light={course.thumbnail_url}
+                          config={{
+                            file: {
+                              attributes: {
+                                controlsList: 'nodownload noremoteplayback',
+                                disablePictureInPicture: false,
+                                onContextMenu: (e: React.MouseEvent) => e.preventDefault()
+                              }
+                            }
+                          }}
+                          style={{
+                            minHeight: '500px'
+                          }}
+                        />
               ) : (
                 <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-200 to-purple-200">
                   <div className="text-center">
