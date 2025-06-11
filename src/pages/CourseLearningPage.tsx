@@ -19,7 +19,8 @@ import {
   MessageCircle,
   Target,
   CheckCircle,
-  StickyNote
+  StickyNote,
+  CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
@@ -147,6 +148,7 @@ const CourseLearningPage = () => {
   const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
   const [instructor, setInstructor] = useState<Profile | null>(null);
+  const [markingComplete, setMarkingComplete] = useState(false);
 
   useEffect(() => {
     if (courseId) {
@@ -317,6 +319,64 @@ const CourseLearningPage = () => {
     }
   };
 
+  const markAllLessonsComplete = async () => {
+    if (!user || !courseId || !modules.length) {
+      toast.error('Unable to mark lessons complete');
+      return;
+    }
+
+    setMarkingComplete(true);
+    try {
+      // Get all lesson IDs from all modules
+      const allLessonIds = modules.flatMap(module => 
+        module.lessons.map(lesson => lesson.id)
+      );
+
+      // Mark all lessons as complete
+      for (const lessonId of allLessonIds) {
+        const { error } = await supabase
+          .from('lesson_progress')
+          .upsert({
+            user_id: user.id,
+            lesson_id: lessonId,
+            completed: true,
+            completed_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,lesson_id'
+          });
+
+        if (error) {
+          console.error('Error marking lesson complete:', error);
+        }
+      }
+
+      // Update course progress to 100%
+      const { error: progressError } = await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          progress_percentage: 100,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+
+      if (progressError) {
+        console.error('Error updating course progress:', progressError);
+      } else {
+        // Refresh progress data
+        await fetchProgress();
+        toast.success('All lessons marked as complete!');
+      }
+    } catch (error) {
+      console.error('Error marking lessons complete:', error);
+      toast.error('Failed to mark lessons complete');
+    } finally {
+      setMarkingComplete(false);
+    }
+  };
+
   const handleStartLearning = () => {
     if (modules.length > 0 && modules[0].lessons.length > 0) {
       const firstLesson = modules[0].lessons[0];
@@ -325,6 +385,8 @@ const CourseLearningPage = () => {
   };
 
   const enrolledUser = enrollment && enrollment.payment_status === 'completed';
+  const progressPercentage = progress?.progress_percentage || 0;
+  const isNotComplete = progressPercentage < 100;
 
   if (loading) {
     return (
@@ -387,12 +449,30 @@ const CourseLearningPage = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Your Progress</h3>
-                <span className="text-2xl font-bold text-orange-600">{progress?.progress_percentage || 0}%</span>
+                <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
               </div>
-              <Progress value={progress?.progress_percentage || 0} className="h-3" />
-              <p className="text-sm text-gray-600 mt-2">
-                Keep going! You're doing great.
-              </p>
+              <Progress value={progressPercentage} className="h-3" />
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-gray-600">
+                  Keep going! You're doing great.
+                </p>
+                {/* Mark All Lessons Complete Button */}
+                {isNotComplete && (
+                  <Button
+                    onClick={markAllLessonsComplete}
+                    disabled={markingComplete}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {markingComplete ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                    )}
+                    {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}

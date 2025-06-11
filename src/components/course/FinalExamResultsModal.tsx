@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { GraduationCap, Award, Download, Share2, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 interface FinalExamResultsModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
 }) => {
   const [certificate, setCertificate] = useState<any>(null);
   const [generatingCertificate, setGeneratingCertificate] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (isOpen && passed) {
@@ -156,6 +158,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 text-align: center;
                 border: 8px solid #f59e0b;
                 position: relative;
+                margin: auto;
             }
             .certificate::before {
                 content: '';
@@ -218,19 +221,36 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-end;
+                flex-wrap: wrap;
+                gap: 20px;
+            }
+            .signature-section {
+                flex: 1;
+                min-width: 200px;
+                text-align: center;
             }
             .signature-line {
                 border-top: 2px solid #1f2937;
-                width: 200px;
+                width: 100%;
                 text-align: center;
                 padding-top: 10px;
                 font-size: 0.9rem;
                 color: #6b7280;
+                margin-bottom: 10px;
+            }
+            .date-section {
+                flex: 1;
+                min-width: 200px;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-end;
             }
             .verification {
                 margin-top: 30px;
                 font-size: 0.8rem;
                 color: #9ca3af;
+                text-align: center;
             }
             .grade-badge {
                 display: inline-block;
@@ -240,6 +260,16 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 border-radius: 25px;
                 font-weight: bold;
                 margin: 20px 0;
+            }
+            @media (max-width: 768px) {
+                .signature {
+                    flex-direction: column;
+                    align-items: center;
+                }
+                .signature-section, .date-section {
+                    min-width: 100%;
+                    margin-bottom: 20px;
+                }
             }
         </style>
     </head>
@@ -254,12 +284,14 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
             <div class="grade-badge">Final Grade: ${finalGrade}%</div>
             <div class="completion">demonstrating professional competency and commitment to continuous learning</div>
             <div class="signature">
-                <div class="signature-line">
-                    <strong>SkillPulse Academy</strong><br>
-                    Authorized Signature
+                <div class="signature-section">
+                    <div class="signature-line">
+                        <strong>SkillPulse Academy</strong><br>
+                        Authorized Signature
+                    </div>
                 </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 0.9rem; color: #6b7280;">${currentDate}</div>
+                <div class="date-section">
+                    <div style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">${currentDate}</div>
                     <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
                 </div>
             </div>
@@ -277,6 +309,14 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
     const text = `I'm excited to share that I've successfully completed "${courseName}" with a final grade of ${finalGrade}%! 🎓 #ProfessionalDevelopment #SkillPulse #ContinuousLearning`;
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.origin)}&summary=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
+  };
+
+  const handleClose = () => {
+    if (passed) {
+      navigate('/course-results');
+    } else {
+      onClose();
+    }
   };
 
   const breakdown = calculateGradeBreakdown();
@@ -462,8 +502,8 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 Retake Exam
               </Button>
             )}
-            <Button onClick={onClose}>
-              {passed ? 'Continue Learning' : 'Close'}
+            <Button onClick={handleClose}>
+              {passed ? 'Proceed To Course Results' : 'Close'}
             </Button>
           </div>
         </div>
