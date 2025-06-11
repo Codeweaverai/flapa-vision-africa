@@ -435,6 +435,14 @@ const UserOrders = () => {
                                           <Printer className="h-4 w-4 mr-2" />
                                           Print Ticket
                                         </Button>
+                                        <Button
+                                          onClick={() => window.location.href = `/ticket-details/${order.id}`}
+                                          className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white"
+                                          size="sm"
+                                        >
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          View Tickets
+                                        </Button>
                                         {eventDetail && (
                                           <Button
                                             onClick={() => window.open(`/event/${eventDetail.id}`, '_blank')}

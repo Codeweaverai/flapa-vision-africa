@@ -112,6 +112,7 @@ import CheckoutPage from '@/pages/CheckoutPage';
 import CheckoutSuccessPage from '@/pages/CheckoutSuccessPage';
 
 import TicketPage from '@/pages/TicketPage';
+import TicketDetailPage from '@/pages/TicketDetailPage';
 
 import CourseResultsPage from '@/pages/CourseResultsPage';
 
@@ -232,8 +233,9 @@ function App() {
                 <Route path="/payment/cancel" element={<PaymentCancelPage />} />
                 <Route path="/payment/result" element={<PaymentResultPage />} />
 
-                {/* Ticket Route */}
+                {/* Ticket Routes */}
                 <Route path="/ticket/:ticketId" element={<TicketPage />} />
+                <Route path="/ticket-details/:orderId" element={<ProtectedRoute><TicketDetailPage /></ProtectedRoute>} />
 
                 {/* 404 Route */}
                 <Route path="/course-results" element={<CourseResultsPage />} />
