@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -71,7 +71,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
         .from('certificates')
         .select('*')
         .eq('enrollment_id', enrollmentId)
-        .single();
+        .maybeSingle();
 
       if (existingCert) {
         setCertificate(existingCert);
@@ -347,6 +347,12 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
             <GraduationCap className="h-6 w-6 text-orange-500" />
             Final Exam Results
           </DialogTitle>
+          <DialogDescription>
+            {passed 
+              ? "Congratulations! You have successfully completed the course." 
+              : "You need 70% or higher to pass. You can retake the exam."
+            }
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -521,7 +527,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
               </Button>
             )}
             <Button onClick={handleClose}>
-              {passed ? 'Proceed To Course Results' : 'Close'}
+              {passed ? 'View All Results' : 'Close'}
             </Button>
           </div>
         </div>

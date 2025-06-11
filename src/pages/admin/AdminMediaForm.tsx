@@ -1,413 +1,342 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'sonner';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { 
-  Form, 
-  FormControl, 
-  FormDescription, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from '@/components/ui/form';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { supabase } from '@/lib/supabaseClient';
+import { ArrowLeft, Save, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+import AdminLayout from '@/components/layout/AdminLayout';
+import FileUpload from '@/components/common/FileUpload';
 
-// Define MediaPost type
 interface MediaPost {
-  id: string;
+  id?: string;
   title: string;
   content: string;
-  summary?: string;
+  summary: string;
   post_type: string;
+  category: string;
   media_url?: string;
   image_url?: string;
-  category?: string;
   duration_minutes?: number;
   is_published: boolean;
   author_id?: string;
-  published_at?: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
-// Define form schema
-const mediaFormSchema = z.object({
-  title: z.string().min(3, { message: 'Title must be at least 3 characters' }),
-  content: z.string().min(10, { message: 'Content must be at least 10 characters' }),
-  summary: z.string().optional(),
-  post_type: z.string().min(1, { message: 'Post type is required' }),
-  media_url: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal('')),
-  image_url: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal('')),
-  category: z.string().optional(),
-  duration_minutes: z.number().int().positive().optional(),
-  is_published: z.boolean().default(false),
-});
-
-type MediaFormValues = z.infer<typeof mediaFormSchema>;
-
-const POST_TYPES = ['article', 'video', 'podcast', 'interview', 'resource'];
-const CATEGORIES = ['Technology', 'Business', 'Health', 'Education', 'Lifestyle', 'Personal Development', 'Other'];
-
 const AdminMediaForm = () => {
+  const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const isEditing = !!id;
-  const [loading, setLoading] = useState(false);
-  
-  // Initialize form
-  const form = useForm<MediaFormValues>({
-    resolver: zodResolver(mediaFormSchema),
-    defaultValues: {
-      title: '',
-      content: '',
-      summary: '',
-      post_type: 'article',
-      media_url: '',
-      image_url: '',
-      category: '',
-      duration_minutes: undefined,
-      is_published: false,
-    },
+  const [post, setPost] = useState<MediaPost>({
+    title: '',
+    content: '',
+    summary: '',
+    post_type: 'article',
+    category: '',
+    is_published: false,
   });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
 
-  // Load media post if editing
   useEffect(() => {
-    if (isEditing && id) {
-      const fetchMediaPost = async () => {
-        setLoading(true);
-        try {
-          const { data, error } = await supabase
-            .from('media_posts')
-            .select('*')
-            .eq('id', id)
-            .single();
-          
-          if (error) throw error;
-          
-          // Set form values from data
-          form.reset({
-            title: data.title,
-            content: data.content,
-            summary: data.summary || '',
-            post_type: data.post_type,
-            media_url: data.media_url || '',
-            image_url: data.image_url || '',
-            category: data.category || '',
-            duration_minutes: data.duration_minutes || undefined,
-            is_published: data.is_published,
-          });
-        } catch (error) {
-          console.error('Error fetching media post:', error);
-          toast.error('Failed to load media post');
-          navigate('/admin/media');
-        } finally {
-          setLoading(false);
-        }
-      };
-      
-      fetchMediaPost();
+    if (postId && postId !== 'new') {
+      fetchPost();
     }
-  }, [id, isEditing, form, navigate]);
+  }, [postId]);
 
-  const onSubmit = async (values: MediaFormValues) => {
+  const fetchPost = async () => {
     setLoading(true);
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('You must be logged in to create or edit media');
-        return;
-      }
-      
-      const mediaData = {
-        title: values.title,
-        content: values.content,
-        summary: values.summary || null,
-        post_type: values.post_type,
-        media_url: values.media_url || null,
-        image_url: values.image_url || null,
-        category: values.category || null,
-        duration_minutes: values.duration_minutes || null,
-        is_published: values.is_published,
-        author_id: user.id,
-        updated_at: new Date().toISOString()
-      };
-      
-      if (isEditing) {
-        // Update existing post
-        const { error } = await supabase
-          .from('media_posts')
-          .update(mediaData)
-          .eq('id', id);
-        
-        if (error) throw error;
-        
-        toast.success('Media post updated successfully');
-      } else {
-        // Create new post
-        const { data, error } = await supabase
-          .from('media_posts')
-          .insert({ ...mediaData, published_at: values.is_published ? new Date().toISOString() : null })
-          .select();
-        
-        if (error) throw error;
-        
-        toast.success('Media post created successfully');
-      }
-      
-      navigate('/admin/media');
+      const { data, error } = await supabase
+        .from('media_posts')
+        .select('*')
+        .eq('id', postId)
+        .single();
+
+      if (error) throw error;
+      setPost(data);
     } catch (error) {
-      console.error('Error saving media post:', error);
-      toast.error(`Failed to ${isEditing ? 'update' : 'create'} media post`);
+      console.error('Error fetching post:', error);
+      toast.error('Failed to load media post');
+      navigate('/admin/media');
     } finally {
       setLoading(false);
     }
   };
 
-  const postType = form.watch('post_type');
+  const handleSave = async () => {
+    if (!post.title || !post.content) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const postData = {
+        ...post,
+        updated_at: new Date().toISOString(),
+      };
+
+      let result;
+      if (postId && postId !== 'new') {
+        result = await supabase
+          .from('media_posts')
+          .update(postData)
+          .eq('id', postId);
+      } else {
+        result = await supabase
+          .from('media_posts')
+          .insert([{
+            ...postData,
+            created_at: new Date().toISOString(),
+            published_at: post.is_published ? new Date().toISOString() : null,
+          }]);
+      }
+
+      if (result.error) throw result.error;
+
+      toast.success(`Media post ${postId && postId !== 'new' ? 'updated' : 'created'} successfully!`);
+      navigate('/admin/media');
+    } catch (error) {
+      console.error('Error saving post:', error);
+      toast.error('Failed to save media post');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleThumbnailUpload = async (file: File) => {
+    setUploadingThumbnail(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `thumbnail-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('course-thumbnails')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-thumbnails')
+        .getPublicUrl(fileName);
+
+      setPost(prev => ({ ...prev, image_url: publicUrl }));
+      toast.success('Thumbnail uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading thumbnail:', error);
+      toast.error('Failed to upload thumbnail');
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  };
+
+  const handleMediaUpload = async (file: File) => {
+    setUploadingMedia(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `media-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('course-thumbnails')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-thumbnails')
+        .getPublicUrl(fileName);
+
+      setPost(prev => ({ ...prev, media_url: publicUrl }));
+      toast.success('Media file uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      toast.error('Failed to upload media file');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout title={postId && postId !== 'new' ? 'Edit Media Post' : 'Create Media Post'}>
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
-    <AdminLayout title={isEditing ? "Edit Media" : "Create Media"}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{isEditing ? 'Edit Media Post' : 'Create New Media Post'}</CardTitle>
-          <CardDescription>
-            {isEditing 
-              ? 'Update your media post details below' 
-              : 'Enter the details for your new media post'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title*</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter media title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
+    <AdminLayout title={postId && postId !== 'new' ? 'Edit Media Post' : 'Create Media Post'}>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="space-y-6 p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={() => navigate('/admin/media')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Media
+              </Button>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                {postId && postId !== 'new' ? 'Edit Media Post' : 'Create Media Post'}
+              </h1>
+            </div>
+            <Button onClick={handleSave} disabled={saving} className="bg-gradient-to-r from-orange-500 to-purple-600">
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+
+          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Media Post Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="post_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Media Type*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select media type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {POST_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type.charAt(0).toUpperCase() + type.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category (optional)</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value || ''}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {CATEGORIES.map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title *</Label>
+                  <Input
+                    id="title"
+                    value={post.title}
+                    onChange={(e) => setPost({ ...post, title: e.target.value })}
+                    placeholder="Enter post title"
+                    className="border-orange-200 focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="post_type">Post Type</Label>
+                  <Select value={post.post_type} onValueChange={(value) => setPost({ ...post, post_type: value })}>
+                    <SelectTrigger className="border-orange-200 focus:border-orange-500">
+                      <SelectValue placeholder="Select post type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="article">Article</SelectItem>
+                      <SelectItem value="video">Video</SelectItem>
+                      <SelectItem value="podcast">Podcast</SelectItem>
+                      <SelectItem value="infographic">Infographic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select value={post.category || ''} onValueChange={(value) => setPost({ ...post, category: value })}>
+                    <SelectTrigger className="border-purple-200 focus:border-purple-500">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Technology">Technology</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
+                      <SelectItem value="Design">Design</SelectItem>
+                      <SelectItem value="Marketing">Marketing</SelectItem>
+                      <SelectItem value="Education">Education</SelectItem>
+                      <SelectItem value="Health">Health</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(post.post_type === 'video' || post.post_type === 'podcast') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="duration">Duration (minutes)</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      value={post.duration_minutes || ''}
+                      onChange={(e) => setPost({ ...post, duration_minutes: parseInt(e.target.value) || undefined })}
+                      placeholder="Duration in minutes"
+                      className="border-orange-200 focus:border-orange-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="summary">Summary</Label>
+                <Textarea
+                  id="summary"
+                  value={post.summary}
+                  onChange={(e) => setPost({ ...post, summary: e.target.value })}
+                  placeholder="Brief summary of the post"
+                  rows={3}
+                  className="border-purple-200 focus:border-purple-500"
                 />
               </div>
-              
-              <FormField
-                control={form.control}
-                name="summary"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Summary (optional)</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="A brief summary of your content" 
-                        className="min-h-[80px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      This will appear in listings and previews
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="content"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Content*</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Write your content here" 
-                        className="min-h-[200px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {(postType === 'video' || postType === 'podcast') && (
-                <FormField
-                  control={form.control}
-                  name="media_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{postType === 'video' ? 'Video URL' : 'Audio URL'}</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder={`Enter ${postType === 'video' ? 'video' : 'audio'} URL`} 
-                          {...field} 
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {postType === 'video' 
-                          ? 'YouTube, Vimeo or direct video URL' 
-                          : 'SoundCloud, Spotify or direct audio URL'}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+
+              <div className="space-y-2">
+                <Label htmlFor="content">Content *</Label>
+                <Textarea
+                  id="content"
+                  value={post.content}
+                  onChange={(e) => setPost({ ...post, content: e.target.value })}
+                  placeholder="Full content of the post"
+                  rows={8}
+                  className="border-orange-200 focus:border-orange-500"
                 />
-              )}
-              
-              {(postType === 'video' || postType === 'podcast') && (
-                <FormField
-                  control={form.control}
-                  name="duration_minutes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Duration (minutes)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="Media duration in minutes" 
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            field.onChange(!isNaN(value) ? value : undefined);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-              
-              <FormField
-                control={form.control}
-                name="image_url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Featured Image URL (optional)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter image URL" 
-                        {...field}
-                        value={field.value || ''}
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Thumbnail Image</Label>
+                  <FileUpload
+                    onFileSelect={handleThumbnailUpload}
+                    accept="image/*"
+                    buttonText={uploadingThumbnail ? "Uploading..." : "Upload Thumbnail"}
+                    disabled={uploadingThumbnail}
+                  />
+                  {post.image_url && (
+                    <div className="mt-2">
+                      <img
+                        src={post.image_url}
+                        alt="Post thumbnail"
+                        className="w-32 h-32 object-cover rounded-lg border-2 border-orange-200"
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="is_published"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Publish</FormLabel>
-                      <FormDescription>
-                        Make this {postType} visible to visitors
-                      </FormDescription>
                     </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
+                  )}
+                </div>
+
+                {(post.post_type === 'video' || post.post_type === 'podcast') && (
+                  <div className="space-y-2">
+                    <Label>Media File</Label>
+                    <FileUpload
+                      onFileSelect={handleMediaUpload}
+                      accept={post.post_type === 'video' ? 'video/*' : 'audio/*'}
+                      buttonText={uploadingMedia ? "Uploading..." : `Upload ${post.post_type === 'video' ? 'Video' : 'Audio'}`}
+                      disabled={uploadingMedia}
+                    />
+                    {post.media_url && (
+                      <div className="mt-2">
+                        <p className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                          ✓ Media file uploaded successfully
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
-              />
-              
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/admin/media')}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Saving...' : isEditing ? 'Update Media' : 'Create Media'}
-                </Button>
               </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="is_published"
+                  checked={post.is_published}
+                  onCheckedChange={(checked) => setPost({ ...post, is_published: checked })}
+                />
+                <Label htmlFor="is_published" className="font-medium">
+                  Publish Post
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </AdminLayout>
   );
 };

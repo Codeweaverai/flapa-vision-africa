@@ -1,37 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import CreatorLayout from '@/components/creator/CreatorLayout';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { X, Plus, Upload } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { ArrowLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-
-const VALID_CATEGORIES = [
-  'Technology',
-  'Business',
-  'Marketing',
-  'Design',
-  'Development',
-  'Data Science',
-  'Health & Fitness',
-  'Lifestyle',
-  'Language',
-  'Music',
-  'Photography'
-];
-
-const VALID_DIFFICULTY_LEVELS = [
-  'Beginner',
-  'Intermediate', 
-  'Advanced',
-  'Expert'
-];
+import CreatorLayout from '@/components/layout/CreatorLayout';
+import FileUpload from '@/components/common/FileUpload';
 
 interface Course {
   id: string;
@@ -39,173 +21,88 @@ interface Course {
   description: string;
   summary: string;
   category: string;
-  difficulty_level: string;
-  duration_minutes: number;
   price: number;
   is_free: boolean;
-  certificate_enabled: boolean;
+  difficulty_level: string;
+  duration_minutes: number;
   thumbnail_url?: string;
-  tags?: string[];
   is_published: boolean;
+  certificate_enabled: boolean;
 }
 
 const CreatorCourseEdit = () => {
+  const { courseId } = useParams<{ courseId: string }>();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const [loading, setLoading] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [course, setCourse] = useState<Course | null>(null);
-  
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    summary: '',
-    category: '',
-    difficulty_level: '',
-    duration_minutes: 0,
-    price: 0,
-    currency: 'USD',
-    is_free: true,
-    certificate_enabled: false,
-    thumbnail_url: '',
-    tags: [] as string[],
-    is_published: false
-  });
-  const [newTag, setNewTag] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      loadCourse();
+    if (courseId && user) {
+      fetchCourse();
     }
-  }, [id]);
+  }, [courseId, user]);
 
-  const loadCourse = async () => {
-    if (!id) return;
-    
-    setLoading(true);
+  const fetchCourse = async () => {
     try {
       const { data, error } = await supabase
         .from('courses')
         .select('*')
-        .eq('id', id)
+        .eq('id', courseId)
+        .eq('creator_id', user!.id)
         .single();
 
       if (error) throw error;
-
-      if (data) {
-        setCourse(data);
-        setFormData({
-          title: data.title,
-          description: data.description,
-          summary: data.summary,
-          category: data.category,
-          difficulty_level: data.difficulty_level,
-          duration_minutes: data.duration_minutes,
-          price: data.price,
-          currency: 'USD',
-          is_free: data.is_free,
-          certificate_enabled: data.certificate_enabled,
-          thumbnail_url: data.thumbnail_url || '',
-          tags: data.tags || [],
-          is_published: data.is_published
-        });
-      }
+      setCourse(data);
     } catch (error) {
-      console.error('Error loading course:', error);
+      console.error('Error fetching course:', error);
       toast.error('Failed to load course');
+      navigate('/creator/courses');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!id) return;
-    
-    // Validate required fields
-    if (!formData.title || !formData.description || !formData.summary || 
-        !formData.category || !formData.difficulty_level) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+  const handleSave = async () => {
+    if (!course) return;
 
-    setLoading(true);
-    
+    setSaving(true);
     try {
       const { error } = await supabase
         .from('courses')
         .update({
-          title: formData.title,
-          description: formData.description,
-          summary: formData.summary,
-          category: formData.category,
-          difficulty_level: formData.difficulty_level,
-          duration_minutes: formData.duration_minutes,
-          price: formData.is_free ? 0 : formData.price,
-          is_free: formData.is_free,
-          certificate_enabled: formData.certificate_enabled,
-          thumbnail_url: formData.thumbnail_url,
-          tags: formData.tags,
-          is_published: formData.is_published,
+          title: course.title,
+          description: course.description,
+          summary: course.summary,
+          category: course.category,
+          price: course.price,
+          is_free: course.is_free,
+          difficulty_level: course.difficulty_level,
+          duration_minutes: course.duration_minutes,
+          thumbnail_url: course.thumbnail_url,
+          is_published: course.is_published,
+          certificate_enabled: course.certificate_enabled,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', courseId);
 
       if (error) throw error;
 
-      toast.success('Course updated successfully');
+      toast.success('Course updated successfully!');
       navigate('/creator/courses');
     } catch (error) {
       console.error('Error updating course:', error);
       toast.error('Failed to update course');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }));
-      setNewTag('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
-      return;
-    }
-
-    setUploadingImage(true);
-    
+  const handleThumbnailUpload = async (file: File) => {
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `course-thumbnail-${Date.now()}.${fileExt}`;
+      const fileName = `${courseId}-${Date.now()}.${fileExt}`;
       
       const { data, error } = await supabase.storage
         .from('course-thumbnails')
@@ -217,281 +114,201 @@ const CreatorCourseEdit = () => {
         .from('course-thumbnails')
         .getPublicUrl(fileName);
 
-      handleInputChange('thumbnail_url', publicUrl);
-      toast.success('Image uploaded successfully');
+      setCourse(prev => prev ? { ...prev, thumbnail_url: publicUrl } : null);
+      toast.success('Thumbnail uploaded successfully!');
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
-    } finally {
-      setUploadingImage(false);
+      console.error('Error uploading thumbnail:', error);
+      toast.error('Failed to upload thumbnail');
     }
   };
 
-  const handlePublishToggle = async () => {
-    if (!id) return;
-    
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ 
-          is_published: !formData.is_published,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setFormData(prev => ({ ...prev, is_published: !prev.is_published }));
-      toast.success(`Course ${!formData.is_published ? 'published' : 'unpublished'} successfully`);
-    } catch (error) {
-      console.error('Error updating course:', error);
-      toast.error('Failed to update course status');
-    }
-  };
-
-  if (loading && !course) {
+  if (loading) {
     return (
-      <CreatorLayout title="Edit Course">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <CreatorLayout>
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        </div>
+      </CreatorLayout>
+    );
+  }
+
+  if (!course) {
+    return (
+      <CreatorLayout>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
+          <Button onClick={() => navigate('/creator/courses')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Courses
+          </Button>
         </div>
       </CreatorLayout>
     );
   }
 
   return (
-    <CreatorLayout title="Edit Course">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle>Edit Course</CardTitle>
-              <CardDescription>
-                Update your course information
-              </CardDescription>
-            </div>
-            <Button
-              onClick={handlePublishToggle}
-              variant={formData.is_published ? "destructive" : "default"}
-            >
-              {formData.is_published ? 'Unpublish' : 'Publish'} Course
+    <CreatorLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => navigate('/creator/courses')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Courses
             </Button>
+            <h1 className="text-2xl font-bold text-gray-900">Edit Course</h1>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Course Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="title">Course Title *</Label>
+                <Label htmlFor="title">Course Title</Label>
                 <Input
                   id="title"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  value={course.title}
+                  onChange={(e) => setCourse({ ...course, title: e.target.value })}
                   placeholder="Enter course title"
-                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
-                <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
+                <Label htmlFor="category">Category</Label>
+                <Select value={course.category} onValueChange={(value) => setCourse({ ...course, category: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VALID_CATEGORIES.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="Technology">Technology</SelectItem>
+                    <SelectItem value="Business">Business</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Photography">Photography</SelectItem>
+                    <SelectItem value="Music">Music</SelectItem>
+                    <SelectItem value="Health">Health</SelectItem>
+                    <SelectItem value="Fitness">Fitness</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="difficulty_level">Difficulty Level *</Label>
-                <Select value={formData.difficulty_level} onValueChange={(value) => handleInputChange('difficulty_level', value)}>
+                <Label htmlFor="difficulty">Difficulty Level</Label>
+                <Select value={course.difficulty_level} onValueChange={(value) => setCourse({ ...course, difficulty_level: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select difficulty" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VALID_DIFFICULTY_LEVELS.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        {level}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="Beginner">Beginner</SelectItem>
+                    <SelectItem value="Intermediate">Intermediate</SelectItem>
+                    <SelectItem value="Advanced">Advanced</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="duration_minutes">Duration (minutes) *</Label>
+                <Label htmlFor="duration">Duration (minutes)</Label>
                 <Input
-                  id="duration_minutes"
+                  id="duration"
                   type="number"
-                  value={formData.duration_minutes}
-                  onChange={(e) => handleInputChange('duration_minutes', parseInt(e.target.value) || 0)}
-                  placeholder="120"
-                  min="0"
-                  required
+                  value={course.duration_minutes}
+                  onChange={(e) => setCourse({ ...course, duration_minutes: parseInt(e.target.value) || 0 })}
+                  placeholder="Duration in minutes"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="summary">Summary *</Label>
+              <Label htmlFor="summary">Course Summary</Label>
               <Textarea
                 id="summary"
-                value={formData.summary}
-                onChange={(e) => handleInputChange('summary', e.target.value)}
-                placeholder="Brief summary of the course"
-                rows={2}
-                required
+                value={course.summary}
+                onChange={(e) => setCourse({ ...course, summary: e.target.value })}
+                placeholder="Brief description of the course"
+                rows={3}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
+              <Label htmlFor="description">Course Description</Label>
               <Textarea
                 id="description"
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Detailed course description"
-                rows={4}
-                required
+                value={course.description}
+                onChange={(e) => setCourse({ ...course, description: e.target.value })}
+                placeholder="Detailed description of the course"
+                rows={5}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="thumbnail">Course Thumbnail</Label>
-              <div className="flex items-center gap-4">
-                <Input
-                  id="thumbnail"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                  className="hidden"
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => document.getElementById('thumbnail')?.click()}
-                  disabled={uploadingImage}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  {uploadingImage ? 'Uploading...' : 'Upload Image'}
-                </Button>
-                {formData.thumbnail_url && (
-                  <img 
-                    src={formData.thumbnail_url} 
-                    alt="Thumbnail preview" 
-                    className="h-12 w-12 object-cover rounded"
+              <Label>Course Thumbnail</Label>
+              <FileUpload
+                onFileSelect={handleThumbnailUpload}
+                accept="image/*"
+                buttonText="Upload Thumbnail"
+              />
+              {course.thumbnail_url && (
+                <div className="mt-2">
+                  <img
+                    src={course.thumbnail_url}
+                    alt="Course thumbnail"
+                    className="w-32 h-32 object-cover rounded-lg"
                   />
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <Label>Pricing</Label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="is_free"
-                    checked={formData.is_free}
-                    onChange={(e) => handleInputChange('is_free', e.target.checked)}
-                    className="rounded"
-                  />
-                  <Label htmlFor="is_free">Free Course</Label>
                 </div>
-              </div>
-
-              {!formData.is_free && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) => handleInputChange('price', parseFloat(e.target.value) || 0)}
-                      placeholder="99.99"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select value={formData.currency} onValueChange={(value) => handleInputChange('currency', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Course Tags</Label>
-              <div className="flex gap-2 mb-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Add a tag"
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="is_free"
+                  checked={course.is_free}
+                  onCheckedChange={(checked) => setCourse({ ...course, is_free: checked, price: checked ? 0 : course.price })}
                 />
-                <Button type="button" onClick={addTag} size="sm">
-                  <Plus className="h-4 w-4" />
-                </Button>
+                <Label htmlFor="is_free">Free Course</Label>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                    {tag}
-                    <X 
-                      className="h-3 w-3 cursor-pointer" 
-                      onClick={() => removeTag(tag)}
-                    />
-                  </Badge>
-                ))}
-              </div>
+
+              {!course.is_free && (
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price ($)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    value={course.price}
+                    onChange={(e) => setCourse({ ...course, price: parseFloat(e.target.value) || 0 })}
+                    placeholder="Course price"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
+              <Switch
                 id="certificate_enabled"
-                checked={formData.certificate_enabled}
-                onChange={(e) => handleInputChange('certificate_enabled', e.target.checked)}
-                className="rounded"
+                checked={course.certificate_enabled}
+                onCheckedChange={(checked) => setCourse({ ...course, certificate_enabled: checked })}
               />
               <Label htmlFor="certificate_enabled">Enable Certificates</Label>
             </div>
 
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/creator/courses')}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || uploadingImage}>
-                {loading ? 'Updating...' : 'Update Course'}
-              </Button>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_published"
+                checked={course.is_published}
+                onCheckedChange={(checked) => setCourse({ ...course, is_published: checked })}
+              />
+              <Label htmlFor="is_published">Publish Course</Label>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </CreatorLayout>
   );
 };
