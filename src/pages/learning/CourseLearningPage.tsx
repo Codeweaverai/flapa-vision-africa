@@ -701,6 +701,60 @@ const CourseLearningPage = () => {
     setIsFinalExamModalOpen(true);
   };
 
+  const handleMarkAllLessonsComplete = async () => {
+    if (!enrollment || !user) return;
+
+    try {
+      // Get all lessons that are not completed
+      const incompleteLessons = modules.flatMap(module => 
+        module.lessons.filter(lesson => !lesson.is_completed)
+      );
+
+      if (incompleteLessons.length === 0) {
+        toast.info('All lessons are already completed!');
+        return;
+      }
+
+      // Mark all lessons as complete
+      for (const lesson of incompleteLessons) {
+        const { data: existingProgress } = await supabase
+          .from('lesson_progress')
+          .select('*')
+          .eq('lesson_id', lesson.id)
+          .eq('enrollment_id', enrollment.id)
+          .single();
+
+        if (existingProgress) {
+          await supabase
+            .from('lesson_progress')
+            .update({
+              is_completed: true,
+              completion_date: new Date().toISOString()
+            })
+            .eq('id', existingProgress.id);
+        } else {
+          await supabase
+            .from('lesson_progress')
+            .insert({
+              lesson_id: lesson.id,
+              enrollment_id: enrollment.id,
+              is_completed: true,
+              completion_date: new Date().toISOString()
+            });
+        }
+      }
+
+      toast.success(`Marked ${incompleteLessons.length} lessons as complete!`);
+      
+      // Reload course data to update progress
+      await loadCourseData();
+      
+    } catch (error) {
+      console.error('Error marking lessons as complete:', error);
+      toast.error('Failed to mark lessons as complete');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
@@ -760,6 +814,26 @@ const CourseLearningPage = () => {
                 </div>
               )}
             </div>
+            
+            {/* Mark All Lessons Complete Button */}
+            {progress < 100 && (
+              <div className="p-4 bg-gray-50 border-t">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-800">Need to catch up?</h4>
+                    <p className="text-sm text-gray-600">Mark all lessons as complete to focus on quizzes and final exam</p>
+                  </div>
+                  <Button
+                    onClick={handleMarkAllLessonsComplete}
+                    variant="outline"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Mark All Lessons Complete
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="transcript" className="p-6">

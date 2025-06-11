@@ -45,6 +45,7 @@ import AccountPage from '@/pages/AccountPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import InboxPage from '@/pages/InboxPage';
 import SettingsPage from '@/pages/SettingsPage';
+import VerifyPage from '@/pages/VerifyPage';
 
 // User Account Pages
 import UserProfile from '@/pages/account/UserProfile';
@@ -159,6 +160,7 @@ function App() {
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+                <Route path="/verify" element={<VerifyPage />} />
 
                 {/* Creator Public Profile */}
                 <Route path="/creator/profile/:creatorId" element={<CreatorPublicProfile />} />

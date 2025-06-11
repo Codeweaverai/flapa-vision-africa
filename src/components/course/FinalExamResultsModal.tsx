@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useNavigate } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +33,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
   enrollmentId,
   onRetake
 }) => {
+  const navigate = useNavigate();
   const [certificate, setCertificate] = useState<any>(null);
   const [generatingCertificate, setGeneratingCertificate] = useState(false);
 
@@ -213,29 +213,46 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 font-weight: bold;
                 margin: 20px 0;
             }
-            .signature {
+            .signature-section {
                 margin-top: 50px;
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-end;
             }
-           .signature-image {
-             max-width: 150px;
-             max-height: 80px;
-             margin-bottom: 10px;
-             }
+            .signature-left {
+                flex: 1;
+                text-align: left;
+            }
+            .signature-image {
+                max-width: 150px;
+                max-height: 80px;
+                margin-bottom: 10px;
+                display: block;
+            }
+            .signature-right {
+                flex: 1;
+                text-align: right;
+            }
             .signature-line {
                 border-top: 2px solid #1f2937;
                 width: 200px;
+                margin: 0 auto 10px auto;
                 text-align: center;
-                padding-top: 10px;
+            }
+            .signature-title {
                 font-size: 0.9rem;
                 color: #6b7280;
+                text-align: center;
+            }
+            .date-section {
+                text-align: center;
+                margin-top: 30px;
             }
             .verification {
                 margin-top: 30px;
                 font-size: 0.8rem;
                 color: #9ca3af;
+                text-align: center;
             }
             .grade-badge {
                 display: inline-block;
@@ -258,18 +275,25 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
             <div class="course">"${courseName}"</div>
             <div class="grade-badge">Final Grade: ${finalGrade}%</div>
             <div class="completion">Demonstrating professional competency and commitment to continuous learning</div>           
-        <div class="signature">
-            <img src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png" 
-                 alt="Authorized Signature" class="signature-image" />
-            <div class="signature-line"></div>
-            <div class="signature-title">Director Learning, SkillPulse Technologies Limited</div>
-            <div class="signature-title">Authorized Signature</div>
-          </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 0.9rem; color: #6b7280;">${currentDate}</div>
-                    <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
+            
+            <div class="signature-section">
+                <div class="signature-left">
+                    <img src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png" 
+                         alt="Authorized Signature" class="signature-image" />
+                    <div class="signature-title">Director Learning</div>
+                    <div class="signature-title">SkillPulse Technologies Limited</div>
+                </div>
+                <div class="signature-right">
+                    <div class="signature-line"></div>
+                    <div class="signature-title">Authorized Signature</div>
                 </div>
             </div>
+            
+            <div class="date-section">
+                <div style="font-size: 0.9rem; color: #6b7280;">${currentDate}</div>
+                <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
+            </div>
+            
             <div class="verification">
                 Verification Code: ${certificate?.verification_code || 'SP-GENERATING'}<br>
                 This certificate can be verified at skillpulse.cloud/verify
@@ -469,17 +493,17 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 Retake Exam
               </Button>
             )}
-           <Button
-      onClick={() => {
-        if (passed) {
-          navigate('/course-results');
-        } else {
-          onClose();
-        }
-      }}
-    >
-      {passed ? 'Proceed To Course Results' : 'Close'}
-    </Button>
+            <Button
+              onClick={() => {
+                if (passed) {
+                  navigate('/course-results');
+                } else {
+                  onClose();
+                }
+              }}
+            >
+              {passed ? 'Proceed To Course Results' : 'Close'}
+            </Button>
           </div>
         </div>
       </DialogContent>
