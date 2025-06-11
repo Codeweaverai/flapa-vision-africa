@@ -103,11 +103,13 @@ const TicketDetailPage = () => {
         .from('generated_tickets')
         .select(`
           *,
-          event:events (
-            id, title, description, start_time, end_time, location, event_type, image_url
-          ),
-          event_ticket:event_tickets (
-            name, price, ticket_type
+          booking:event_bookings!generated_tickets_booking_id_fkey (
+            event:events (
+              id, title, description, start_time, end_time, location, event_type, image_url
+            ),
+            event_ticket:event_tickets (
+              name, price, ticket_type
+            )
           )
         `)
         .eq('order_id', orderId);
@@ -121,8 +123,8 @@ const TicketDetailPage = () => {
         qr_code_data: ticket.qr_code_data,
         ticket_status: ticket.ticket_status,
         event_ticket_id: ticket.event_ticket_id,
-        event: ticket.event,
-        event_ticket: ticket.event_ticket
+        event: ticket.booking?.event,
+        event_ticket: ticket.booking?.event_ticket
       })) || [];
 
       setTickets(formattedTickets);
@@ -159,7 +161,7 @@ const TicketDetailPage = () => {
           
           <div>
             <h3 style="border-bottom: 2px solid rgba(255,255,255,0.3); padding-bottom: 10px;">Ticket Info</h3>
-            <p><strong>Holder:</strong> ${getTicketHolderName(ticket)}</p>
+            <p><strong>Holder:</strong> ${ticket.ticket_holder_name}</p>
             <p><strong>Ticket #:</strong> ${ticket.ticket_code}</p>
             <p><strong>Type:</strong> ${ticket.event_ticket?.ticket_type || 'Standard'}</p>
             <p><strong>Status:</strong> ${ticket.ticket_status.toUpperCase()}</p>
@@ -188,26 +190,9 @@ const TicketDetailPage = () => {
     }
   };
 
-  const downloadTicket = async (ticket: TicketData) => {
-    try {
-      // Generate tickets and get the latest version
-      const { data, error } = await supabase.functions.invoke('generate-tickets', {
-        body: { orderId }
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        toast.success('Ticket downloaded successfully!');
-        // For now, just trigger print - in production you'd generate a PDF
-        printTicket(ticket);
-      } else {
-        throw new Error('Failed to generate ticket');
-      }
-    } catch (error) {
-      console.error('Error downloading ticket:', error);
-      toast.error('Failed to download ticket');
-    }
+  const downloadTicket = (ticket: TicketData) => {
+    // For now, just trigger print - in production you'd generate a PDF
+    printTicket(ticket);
   };
 
   const getTicketHolderName = (ticket: TicketData) => {
@@ -235,7 +220,7 @@ const TicketDetailPage = () => {
             <CardContent className="pt-6">
               <Ticket className="h-16 w-16 mx-auto mb-4 text-gray-400" />
               <h2 className="text-xl font-semibold mb-4">Tickets Not Found</h2>
-              <p className="text-gray-600 mb-4">The tickets you're looking for don't exist or haven't been generated yet.</p>
+              <p className="text-gray-600 mb-4">The tickets you're looking for don't exist or have been removed.</p>
               <Button onClick={() => window.history.back()} className="bg-gradient-to-r from-orange-500 to-purple-600">
                 Go Back
               </Button>
