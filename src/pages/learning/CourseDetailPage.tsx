@@ -396,7 +396,7 @@ const CourseDetailPage = () => {
                             file: {
                               attributes: {
                                 controlsList: 'nodownload noremoteplayback',
-                                disablePictureInPicture: true,
+                                disablePictureInPicture: false,
                                 onContextMenu: (e: React.MouseEvent) => e.preventDefault()
                               }
                             }
