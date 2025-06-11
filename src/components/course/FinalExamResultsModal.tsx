@@ -219,11 +219,6 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 justify-content: space-between;
                 align-items: flex-end;
             }
-           .signature-image {
-             max-width: 150px;
-             max-height: 80px;
-             margin-bottom: 10px;
-             }
             .signature-line {
                 border-top: 2px solid #1f2937;
                 width: 200px;
@@ -259,6 +254,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
             <div class="grade-badge">Final Grade: ${finalGrade}%</div>
             <div class="completion">Demonstrating professional competency and commitment to continuous learning</div>           
         <div class="signature">
+          <div class="signature-line">
             <img src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png" 
                  alt="Authorized Signature" class="signature-image" />
             <div class="signature-line"></div>
@@ -469,17 +465,9 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
                 Retake Exam
               </Button>
             )}
-           <Button
-      onClick={() => {
-        if (passed) {
-          navigate('/course-results');
-        } else {
-          onClose();
-        }
-      }}
-    >
-      {passed ? 'Proceed To Course Results' : 'Close'}
-    </Button>
+            <Button onClick={onClose}>
+              {passed ? 'Proceed To Course Results' : 'Close'}
+            </Button>
           </div>
         </div>
       </DialogContent>
