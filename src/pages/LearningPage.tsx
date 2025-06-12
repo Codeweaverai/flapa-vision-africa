@@ -55,7 +55,7 @@ const LearningPage = () => {
   useEffect(() => {
     const fetchEnrolledCourses = async () => {
       if (!user) {
-        navigate('/login');
+        navigate('/auth');
         return;
       }
 
@@ -82,18 +82,16 @@ const LearningPage = () => {
 
           setEnrolledCourses(courses || []);
 
-          // Fetch course progress for the user - fixed RLS by using proper auth
+          // Fetch course progress for the user
           const { data: progressData, error: progressError } = await supabase
             .from('course_progress')
             .select('*')
             .eq('user_id', user.id)
             .in('course_id', courseIds);
 
-          if (progressError) {
-            console.error('Progress fetch error:', progressError);
-          } else {
-            setCourseProgress(progressData || []);
-          }
+          if (progressError) throw progressError;
+
+          setCourseProgress(progressData || []);
 
           // Fetch real-time course statistics
           await fetchCourseStats(courseIds);
@@ -151,24 +149,23 @@ const LearningPage = () => {
           .select('id')
           .eq('course_id', courseId);
 
-        // Calculate actual duration from lessons - fixed relationship query
+        // Calculate actual duration from lessons
         const { data: modules } = await supabase
           .from('course_modules')
-          .select('id')
+          .select(`
+            lessons (duration_minutes)
+          `)
           .eq('course_id', courseId);
 
         let totalDuration = 0;
         if (modules) {
-          for (const module of modules) {
-            const { data: lessons } = await supabase
-              .from('lessons')
-              .select('duration_minutes')
-              .eq('module_id', module.id);
-
-            if (lessons) {
-              totalDuration += lessons.reduce((sum, lesson) => sum + (lesson.duration_minutes || 0), 0);
+          modules.forEach(module => {
+            if (module.lessons) {
+              module.lessons.forEach((lesson: any) => {
+                totalDuration += lesson.duration_minutes || 0;
+              });
             }
-          }
+          });
         }
 
         const averageRating = reviews && reviews.length > 0

@@ -177,7 +177,7 @@ const CourseLearningPage = () => {
       if (courseError) throw courseError;
       setCourse(courseData as Course);
 
-      // Fetch modules with lessons - fixed query structure
+      // Fetch modules with lessons
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
         .select('*')
@@ -186,7 +186,7 @@ const CourseLearningPage = () => {
 
       if (modulesError) throw modulesError;
 
-      // Fetch lessons for each module separately to avoid relationship issues
+      // Fetch lessons for each module - using correct table name 'lessons'
       const modulesWithLessons = await Promise.all(
         (modulesData as CourseModule[]).map(async (module) => {
           const { data: lessonsData, error: lessonsError } = await supabase
@@ -197,12 +197,12 @@ const CourseLearningPage = () => {
 
           if (lessonsError) {
             console.error('Error fetching lessons:', lessonsError);
-            return { ...module, lessons: [] };
+            return module;
           }
 
           return {
             ...module,
-            lessons: lessonsData as CourseLesson[] || [],
+            lessons: lessonsData as CourseLesson[],
           };
         })
       );
@@ -277,19 +277,22 @@ const CourseLearningPage = () => {
   };
 
   const fetchEnrollmentData = async () => {
-    if (!user) return;
-    
     try {
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user!.id)
         .eq('course_id', courseId)
-        .maybeSingle();
+        .single();
 
-      if (enrollmentError && enrollmentError.code !== 'PGRST116') {
-        console.error('Error fetching enrollment data:', enrollmentError);
-        toast.error('Failed to load enrollment data');
+      if (enrollmentError) {
+        // Check if the error is because no record was found
+        if (enrollmentError.message !== 'No rows found') {
+          console.error('Error fetching enrollment data:', enrollmentError);
+          toast.error('Failed to load enrollment data');
+        }
+        // If no record found, it's not an error, just means the user isn't enrolled
+        setEnrollment(null);
       } else {
         setEnrollment(enrollmentData as CourseEnrollment);
       }
@@ -300,18 +303,17 @@ const CourseLearningPage = () => {
   };
 
   const fetchProgress = async () => {
-    if (!user || !courseId) return;
-    
     try {
       const { data: progressData, error: progressError } = await supabase
         .from('course_progress')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user!.id)
         .eq('course_id', courseId)
-        .maybeSingle();
+        .single();
 
-      if (progressError && progressError.code !== 'PGRST116') {
-        console.error('Error fetching progress data:', progressError);
+      if (progressError) {
+        // If no record found, it's not an error, just means no progress yet
+        setProgress(null);
       } else {
         setProgress(progressData as ProgressData);
       }
