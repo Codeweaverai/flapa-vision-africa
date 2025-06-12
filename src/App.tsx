@@ -14,7 +14,6 @@ import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
-import AdminLayout from './components/admin/AdminLayout';
 import CreatorDashboard from './pages/creator/CreatorDashboard';
 import CreatorCourses from './pages/creator/CreatorCourses';
 import CreatorEvents from './pages/creator/CreatorEvents';
@@ -22,7 +21,6 @@ import CreatorAnalytics from './pages/creator/CreatorAnalytics';
 import CreatorStudents from './pages/creator/CreatorStudents';
 import CreatorPayments from './pages/creator/CreatorPayments';
 import CreatorSettings from './pages/creator/CreatorSettings';
-import CreatorLayout from './components/layout/CreatorLayout';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import CreatorCourseCreate from './pages/creator/CreatorCourseCreate';
@@ -40,6 +38,8 @@ import EventForm from './pages/admin/EventForm';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminEventEdit from './pages/admin/AdminEventEdit';
 import AdminEventRegistrations from './pages/admin/AdminEventRegistrations';
+import LearningPage from './pages/LearningPage';
+import CourseLearningPage from './pages/CourseLearningPage';
 
 // Create a query client instance
 const queryClient = new QueryClient();
@@ -60,6 +60,8 @@ function App() {
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
+                  <Route path="/learning/course/:courseId" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
 
                   {/* Creator Routes */}
                   <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
