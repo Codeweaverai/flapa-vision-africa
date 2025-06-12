@@ -65,14 +65,9 @@ const LearningPage = () => {
         const { data: enrollments, error: enrollmentsError } = await supabase
           .from('course_enrollments')
           .select('course_id')
-          .eq('user_id', user.id)
-          .eq('payment_status', 'completed');
+          .eq('user_id', user.id);
 
-        if (enrollmentsError) {
-          console.error('Error fetching enrollments:', enrollmentsError);
-          toast.error('Failed to load course enrollments');
-          return;
-        }
+        if (enrollmentsError) throw enrollmentsError;
 
         if (enrollments && enrollments.length > 0) {
           const courseIds = enrollments.map(enrollment => enrollment.course_id);
@@ -83,26 +78,20 @@ const LearningPage = () => {
             .select('*')
             .in('id', courseIds);
 
-          if (coursesError) {
-            console.error('Error fetching courses:', coursesError);
-            toast.error('Failed to load courses');
-            return;
-          }
+          if (coursesError) throw coursesError;
 
           setEnrolledCourses(courses || []);
 
-          // Fetch course progress for the user with proper single condition query
+          // Fetch course progress for the user
           const { data: progressData, error: progressError } = await supabase
             .from('course_progress')
             .select('*')
-            .eq('user_id', user.id);
+            .eq('user_id', user.id)
+            .in('course_id', courseIds);
 
-          if (progressError) {
-            console.error('Error fetching progress:', progressError);
-            // Don't show error to user, just log it
-          } else {
-            setCourseProgress(progressData || []);
-          }
+          if (progressError) throw progressError;
+
+          setCourseProgress(progressData || []);
 
           // Fetch real-time course statistics
           await fetchCourseStats(courseIds);
@@ -158,26 +147,25 @@ const LearningPage = () => {
         const { data: enrollments } = await supabase
           .from('course_enrollments')
           .select('id')
-          .eq('course_id', courseId)
-          .eq('payment_status', 'completed');
+          .eq('course_id', courseId);
 
-        // Calculate actual duration from lessons - simplified query
+        // Calculate actual duration from lessons
         const { data: modules } = await supabase
           .from('course_modules')
-          .select('id')
+          .select(`
+            lessons (duration_minutes)
+          `)
           .eq('course_id', courseId);
 
         let totalDuration = 0;
-        if (modules && modules.length > 0) {
-          for (const module of modules) {
-            const { data: lessons } = await supabase
-              .from('lessons')
-              .select('id')
-              .eq('module_id', module.id);
-            
-            // For now, estimate 10 minutes per lesson if no duration_minutes field exists
-            totalDuration += (lessons?.length || 0) * 10;
-          }
+        if (modules) {
+          modules.forEach(module => {
+            if (module.lessons) {
+              module.lessons.forEach((lesson: any) => {
+                totalDuration += lesson.duration_minutes || 0;
+              });
+            }
+          });
         }
 
         const averageRating = reviews && reviews.length > 0

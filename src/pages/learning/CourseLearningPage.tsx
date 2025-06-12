@@ -24,6 +24,12 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { toast } from 'sonner';
+import CourseModuleList from '@/components/course/CourseModuleList';
+import CourseReviews from '@/components/course/CourseReviews';
+import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
+import AddToCartButton from '@/components/cart/AddToCartButton';
+import LessonNotesTab from '@/components/course/LessonNotesTab';
+import FinalExamModal from '@/components/course/FinalExamModal';
 
 interface Course {
   id?: string;
@@ -171,7 +177,7 @@ const CourseLearningPage = () => {
       if (courseError) throw courseError;
       setCourse(courseData as Course);
 
-      // Fetch modules separately
+      // Fetch modules with lessons
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
         .select('*')
@@ -180,7 +186,7 @@ const CourseLearningPage = () => {
 
       if (modulesError) throw modulesError;
 
-      // Fetch lessons for each module separately to avoid complex queries
+      // Fetch lessons for each module - using correct table name 'lessons'
       const modulesWithLessons = await Promise.all(
         (modulesData as CourseModule[]).map(async (module) => {
           const { data: lessonsData, error: lessonsError } = await supabase
@@ -191,7 +197,7 @@ const CourseLearningPage = () => {
 
           if (lessonsError) {
             console.error('Error fetching lessons:', lessonsError);
-            return { ...module, lessons: [] };
+            return module;
           }
 
           return {
@@ -202,18 +208,14 @@ const CourseLearningPage = () => {
       );
       setModules(modulesWithLessons);
 
-      // Fetch enrollment count
+      // Fetch enrollment count with updated table name
       const { count: enrolledCount, error: enrollCountError } = await supabase
         .from('course_enrollments')
         .select('*', { count: 'exact' })
-        .eq('course_id', courseId)
-        .eq('payment_status', 'completed');
+        .eq('course_id', courseId);
 
-      if (enrollCountError) {
-        console.error('Error fetching enrollment count:', enrollCountError);
-      } else {
-        setEnrollmentCount(enrolledCount || 0);
-      }
+      if (enrollCountError) throw enrollCountError;
+      setEnrollmentCount(enrolledCount || 0);
 
       // Fetch average rating and review count
       const { data: ratingData, error: ratingError } = await supabase
@@ -221,16 +223,14 @@ const CourseLearningPage = () => {
         .select('rating')
         .eq('course_id', courseId);
 
-      if (ratingError) {
-        console.error('Error fetching ratings:', ratingError);
-      } else {
-        const ratings = ratingData?.map((review) => review.rating) || [];
-        const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
-        const avgRating = ratings.length > 0 ? totalRating / ratings.length : 0;
+      if (ratingError) throw ratingError;
 
-        setAverageRating(avgRating);
-        setReviewCount(ratings.length);
-      }
+      const ratings = ratingData?.map((review) => review.rating) || [];
+      const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
+      const avgRating = ratings.length > 0 ? totalRating / ratings.length : 0;
+
+      setAverageRating(avgRating);
+      setReviewCount(ratings.length);
 
       // Fetch learning outcomes with updated table name
       const { data: outcomesData, error: outcomesError } = await supabase
@@ -283,16 +283,22 @@ const CourseLearningPage = () => {
         .select('*')
         .eq('user_id', user!.id)
         .eq('course_id', courseId)
-        .eq('payment_status', 'completed')
-        .maybeSingle();
+        .single();
 
-      if (enrollmentError && enrollmentError.code !== 'PGRST116') {
-        console.error('Error fetching enrollment data:', enrollmentError);
+      if (enrollmentError) {
+        // Check if the error is because no record was found
+        if (enrollmentError.message !== 'No rows found') {
+          console.error('Error fetching enrollment data:', enrollmentError);
+          toast.error('Failed to load enrollment data');
+        }
+        // If no record found, it's not an error, just means the user isn't enrolled
+        setEnrollment(null);
       } else {
         setEnrollment(enrollmentData as CourseEnrollment);
       }
     } catch (error) {
       console.error('Error fetching enrollment data:', error);
+      toast.error('Failed to load enrollment data');
     }
   };
 
@@ -303,15 +309,17 @@ const CourseLearningPage = () => {
         .select('*')
         .eq('user_id', user!.id)
         .eq('course_id', courseId)
-        .maybeSingle();
+        .single();
 
-      if (progressError && progressError.code !== 'PGRST116') {
-        console.error('Error fetching progress data:', progressError);
+      if (progressError) {
+        // If no record found, it's not an error, just means no progress yet
+        setProgress(null);
       } else {
         setProgress(progressData as ProgressData);
       }
     } catch (error) {
       console.error('Error fetching progress data:', error);
+      toast.error('Failed to load progress data');
     }
   };
 
