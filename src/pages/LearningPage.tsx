@@ -82,20 +82,16 @@ const LearningPage = () => {
 
           setEnrolledCourses(courses || []);
 
-          // Fetch course progress for the user - fixed RLS issue by not filtering user_id in query
+          // Fetch course progress for the user
           const { data: progressData, error: progressError } = await supabase
             .from('course_progress')
             .select('*')
+            .eq('user_id', user.id)
             .in('course_id', courseIds);
 
-          if (progressError) {
-            console.error('Error fetching progress:', progressError);
-            // Don't throw error, just log it and continue
-          } else {
-            // Filter progress data to only current user's data on client side
-            const userProgress = progressData?.filter(p => p.user_id === user.id) || [];
-            setCourseProgress(userProgress);
-          }
+          if (progressError) throw progressError;
+
+          setCourseProgress(progressData || []);
 
           // Fetch real-time course statistics
           await fetchCourseStats(courseIds);
@@ -153,34 +149,23 @@ const LearningPage = () => {
           .select('id')
           .eq('course_id', courseId);
 
-        // Calculate actual duration from lessons - fixed query structure
+        // Calculate actual duration from lessons
+        const { data: modules } = await supabase
+          .from('course_modules')
+          .select(`
+            lessons (duration_minutes)
+          `)
+          .eq('course_id', courseId);
+
         let totalDuration = 0;
-        try {
-          const { data: modules } = await supabase
-            .from('course_modules')
-            .select('id')
-            .eq('course_id', courseId);
-
-          if (modules && modules.length > 0) {
-            const moduleIds = modules.map(m => m.id);
-            
-            // Separate query for lessons to avoid relationship issues
-            const { data: lessons } = await supabase
-              .from('lessons')
-              .select('duration_minutes')
-              .in('module_id', moduleIds);
-
-            if (lessons) {
-              totalDuration = lessons.reduce((sum, lesson) => {
-                return sum + (lesson.duration_minutes || 0);
-              }, 0);
+        if (modules) {
+          modules.forEach(module => {
+            if (module.lessons) {
+              module.lessons.forEach((lesson: any) => {
+                totalDuration += lesson.duration_minutes || 0;
+              });
             }
-          }
-        } catch (lessonError) {
-          console.error(`Error fetching lessons for course ${courseId}:`, lessonError);
-          // Use course duration as fallback
-          const course = enrolledCourses.find(c => c.id === courseId);
-          totalDuration = course?.duration_minutes || 0;
+          });
         }
 
         const averageRating = reviews && reviews.length > 0
