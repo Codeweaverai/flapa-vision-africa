@@ -68,7 +68,7 @@ const AboutPage = () => {
     {
       name: "Nakolo Pule",
       role: "Head of Content",
-      bio: " Specialised in Content Creation and Finance Specialist.",
+      bio: " Specialised in Content Creation and Finance.",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-06-12_at_17.40.14_5fcc6eb5-removebg-preview.png?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
