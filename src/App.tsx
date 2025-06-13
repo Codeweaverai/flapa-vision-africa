@@ -78,7 +78,7 @@ import ExploreEventsPage from './pages/ExploreEventsPage';
 import HelpCenterPage from './pages/HelpCenterPage';
 import MyCoursesPage from './pages/MyCoursesPage';
 import MyEventsPage from './pages/MyEventsPage';
-import CareersPage from './pages/CareersPage';
+import CareersPage from './pages/careers';
 import VerifyPage from './pages/VerifyPage';
 import TicketPage from './pages/TicketPage';
 import TicketDetailPage from './pages/TicketDetailPage';
@@ -98,6 +98,14 @@ import NotificationsPage from './pages/NotificationsPage';
 import CourseDetailPage from './pages/learning/CourseDetailPage';
 import CoursesPage from './pages/CoursesPage';
 import AnimationsPage from './pages/AnimationsPage';
+
+// Account Pages
+import UserConsultations from './pages/account/UserConsultations';
+import UserCourses from './pages/account/UserCourses';
+import UserEvents from './pages/account/UserEvents';
+import UserOrders from './pages/account/UserOrders';
+import UserProfile from './pages/account/UserProfile';
+import UserSettings from './pages/account/UserSettings';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
@@ -160,6 +168,14 @@ function App() {
                   <Route path="/help" element={<HelpCenterPage />} />
                   <Route path="/careers" element={<CareersPage />} />
                   <Route path="/animations" element={<AnimationsPage />} />
+
+                  {/* Account Routes */}
+                  <Route path="/account/consultations" element={<ProtectedRoute><UserConsultations /></ProtectedRoute>} />
+                  <Route path="/account/courses" element={<ProtectedRoute><UserCourses /></ProtectedRoute>} />
+                  <Route path="/account/events" element={<ProtectedRoute><UserEvents /></ProtectedRoute>} />
+                  <Route path="/account/orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
+                  <Route path="/account/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+                  <Route path="/account/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
 
                   {/* Creator Routes */}
                   <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
