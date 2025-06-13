@@ -156,6 +156,7 @@ function App() {
                   <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
                   <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
                   <Route path="/course-results" element={<ProtectedRoute><CourseResultsPage /></ProtectedRoute>} />
+                  <Route path="/course/:Id/results" element={<ProtectedRoute><CourseResultsPage /></ProtectedRoute>} />
                   <Route path="/results" element={<ProtectedRoute><CourseResultsPage /></ProtectedRoute>} />
                   <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
                   <Route path="/community/notifications" element={<ProtectedRoute><CommunityNotificationsPage /></ProtectedRoute>} />
