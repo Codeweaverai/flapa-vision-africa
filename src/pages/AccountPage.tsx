@@ -202,7 +202,7 @@ const AccountPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
+    <div className="min-h-screen bg-gradient-to-br from-orange-200 via-purple-200 to-orange-300">
       <Layout>
         <div className="container mx-auto py-8 px-4 max-w-6xl">
           <div className="mb-8">

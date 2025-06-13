@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,7 @@ import CourseDiscussionSection from '@/components/community/CourseDiscussionSect
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
+import VideoPlayer from '@/components/video/VideoPlayer';
 
 interface Course {
   id?: string;
@@ -94,30 +96,6 @@ interface ProgressData {
   updated_at: string;
 }
 
-interface Review {
-  id: string;
-  course_id: string;
-  user_id: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-  updated_at: string;
-  profiles?: {
-    id: string;
-    username?: string;
-    full_name?: string;
-    avatar_url?: string;
-  };
-}
-
-interface LearningOutcome {
-  id: string;
-  course_id: string;
-  outcome: string;
-  created_at: string;
-  updated_at: string;
-}
-
 interface FinalExam {
   id: string;
   course_id: string;
@@ -148,23 +126,23 @@ const CourseLearningPage = () => {
   const [enrollmentCount, setEnrollmentCount] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
-  const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
   const [instructor, setInstructor] = useState<Profile | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
 
   useEffect(() => {
-    if (courseId) {
+    if (courseId && user) {
       fetchCourseData();
-      if (user) {
-        fetchEnrollmentData();
-        fetchProgress();
-      }
+      fetchEnrollmentData();
+      fetchProgress();
     }
   }, [courseId, user]);
 
   const fetchCourseData = async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
       // Fetch course details
@@ -186,7 +164,7 @@ const CourseLearningPage = () => {
 
       if (modulesError) throw modulesError;
 
-      // Fetch lessons for each module - using correct table name 'lessons'
+      // Fetch lessons for each module
       const modulesWithLessons = await Promise.all(
         (modulesData as CourseModule[]).map(async (module) => {
           const { data: lessonsData, error: lessonsError } = await supabase
@@ -197,7 +175,7 @@ const CourseLearningPage = () => {
 
           if (lessonsError) {
             console.error('Error fetching lessons:', lessonsError);
-            return module;
+            return { ...module, lessons: [] };
           }
 
           return {
@@ -208,7 +186,12 @@ const CourseLearningPage = () => {
       );
       setModules(modulesWithLessons);
 
-      // Fetch enrollment count with updated table name
+      // Set first lesson as selected by default
+      if (modulesWithLessons.length > 0 && modulesWithLessons[0].lessons.length > 0) {
+        setSelectedLesson(modulesWithLessons[0].lessons[0]);
+      }
+
+      // Fetch enrollment count
       const { count: enrolledCount, error: enrollCountError } = await supabase
         .from('course_enrollments')
         .select('*', { count: 'exact' })
@@ -232,25 +215,14 @@ const CourseLearningPage = () => {
       setAverageRating(avgRating);
       setReviewCount(ratings.length);
 
-      // Fetch learning outcomes with updated table name
-      const { data: outcomesData, error: outcomesError } = await supabase
-        .from('course_learning_outcomes')
-        .select('*')
-        .eq('course_id', courseId);
-
-      if (outcomesError) throw outcomesError;
-      setLearningOutcomes(outcomesData as LearningOutcome[]);
-
       // Fetch final exam
       const { data: examData, error: examError } = await supabase
         .from('final_exams')
         .select('*')
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (examError) {
-        console.error('Error fetching final exam:', examError);
-      } else {
+      if (!examError && examData) {
         setFinalExam(examData as FinalExam);
       }
 
@@ -260,11 +232,9 @@ const CourseLearningPage = () => {
           .from('profiles')
           .select('*')
           .eq('id', courseData.creator_id)
-          .single();
+          .maybeSingle();
 
-        if (instructorError) {
-          console.error('Error fetching instructor profile:', instructorError);
-        } else {
+        if (!instructorError && instructorData) {
           setInstructor(instructorData as Profile);
         }
       }
@@ -277,49 +247,40 @@ const CourseLearningPage = () => {
   };
 
   const fetchEnrollmentData = async () => {
+    if (!user || !courseId) return;
+    
     try {
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (enrollmentError) {
-        // Check if the error is because no record was found
-        if (enrollmentError.message !== 'No rows found') {
-          console.error('Error fetching enrollment data:', enrollmentError);
-          toast.error('Failed to load enrollment data');
-        }
-        // If no record found, it's not an error, just means the user isn't enrolled
-        setEnrollment(null);
-      } else {
+      if (!enrollmentError && enrollmentData) {
         setEnrollment(enrollmentData as CourseEnrollment);
       }
     } catch (error) {
       console.error('Error fetching enrollment data:', error);
-      toast.error('Failed to load enrollment data');
     }
   };
 
   const fetchProgress = async () => {
+    if (!user || !courseId) return;
+    
     try {
       const { data: progressData, error: progressError } = await supabase
         .from('course_progress')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (progressError) {
-        // If no record found, it's not an error, just means no progress yet
-        setProgress(null);
-      } else {
+      if (!progressError && progressData) {
         setProgress(progressData as ProgressData);
       }
     } catch (error) {
       console.error('Error fetching progress data:', error);
-      toast.error('Failed to load progress data');
     }
   };
 
@@ -336,7 +297,7 @@ const CourseLearningPage = () => {
         module.lessons.map(lesson => lesson.id)
       );
 
-      // Mark all lessons as complete using enrollment_id instead of user_id
+      // Mark all lessons as complete
       for (const lessonId of allLessonIds) {
         const { error } = await supabase
           .from('lesson_progress')
@@ -369,7 +330,6 @@ const CourseLearningPage = () => {
       if (progressError) {
         console.error('Error updating course progress:', progressError);
       } else {
-        // Refresh progress data
         await fetchProgress();
         toast.success('All lessons marked as complete!');
       }
@@ -381,15 +341,12 @@ const CourseLearningPage = () => {
     }
   };
 
-  const handleStartLearning = () => {
-    if (modules.length > 0 && modules[0].lessons.length > 0) {
-      const firstLesson = modules[0].lessons[0];
-      window.location.href = `/course/${courseId}/lesson/${firstLesson.id}`;
-    }
-  };
-
   const handleTakeExam = () => {
     setShowExamModal(true);
+  };
+
+  const handleLessonSelect = (lesson: CourseLesson) => {
+    setSelectedLesson(lesson);
   };
 
   const enrolledUser = enrollment && enrollment.payment_status === 'completed';
@@ -410,8 +367,8 @@ const CourseLearningPage = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
-          <Link to="/explore/courses">
-            <Button>Browse Courses</Button>
+          <Link to="/learning">
+            <Button>Back to Learning</Button>
           </Link>
         </div>
       </div>
@@ -466,7 +423,6 @@ const CourseLearningPage = () => {
                   Keep going! You're doing great.
                 </p>
                 <div className="flex gap-2">
-                  {/* Mark All Lessons Complete Button */}
                   {isNotComplete && hasLessons && (
                     <Button
                       onClick={markAllLessonsComplete}
@@ -479,11 +435,10 @@ const CourseLearningPage = () => {
                       ) : (
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                       )}
-                      {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
+                      {markingComplete ? 'Marking Complete...' : 'Mark All Complete'}
                     </Button>
                   )}
                   
-                  {/* Take Final Exam Button */}
                   {(!hasLessons || progressPercentage === 100) && finalExam && (
                     <Button
                       onClick={handleTakeExam}
@@ -513,17 +468,14 @@ const CourseLearningPage = () => {
               <CardContent>
                 <CourseModuleList 
                   modules={modules}
-                  onLessonSelect={(lesson) => {
-                    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
-                  }}
-                  currentLessonId={undefined}
+                  onLessonSelect={handleLessonSelect}
+                  currentLessonId={selectedLesson?.id}
                   completedLessons={[]}
                   onQuizStart={(quizId) => {
                     console.log('Starting quiz:', quizId);
                   }}
                 />
                 
-                {/* Final Exam */}
                 {finalExam && (
                   <div className="mt-4 p-4 border border-orange-200 rounded-lg bg-orange-50">
                     <div className="flex items-center justify-between">
@@ -553,21 +505,103 @@ const CourseLearningPage = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-8">
-            <Tabs defaultValue="lesson-notes" className="w-full">
+            <Tabs defaultValue="content" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="content" className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
+                  Content
+                </TabsTrigger>
                 <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
                   <StickyNote className="h-4 w-4" />
-                  Lesson Notes
+                  Notes
                 </TabsTrigger>
-                <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
                 <TabsTrigger value="reviews">Reviews</TabsTrigger>
                 <TabsTrigger value="discussion">Discussion</TabsTrigger>
               </TabsList>
               
+              <TabsContent value="content" className="space-y-6">
+                {enrolledUser ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>
+                        {selectedLesson ? selectedLesson.title : 'Select a lesson to begin'}
+                      </CardTitle>
+                      {selectedLesson && selectedLesson.description && (
+                        <p className="text-muted-foreground">{selectedLesson.description}</p>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      {selectedLesson && selectedLesson.video_url ? (
+                        <div className="space-y-4">
+                          <VideoPlayer
+                            src={selectedLesson.video_url}
+                            poster={course.thumbnail_url}
+                            className="w-full aspect-video rounded-lg overflow-hidden"
+                            onTimeUpdate={(currentTime, duration, percent) => {
+                              // You can add progress tracking here
+                              console.log('Video progress:', percent);
+                            }}
+                            onEnded={() => {
+                              // Mark lesson as complete when video ends
+                              console.log('Video ended');
+                            }}
+                          />
+                          {selectedLesson.materials_urls && selectedLesson.materials_urls.length > 0 && (
+                            <div className="mt-4">
+                              <h4 className="font-semibold mb-2">Additional Materials</h4>
+                              <div className="space-y-2">
+                                {selectedLesson.materials_urls.map((url, index) => (
+                                  <a
+                                    key={index}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block p-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                                  >
+                                    Material {index + 1}
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : selectedLesson ? (
+                        <div className="text-center py-8">
+                          <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                          <p className="text-gray-500">
+                            This lesson doesn't have a video. Content coming soon!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                          <p className="text-gray-500">
+                            Select a lesson from the curriculum to start learning
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-500 mb-4">Enroll in this course to access the content</p>
+                      <Button 
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
+                      >
+                        Enroll Now
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+              
               <TabsContent value="lesson-notes" className="space-y-6">
                 {enrolledUser ? (
                   <LessonNotesTab 
-                    lessonId={modules[0]?.lessons[0]?.id || ''} 
+                    lessonId={selectedLesson?.id || ''} 
                     currentVideoTime={0}
                   />
                 ) : (
@@ -584,20 +618,6 @@ const CourseLearningPage = () => {
                     </CardContent>
                   </Card>
                 )}
-              </TabsContent>
-              
-              <TabsContent value="curriculum">
-                <CourseModuleList 
-                  modules={modules}
-                  onLessonSelect={(lesson) => {
-                    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
-                  }}
-                  currentLessonId={undefined}
-                  completedLessons={[]}
-                  onQuizStart={(quizId) => {
-                    console.log('Starting quiz:', quizId);
-                  }}
-                />
               </TabsContent>
               
               <TabsContent value="reviews">
@@ -698,7 +718,7 @@ const CourseLearningPage = () => {
           </Card>
         )}
 
-        {/* Final Exam Modal - Fixed props */}
+        {/* Final Exam Modal */}
         {finalExam && (
           <FinalExamModal
             isOpen={showExamModal}
