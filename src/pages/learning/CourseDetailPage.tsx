@@ -357,7 +357,7 @@ const CourseDetailPage = () => {
               <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
               <p className="mb-6 text-gray-600">The course you are looking for might have been removed or doesn't exist.</p>
               <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600">
-                <Link to="/explore/courses">Browse Courses</Link>
+                <Link to="/explore-courses">Browse Courses</Link>
               </Button>
             </div>
           </div>
