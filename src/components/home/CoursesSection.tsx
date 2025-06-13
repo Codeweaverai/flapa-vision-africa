@@ -148,7 +148,7 @@ const CoursesSection = () => {
                   </Badge>
                 </div>
                 
-                <Link to={`/learning/course-detail/${course.id}`}>
+                <Link to={`/course/${course.id}`}>
                   <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0">
                     View Course
                   </Button>
@@ -160,7 +160,7 @@ const CoursesSection = () => {
 
         <div className="text-center">
           <Button asChild size="lg" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0">
-            <Link to="/explore/courses">
+            <Link to="/explore-courses">
               <BookOpen className="h-5 w-5 mr-2" />
               Explore All Courses
             </Link>
