@@ -534,7 +534,7 @@ const CourseLearningPage = () => {
                     <CardContent>
                       {selectedLesson && selectedLesson.video_url ? (
                         <div className="space-y-4">
-                          <reactPlayer
+                          <ReactPlayer
                             src={selectedLesson.video_url}
                             poster={course.thumbnail_url}
                             className="w-full aspect-video rounded-lg overflow-hidden"
@@ -699,11 +699,11 @@ const CourseLearningPage = () => {
               </div>
               
               {instructor.bio && (
-                <p className="text-sm text-gray-700">{creator.bio}</p>
+                <p className="text-sm text-gray-700">{instructor.bio}</p>
               )}
               
               <div className="flex gap-2">
-                <Link to={`/creator/profile/${creator.id}`}>
+                <Link to={`/creator/profile/${instructor.id}`}>
                   <Button variant="outline" size="sm" className="flex-1">
                     View Profile
                   </Button>
