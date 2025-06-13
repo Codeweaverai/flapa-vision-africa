@@ -69,6 +69,7 @@ import CommunityNotificationsPage from './pages/CommunityNotificationsPage';
 import CommunityChatPage from './pages/CommunityChatPage';
 import MediaPage from './pages/MediaPage';
 import MediaPostDetailPage from './pages/MediaPostDetailPage';
+import CourseDetailPage from './pages/learning/CourseDetailPage';
 
 // Additional Pages
 import EventDetailPage from './pages/EventDetailPage';
