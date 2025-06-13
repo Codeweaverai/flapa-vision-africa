@@ -32,9 +32,6 @@ const CheckoutSuccessPage = () => {
         await clearCart();
 
         if (sessionId) {
-          // Wait a moment for webhook processing
-          await new Promise(resolve => setTimeout(resolve, 2000));
-
           // Fetch order details using the session ID
           const { data: order, error } = await supabase
             .from('orders')
@@ -56,12 +53,6 @@ const CheckoutSuccessPage = () => {
         }
 
         toast.success('Payment successful! Your order has been confirmed.');
-        
-        // Auto-redirect to My Orders after 3 seconds
-        setTimeout(() => {
-          navigate('/account/orders');
-        }, 3000);
-
       } catch (error) {
         console.error('Error handling success:', error);
         toast.error('There was an issue processing your order. Please contact support.');
@@ -77,10 +68,7 @@ const CheckoutSuccessPage = () => {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Processing your order...</p>
-          </div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
         </div>
       </Layout>
     );
@@ -100,7 +88,7 @@ const CheckoutSuccessPage = () => {
                   Payment Successful!
                 </CardTitle>
                 <p className="text-green-700">
-                  Thank you for your purchase. Your order has been confirmed and is being processed.
+                  Thank you for your purchase. Your order has been confirmed.
                 </p>
               </CardHeader>
               
@@ -123,34 +111,14 @@ const CheckoutSuccessPage = () => {
                           {orderDetails.payment_status.toUpperCase()}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Items:</span>
-                        <span>{orderDetails.order_items.length} item(s)</span>
-                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-800 mb-2">What's happening now?</h3>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>✅ Payment processed successfully</li>
-                    <li>📧 Confirmation email being sent</li>
-                    <li>🎫 Tickets and receipts being generated</li>
-                    <li>📚 Course access being activated</li>
-                  </ul>
-                </div>
-
                 <div className="text-center space-y-4">
                   <p className="text-gray-600">
-                    You will receive a confirmation email shortly with your receipt and any tickets.
+                    You will receive a confirmation email shortly with your receipt and order details.
                   </p>
-                  
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800">
-                      🚀 Redirecting you to My Orders in a few seconds...
-                    </p>
-                  </div>
                   
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button 

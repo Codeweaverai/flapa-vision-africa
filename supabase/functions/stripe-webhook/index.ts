@@ -45,7 +45,8 @@ serve(async (req) => {
         .update({
           payment_status: 'completed',
           stripe_payment_intent_id: session.payment_intent as string,
-          stripe_session_id: session.id,
+          receipt_url: session.receipt_email ? `Receipt sent to ${session.receipt_email}` : null,
+          receipt_generated_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -55,64 +56,94 @@ serve(async (req) => {
         return new Response("Error updating order", { status: 500 });
       }
 
-      // Clear the cart for this user
-      const { data: order } = await supabaseClient
+      // Get order details
+      const { data: order, error: orderError } = await supabaseClient
         .from('orders')
-        .select('user_id')
+        .select('*, order_items(*)')
         .eq('id', orderId)
         .single();
 
-      if (order?.user_id) {
-        await supabaseClient
-          .from('carts')
-          .delete()
-          .eq('user_id', order.user_id);
+      if (orderError || !order) {
+        console.error("Error fetching order:", orderError);
+        return new Response("Error fetching order", { status: 500 });
       }
 
-      console.log("Order payment completed, starting fulfillment process");
-
-      // Trigger order fulfillment (tickets, receipts, enrollments)
-      try {
-        const fulfillmentResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-tickets`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-          },
-          body: JSON.stringify({ orderId })
-        });
-
-        if (fulfillmentResponse.ok) {
-          console.log("Order fulfillment completed successfully");
-          
-          // Send confirmation email
-          try {
-            const emailResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-order-confirmation`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-              },
-              body: JSON.stringify({ orderId })
+      // Process order items
+      for (const item of order.order_items) {
+        if (item.item_type === 'course') {
+          // Create course enrollment
+          const { error: enrollmentError } = await supabaseClient
+            .from('course_enrollments')
+            .insert({
+              user_id: order.user_id,
+              course_id: item.item_id,
+              payment_status: 'completed',
+              order_id: orderId,
+              enrollment_date: new Date().toISOString()
             });
 
-            if (emailResponse.ok) {
-              console.log("Order confirmation email sent successfully");
-            } else {
-              console.error("Failed to send confirmation email");
-            }
-          } catch (emailError) {
-            console.error("Error sending confirmation email:", emailError);
+          if (enrollmentError) {
+            console.error("Error creating course enrollment:", enrollmentError);
           }
-          
-        } else {
-          console.error("Order fulfillment failed");
+        } else if (item.item_type === 'event_ticket') {
+          // Get event details
+          const { data: ticket } = await supabaseClient
+            .from('event_tickets')
+            .select('event_id')
+            .eq('id', item.item_id)
+            .single();
+
+          if (ticket) {
+            // Create event booking
+            const { data: booking, error: bookingError } = await supabaseClient
+              .from('event_bookings')
+              .insert({
+                user_id: order.user_id,
+                event_id: ticket.event_id,
+                event_ticket_id: item.item_id,
+                status: 'confirmed',
+                payment_status: 'completed',
+                payment_amount: item.total_price,
+                payment_currency: 'USD',
+                ticket_quantity: item.quantity,
+                order_id: orderId,
+                booking_date: new Date().toISOString()
+              })
+              .select()
+              .single();
+
+            if (bookingError) {
+              console.error("Error creating booking:", bookingError);
+            }
+          }
         }
-      } catch (fulfillmentError) {
-        console.error("Error in order fulfillment:", fulfillmentError);
       }
 
-      console.log("Successfully processed Stripe order:", orderId);
+      // Generate tickets for event orders
+      const hasEventTickets = order.order_items.some(item => item.item_type === 'event_ticket');
+      if (hasEventTickets) {
+        try {
+          const { data: ticketResponse, error: ticketError } = await supabaseClient.functions.invoke('generate-tickets', {
+            body: { orderId: orderId }
+          });
+
+          if (ticketError) {
+            console.error("Error generating tickets:", ticketError);
+          } else {
+            console.log("Tickets generated successfully:", ticketResponse);
+          }
+        } catch (ticketGenerationError) {
+          console.error("Error invoking ticket generation:", ticketGenerationError);
+        }
+      }
+
+      // Clear the cart
+      await supabaseClient
+        .from('carts')
+        .delete()
+        .eq('user_id', order.user_id);
+
+      console.log("Successfully processed order:", orderId);
     }
 
     return new Response(JSON.stringify({ received: true }), {

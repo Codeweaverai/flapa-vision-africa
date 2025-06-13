@@ -1,14 +1,24 @@
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, Mail } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, Package, CreditCard, Download, Ticket, Eye, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+
+interface OrderItem {
+  id: string;
+  item_name: string;
+  item_type: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  metadata?: any;
+}
 
 interface Order {
   id: string;
@@ -17,21 +27,7 @@ interface Order {
   payment_status: string;
   payment_method: string;
   created_at: string;
-  receipt_url: string;
-  order_items: Array<{
-    id: string;
-    item_name: string;
-    item_type: string;
-    quantity: number;
-    total_price: number;
-  }>;
-  generated_tickets?: Array<{
-    id: string;
-    ticket_code: string;
-    ticket_holder_name: string;
-    pdf_url: string;
-    ticket_status: string;
-  }>;
+  order_items: OrderItem[];
 }
 
 const UserOrders = () => {
@@ -39,6 +35,7 @@ const UserOrders = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingTickets, setGeneratingTickets] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -53,8 +50,7 @@ const UserOrders = () => {
         .from('orders')
         .select(`
           *,
-          order_items (*),
-          generated_tickets (*)
+          order_items (*)
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -69,43 +65,200 @@ const UserOrders = () => {
     }
   };
 
-  const handleDownloadReceipt = (receiptUrl: string, orderNumber: string) => {
-    if (receiptUrl) {
-      window.open(receiptUrl, '_blank');
-    } else {
-      toast.error('Receipt not available');
-    }
-  };
-
-  const handleViewTickets = (orderId: string) => {
-    navigate(`/tickets/${orderId}`);
-  };
-
-  const handlePrintTicket = (ticketUrl: string) => {
-    if (ticketUrl) {
-      window.open(ticketUrl, '_blank');
-    } else {
-      toast.error('Ticket not available');
-    }
-  };
-
-  const handleRegenerateTickets = async (orderId: string) => {
+  const generateTickets = async (orderId: string) => {
     try {
+      setGeneratingTickets(orderId);
       const { data, error } = await supabase.functions.invoke('generate-tickets', {
         body: { orderId }
       });
 
       if (error) throw error;
-      
-      toast.success('Tickets regenerated successfully');
-      loadOrders(); // Refresh the orders
+
+      if (data?.success) {
+        toast.success(`Generated ${data.generatedTickets} tickets successfully!`);
+        // Refresh orders to get updated ticket data
+        await loadOrders();
+      } else {
+        toast.error('Failed to generate tickets');
+      }
     } catch (error) {
-      console.error('Error regenerating tickets:', error);
-      toast.error('Failed to regenerate tickets');
+      console.error('Error generating tickets:', error);
+      toast.error('Failed to generate tickets');
+    } finally {
+      setGeneratingTickets(null);
     }
   };
 
-  const getStatusBadgeColor = (status: string) => {
+  const printTicket = async (orderId: string) => {
+    try {
+      // Get generated tickets for this order
+      const { data: tickets, error } = await supabase
+        .from('generated_tickets')
+        .select(`
+          *,
+          event:events (
+            title, start_time, location, description
+          ),
+          event_ticket:event_tickets (
+            name, ticket_type
+          )
+        `)
+        .eq('order_id', orderId);
+
+      if (error) throw error;
+
+      if (!tickets || tickets.length === 0) {
+        toast.error('No tickets found for this order');
+        return;
+      }
+
+      // Generate and print ticket HTML for each ticket
+      tickets.forEach((ticket, index) => {
+        setTimeout(() => {
+          const ticketHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>Event Ticket - ${ticket.event?.title}</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  margin: 0;
+                  padding: 20px;
+                  background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+                  min-height: 100vh;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                }
+                .ticket {
+                  background: white;
+                  width: 600px;
+                  border-radius: 15px;
+                  overflow: hidden;
+                  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                  border: 3px solid #e9ecef;
+                }
+                .ticket-header {
+                  background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+                  color: white;
+                  padding: 40px;
+                  text-align: center;
+                }
+                .event-title {
+                  font-size: 32px;
+                  font-weight: bold;
+                  margin-bottom: 15px;
+                }
+                .ticket-body {
+                  padding: 50px 40px;
+                }
+                .holder-name {
+                  font-size: 36px;
+                  font-weight: bold;
+                  color: #2c3e50;
+                  text-align: center;
+                  margin-bottom: 40px;
+                  border-bottom: 3px solid #f97316;
+                  padding-bottom: 20px;
+                }
+                .event-details {
+                  margin-bottom: 30px;
+                }
+                .detail-item {
+                  margin: 15px 0;
+                  padding: 15px;
+                  background: #f8f9fa;
+                  border-radius: 8px;
+                  border-left: 4px solid #f97316;
+                }
+                .detail-label {
+                  font-weight: bold;
+                  color: #666;
+                  font-size: 14px;
+                  text-transform: uppercase;
+                }
+                .detail-value {
+                  font-size: 18px;
+                  color: #333;
+                  margin-top: 5px;
+                }
+                .ticket-code {
+                  text-align: center;
+                  margin: 30px 0;
+                  padding: 20px;
+                  background: #f8f9fa;
+                  border-radius: 10px;
+                  border: 2px dashed #f97316;
+                }
+                .code {
+                  font-family: monospace;
+                  font-size: 24px;
+                  font-weight: bold;
+                  color: #333;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="ticket">
+                <div class="ticket-header">
+                  <div class="event-title">${ticket.event?.title || 'Event'}</div>
+                  <div>${ticket.event_ticket?.ticket_type || 'Standard'} Ticket</div>
+                </div>
+                
+                <div class="ticket-body">
+                  <div class="holder-name">${ticket.ticket_holder_name}</div>
+                  
+                  <div class="event-details">
+                    <div class="detail-item">
+                      <div class="detail-label">Date & Time</div>
+                      <div class="detail-value">
+                        ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'PPP p') : 'TBD'}
+                      </div>
+                    </div>
+                    
+                    <div class="detail-item">
+                      <div class="detail-label">Location</div>
+                      <div class="detail-value">${ticket.event?.location || 'TBD'}</div>
+                    </div>
+                  </div>
+                  
+                  <div class="ticket-code">
+                    <div class="detail-label">Ticket Code</div>
+                    <div class="code">${ticket.ticket_code}</div>
+                  </div>
+                  
+                  <div style="text-align: center; color: #666; font-size: 14px;">
+                    Present this ticket at the venue entrance
+                  </div>
+                </div>
+              </div>
+            </body>
+            </html>
+          `;
+          
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            printWindow.document.write(ticketHTML);
+            printWindow.document.close();
+            printWindow.print();
+          }
+        }, index * 500); // Stagger multiple tickets
+      });
+      
+      toast.success('Tickets sent to printer');
+    } catch (error) {
+      console.error('Error printing tickets:', error);
+      toast.error('Failed to print tickets');
+    }
+  };
+
+  const hasEventTickets = (order: Order) => {
+    return order.order_items.some(item => item.item_type === 'event_ticket');
+  };
+
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-300';
@@ -120,187 +273,145 @@ const UserOrders = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
       </div>
     );
   }
 
+  if (orders.length === 0) {
+    return (
+      <Card className="text-center py-12">
+        <CardContent>
+          <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2">No Orders Yet</h3>
+          <p className="text-gray-600 mb-4">You haven't placed any orders yet.</p>
+          <Button 
+            onClick={() => navigate('/courses')}
+            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+          >
+            Browse Courses
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
-      <div className="container mx-auto px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 mb-8">
-            <Package className="h-8 w-8 text-orange-600" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-              My Orders
-            </h1>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Package className="h-8 w-8 text-orange-600" />
+        <h1 className="text-2xl font-bold">My Orders</h1>
+      </div>
 
-          {orders.length === 0 ? (
-            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="p-12 text-center">
-                <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                <h2 className="text-xl font-semibold mb-4">No orders found</h2>
-                <p className="text-gray-600 mb-6">You haven't made any purchases yet.</p>
-                <Button 
-                  onClick={() => navigate('/courses')}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600"
-                >
-                  Browse Courses
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-6">
-              {orders.map((order) => {
-                const hasEventTickets = order.order_items.some(item => item.item_type === 'event_ticket');
-                const tickets = order.generated_tickets || [];
-                
-                return (
-                  <Card key={order.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-orange-100 to-purple-100">
-                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="space-y-4">
+        {orders.map((order) => (
+          <Card key={order.id} className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
+            <CardHeader className="bg-gradient-to-r from-orange-50 to-purple-50">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg">
+                    Order #{order.id.slice(-8).toUpperCase()}
+                  </CardTitle>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <CalendarDays className="h-4 w-4" />
+                    {format(new Date(order.created_at), 'PPP')}
+                  </div>
+                </div>
+                <div className="flex flex-col md:items-end gap-2">
+                  <div className="text-2xl font-bold text-orange-600">
+                    ${order.total_amount.toFixed(2)} {order.currency}
+                  </div>
+                  <Badge className={getStatusColor(order.payment_status)}>
+                    {order.payment_status.toUpperCase()}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {/* Order Items */}
+                <div>
+                  <h4 className="font-semibold mb-3">Items Ordered</h4>
+                  <div className="space-y-2">
+                    {order.order_items.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                         <div>
-                          <CardTitle className="text-xl">
-                            Order #{order.id.slice(-8).toUpperCase()}
-                          </CardTitle>
-                          <div className="flex items-center gap-4 mt-2">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-gray-500" />
-                              <span className="text-sm text-gray-600">
-                                {format(new Date(order.created_at), 'PPP')}
-                              </span>
-                            </div>
-                            <Badge className={getStatusBadgeColor(order.payment_status)}>
-                              {order.payment_status.toUpperCase()}
+                          <div className="font-medium">{item.item_name}</div>
+                          <div className="text-sm text-gray-600 flex items-center gap-2">
+                            <Badge variant="secondary">
+                              {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
                             </Badge>
+                            <span>Qty: {item.quantity}</span>
                           </div>
                         </div>
-                        <div className="text-lg lg:text-right">
-                          <div className="font-bold text-orange-600">
-                            {order.total_amount.toFixed(2)} {order.currency}
-                          </div>
-                          <div className="text-sm text-gray-600 capitalize">
-                            via {order.payment_method}
-                          </div>
+                        <div className="text-right">
+                          <div className="font-semibold">${item.total_price.toFixed(2)}</div>
+                          <div className="text-sm text-gray-600">${item.unit_price.toFixed(2)} each</div>
                         </div>
                       </div>
-                    </CardHeader>
+                    ))}
+                  </div>
+                </div>
 
-                    <CardContent className="p-6">
-                      {/* Order Items */}
-                      <div className="mb-6">
-                        <h3 className="font-semibold mb-3">Items</h3>
-                        <div className="space-y-2">
-                          {order.order_items.map((item) => (
-                            <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                              <div>
-                                <div className="font-medium">{item.item_name}</div>
-                                <div className="text-sm text-gray-600">
-                                  {item.item_type === 'event_ticket' ? 'Event Ticket' : 'Course'} • 
-                                  Quantity: {item.quantity}
-                                </div>
-                              </div>
-                              <div className="font-semibold">
-                                {item.total_price.toFixed(2)} {order.currency}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                {/* Payment Info */}
+                <div className="flex items-center gap-2 text-sm text-gray-600 pt-4 border-t">
+                  <CreditCard className="h-4 w-4" />
+                  <span>Payment Method: {order.payment_method}</span>
+                </div>
 
-                      {/* Tickets Section */}
-                      {hasEventTickets && (
-                        <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <Ticket className="h-5 w-5 text-green-600" />
-                              <h3 className="font-semibold text-green-800">Event Tickets</h3>
-                              {tickets.length > 0 && (
-                                <Badge className="bg-green-100 text-green-800">
-                                  {tickets.length} ticket(s)
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {tickets.length > 0 ? (
-                            <div className="space-y-2">
-                              {tickets.slice(0, 3).map((ticket) => (
-                                <div key={ticket.id} className="flex items-center justify-between p-2 bg-white rounded border">
-                                  <div>
-                                    <div className="font-medium text-sm">{ticket.ticket_holder_name}</div>
-                                    <div className="text-xs text-gray-600">Code: {ticket.ticket_code}</div>
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handlePrintTicket(ticket.pdf_url)}
-                                    className="border-green-300 text-green-700 hover:bg-green-50"
-                                  >
-                                    <Printer className="h-3 w-3 mr-1" />
-                                    Print
-                                  </Button>
-                                </div>
-                              ))}
-                              {tickets.length > 3 && (
-                                <div className="text-sm text-gray-600 text-center">
-                                  +{tickets.length - 3} more tickets
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-sm text-gray-600">
-                              Tickets are being generated...
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-3">
-                        {/* Receipt Download */}
-                        <Button
-                          variant="outline"
-                          onClick={() => handleDownloadReceipt(order.receipt_url, order.id.slice(-8).toUpperCase())}
-                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                          disabled={!order.receipt_url}
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          Download Receipt
-                        </Button>
-
-                        {/* Ticket Actions */}
-                        {hasEventTickets && (
-                          <>
-                            <Button
-                              onClick={() => handleViewTickets(order.id)}
-                              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-                              disabled={tickets.length === 0}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Tickets
-                            </Button>
-                            
-                            <Button
-                              variant="outline"
-                              onClick={() => handleRegenerateTickets(order.id)}
-                              className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                            >
-                              <Ticket className="h-4 w-4 mr-2" />
-                              Regenerate Tickets
-                            </Button>
-                          </>
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3 pt-4 border-t">
+                  {hasEventTickets(order) && order.payment_status === 'completed' && (
+                    <>
+                      <Button
+                        onClick={() => navigate(`/ticket-details/${order.id}`)}
+                        variant="outline"
+                        className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Tickets
+                      </Button>
+                      
+                      <Button
+                        onClick={() => printTicket(order.id)}
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print Tickets
+                      </Button>
+                      
+                      <Button
+                        onClick={() => generateTickets(order.id)}
+                        disabled={generatingTickets === order.id}
+                        variant="outline"
+                        className="border-green-300 text-green-700 hover:bg-green-50"
+                      >
+                        {generatingTickets === order.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                        ) : (
+                          <Ticket className="h-4 w-4 mr-2" />
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                        {generatingTickets === order.id ? 'Generating...' : 'Regenerate Tickets'}
+                      </Button>
+                    </>
+                  )}
+                  
+                  <Button
+                    onClick={() => navigate(`/order-details/${order.id}`)}
+                    variant="outline"
+                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    View Full Details
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
