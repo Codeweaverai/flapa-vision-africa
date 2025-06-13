@@ -38,7 +38,6 @@ import CourseContentPage from './pages/admin/CourseContentPage';
 import CourseForm from './pages/admin/CourseForm';
 import EventForm from './pages/admin/EventForm';
 import EventRegistrations from './pages/admin/EventRegistrations';
-import LessonFormDialog from './pages/admin/LessonFormDialog';
 import MediaForm from './pages/admin/MediaForm';
 
 // Creator Pages
@@ -145,7 +144,6 @@ function App() {
                   <Route path="/admin/courses/:courseId/edit" element={<ProtectedRoute><AdminCourseEdit /></ProtectedRoute>} />
                   <Route path="/admin/courses/:courseId/content" element={<ProtectedRoute><AdminCourseContent /></ProtectedRoute>} />
                   <Route path="/admin/course-content" element={<ProtectedRoute><CourseContentPage /></ProtectedRoute>} />
-                  <Route path="/admin/lesson-form" element={<ProtectedRoute><LessonFormDialog /></ProtectedRoute>} />
 
                   {/* Admin Event Routes */}
                   <Route path="/admin/events" element={<ProtectedRoute><AdminEvents /></ProtectedRoute>} />
