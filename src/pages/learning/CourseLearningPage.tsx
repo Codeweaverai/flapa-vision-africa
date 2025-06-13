@@ -31,6 +31,8 @@ import CourseDiscussionSection from '@/components/community/CourseDiscussionSect
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
+import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
+
 import VideoPlayer from '@/components/video/VideoPlayer';
 
 interface Course {
