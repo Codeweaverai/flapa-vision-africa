@@ -70,6 +70,35 @@ import CommunityChatPage from './pages/CommunityChatPage';
 import MediaPage from './pages/MediaPage';
 import MediaPostDetailPage from './pages/MediaPostDetailPage';
 
+// Additional Pages
+import EventDetailPage from './pages/EventDetailPage';
+import EventsPage from './pages/EventsPage';
+import ExploreCoursesPage from './pages/ExploreCoursesPage';
+import ExploreEventsPage from './pages/ExploreEventsPage';
+import HelpCenterPage from './pages/HelpCenterPage';
+import MyCoursesPage from './pages/MyCoursesPage';
+import MyEventsPage from './pages/MyEventsPage';
+import CareersPage from './pages/CareersPage';
+import VerifyPage from './pages/VerifyPage';
+import TicketPage from './pages/TicketPage';
+import TicketDetailPage from './pages/TicketDetailPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import RegisterPage from './pages/RegisterPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import SettingsPage from './pages/SettingsPage';
+import SigninPage from './pages/SigninPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
+import BecomeCreatorPage from './pages/BecomeCreatorPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import PaymentResultPage from './pages/PaymentResultPage';
+import PaymentCancelPage from './pages/PaymentCancelPage';
+import NotificationsPage from './pages/NotificationsPage';
+import CourseDetailPage from './pages/learning/CourseDetailPage';
+import CoursesPage from './pages/CoursesPage';
+import AnimationsPage from './pages/AnimationsPage';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 
@@ -88,15 +117,34 @@ function App() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/auth" element={<LoginPage />} />
                   <Route path="/login" element={<LoginPage />} />
+                  <Route path="/signin" element={<SigninPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
+                  <Route path="/payment-success" element={<PaymentSuccessPage />} />
+                  <Route path="/payment-result" element={<PaymentResultPage />} />
+                  <Route path="/payment-cancel" element={<PaymentCancelPage />} />
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                   <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
                   <Route path="/learning/course/:courseId" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
+                  <Route path="/course/:courseId" element={<CourseDetailPage />} />
+                  <Route path="/courses" element={<CoursesPage />} />
+                  <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
+                  <Route path="/explore-courses" element={<ExploreCoursesPage />} />
+                  <Route path="/events" element={<EventsPage />} />
+                  <Route path="/event/:eventId" element={<EventDetailPage />} />
+                  <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
+                  <Route path="/explore-events" element={<ExploreEventsPage />} />
                   <Route path="/creator/:creatorId" element={<CreatorPublicProfile />} />
+                  <Route path="/become-creator" element={<BecomeCreatorPage />} />
                   <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+                  <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
                   <Route path="/course-results" element={<ProtectedRoute><CourseResultsPage /></ProtectedRoute>} />
                   <Route path="/results" element={<ProtectedRoute><CourseResultsPage /></ProtectedRoute>} />
                   <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
@@ -104,6 +152,14 @@ function App() {
                   <Route path="/community/chat" element={<ProtectedRoute><CommunityChatPage /></ProtectedRoute>} />
                   <Route path="/media" element={<MediaPage />} />
                   <Route path="/media/:id" element={<MediaPostDetailPage />} />
+                  <Route path="/verify" element={<VerifyPage />} />
+                  <Route path="/ticket/:ticketId" element={<TicketPage />} />
+                  <Route path="/ticket-detail/:ticketId" element={<TicketDetailPage />} />
+                  <Route path="/terms" element={<TermsOfServicePage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route path="/help" element={<HelpCenterPage />} />
+                  <Route path="/careers" element={<CareersPage />} />
+                  <Route path="/animations" element={<AnimationsPage />} />
 
                   {/* Creator Routes */}
                   <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
