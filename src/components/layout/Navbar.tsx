@@ -163,8 +163,8 @@ const Navbar = () => {
   ];
 
   const exploreLinks = [
-    { name: 'Explore Courses', path: '/explore/courses' },
-    { name: 'Explore Events', path: '/explore/events' },
+    { name: 'Explore Courses', path: '/explore-courses' },
+    { name: 'Explore Events', path: '/explore-events' },
   ];
 
   const handleSignOut = async () => {
