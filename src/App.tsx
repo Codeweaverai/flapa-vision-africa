@@ -98,6 +98,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import CourseDetailPage from './pages/learning/CourseDetailPage';
 import CoursesPage from './pages/CoursesPage';
 import AnimationsPage from './pages/AnimationsPage';
+import LearnOurCulturePage from './pages/LearnOurCulturePage';
 
 // Account Pages
 import UserConsultations from './pages/account/UserConsultations';
@@ -139,6 +140,7 @@ function App() {
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
                   <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
                   <Route path="/learning/course/:courseId" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
                   <Route path="/course/:courseId" element={<CourseDetailPage />} />
