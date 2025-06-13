@@ -196,7 +196,7 @@ const CommunityAISection = () => {
                   <Link to="/community">Explore Community</Link>
                 </Button>
                 <Button asChild variant="outline" size="lg" className="border-2 border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 font-semibold px-8 py-3 rounded-xl">
-                  <Link to="/explore/courses">Browse AI-Curated Courses</Link>
+                  <Link to="/explore-courses">Browse Courses</Link>
                 </Button>
               </div>
             </CardContent>
