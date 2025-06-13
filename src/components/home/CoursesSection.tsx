@@ -148,7 +148,7 @@ const CoursesSection = () => {
                   </Badge>
                 </div>
                 
-                <Link to={`/course/${course.id}`}>
+                <Link to={`/learning/course-detail/${course.id}`}>
                   <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0">
                     View Course
                   </Button>
