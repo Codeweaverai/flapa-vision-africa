@@ -262,10 +262,10 @@ const Navbar = () => {
                     My Events
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/explore/courses')}>
+                  <DropdownMenuItem onClick={() => navigate('/explore-courses')}>
                     Explore Courses
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/explore/events')}>
+                  <DropdownMenuItem onClick={() => navigate('/explore-events')}>
                     Explore Events
                   </DropdownMenuItem>
                   {user.user_metadata?.is_creator || user.user_metadata?.role === 'creator' ? (
