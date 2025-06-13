@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/layout/CreatorLayout';
 import FileUpload from '@/components/common/FileUpload';
@@ -101,13 +101,14 @@ const CreatorCourseEdit = () => {
 
   const handleThumbnailUpload = (url: string, path: string) => {
     setCourse(prev => prev ? { ...prev, thumbnail_url: url } : null);
+    toast.success('Thumbnail uploaded successfully!');
   };
 
   if (loading) {
     return (
       <CreatorLayout>
         <div className="flex justify-center items-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
         </div>
       </CreatorLayout>
     );
@@ -139,7 +140,11 @@ const CreatorCourseEdit = () => {
             <h1 className="text-2xl font-bold text-gray-900">Edit Course</h1>
           </div>
           <Button onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
             {saving ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>

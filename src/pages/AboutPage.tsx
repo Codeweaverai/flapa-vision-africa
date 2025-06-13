@@ -66,13 +66,13 @@ const AboutPage = () => {
       email: "george@skillpulse.cloud"
     },
     {
-      name: "Emily Rodriguez",
+      name: "Nakolo Pule",
       role: "Head of Content",
-      bio: "Former university professor specializing in curriculum development and instructional design.",
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
+      bio: " Specialised in Content Creation and Finance.",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-06-12_at_17.40.14_5fcc6eb5-removebg-preview.png?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
-      email: "emily@skillpulse.cloud"
+      email: "nakolo@skillpulse.cloud"
     },
     {
       name: "David Kim",
