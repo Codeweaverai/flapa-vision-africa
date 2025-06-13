@@ -33,7 +33,6 @@ import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
 import ReactPlayer from 'react-player';
-import VideoPlayer from '@/components/video/VideoPlayer';
 
 interface Course {
   id?: string;
