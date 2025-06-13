@@ -37,13 +37,13 @@ const HeroSection = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link to="/explore/courses">
+            <Link to="/explore-courses">
               <Button size="lg" className="text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200">
                 <Play className="mr-2 h-5 w-5" />
                 Start Learning Now
               </Button>
             </Link>
-            <Link to="/explore/events">
+            <Link to="/explore-events">
                <Button size="lg" className="text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200">
                 Explore Events
                 <ArrowRight className="ml-2 h-5 w-5" />
