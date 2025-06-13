@@ -215,6 +215,17 @@ const CreatorCourses = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((course) => (
               <Card key={course.id} className="group hover:shadow-lg transition-shadow">
+                {/* Course Thumbnail */}
+                {course.thumbnail_url && (
+                  <div className="w-full h-48 overflow-hidden rounded-t-lg">
+                    <img 
+                      src={course.thumbnail_url} 
+                      alt={course.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                )}
+                
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start mb-2">
                     <Badge variant={course.is_published ? "default" : "outline"}>

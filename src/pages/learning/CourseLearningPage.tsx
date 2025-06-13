@@ -28,12 +28,12 @@ import {
 import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviews from '@/components/course/CourseReviews';
-import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
+import LessonDiscussionTab from '@/components/course/LessonDiscussionTab';
 import ReactPlayer from 'react-player';
 
 interface Course {
@@ -118,6 +118,20 @@ interface Profile {
   bio?: string;
 }
 
+interface FinalExamResult {
+  id: string;
+  exam_id: string;
+  user_id: string;
+  enrollment_id: string;
+  course_id: string;
+  score: number;
+  percentage_score: number;
+  passed: boolean;
+  attempt_number: number;
+  created_at: string;
+  completed_at: string;
+}
+
 const CourseLearningPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
@@ -134,12 +148,14 @@ const CourseLearningPage = () => {
   const [markingComplete, setMarkingComplete] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
+  const [examResults, setExamResults] = useState<FinalExamResult[]>([]);
 
   useEffect(() => {
     if (courseId && user) {
       fetchCourseData();
       fetchEnrollmentData();
       fetchProgress();
+      fetchExamResults();
     }
   }, [courseId, user]);
 
@@ -287,6 +303,25 @@ const CourseLearningPage = () => {
     }
   };
 
+  const fetchExamResults = async () => {
+    if (!user || !courseId) return;
+    
+    try {
+      const { data: resultsData, error } = await supabase
+        .from('final_exam_results')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .order('attempt_number', { ascending: false });
+
+      if (!error && resultsData) {
+        setExamResults(resultsData as FinalExamResult[]);
+      }
+    } catch (error) {
+      console.error('Error fetching exam results:', error);
+    }
+  };
+
   const markAllLessonsComplete = async () => {
     if (!user || !courseId || !modules.length || !enrollment) {
       toast.error('Unable to mark lessons complete');
@@ -430,10 +465,67 @@ const CourseLearningPage = () => {
     }
   };
 
+  const handleExamComplete = async (examResult: any) => {
+    // Record exam results and attempts
+    try {
+      if (!user || !finalExam || !enrollment) return;
+
+      // Record in final_exam_results
+      const { error: resultError } = await supabase
+        .from('final_exam_results')
+        .insert({
+          exam_id: finalExam.id,
+          user_id: user.id,
+          enrollment_id: enrollment.id,
+          course_id: courseId,
+          score: examResult.score,
+          percentage_score: examResult.percentage,
+          passed: examResult.passed,
+          attempt_number: (examResults.length || 0) + 1,
+          completed_at: new Date().toISOString()
+        });
+
+      if (resultError) throw resultError;
+
+      // Record in final_exam_attempts
+      const { error: attemptError } = await supabase
+        .from('final_exam_attempts')
+        .insert({
+          exam_id: finalExam.id,
+          user_id: user.id,
+          enrollment_id: enrollment.id,
+          score: examResult.score,
+          passed: examResult.passed,
+          attempt_number: (examResults.length || 0) + 1,
+          answers: examResult.answers,
+          completed_at: new Date().toISOString(),
+          started_at: new Date().toISOString()
+        });
+
+      if (attemptError) throw attemptError;
+
+      // Refresh exam results
+      await fetchExamResults();
+      
+      setShowExamModal(false);
+      
+      if (examResult.passed) {
+        toast.success('Congratulations! You passed the exam!');
+      } else {
+        toast.error('You did not pass the exam. You can retake it.');
+      }
+    } catch (error) {
+      console.error('Error recording exam results:', error);
+      toast.error('Failed to record exam results');
+    }
+  };
+
   const enrolledUser = enrollment && enrollment.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
   const isNotComplete = progressPercentage < 100;
   const hasLessons = modules.some(module => module.lessons.length > 0);
+  const latestExamResult = examResults[0];
+  const hasPassedExam = latestExamResult?.passed;
 
   if (loading) {
     return (
@@ -521,14 +613,45 @@ const CourseLearningPage = () => {
                   )}
                   
                   {(!hasLessons || progressPercentage === 100) && finalExam && (
-                    <Button
-                      onClick={handleTakeExam}
-                      size="sm"
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <GraduationCap className="h-4 w-4 mr-2" />
-                      Take Final Exam
-                    </Button>
+                    <div className="flex gap-2">
+                      {hasPassedExam ? (
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => window.location.href = `/course/${courseId}/results`}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <Award className="h-4 w-4 mr-2" />
+                            View Results
+                          </Button>
+                          <Button
+                            onClick={() => window.location.href = `/learning`}
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            Continue Learning
+                          </Button>
+                        </div>
+                      ) : latestExamResult && !latestExamResult.passed ? (
+                        <Button
+                          onClick={handleTakeExam}
+                          size="sm"
+                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                        >
+                          <GraduationCap className="h-4 w-4 mr-2" />
+                          Retake Exam (Attempt {(examResults.length || 0) + 1})
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleTakeExam}
+                          size="sm"
+                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                        >
+                          <GraduationCap className="h-4 w-4 mr-2" />
+                          Take Final Exam
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -575,7 +698,7 @@ const CourseLearningPage = () => {
                         className="mt-3 bg-orange-600 hover:bg-orange-700"
                         onClick={handleTakeExam}
                       >
-                        Take Final Exam
+                        {latestExamResult && !latestExamResult.passed ? 'Retake Exam' : 'Take Final Exam'}
                       </Button>
                     )}
                   </div>
@@ -749,7 +872,22 @@ const CourseLearningPage = () => {
               </TabsContent>
               
               <TabsContent value="discussion">
-                <CourseDiscussionSection courseId={courseId!} />
+                {enrolledUser && selectedLesson ? (
+                  <LessonDiscussionTab lessonId={selectedLesson.id} />
+                ) : (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-500 mb-4">Enroll in this course to participate in lesson discussions</p>
+                      <Button 
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
+                      >
+                        Enroll Now
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
             </Tabs>
           </div>
@@ -849,6 +987,7 @@ const CourseLearningPage = () => {
             onClose={() => setShowExamModal(false)}
             exam={finalExam}
             enrollmentId={enrollment?.id || ''}
+            onExamComplete={handleExamComplete}
           />
         )}
 
