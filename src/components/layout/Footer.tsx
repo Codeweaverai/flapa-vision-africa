@@ -61,7 +61,7 @@ const Footer = () => {
             <ul className="space-y-2">
               <li>
                 <Link to="/learning" className="hover:text-primary transition-colors">
-                  Learning
+                  My Learning
                 </Link>
               </li>
               <li>
@@ -70,12 +70,12 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/explore/events" className="hover:text-primary transition-colors">
+                <Link to="/explore-events" className="hover:text-primary transition-colors">
                   Explore Events
                 </Link>
               </li>
               <li>
-                <Link to="/explore/courses" className="hover:text-primary transition-colors">
+                <Link to="/explore-courses" className="hover:text-primary transition-colors">
                   Explore Courses
                 </Link>
               </li>
