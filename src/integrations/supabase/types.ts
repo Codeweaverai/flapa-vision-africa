@@ -2417,6 +2417,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_creator: boolean | null
+          mobile_money_details: Json | null
           mobile_money_number: string | null
           payout_method: string | null
           role: Database["public"]["Enums"]["user_role"] | null
@@ -2434,6 +2435,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_creator?: boolean | null
+          mobile_money_details?: Json | null
           mobile_money_number?: string | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
@@ -2451,6 +2453,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_creator?: boolean | null
+          mobile_money_details?: Json | null
           mobile_money_number?: string | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null

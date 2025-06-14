@@ -44,8 +44,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
           email,
           payment_status,
           total_amount,
-          created_at,
-          profiles(username, full_name)
+          created_at
         ),
         courses(id, title, creator_id),
         events(id, title, creator_id)
@@ -125,8 +124,7 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
           email,
           payment_status,
           total_amount,
-          created_at,
-          profiles(username, full_name)
+          created_at
         ),
         courses(id, title, creator_id),
         events(id, title, creator_id)
@@ -137,16 +135,30 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
 
     if (error) throw error;
 
+    if (!orderItems || orderItems.length === 0) {
+      return [];
+    }
+
+    // Get user profiles for customer names
+    const userIds = [...new Set(orderItems.map(item => item.orders.user_id))];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, full_name')
+      .in('id', userIds);
+
     const transactions: CreatorTransaction[] = orderItems?.map(item => {
       const itemTotal = Number(item.total_price);
       const platformFee = itemTotal * PLATFORM_FEE_RATE;
       const creatorEarning = itemTotal - platformFee;
 
+      // Find the profile for this user
+      const profile = profiles?.find(p => p.id === item.orders.user_id);
+
       return {
         id: item.id,
         order_id: item.orders.id,
         customer_email: item.orders.email,
-        customer_name: item.orders.profiles?.username || item.orders.profiles?.full_name,
+        customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
         item_type: item.item_type as 'course' | 'event_ticket',
         item_name: item.item_name,
         item_id: item.item_id,
