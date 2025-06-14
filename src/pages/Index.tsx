@@ -8,12 +8,14 @@ import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
 import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
+import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
 
 const Index = () => {
   return (
     <Layout>
       <HeroSection />
       <AboutSection />
+      <BrowseCategoriesSection />
       <CoursesSection />
       <CommunityAISection />
       <MediaSection />
