@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -383,11 +382,11 @@ const CheckoutPage = () => {
       <MobileMoneyPaymentDialog
         isOpen={showMobileMoneyDialog}
         onClose={() => setShowMobileMoneyDialog(false)}
-        amount={finalAmountUSD}
-        currency="USD"
+        amount={convertedAmounts.final}
+        currency={currentCurrency}
         items={items}
-        discount={discount}
-        taxAmount={taxAmountUSD}
+        discount={convertedAmounts.discount}
+        taxAmount={convertedAmounts.tax}
         promoCode={promoCode}
       />
     </Layout>
