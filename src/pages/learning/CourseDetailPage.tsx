@@ -23,6 +23,7 @@ import CreatorCard from '@/components/course/CreatorCard';
 import RecommendedCourses from '@/components/course/RecommendedCourses';
 import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import ReactPlayer from 'react-player';
 
 interface Course {
   id: string;
@@ -475,6 +476,33 @@ const CourseDetailPage = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Course Preview Video */}
+                  {course.course_preview?.preview_video_url && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
+                      <div className="relative rounded-lg overflow-hidden bg-black">
+                        <ReactPlayer
+                          url={course.course_preview.preview_video_url}
+                          controls={true}
+                          playing={false}
+                          width="100%"
+                          height="400px"
+                          light={course.thumbnail_url}
+                          config={{
+                            file: {
+                              attributes: {
+                                controlsList: 'nodownload noremoteplayback',
+                                disablePictureInPicture: true,
+                                onContextMenu: (e: React.MouseEvent) => e.preventDefault()
+                              }
+                            }
+                          }}
+                          style={{ borderRadius: '8px' }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Instructor */}
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
