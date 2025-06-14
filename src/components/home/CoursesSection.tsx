@@ -168,7 +168,7 @@ const CoursesSection = () => {
           </Button>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
