@@ -104,21 +104,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .maybeSingle();
               
               if (!courseError && course) {
-                title = course.title || 'Course';
+                title = course.title || '';
                 thumbnail_url = course.thumbnail_url || '';
-              } else {
-                title = 'Course';
               }
             } catch (err) {
               console.error('Error fetching course:', err);
-              title = 'Course';
             }
           } else if (item.item_type === 'event_ticket') {
             try {
               // First get the ticket details
               const { data: ticket, error: ticketError } = await supabase
                 .from('event_tickets')
-                .select('id, name, event_id')
+                .select('event_id')
                 .eq('id', item.item_id)
                 .maybeSingle();
               
@@ -131,24 +128,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   .maybeSingle();
                 
                 if (!eventError && event) {
-                  // Always use the event title, not the ticket name
                   title = event.title;
                   thumbnail_url = event.image_url || '';
                   event_id = event.id;
                 } else {
                   console.warn('Failed to fetch event details:', eventError);
-                  title = 'Event';
+                  // Don't set any fallback title - let it remain empty if we can't fetch the event
                 }
               } else {
                 console.warn('Failed to fetch event ticket details:', ticketError);
-                title = 'Event';
+                // Don't set any fallback title
               }
             } catch (err) {
               console.error('Error fetching event ticket:', err);
-              title = 'Event';
+              // Don't set any fallback title
             }
           }
 
+          // Only return the cart item if we successfully got a title
           return {
             id: item.id,
             item_id: item.item_id,
@@ -163,7 +160,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })
       );
 
-      setItems(cartItems);
+      // Filter out items without titles (failed fetches)
+      const validItems = cartItems.filter(item => item.title && item.title.trim() !== '');
+      setItems(validItems);
     } catch (error) {
       console.error('Error loading cart:', error);
       toast.error('Failed to load cart');
