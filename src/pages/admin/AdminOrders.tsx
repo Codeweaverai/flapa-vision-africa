@@ -40,10 +40,12 @@ interface Order {
   payment_method: string;
   created_at: string;
   updated_at: string;
+  stripe_payment_intent_id?: string;
+  stripe_session_id?: string;
   profiles?: {
     full_name: string;
     username: string;
-  };
+  } | null;
   order_items: Array<{
     id: string;
     item_type: string;
@@ -65,11 +67,13 @@ const AdminOrders = () => {
   const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-orders', searchTerm, statusFilter, typeFilter],
     queryFn: async () => {
+      console.log('Fetching orders...');
+      
       let query = supabase
         .from('orders')
         .select(`
           *,
-          profiles:user_id (
+          profiles!orders_user_id_fkey (
             full_name,
             username
           ),
@@ -90,7 +94,12 @@ const AdminOrders = () => {
 
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching orders:', error);
+        throw error;
+      }
+      
+      console.log('Raw orders data:', data);
       
       let filteredData = data || [];
       
@@ -108,6 +117,7 @@ const AdminOrders = () => {
         );
       }
 
+      console.log('Filtered orders:', filteredData);
       return filteredData as Order[];
     }
   });

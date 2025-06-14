@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -118,9 +119,6 @@ import CreatorSettings from "./pages/creator/CreatorSettings";
 import LearningCourseDetailPage from "./pages/learning/CourseDetailPage";
 import LearningCourseLearningPage from "./pages/learning/CourseLearningPage";
 
-// Admin Pages
-import AdminOrders from "./pages/admin/AdminOrders";
-
 const queryClient = new QueryClient();
 
 function App() {
@@ -145,6 +143,7 @@ function App() {
                   <Route path="/courses" element={<CoursesPage />} />
                   <Route path="/courses/:id" element={<CourseDetailPage />} />
                   <Route path="/events" element={<EventsPage />} />
+                  <Route path="/events/:eventId" element={<EventDetailPage />} />
                   <Route path="/event-detail/:eventId" element={<EventDetailPage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/contact" element={<ContactPage />} />
