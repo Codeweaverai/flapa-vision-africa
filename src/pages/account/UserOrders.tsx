@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Download, Package, Ticket, Eye, Printer, FileText } from 'lucide-react';
+import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, PlayCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface OrderItem {
   id: string;
@@ -41,6 +42,7 @@ interface Order {
 
 const UserOrders = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -177,6 +179,10 @@ const UserOrders = () => {
     }
   };
 
+  const handleStartLearning = (courseId: string) => {
+    navigate(`/learning/course/${courseId}`);
+  };
+
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -221,6 +227,7 @@ const UserOrders = () => {
             <div className="space-y-6">
               {orders.map((order) => {
                 const hasEventTickets = order.order_items.some(item => item.item_type === 'event_ticket');
+                const hasCourses = order.order_items.some(item => item.item_type === 'course');
                 const tickets = order.generated_tickets || [];
                 
                 return (
@@ -268,8 +275,21 @@ const UserOrders = () => {
                                   Quantity: {item.quantity}
                                 </div>
                               </div>
-                              <div className="font-semibold">
-                                {item.total_price.toFixed(2)} {order.currency}
+                              <div className="flex items-center gap-3">
+                                <div className="font-semibold">
+                                  {item.total_price.toFixed(2)} {order.currency}
+                                </div>
+                                {/* Start Learning Button for Courses */}
+                                {item.item_type === 'course' && order.payment_status === 'completed' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleStartLearning(item.item_id)}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                                  >
+                                    <PlayCircle className="h-4 w-4 mr-1" />
+                                    Start Learning
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           ))}

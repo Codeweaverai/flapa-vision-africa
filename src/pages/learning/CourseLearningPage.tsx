@@ -28,7 +28,6 @@ import {
 import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviews from '@/components/course/CourseReviews';
-import AddToCartButton from '@/components/cart/AddToCartButton';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
@@ -833,13 +832,8 @@ const CourseLearningPage = () => {
                   <Card>
                     <CardContent className="text-center py-8">
                       <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Enroll in this course to access the content</p>
-                      <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        Enroll Now
-                      </Button>
+                      <p className="text-gray-500 mb-4">You need to be enrolled to access this course content</p>
+                      <p className="text-sm text-gray-400">Please purchase this course through our main course page</p>
                     </CardContent>
                   </Card>
                 )}
@@ -856,12 +850,6 @@ const CourseLearningPage = () => {
                     <CardContent className="text-center py-8">
                       <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                       <p className="text-gray-500 mb-4">Enroll in this course to start taking lesson notes</p>
-                      <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        Enroll Now
-                      </Button>
                     </CardContent>
                   </Card>
                 )}
@@ -879,12 +867,6 @@ const CourseLearningPage = () => {
                     <CardContent className="text-center py-8">
                       <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                       <p className="text-gray-500 mb-4">Enroll in this course to participate in lesson discussions</p>
-                      <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        Enroll Now
-                      </Button>
                     </CardContent>
                   </Card>
                 )}
@@ -892,49 +874,6 @@ const CourseLearningPage = () => {
             </Tabs>
           </div>
         </div>
-
-        {/* Enrollment Actions */}
-        {!enrolledUser && (
-          <Card className="mt-8 sticky bottom-4">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-orange-600 mb-2">
-                    {course.is_free ? 'Free' : `$${course.price}`}
-                  </div>
-                  {!course.is_free && (
-                    <p className="text-sm text-gray-600">One-time payment</p>
-                  )}
-                </div>
-                {user ? (
-                  <div className="flex gap-2">
-                    {!course.is_free && (
-                      <AddToCartButton
-                        itemType="course"
-                        itemId={courseId!}
-                        itemName={course.title}
-                        price={course.price || 0}
-                      />
-                    )}
-                    <Button 
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                      onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                    >
-                      {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                    onClick={() => window.location.href = '/auth'}
-                  >
-                    Sign in to Enroll
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Instructor Card */}
         {instructor && (
