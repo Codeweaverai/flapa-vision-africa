@@ -158,8 +158,8 @@ function App() {
                   <Route path="/community/chat" element={<CommunityChatPage />} />
                   <Route path="/community/courses" element={<CommunityCoursesPage />} />
                   <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
-                  <Route path="/explore/courses" element={<ExploreCoursesPage />} />
-                  <Route path="/explore/events" element={<ExploreEventsPage />} />
+                  <Route path="/explore-courses" element={<ExploreCoursesPage />} />
+                  <Route path="/explore-events" element={<ExploreEventsPage />} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/blog/:id" element={<BlogPostPage />} />
                   <Route path="/payment/success" element={<PaymentSuccessPage />} />
