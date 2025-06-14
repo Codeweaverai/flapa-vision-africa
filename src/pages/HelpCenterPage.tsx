@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -50,7 +51,14 @@ const HelpCenterPage = () => {
         .limit(6);
 
       if (error) throw error;
-      setMediaPosts(data || []);
+      
+      // Properly type the post_type field
+      const typedPosts: MediaPost[] = (data || []).map(post => ({
+        ...post,
+        post_type: post.post_type as 'article' | 'video' | 'podcast'
+      }));
+      
+      setMediaPosts(typedPosts);
     } catch (error) {
       console.error('Error fetching media posts:', error);
     } finally {
