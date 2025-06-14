@@ -15,7 +15,7 @@ const PaymentResultPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
-  const [itemType, setItemType] = useState<'course' | 'event' | null>(null);
+  const [itemType, setItemType] = useState<'course' | 'event' | 'order' | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState<string>('');
 
@@ -37,26 +37,35 @@ const PaymentResultPage = () => {
       return;
     }
 
-    if (!sessionId || !type || !id) {
+    if (!sessionId) {
       setLoading(false);
       setSuccess(false);
       return;
     }
 
-    setItemType(type);
-    setItemId(id);
-
     const verifyPayment = async () => {
       try {
-        console.log("Verifying payment with:", { sessionId, userId: user.id, type, itemId: id });
+        console.log("Verifying payment with session:", sessionId);
         
+        // For cart-based checkout, we don't have type and id
+        const requestBody: any = {
+          sessionId,
+          userId: user.id
+        };
+
+        // Add type and itemId only if they exist (individual purchases)
+        if (type && id) {
+          requestBody.type = type;
+          requestBody.itemId = id;
+          setItemType(type);
+          setItemId(id);
+        } else {
+          // This is likely a cart-based order
+          setItemType('order');
+        }
+
         const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: {
-            sessionId,
-            userId: user.id,
-            type,
-            itemId: id
-          }
+          body: requestBody
         });
 
         console.log("Verification response:", data, error);
@@ -65,7 +74,7 @@ const PaymentResultPage = () => {
 
         if (data?.success) {
           setSuccess(true);
-          setItemTitle(data.title || '');
+          setItemTitle(data.title || 'Your Order');
           toast.success(data.message || 'Payment successful!');
         } else {
           setSuccess(false);
@@ -127,6 +136,9 @@ const PaymentResultPage = () => {
                 {itemType === 'course' && (
                   <p className="text-sm text-blue-600">You now have access to the course materials.</p>
                 )}
+                {itemType === 'order' && (
+                  <p className="text-sm text-blue-600">Your order is complete. Tickets and receipts are being generated and will be available in My Orders.</p>
+                )}
               </div>
             ) : (
               <div className="text-center space-y-2">
@@ -142,7 +154,7 @@ const PaymentResultPage = () => {
                   ? 'Go to Course' 
                   : itemType === 'event' 
                     ? 'View My Events' 
-                    : 'View Orders' 
+                    : 'View My Orders' 
                 : 'Go Back'}
             </Button>
           </CardFooter>

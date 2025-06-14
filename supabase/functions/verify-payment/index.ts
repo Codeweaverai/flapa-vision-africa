@@ -44,12 +44,27 @@ serve(async (req) => {
       });
     }
 
-    // Find or create order based on session metadata
+    // Check if this is a cart-based order or individual item purchase
     let orderId;
-    if (session.metadata?.order_id) {
+    let isCartOrder = false;
+
+    // First check if there's an existing order with this session ID
+    const { data: existingOrder } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .eq('stripe_session_id', sessionId)
+      .single();
+
+    if (existingOrder) {
+      // This is a cart-based order
+      orderId = existingOrder.id;
+      isCartOrder = true;
+      console.log("Found existing cart order:", orderId);
+    } else if (session.metadata?.order_id) {
+      // Order ID from metadata
       orderId = session.metadata.order_id;
     } else {
-      // Create a new order for this payment
+      // Create a new order for individual item purchase
       const { data: orderData, error: orderError } = await supabaseClient
         .from('orders')
         .insert({
@@ -72,7 +87,7 @@ serve(async (req) => {
 
       orderId = orderData.id;
 
-      // Create order item
+      // Create order item for individual purchase
       let itemName = "Unknown Item";
       let itemPrice = session.amount_total / 100;
 
@@ -125,7 +140,7 @@ serve(async (req) => {
       }
     }
 
-    // Update order status
+    // Update order status to completed
     await supabaseClient
       .from('orders')
       .update({
@@ -136,100 +151,116 @@ serve(async (req) => {
       })
       .eq('id', orderId);
 
-    // Process fulfillment based on type
-    if (type === 'course') {
-      // Create course enrollment
-      const { error: enrollmentError } = await supabaseClient
-        .from('course_enrollments')
-        .upsert({
-          user_id: userId,
-          course_id: itemId,
-          payment_status: 'completed',
-          order_id: orderId,
-          enrollment_date: new Date().toISOString()
-        });
+    console.log("Updated order status to completed for order:", orderId);
 
-      if (enrollmentError) {
-        console.error("Enrollment error:", enrollmentError);
+    // If this was a cart order, clear the user's cart
+    if (isCartOrder && userId) {
+      await supabaseClient
+        .from('carts')
+        .delete()
+        .eq('user_id', userId);
+      console.log("Cleared cart for user:", userId);
+    }
+
+    // Get order items to process fulfillment
+    const { data: orderItems } = await supabaseClient
+      .from('order_items')
+      .select('*')
+      .eq('order_id', orderId);
+
+    if (orderItems && orderItems.length > 0) {
+      // Process fulfillment for each item
+      for (const item of orderItems) {
+        if (item.item_type === 'course') {
+          // Create course enrollment
+          await supabaseClient
+            .from('course_enrollments')
+            .upsert({
+              user_id: userId,
+              course_id: item.item_id,
+              payment_status: 'completed',
+              order_id: orderId,
+              enrollment_date: new Date().toISOString()
+            });
+
+          console.log("Created course enrollment for:", item.item_id);
+
+        } else if (item.item_type === 'event_ticket') {
+          // Find the event for this ticket
+          const { data: event } = await supabaseClient
+            .from('events')
+            .select('*')
+            .eq('id', item.item_id)
+            .single();
+
+          if (event) {
+            // Create event booking
+            await supabaseClient
+              .from('event_bookings')
+              .upsert({
+                user_id: userId,
+                event_id: event.id,
+                status: 'confirmed',
+                payment_status: 'completed',
+                payment_amount: item.total_price,
+                payment_currency: 'USD',
+                ticket_quantity: item.quantity,
+                order_id: orderId,
+                booking_date: new Date().toISOString()
+              });
+
+            console.log("Created event booking for:", event.id);
+          }
+        }
       }
 
-      // Get course title for response
+      // Generate tickets and receipts
+      try {
+        const ticketResponse = await supabaseClient.functions.invoke('generate-tickets', {
+          body: { orderId }
+        });
+
+        if (ticketResponse.error) {
+          console.error("Failed to generate tickets:", ticketResponse.error);
+        } else {
+          console.log("Tickets generated successfully for order:", orderId);
+        }
+      } catch (error) {
+        console.error("Error generating tickets:", error);
+      }
+    }
+
+    // Return success response with item information
+    let responseData = { 
+      success: true, 
+      message: "Payment verified successfully",
+      orderId: orderId
+    };
+
+    if (type === 'course') {
       const { data: course } = await supabaseClient
         .from('courses')
         .select('title')
         .eq('id', itemId)
         .single();
 
-      return new Response(JSON.stringify({ 
-        success: true, 
-        title: course?.title || "Course",
-        message: "Successfully enrolled in course"
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-
+      responseData.title = course?.title || "Course";
+      responseData.message = "Successfully enrolled in course";
     } else if (type === 'event') {
-      // Create event booking
-      const { data: booking, error: bookingError } = await supabaseClient
-        .from('event_bookings')
-        .upsert({
-          user_id: userId,
-          event_id: itemId,
-          status: 'confirmed',
-          payment_status: 'completed',
-          payment_amount: session.amount_total / 100,
-          payment_currency: session.currency?.toUpperCase() || 'USD',
-          ticket_quantity: 1,
-          order_id: orderId,
-          booking_date: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (bookingError) {
-        console.error("Booking error:", bookingError);
-      }
-
-      // Generate tickets
-      try {
-        const ticketResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-tickets`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-          },
-          body: JSON.stringify({ orderId })
-        });
-
-        if (!ticketResponse.ok) {
-          console.error("Failed to generate tickets");
-        } else {
-          console.log("Tickets generated successfully");
-        }
-      } catch (error) {
-        console.error("Error generating tickets:", error);
-      }
-
-      // Get event title for response
       const { data: event } = await supabaseClient
         .from('events')
         .select('title')
         .eq('id', itemId)
         .single();
 
-      return new Response(JSON.stringify({ 
-        success: true, 
-        title: event?.title || "Event",
-        message: "Successfully registered for event"
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      responseData.title = event?.title || "Event";
+      responseData.message = "Successfully registered for event";
+    } else if (isCartOrder) {
+      responseData.message = "Order completed successfully";
+      responseData.title = "Your Order";
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: "Payment verified successfully"
-    }), {
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
