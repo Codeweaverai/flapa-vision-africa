@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -14,21 +14,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { 
-  fetchCreatorEarnings,
-  fetchCreatorPaymentTransactions,
-  fetchCreatorPayouts,
-  CreatorEarnings,
-  CreatorPaymentTransaction
+  fetchCreatorPayouts
 } from '@/services/creatorPaymentService';
-import { getStripeAccountStatus } from '@/services/paymentService';
+import { 
+  calculateCreatorEarningsFromOrders,
+  fetchCreatorTransactions,
+  getCreatorPayoutMethod,
+  CreatorEarningsData,
+  CreatorTransaction
+} from '@/services/creatorEarningsService';
 import CreatorWithdrawDialog from '@/components/creator/CreatorWithdrawDialog';
+import PayoutMethodSetupDialog from '@/components/creator/PayoutMethodSetupDialog';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 const CreatorPayments: React.FC = () => {
-  const [transactions, setTransactions] = useState<CreatorPaymentTransaction[]>([]);
+  const [transactions, setTransactions] = useState<CreatorTransaction[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
-  const [earnings, setEarnings] = useState<CreatorEarnings>({
+  const [earnings, setEarnings] = useState<CreatorEarningsData>({
     available_balance: 0,
     pending_balance: 0,
     total_earnings: 0,
@@ -41,8 +44,8 @@ const CreatorPayments: React.FC = () => {
   const [loadingPayouts, setLoadingPayouts] = useState(true);
   const [loadingEarnings, setLoadingEarnings] = useState(true);
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
-  const [isStripeConnected, setIsStripeConnected] = useState(false);
-  const [stripeAccountId, setStripeAccountId] = useState<string | undefined>();
+  const [isSetupDialogOpen, setIsSetupDialogOpen] = useState(false);
+  const [payoutMethod, setPayoutMethod] = useState<any>(null);
   
   const { user } = useAuth();
   const { toast } = useToast();
@@ -52,7 +55,7 @@ const CreatorPayments: React.FC = () => {
   useEffect(() => {
     if (user) {
       loadPaymentData();
-      checkStripeStatus();
+      loadPayoutMethod();
       
       // Check URL parameters for Stripe callback
       const success = searchParams.get('success');
@@ -64,6 +67,7 @@ const CreatorPayments: React.FC = () => {
           description: "Your Stripe Connect account has been set up successfully!",
         });
         setSearchParams({});
+        loadPayoutMethod(); // Refresh payout method
       } else if (refresh === 'true') {
         toast({
           title: "Account Setup Incomplete",
@@ -83,9 +87,9 @@ const CreatorPayments: React.FC = () => {
       setLoadingEarnings(true);
       
       const [transactionsData, payoutsData, earningsData] = await Promise.all([
-        fetchCreatorPaymentTransactions(user.id),
+        fetchCreatorTransactions(user.id),
         fetchCreatorPayouts(user.id),
-        fetchCreatorEarnings(user.id)
+        calculateCreatorEarningsFromOrders(user.id)
       ]);
       
       setTransactions(transactionsData);
@@ -104,16 +108,15 @@ const CreatorPayments: React.FC = () => {
       setLoadingEarnings(false);
     }
   };
-  
-  const checkStripeStatus = async () => {
+
+  const loadPayoutMethod = async () => {
     if (!user) return;
     
     try {
-      const { isConnected, accountId } = await getStripeAccountStatus(user.id);
-      setIsStripeConnected(isConnected);
-      setStripeAccountId(accountId);
+      const method = await getCreatorPayoutMethod(user.id);
+      setPayoutMethod(method);
     } catch (error) {
-      console.error('Error checking Stripe status:', error);
+      console.error('Error loading payout method:', error);
     }
   };
 
@@ -136,7 +139,7 @@ const CreatorPayments: React.FC = () => {
     switch (type) {
       case 'course':
         return 'Course Purchase';
-      case 'event':
+      case 'event_ticket':
         return 'Event Registration';
       case 'consultation':
         return 'Consultation Booking';
@@ -145,10 +148,68 @@ const CreatorPayments: React.FC = () => {
     }
   };
 
+  const renderPayoutMethodInfo = () => {
+    if (!payoutMethod?.has_payout_method) {
+      return (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No Payout Method Set Up</AlertTitle>
+          <AlertDescription>
+            Set up a payout method to withdraw your earnings. Choose between Stripe (for USA) or Mobile Money (for African countries).
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (payoutMethod.payout_method === 'stripe') {
+      return (
+        <div className="bg-blue-50 p-3 rounded-lg">
+          <div className="flex items-center gap-2 text-blue-700">
+            <CreditCard className="h-4 w-4" />
+            <span className="font-medium">Stripe Connect</span>
+          </div>
+          <div className="text-sm text-blue-600 mt-1">
+            Bank transfers (2-7 business days)
+          </div>
+        </div>
+      );
+    }
+
+    if (payoutMethod.payout_method === 'mobile_money' && payoutMethod.mobile_money_details) {
+      const details = payoutMethod.mobile_money_details;
+      return (
+        <div className="bg-green-50 p-3 rounded-lg">
+          <div className="flex items-center gap-2 text-green-700">
+            <CreditCard className="h-4 w-4" />
+            <span className="font-medium">Mobile Money</span>
+          </div>
+          <div className="text-sm text-green-600 mt-1">
+            {details.operator} • {details.phone_number}
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <CreatorLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Payments & Payouts</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Payments & Payouts</h1>
+          <Button
+            variant="outline"
+            onClick={() => setIsSetupDialogOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Payout Settings
+          </Button>
+        </div>
+
+        {/* Payout Method Status */}
+        {renderPayoutMethodInfo()}
         
         {/* Enhanced Balance Cards with Currency Conversion */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -172,10 +233,10 @@ const CreatorPayments: React.FC = () => {
             <CardFooter>
               <Button 
                 onClick={() => setIsWithdrawDialogOpen(true)}
-                disabled={loadingEarnings || earnings.available_balance < 5}
+                disabled={loadingEarnings || earnings.available_balance < 5 || !payoutMethod?.has_payout_method}
                 className="w-full"
               >
-                Withdraw Funds
+                {!payoutMethod?.has_payout_method ? 'Set Up Payout Method' : 'Withdraw Funds'}
               </Button>
             </CardFooter>
           </Card>
@@ -275,9 +336,9 @@ const CreatorPayments: React.FC = () => {
           <TabsContent value="transactions" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Customer Payment Transactions</CardTitle>
+                <CardTitle>Customer Orders & Transactions</CardTitle>
                 <CardDescription>
-                  View all payments from customers for your courses and events
+                  View all completed orders from customers for your courses and events
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -296,6 +357,7 @@ const CreatorPayments: React.FC = () => {
                           <TableHead>Customer</TableHead>
                           <TableHead>Item</TableHead>
                           <TableHead>Type</TableHead>
+                          <TableHead>Qty</TableHead>
                           <TableHead>Total Amount</TableHead>
                           <TableHead>Your Earning</TableHead>
                           <TableHead>Platform Fee</TableHead>
@@ -305,7 +367,7 @@ const CreatorPayments: React.FC = () => {
                       <TableBody>
                         {transactions.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                            <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
                               No customer transactions found
                             </TableCell>
                           </TableRow>
@@ -315,21 +377,27 @@ const CreatorPayments: React.FC = () => {
                               <TableCell>
                                 {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
                               </TableCell>
-                              <TableCell>{transaction.customer_name || 'Unknown'}</TableCell>
-                              <TableCell className="max-w-[200px] truncate">
-                                {transaction.item_name || 'Unknown Item'}
-                              </TableCell>
-                              <TableCell>{getPaymentTypeLabel(transaction.reference_type)}</TableCell>
                               <TableCell>
-                                <PriceDisplay amount={transaction.amount} originalCurrency={transaction.currency as any} />
+                                <div>
+                                  <div>{transaction.customer_name || 'Unknown'}</div>
+                                  <div className="text-xs text-muted-foreground">{transaction.customer_email}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate">
+                                {transaction.item_name}
+                              </TableCell>
+                              <TableCell>{getPaymentTypeLabel(transaction.item_type)}</TableCell>
+                              <TableCell>{transaction.quantity}</TableCell>
+                              <TableCell>
+                                <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
                               </TableCell>
                               <TableCell className="text-green-600 font-medium">
                                 <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" />
                               </TableCell>
                               <TableCell className="text-gray-500">
-                                <PriceDisplay amount={transaction.platform_fee_amount} originalCurrency="USD" />
+                                <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" />
                               </TableCell>
-                              <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                              <TableCell>{getStatusBadge(transaction.payment_status)}</TableCell>
                             </TableRow>
                           ))
                         )}
@@ -413,6 +481,16 @@ const CreatorPayments: React.FC = () => {
         availableBalance={earnings.available_balance}
         currency="USD"
         onSuccess={loadPaymentData}
+      />
+
+      {/* Payout Method Setup Dialog */}
+      <PayoutMethodSetupDialog
+        open={isSetupDialogOpen}
+        onOpenChange={setIsSetupDialogOpen}
+        onSuccess={() => {
+          loadPayoutMethod();
+          loadPaymentData();
+        }}
       />
     </CreatorLayout>
   );
