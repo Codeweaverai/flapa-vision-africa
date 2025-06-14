@@ -1,15 +1,73 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Search, MessageCircle, BookOpen, Settings, Shield, CreditCard } from 'lucide-react';
+import { Search, MessageCircle, BookOpen, Settings, Shield, CreditCard, Play, FileText, Headphones, Eye } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+
+interface MediaPost {
+  id: string;
+  title: string;
+  summary?: string;
+  post_type: 'article' | 'video' | 'podcast';
+  published_at: string;
+}
 
 const HelpCenterPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
+  const [filteredMediaPosts, setFilteredMediaPosts] = useState<MediaPost[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+
+  useEffect(() => {
+    fetchMediaPosts();
+  }, []);
+
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = mediaPosts.filter(post =>
+        post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        post.summary?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredMediaPosts(filtered);
+    } else {
+      setFilteredMediaPosts([]);
+    }
+  }, [searchTerm, mediaPosts]);
+
+  const fetchMediaPosts = async () => {
+    try {
+      setMediaLoading(true);
+      const { data, error } = await supabase
+        .from('media_posts')
+        .select('id, title, summary, post_type, published_at')
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+        .limit(6);
+
+      if (error) throw error;
+      setMediaPosts(data || []);
+    } catch (error) {
+      console.error('Error fetching media posts:', error);
+    } finally {
+      setMediaLoading(false);
+    }
+  };
+
+  const getPostIcon = (type: string) => {
+    switch (type) {
+      case 'video':
+        return <Play className="h-4 w-4" />;
+      case 'podcast':
+        return <Headphones className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
+  };
 
   const helpCategories = [
     {
@@ -136,7 +194,7 @@ const HelpCenterPage = () => {
               <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Help Center</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Find answers to common questions and get the support you need.
+              Find answers to common questions, search media posts, and get the support you need.
             </p>
           </div>
 
@@ -145,12 +203,56 @@ const HelpCenterPage = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search for help articles..."
+                placeholder="Search help articles and media posts..."
                 className="pl-10 h-12 text-lg bg-white/80 backdrop-blur-sm border-0 shadow-lg"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {/* Media Posts Search Results */}
+            {searchTerm && filteredMediaPosts.length > 0 && (
+              <Card className="mt-4 bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Search className="h-5 w-5" />
+                    Media Posts ({filteredMediaPosts.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {filteredMediaPosts.map((post) => (
+                      <div key={post.id} className="flex items-start gap-3 p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg hover:shadow-md transition-shadow">
+                        <div className="flex-shrink-0 p-2 bg-white rounded-lg">
+                          {getPostIcon(post.post_type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm text-gray-800 line-clamp-1">
+                            {post.title}
+                          </h3>
+                          {post.summary && (
+                            <p className="text-xs text-gray-600 line-clamp-2 mt-1">
+                              {post.summary}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs text-gray-500">
+                              {new Date(post.published_at).toLocaleDateString()}
+                            </span>
+                            <Button asChild size="sm" variant="outline">
+                              <Link to={`/media/${post.id}`} className="flex items-center gap-1 text-xs">
+                                <Eye className="h-3 w-3" />
+                                View
+                              </Link>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Help Categories */}
@@ -192,7 +294,7 @@ const HelpCenterPage = () => {
           )}
 
           {/* FAQ Section */}
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto mb-12">
             <h2 className="text-3xl font-bold text-center mb-8">
               {selectedCategory ? `${selectedCategory} FAQ` : 'Frequently Asked Questions'}
             </h2>
@@ -218,6 +320,72 @@ const HelpCenterPage = () => {
                 </CardContent>
               </Card>
             )}
+          </div>
+
+          {/* Media Posts Section */}
+          <div className="max-w-6xl mx-auto mb-12">
+            <h2 className="text-3xl font-bold text-center mb-8">
+              <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Media Posts
+              </span>
+            </h2>
+            {mediaLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse border-0 shadow-lg">
+                    <div className="h-48 bg-gradient-to-r from-gray-200 to-gray-300 rounded-t-lg"></div>
+                    <CardContent className="p-4">
+                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {mediaPosts.map((post) => (
+                  <Card key={post.id} className="group hover:shadow-2xl transition-all duration-300 overflow-hidden border-0 bg-white/90 backdrop-blur-sm hover:-translate-y-2">
+                    <div className="relative p-6 bg-gradient-to-br from-orange-100 to-purple-100">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-white rounded-lg shadow-sm">
+                          {getPostIcon(post.post_type)}
+                        </div>
+                        <span className="text-xs font-medium text-purple-600 bg-white px-2 py-1 rounded-full">
+                          {post.post_type.charAt(0).toUpperCase() + post.post_type.slice(1)}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-lg text-gray-800 line-clamp-2 mb-2">
+                        {post.title}
+                      </h3>
+                      {post.summary && (
+                        <p className="text-gray-600 text-sm line-clamp-3 mb-4">
+                          {post.summary}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                          {new Date(post.published_at).toLocaleDateString()}
+                        </span>
+                        <Button asChild size="sm" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
+                          <Link to={`/media/${post.id}`} className="flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            <div className="text-center mt-8">
+              <Button asChild size="lg" variant="outline" className="border-purple-200 text-purple-600 hover:bg-purple-50 bg-white/80 backdrop-blur-sm">
+                <Link to="/media">
+                  View All Media Posts
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {/* Back to All Categories */}

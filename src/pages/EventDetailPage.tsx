@@ -698,7 +698,7 @@ const EventDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Related Events */}
+              {/* Related Events - Ensure this is visible */}
               <RelatedEventsSection 
                 currentEventId={event.id} 
                 eventType={event.event_type} 
