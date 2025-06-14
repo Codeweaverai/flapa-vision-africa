@@ -159,7 +159,7 @@ const RelatedEventsSection: React.FC<RelatedEventsSectionProps> = ({
               </div>
               
               <Button asChild size="sm" variant="outline" className="mt-2">
-                <Link to={`/event/${event.id}`} className="flex items-center gap-1">
+                <Link to={`/event-detail/${event.id}`} className="flex items-center gap-1">
                   View Details
                   <ArrowRight className="h-3 w-3" />
                 </Link>

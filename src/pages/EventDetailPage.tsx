@@ -48,7 +48,7 @@ interface EventCreator {
 }
 
 const EventDetailPage = () => {
-  const { id } = useParams<{ id: string }>();
+  const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const [event, setEvent] = useState<Event | null>(null);
   const [creator, setCreator] = useState<EventCreator | null>(null);
@@ -69,15 +69,15 @@ const EventDetailPage = () => {
   };
 
   useEffect(() => {
-    if (!id) {
+    if (!eventId) {
       console.error('No event ID provided');
-      navigate('/events');
+      navigate('/explore-events');
       return;
     }
     
-    console.log('Fetching event with ID:', id);
+    console.log('Fetching event with ID:', eventId);
     fetchEventDetails();
-  }, [id, navigate]);
+  }, [eventId, navigate]);
 
   useEffect(() => {
     if (event) {
@@ -94,25 +94,25 @@ const EventDetailPage = () => {
   const fetchEventDetails = async () => {
     try {
       setLoading(true);
-      console.log('Fetching event details for ID:', id);
+      console.log('Fetching event details for ID:', eventId);
       
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select('*')
-        .eq('id', id)
+        .eq('id', eventId)
         .single();
       
       if (eventError) {
         console.error('Error fetching event:', eventError);
         toast.error('Event not found');
-        navigate('/events');
+        navigate('/explore-events');
         return;
       }
 
       if (!eventData) {
         console.error('No event data returned');
         toast.error('Event not found');
-        navigate('/events');
+        navigate('/explore-events');
         return;
       }
 
@@ -126,7 +126,7 @@ const EventDetailPage = () => {
     } catch (error) {
       console.error('Error in fetchEventDetails:', error);
       toast.error('Failed to load event details');
-      navigate('/events');
+      navigate('/explore-events');
     } finally {
       setLoading(false);
     }
@@ -295,7 +295,7 @@ const EventDetailPage = () => {
         <div className="section-container min-h-[50vh] flex flex-col justify-center items-center gap-4">
           <p>Event not found</p>
           <Button asChild>
-            <Link to="/events">Back to Events</Link>
+            <Link to="/explore-events">Back to Events</Link>
           </Button>
         </div>
       </Layout>
@@ -307,7 +307,7 @@ const EventDetailPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="section-container">
           <Button variant="ghost" className="mb-6" asChild>
-            <Link to="/events" className="flex items-center gap-1">
+            <Link to="/explore-events" className="flex items-center gap-1">
               <ArrowLeft className="h-4 w-4" /> Back to Events
             </Link>
           </Button>
