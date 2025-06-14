@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +8,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
+interface OrderItem {
+  id: string;
+  item_name: string;
+  item_type: string;
+  quantity: number;
+  total_price: number;
+  item_id: string;
+}
+
 interface Order {
   id: string;
   total_amount: number;
@@ -17,13 +25,7 @@ interface Order {
   payment_method: string;
   created_at: string;
   receipt_url: string;
-  order_items: Array<{
-    id: string;
-    item_name: string;
-    item_type: string;
-    quantity: number;
-    total_price: number;
-  }>;
+  order_items: OrderItem[];
   generated_tickets?: Array<{
     id: string;
     ticket_code: string;
@@ -51,7 +53,7 @@ const UserOrders = () => {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: ordersData, error } = await supabase
         .from('orders')
         .select(`
           *,
@@ -65,7 +67,52 @@ const UserOrders = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOrders(data || []);
+
+      // Enhance order items with proper event titles
+      const enhancedOrders = await Promise.all(
+        (ordersData || []).map(async (order) => {
+          const enhancedItems = await Promise.all(
+            order.order_items.map(async (item: OrderItem) => {
+              if (item.item_type === 'event_ticket') {
+                try {
+                  // Get the event ticket details
+                  const { data: ticket } = await supabase
+                    .from('event_tickets')
+                    .select('event_id')
+                    .eq('id', item.item_id)
+                    .maybeSingle();
+
+                  if (ticket) {
+                    // Get the event details
+                    const { data: event } = await supabase
+                      .from('events')
+                      .select('title')
+                      .eq('id', ticket.event_id)
+                      .maybeSingle();
+
+                    if (event) {
+                      return {
+                        ...item,
+                        item_name: event.title
+                      };
+                    }
+                  }
+                } catch (err) {
+                  console.error('Error fetching event details for item:', item.item_id, err);
+                }
+              }
+              return item;
+            })
+          );
+
+          return {
+            ...order,
+            order_items: enhancedItems
+          };
+        })
+      );
+
+      setOrders(enhancedOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
       toast.error('Failed to load orders');

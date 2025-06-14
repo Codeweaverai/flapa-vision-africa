@@ -92,26 +92,24 @@ const TicketHolderForm: React.FC<TicketHolderFormProps> = ({
           <div key={index} className="p-4 border rounded-lg bg-gray-50">
             <h4 className="font-medium mb-3">Ticket {index + 1}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="min-h-[72px] flex flex-col">
-                <Label htmlFor={`name-${index}`} className="mb-2">Full Name *</Label>
+              <div className="space-y-2">
+                <Label htmlFor={`name-${index}`}>Full Name *</Label>
                 <Input
                   id={`name-${index}`}
                   placeholder="Enter ticket holder name"
                   value={holders[index]?.name || ''}
                   onChange={(e) => updateHolder(index, 'name', e.target.value)}
                   required
-                  className="flex-1"
                 />
               </div>
-              <div className="min-h-[72px] flex flex-col">
-                <Label htmlFor={`email-${index}`} className="mb-2">Email (Optional)</Label>
+              <div className="space-y-2">
+                <Label htmlFor={`email-${index}`}>Email (Optional)</Label>
                 <Input
                   id={`email-${index}`}
                   type="email"
                   placeholder="Enter email address"
                   value={holders[index]?.email || ''}
                   onChange={(e) => updateHolder(index, 'email', e.target.value)}
-                  className="flex-1"
                 />
               </div>
             </div>
