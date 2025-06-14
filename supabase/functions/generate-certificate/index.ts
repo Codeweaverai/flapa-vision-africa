@@ -18,6 +18,13 @@ interface CertificateData {
   courseId: string;
 }
 
+const generateVerificationCode = (): string => {
+  const prefix = 'SP';
+  const part1 = Math.random().toString(36).substring(2, 10).toUpperCase();
+  const part2 = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `${prefix}-${part1}-${part2}`;
+};
+
 const generateCertificateHTML = (data: CertificateData): string => {
   return `
     <!DOCTYPE html>
@@ -129,11 +136,6 @@ const generateCertificateHTML = (data: CertificateData): string => {
           width: 200px;
           margin: 0 auto 10px auto;
         }
-        .signature-image {
-          max-width: 150px;
-          max-height: 80px;
-          margin-bottom: 10px;
-        }
         .signature-title {
           font-size: 14px;
           color: #2c3e50;
@@ -149,6 +151,14 @@ const generateCertificateHTML = (data: CertificateData): string => {
           right: 30px;
           font-size: 12px;
           color: #7f8c8d;
+        }
+        .verification-code {
+          position: absolute;
+          bottom: 20px;
+          left: 30px;
+          font-size: 12px;
+          color: #7f8c8d;
+          font-weight: bold;
         }
         .seal {
           position: absolute;
@@ -208,8 +218,6 @@ const generateCertificateHTML = (data: CertificateData): string => {
         
         <div class="signature-section">
           <div class="signature">
-            <img src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png" 
-                 alt="Authorized Signature" class="signature-image" />
             <div class="signature-line"></div>
             <div class="signature-title">Director, SkillPulse Academy</div>
             <div class="signature-title">Authorized Signature</div>
@@ -225,6 +233,7 @@ const generateCertificateHTML = (data: CertificateData): string => {
           </div>
         </div>
         
+        <div class="verification-code">Verification: ${data.certificateId}</div>
         <div class="certificate-id">Certificate ID: ${data.certificateId}</div>
       </div>
     </body>
@@ -279,14 +288,15 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           certificateUrl: existingCert.pdf_url,
+          verificationCode: existingCert.verification_code,
           message: 'Certificate already exists'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Generate certificate ID
-    const certificateId = `CERT-${Date.now()}-${userId.slice(0, 8)}`
+    // Generate unique verification code
+    const verificationCode = generateVerificationCode()
     
     // Prepare certificate data
     const certificateData: CertificateData = {
@@ -295,7 +305,7 @@ serve(async (req) => {
       completionDate: enrollment.completed_at,
       grade: enrollment.final_grade,
       score: enrollment.score,
-      certificateId,
+      certificateId: verificationCode,
       userId,
       courseId
     }
@@ -303,31 +313,9 @@ serve(async (req) => {
     // Generate HTML
     const htmlContent = generateCertificateHTML(certificateData)
 
-    // Generate PDF using a PDF service (you might want to use Puppeteer or similar)
-    // For now, we'll create a simple HTML-to-PDF conversion
-    const pdfFileName = `certificates/${userId}_${courseId}.pdf`
-    
-    // In a real implementation, you would convert HTML to PDF here
-    // For this example, we'll store the HTML and provide a placeholder PDF URL
-    
-    // Upload to Supabase Storage (placeholder - you'd implement actual PDF generation)
-    const { data: uploadData, error: uploadError } = await supabaseClient.storage
-      .from('certificates')
-      .upload(pdfFileName, new Blob([htmlContent], { type: 'text/html' }), {
-        contentType: 'application/pdf',
-        upsert: true
-      })
-
-    if (uploadError) {
-      throw new Error(`Failed to upload certificate: ${uploadError.message}`)
-    }
-
-    // Get public URL
-    const { data: urlData } = supabaseClient.storage
-      .from('certificates')
-      .getPublicUrl(pdfFileName)
-
-    const certificateUrl = urlData.publicUrl
+    // For demo purposes, we'll store the HTML content as the certificate
+    // In production, you'd want to convert this to PDF
+    const certificateUrl = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`
 
     // Save or update certificate record
     const { error: certError } = await supabaseClient
@@ -337,7 +325,7 @@ serve(async (req) => {
         user_id: userId,
         course_id: courseId,
         enrollment_id: enrollmentId,
-        verification_code: certificateId,
+        verification_code: verificationCode,
         pdf_url: certificateUrl,
         issue_date: new Date().toISOString()
       })
@@ -350,7 +338,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         certificateUrl,
-        certificateId,
+        verificationCode,
         message: 'Certificate generated successfully'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

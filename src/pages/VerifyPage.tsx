@@ -1,18 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
-import { Search, CheckCircle, XCircle, Award, Calendar, User, BookOpen } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Award, Calendar, User, BookOpen, AlertCircle, Copy } from 'lucide-react';
 
 interface CertificateDetails {
   studentName: string;
   courseName: string;
   issueDate: string;
   verificationCode: string;
+  certificateId?: string;
 }
 
 const VerifyPage = () => {
@@ -24,18 +25,30 @@ const VerifyPage = () => {
     error?: string;
   } | null>(null);
 
-  const handleVerify = async () => {
-    if (!verificationCode.trim()) {
+  // Check for verification code in URL on component mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeFromUrl = urlParams.get('code');
+    if (codeFromUrl) {
+      setVerificationCode(codeFromUrl);
+      handleVerify(codeFromUrl);
+    }
+  }, []);
+
+  const handleVerify = async (codeToVerify?: string) => {
+    const code = codeToVerify || verificationCode;
+    
+    if (!code.trim()) {
       toast.error('Please enter a verification code');
       return;
     }
 
     setLoading(true);
     try {
-      console.log('Verifying certificate with code:', verificationCode.trim());
+      console.log('Verifying certificate with code:', code.trim());
       
       const { data, error } = await supabase.functions.invoke('verify-certificate', {
-        body: { code: verificationCode.trim() }
+        body: { code: code.trim() }
       });
 
       console.log('Function response:', { data, error });
@@ -67,6 +80,21 @@ const VerifyPage = () => {
   const handleReset = () => {
     setVerificationCode('');
     setVerificationResult(null);
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
+
+  const copyVerificationCode = () => {
+    if (verificationResult?.details?.verificationCode) {
+      navigator.clipboard.writeText(verificationResult.details.verificationCode);
+      toast.success('Verification code copied to clipboard');
+    }
+  };
+
+  const generateSampleCode = () => {
+    const sampleCode = 'SP-MBMXLVYN-946NB';
+    setVerificationCode(sampleCode);
+    toast.info('Sample verification code loaded for testing');
   };
 
   return (
@@ -92,14 +120,14 @@ const VerifyPage = () => {
               <div className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder="Enter verification code (e.g., SP-ABC123-XYZ789)"
+                  placeholder="Enter verification code (e.g., SP-XXXXX-XXXXX)"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
                   className="flex-1"
                   onKeyPress={(e) => e.key === 'Enter' && handleVerify()}
                 />
                 <Button 
-                  onClick={handleVerify} 
+                  onClick={() => handleVerify()} 
                   disabled={loading}
                   className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                 >
@@ -114,9 +142,17 @@ const VerifyPage = () => {
                 </Button>
               </div>
               
-              <p className="text-sm text-gray-500">
-                The verification code can be found on the certificate document
-              </p>
+              <div className="flex justify-between items-center text-sm text-gray-500">
+                <p>The verification code can be found on the certificate document</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={generateSampleCode}
+                  className="text-orange-600 hover:text-orange-700"
+                >
+                  Try Sample Code
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -133,7 +169,7 @@ const VerifyPage = () => {
                     <>
                       <CheckCircle className="h-8 w-8 text-green-600" />
                       <div>
-                        <h3 className="text-lg font-semibold text-green-800">Certificate Valid</h3>
+                        <h3 className="text-lg font-semibold text-green-800">Certificate Valid ✓</h3>
                         <p className="text-green-600">This certificate has been verified successfully</p>
                       </div>
                     </>
@@ -179,20 +215,46 @@ const VerifyPage = () => {
                       
                       <div className="flex items-center gap-2">
                         <Award className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-sm text-gray-500">Verification Code</p>
-                          <p className="font-mono text-sm">{verificationResult.details.verificationCode}</p>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="text-sm text-gray-500">Verification Code</p>
+                            <p className="font-mono text-sm">{verificationResult.details.verificationCode}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={copyVerificationCode}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
                     
                     <div className="mt-4 p-4 bg-white rounded-lg border">
-                      <Badge className="bg-green-500 mb-2">Verified</Badge>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className="bg-green-500">Verified</Badge>
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
                       <p className="text-sm text-gray-600">
                         This certificate was issued by SkillPulse Academy and represents successful 
                         completion of the specified course with professional competency standards.
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {!verificationResult.valid && (
+                  <div className="mt-4 p-4 bg-white rounded-lg border border-red-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <span className="text-sm font-medium text-red-800">Verification Failed</span>
+                    </div>
+                    <p className="text-sm text-red-600">
+                      Please check that you have entered the correct verification code. 
+                      The code should be in the format: SP-XXXXX-XXXXX
+                    </p>
                   </div>
                 )}
 

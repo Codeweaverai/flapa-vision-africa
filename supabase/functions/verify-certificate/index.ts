@@ -60,25 +60,17 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verify certificate
-    const { data, error } = await supabase
+    // First, get the certificate with the verification code
+    const { data: certificate, error: certError } = await supabase
       .from('certificates')
-      .select(`
-        id,
-        issue_date,
-        verification_code,
-        course_enrollments:enrollment_id (
-          courses:course_id (title),
-          profiles:user_id (full_name)
-        )
-      `)
+      .select('*')
       .eq('verification_code', verificationCode)
       .single()
     
-    console.log('Database query result:', { data, error })
+    console.log('Certificate query result:', { certificate, certError })
     
-    if (error || !data) {
-      console.log('Certificate not found:', error)
+    if (certError || !certificate) {
+      console.log('Certificate not found:', certError)
       return new Response(
         JSON.stringify({ 
           valid: false, 
@@ -90,14 +82,49 @@ serve(async (req) => {
         }
       )
     }
+
+    // Get enrollment details
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('course_enrollments')
+      .select('*')
+      .eq('id', certificate.enrollment_id)
+      .single()
+
+    if (enrollmentError) {
+      console.log('Enrollment not found:', enrollmentError)
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          error: 'Associated enrollment not found' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 200 
+        }
+      )
+    }
+
+    // Get course details
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('title')
+      .eq('id', certificate.course_id || enrollment.course_id)
+      .single()
+
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', certificate.user_id || enrollment.user_id)
+      .single()
     
-    // Format the response
+    // Format the response with available data
     const response = {
       valid: true,
       details: {
-        studentName: data.course_enrollments?.profiles?.full_name || 'Student',
-        courseName: data.course_enrollments?.courses?.title || 'Course',
-        issueDate: data.issue_date ? new Date(data.issue_date).toLocaleDateString('en-US', {
+        studentName: profile?.full_name || 'Student',
+        courseName: course?.title || 'Course',
+        issueDate: certificate.issue_date ? new Date(certificate.issue_date).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'long',
           day: 'numeric'
@@ -106,7 +133,8 @@ serve(async (req) => {
           month: 'long',
           day: 'numeric'
         }),
-        verificationCode: verificationCode
+        verificationCode: verificationCode,
+        certificateId: certificate.id
       }
     }
 
