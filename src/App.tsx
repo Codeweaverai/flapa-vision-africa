@@ -120,11 +120,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <CurrencyProvider>
-            <CartProvider>
-              <Toaster />
-              <BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>
+            <CurrencyProvider>
+              <CartProvider>
+                <Toaster />
                 <Routes>
                   {/* Public Routes */}
                   <Route path="/" element={<Index />} />
@@ -233,10 +233,10 @@ function App() {
                   {/* 404 Route */}
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
-              </BrowserRouter>
-            </CartProvider>
-          </CurrencyProvider>
-        </AuthProvider>
+              </CartProvider>
+            </CurrencyProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
