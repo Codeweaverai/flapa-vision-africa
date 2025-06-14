@@ -147,7 +147,7 @@ function App() {
                   <Route path="/consult" element={<ConsultPage />} />
                   <Route path="/speaking" element={<SpeakingPage />} />
                   <Route path="/become-creator" element={<BecomeCreatorPage />} />
-                  <Route path="/creator/:id" element={<CreatorPublicProfile />} />
+                  <Route path="/creator/profile/:id" element={<CreatorPublicProfile />} />
                   <Route path="/media" element={<MediaPage />} />
                   <Route path="/media/:id" element={<MediaPostDetailPage />} />
                   <Route path="/ventures" element={<VenturesPage />} />
