@@ -1,260 +1,395 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Trash2, Plus, Minus } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useNavigate } from 'react-router-dom';
+import Layout from '@/components/layout/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import Layout from '@/components/layout/Layout';
-import TicketHolderForm from '@/components/cart/TicketHolderForm';
+import { CreditCard, Smartphone, Plus, Minus, Trash2, Users } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
 
 const CheckoutPage = () => {
-  const navigate = useNavigate();
+  const { items, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
-  const { items, updateQuantity, removeFromCart, clearCart, getTotalPrice } = useCart();
-  const { currentCurrency, convertPrice } = useCurrency();
+  const { currentCurrency, convertPrice, formatPrice } = useCurrency();
+  const navigate = useNavigate();
+  
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay'>('stripe');
+  const [promoCode, setPromoCode] = useState('');
+  const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [convertedTotal, setConvertedTotal] = useState(0);
+  const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
+  const [convertedAmounts, setConvertedAmounts] = useState<{
+    total: number;
+    tax: number;
+    final: number;
+    discount: number;
+  }>({
+    total: 0,
+    tax: 0,
+    final: 0,
+    discount: 0
+  });
+  
+  const totalAmountUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const TAX_RATE = 0.1; // 10% tax
+  const taxAmountUSD = totalAmountUSD * TAX_RATE;
+  const finalAmountUSD = totalAmountUSD + taxAmountUSD - discount;
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-
     if (items.length === 0) {
-      navigate('/courses');
-      return;
+      navigate('/');
     }
+  }, [items, navigate]);
 
-    const updateConvertedTotal = async () => {
-      const total = getTotalPrice();
-      const converted = await convertPrice(total, 'USD');
-      setConvertedTotal(converted);
+  // Convert amounts to current currency
+  useEffect(() => {
+    const convertAmounts = async () => {
+      try {
+        const [convertedTotal, convertedTax, convertedDiscount] = await Promise.all([
+          convertPrice(totalAmountUSD, 'USD'),
+          convertPrice(taxAmountUSD, 'USD'),
+          convertPrice(discount, 'USD')
+        ]);
+        
+        const convertedFinal = convertedTotal + convertedTax - convertedDiscount;
+        
+        setConvertedAmounts({
+          total: convertedTotal,
+          tax: convertedTax,
+          final: convertedFinal,
+          discount: convertedDiscount
+        });
+      } catch (error) {
+        console.error('Error converting amounts:', error);
+        setConvertedAmounts({
+          total: totalAmountUSD,
+          tax: taxAmountUSD,
+          final: finalAmountUSD,
+          discount: discount
+        });
+      }
     };
 
-    updateConvertedTotal();
-  }, [user, items, navigate, getTotalPrice, convertPrice]);
+    convertAmounts();
+  }, [totalAmountUSD, taxAmountUSD, finalAmountUSD, discount, convertPrice, currentCurrency]);
+
+  const applyPromoCode = async () => {
+    if (!promoCode.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('promo_codes')
+        .select('*')
+        .eq('code', promoCode.toUpperCase())
+        .eq('is_active', true)
+        .single();
+
+      if (error || !data) {
+        toast.error('Invalid promo code');
+        return;
+      }
+
+      // Check if promo code is valid
+      const now = new Date();
+      const validFrom = new Date(data.valid_from);
+      const validUntil = data.valid_until ? new Date(data.valid_until) : null;
+
+      if (now < validFrom || (validUntil && now > validUntil)) {
+        toast.error('Promo code has expired');
+        return;
+      }
+
+      if (data.max_uses && data.current_uses >= data.max_uses) {
+        toast.error('Promo code usage limit reached');
+        return;
+      }
+
+      if (totalAmountUSD < data.min_order_amount) {
+        toast.error(`Minimum order amount for this promo code is $${data.min_order_amount}`);
+        return;
+      }
+
+      // Calculate discount
+      let discountAmount = 0;
+      if (data.discount_type === 'percentage') {
+        discountAmount = totalAmountUSD * (data.discount_value / 100);
+      } else {
+        discountAmount = data.discount_value;
+      }
+
+      setDiscount(Math.min(discountAmount, totalAmountUSD));
+      toast.success('Promo code applied successfully!');
+    } catch (error) {
+      console.error('Error applying promo code:', error);
+      toast.error('Failed to apply promo code');
+    }
+  };
 
   const handleCheckout = async () => {
     if (!user) {
-      toast.error('Please sign in to continue');
+      navigate('/auth', { state: { redirectTo: '/checkout' } });
       return;
     }
 
     setLoading(true);
     try {
-      // Create order first
-      const orderData = {
-        user_id: user.id,
-        email: user.email,
-        total_amount: getTotalPrice(),
-        currency: 'USD',
-        payment_status: 'pending',
-        payment_method: 'stripe'
-      };
+      if (paymentMethod === 'stripe') {
+        const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+          body: {
+            payment_method: 'stripe',
+            success_url: `${window.location.origin}/checkout/success`,
+            cancel_url: `${window.location.origin}/checkout`,
+          }
+        });
 
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select()
-        .single();
+        if (error) throw error;
 
-      if (orderError) throw orderError;
-
-      // Create order items
-      const orderItems = items.map(item => ({
-        order_id: order.id,
-        item_id: item.item_id,
-        item_type: item.item_type,
-        item_name: item.title,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity,
-        metadata: (item.item_type === 'event_ticket' ? 
-          { ticket_holder_names: item.ticket_holder_names } : {}) as any
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Determine the primary item type for redirect URL
-      const hasEventTickets = items.some(item => item.item_type === 'event_ticket');
-      const hasCourses = items.some(item => item.item_type === 'course');
-      
-      let redirectType = 'mixed';
-      let redirectId = order.id;
-      
-      if (hasEventTickets && !hasCourses) {
-        redirectType = 'event';
-        redirectId = items.find(item => item.item_type === 'event_ticket')?.event_id || order.id;
-      } else if (hasCourses && !hasEventTickets) {
-        redirectType = 'course';
-        redirectId = items.find(item => item.item_type === 'course')?.item_id || order.id;
-      }
-
-      // Create Stripe checkout session
-      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
-        body: {
-          orderId: order.id,
-          amount: Math.round(getTotalPrice() * 100), // Convert to cents
-          currency: 'usd',
-          title: `Order ${order.id.slice(-8).toUpperCase()}`,
-          successUrl: `${window.location.origin}/payment/result?type=${redirectType}&id=${redirectId}&order_id=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${window.location.origin}/checkout`
+        if (data?.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error('No checkout URL returned');
         }
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        // Clear cart after successful checkout initiation
-        await clearCart();
-        window.location.href = data.url;
+      } else {
+        setShowMobileMoneyDialog(true);
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      toast.error('Failed to process checkout. Please try again.');
+      toast.error('Failed to initialize payment');
     } finally {
       setLoading(false);
     }
   };
 
-  if (items.length === 0) {
+  const renderTicketHolderSummary = (item: any) => {
+    if (item.item_type !== 'event_ticket' || !item.ticket_holder_names?.length) {
+      return null;
+    }
+
+    const filledHolders = item.ticket_holder_names.filter((holder: any) => holder.name?.trim());
+    
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
-              <p className="text-gray-600 mb-6">Add some courses or events to your cart to continue.</p>
-              <Button onClick={() => navigate('/courses')}>Browse Courses</Button>
-            </CardContent>
-          </Card>
+      <div className="mt-2 p-2 bg-blue-50 rounded border">
+        <div className="flex items-center gap-2 mb-1">
+          <Users className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-800">Ticket Holders:</span>
         </div>
-      </Layout>
+        {filledHolders.length > 0 ? (
+          <div className="text-sm text-blue-700">
+            {filledHolders.map((holder: any, index: number) => (
+              <div key={index}>• {holder.name}</div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-orange-600">
+            ⚠️ Please add ticket holder names before checkout
+          </div>
+        )}
+      </div>
     );
+  };
+
+  if (items.length === 0) {
+    return null;
   }
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8">Checkout</h1>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Cart Items */}
-            <div className="lg:col-span-2 space-y-4">
-              {items.map((item) => (
-                <Card key={item.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{item.title}</h3>
-                        <p className="text-sm text-gray-600 capitalize">
-                          {item.item_type === 'event_ticket' ? 'Event Ticket' : 'Course'}
-                        </p>
-                        <div className="flex items-center gap-4 mt-4">
-                          <div className="flex items-center gap-2">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto">
+            <h1 className="text-3xl font-bold text-center mb-8">Checkout</h1>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Cart Items */}
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Order Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {items.map((item) => (
+                      <div key={item.id} className="flex flex-col p-4 border rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{item.title}</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="secondary">
+                                {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
+                              </Badge>
+                            </div>
+                            <div className="mt-2 space-y-1">
+                              <div className="text-lg font-semibold">
+                                <PriceDisplay 
+                                  amount={item.price} 
+                                  originalCurrency="USD"
+                                />
+                              </div>
+                              {currentCurrency !== 'USD' && (
+                                <div className="text-sm text-gray-500">
+                                  Original: ${item.price.toFixed(2)} USD
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-4">
+                            {item.item_type === 'event_ticket' && (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                            
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              disabled={loading}
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-red-600 hover:text-red-700"
                             >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="px-3 py-1 bg-gray-100 rounded">
-                              {item.quantity}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              disabled={loading}
-                            >
-                              <Plus className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeFromCart(item.id)}
-                            disabled={loading}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
+                        
+                        {renderTicketHolderSummary(item)}
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">
-                          <PriceDisplay amount={item.price * item.quantity} originalCurrency="USD" />
-                        </p>
-                      </div>
-                    </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
 
-                    {/* Ticket Holder Form for Event Tickets */}
-                    {item.item_type === 'event_ticket' && (
-                      <div className="mt-6">
-                        <TicketHolderForm
-                          eventTitle={item.title}
-                          quantity={item.quantity}
-                          ticketHolders={item.ticket_holder_names || []}
-                          onUpdateTicketHolders={(holders) => {
-                            // Update the cart item with new ticket holders
-                            // This will be handled by the CartContext
-                          }}
-                          onUpdateQuantity={(newQuantity) => updateQuantity(item.id, newQuantity)}
-                        />
+              {/* Payment Details */}
+              <div className="space-y-6">
+                {/* Promo Code */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Promo Code</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter promo code"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value)}
+                      />
+                      <Button onClick={applyPromoCode} variant="outline">
+                        Apply
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Payment Method */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Payment Method</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <RadioGroup 
+                      value={paymentMethod} 
+                      onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay')}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="stripe" id="stripe" />
+                        <Label htmlFor="stripe" className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          Credit/Debit Card
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="pawapay" id="pawapay" />
+                        <Label htmlFor="pawapay" className="flex items-center gap-2">
+                          <Smartphone className="h-4 w-4" />
+                          Mobile Money
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </CardContent>
+                </Card>
+
+                {/* Order Total */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Order Total</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <PriceDisplay amount={convertedAmounts.total} originalCurrency={currentCurrency as any} />
+                    </div>
+                    {discount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount</span>
+                        <span>-<PriceDisplay amount={convertedAmounts.discount} originalCurrency={currentCurrency as any} /></span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>Tax (10%)</span>
+                      <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total</span>
+                      <PriceDisplay amount={convertedAmounts.final} originalCurrency={currentCurrency as any} />
+                    </div>
+                    {currentCurrency !== 'USD' && (
+                      <div className="text-sm text-gray-500 text-right">
+                        Original: ${finalAmountUSD.toFixed(2)} USD
                       </div>
                     )}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
 
-            {/* Order Summary */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-8">
-                <CardHeader>
-                  <CardTitle>Order Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal</span>
-                      <PriceDisplay amount={getTotalPrice()} originalCurrency="USD" />
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between font-semibold text-lg">
-                      <span>Total</span>
-                      <PriceDisplay amount={getTotalPrice()} originalCurrency="USD" />
-                    </div>
-                  </div>
-                  
-                  <Button
-                    onClick={handleCheckout}
-                    disabled={loading}
-                    className="w-full mt-6"
-                    size="lg"
-                  >
-                    {loading ? 'Processing...' : 'Proceed to Payment'}
-                  </Button>
-                </CardContent>
-              </Card>
+                <Button
+                  onClick={handleCheckout}
+                  disabled={loading || finalAmountUSD <= 0}
+                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white py-3"
+                  size="lg"
+                >
+                  {loading ? "Processing..." : paymentMethod === 'stripe' ? "Pay with Card" : "Pay with Mobile Money"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <MobileMoneyPaymentDialog
+        isOpen={showMobileMoneyDialog}
+        onClose={() => setShowMobileMoneyDialog(false)}
+        amount={finalAmountUSD}
+        currency="USD"
+        items={items}
+        discount={discount}
+        taxAmount={taxAmountUSD}
+        promoCode={promoCode}
+      />
     </Layout>
   );
 };
