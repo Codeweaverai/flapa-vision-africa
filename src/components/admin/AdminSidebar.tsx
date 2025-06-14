@@ -11,6 +11,7 @@ import {
   Settings,
   Mic,
   ClipboardCheck,
+  Briefcase,
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -26,6 +27,7 @@ const AdminSidebar = () => {
     { name: 'Media', path: '/admin/media', icon: <FileText className="mr-2 h-4 w-4" /> },
     { name: 'Consultations', path: '/admin/consultations', icon: <PhoneCall className="mr-2 h-4 w-4" /> },
     { name: 'Speaking', path: '/admin/speaking', icon: <Mic className="mr-2 h-4 w-4" /> },
+    { name: 'Careers', path: '/admin/careers', icon: <Briefcase className="mr-2 h-4 w-4" /> },
     { name: 'Registrations', path: '/admin/registrations', icon: <ClipboardCheck className="mr-2 h-4 w-4" /> },
     { name: 'Settings', path: '/admin/settings', icon: <Settings className="mr-2 h-4 w-4" /> },
   ];

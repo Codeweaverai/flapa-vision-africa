@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,8 +21,44 @@ import {
   Award,
   PlayCircle
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+interface JobOpening {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
+  employment_type: string;
+  created_at: string;
+}
 
 const CareersPage = () => {
+  const [jobOpenings, setJobOpenings] = useState<JobOpening[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchJobOpenings();
+  }, []);
+
+  const fetchJobOpenings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('job_openings')
+        .select('id, title, department, location, employment_type, created_at')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setJobOpenings(data || []);
+    } catch (error) {
+      console.error('Error fetching job openings:', error);
+      toast.error('Failed to load job openings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const features = [
     {
       icon: BookOpen,
@@ -130,33 +166,6 @@ const CareersPage = () => {
     "Unlimited learning budget"
   ];
 
-  const openPositions = [
-    {
-      title: "Senior Software Engineer",
-      department: "Engineering",
-      location: "Remote / San Francisco",
-      type: "Full-time"
-    },
-    {
-      title: "Product Manager",
-      department: "Product",
-      location: "Remote / New York",
-      type: "Full-time"
-    },
-    {
-      title: "UX/UI Designer",
-      department: "Design",
-      location: "Remote / London",
-      type: "Full-time"
-    },
-    {
-      title: "Data Scientist",
-      department: "Analytics",
-      location: "Remote / Berlin",
-      type: "Full-time"
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-purple via-white to-light-purple">
       <Layout>
@@ -176,8 +185,10 @@ const CareersPage = () => {
                 Help us build the next generation of learning platforms.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                  View Open Positions <ArrowRight className="ml-2 h-5 w-5" />
+                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                  <a href="#open-positions">
+                    View Open Positions <ArrowRight className="ml-2 h-5 w-5" />
+                  </a>
                 </Button>
                 <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
                   <Link to="/learn-our-culture">
@@ -272,7 +283,7 @@ const CareersPage = () => {
         </section>
 
         {/* Open Positions Section */}
-        <section className="py-20 px-4 bg-white/50">
+        <section id="open-positions" className="py-20 px-4 bg-white/50">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16">
               <h2 className="text-4xl font-bold mb-4">Open Positions</h2>
@@ -280,31 +291,45 @@ const CareersPage = () => {
                 Find your next career opportunity and help us build the future of education.
               </p>
             </div>
-            <div className="space-y-4">
-              {openPositions.map((position, index) => (
-                <Card key={index} className="p-6 hover:shadow-lg transition-shadow border-purple-100">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between">
-                    <div className="mb-4 md:mb-0">
-                      <h3 className="text-xl font-semibold mb-2 text-purple-800">{position.title}</h3>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="border-purple-200 text-purple-600">
-                          {position.department}
-                        </Badge>
-                        <Badge variant="outline" className="border-orange-200 text-orange-600">
-                          {position.location}
-                        </Badge>
-                        <Badge variant="outline" className="border-green-200 text-green-600">
-                          {position.type}
-                        </Badge>
+            
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground mt-4">Loading job openings...</p>
+              </div>
+            ) : jobOpenings.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No job openings available at the moment. Check back soon!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {jobOpenings.map((position) => (
+                  <Card key={position.id} className="p-6 hover:shadow-lg transition-shadow border-purple-100">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between">
+                      <div className="mb-4 md:mb-0">
+                        <h3 className="text-xl font-semibold mb-2 text-purple-800">{position.title}</h3>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline" className="border-purple-200 text-purple-600">
+                            {position.department}
+                          </Badge>
+                          <Badge variant="outline" className="border-orange-200 text-orange-600">
+                            {position.location}
+                          </Badge>
+                          <Badge variant="outline" className="border-green-200 text-green-600">
+                            {position.employment_type}
+                          </Badge>
+                        </div>
                       </div>
+                      <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                        <Link to={`/jobs/${position.id}`}>
+                          Apply Now
+                        </Link>
+                      </Button>
                     </div>
-                    <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                      Apply Now
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -354,11 +379,13 @@ const CareersPage = () => {
               Your next career adventure starts here.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
-                Browse All Positions
+              <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
+                <a href="#open-positions">
+                  Browse All Positions
+                </a>
               </Button>
               <Button size="lg" variant="outline" className="text-lg px-8 py-6 bg-transparent border-white text-white hover:bg-white hover:text-purple-600">
-                Contact HR Team
+                <a href="mailto:jobs@skillpulse.cloud">Contact HR Team</a>
               </Button>
             </div>
             <div className="mt-8 text-sm opacity-75">

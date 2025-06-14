@@ -1518,6 +1518,119 @@ export type Database = {
         }
         Relationships: []
       }
+      job_applications: {
+        Row: {
+          applicant_email: string
+          applicant_name: string
+          applied_at: string
+          cover_letter: string | null
+          id: string
+          job_opening_id: string
+          linkedin_profile: string | null
+          notes: string | null
+          phone_number: string | null
+          portfolio_url: string | null
+          resume_url: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          applicant_email: string
+          applicant_name: string
+          applied_at?: string
+          cover_letter?: string | null
+          id?: string
+          job_opening_id: string
+          linkedin_profile?: string | null
+          notes?: string | null
+          phone_number?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          applicant_email?: string
+          applicant_name?: string
+          applied_at?: string
+          cover_letter?: string | null
+          id?: string
+          job_opening_id?: string
+          linkedin_profile?: string | null
+          notes?: string | null
+          phone_number?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_job_opening_id_fkey"
+            columns: ["job_opening_id"]
+            isOneToOne: false
+            referencedRelation: "job_openings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_openings: {
+        Row: {
+          application_deadline: string | null
+          benefits: string | null
+          created_at: string
+          created_by: string | null
+          department: string
+          description: string
+          employment_type: string
+          id: string
+          is_active: boolean | null
+          location: string
+          requirements: string
+          responsibilities: string | null
+          salary_range: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          application_deadline?: string | null
+          benefits?: string | null
+          created_at?: string
+          created_by?: string | null
+          department: string
+          description: string
+          employment_type?: string
+          id?: string
+          is_active?: boolean | null
+          location: string
+          requirements: string
+          responsibilities?: string | null
+          salary_range?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          application_deadline?: string | null
+          benefits?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          description?: string
+          employment_type?: string
+          id?: string
+          is_active?: boolean | null
+          location?: string
+          requirements?: string
+          responsibilities?: string | null
+          salary_range?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       keynote_speakers: {
         Row: {
           bio: string | null
