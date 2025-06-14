@@ -150,17 +150,17 @@ const CourseLearningPage = () => {
   const [examResults, setExamResults] = useState<FinalExamResult[]>([]);
 
   useEffect(() => {
-    if (courseId && user) {
+    if (courseId) {
       fetchCourseData();
-      fetchEnrollmentData();
-      fetchProgress();
-      fetchExamResults();
+      if (user) {
+        fetchEnrollmentData();
+        fetchProgress();
+        fetchExamResults();
+      }
     }
   }, [courseId, user]);
 
   const fetchCourseData = async () => {
-    if (!user) return;
-    
     setLoading(true);
     try {
       // Fetch course details
@@ -691,15 +691,13 @@ const CourseLearningPage = () => {
                       </Badge>
                     </div>
                     <p className="text-sm text-orange-600 mt-2">{finalExam.description}</p>
-                    {enrolledUser && (
-                      <Button 
-                        size="sm" 
-                        className="mt-3 bg-orange-600 hover:bg-orange-700"
-                        onClick={handleTakeExam}
-                      >
-                        {latestExamResult && !latestExamResult.passed ? 'Retake Exam' : 'Take Final Exam'}
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      className="mt-3 bg-orange-600 hover:bg-orange-700"
+                      onClick={handleTakeExam}
+                    >
+                      {latestExamResult && !latestExamResult.passed ? 'Retake Exam' : 'Take Final Exam'}
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -709,7 +707,7 @@ const CourseLearningPage = () => {
           {/* Main Content */}
           <div className="lg:col-span-8">
             {/* Lesson Navigation */}
-            {enrolledUser && selectedLesson && (
+            {selectedLesson && (
               <div className="flex justify-between items-center mb-4">
                 <Button 
                   variant="outline" 
@@ -751,108 +749,88 @@ const CourseLearningPage = () => {
               </TabsList>
               
               <TabsContent value="content" className="space-y-6">
-                {enrolledUser ? (
-                  <div className="space-y-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>
-                          {selectedLesson ? selectedLesson.title : 'Select a lesson to begin'}
-                        </CardTitle>
-                        {selectedLesson && selectedLesson.description && (
-                          <p className="text-muted-foreground">{selectedLesson.description}</p>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        {selectedLesson && selectedLesson.video_url ? (
-                          <div className="space-y-4">
-                            <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
-                              <ReactPlayer
-                                url={selectedLesson.video_url}
-                                width="100%"
-                                height="100%"
-                                controls={true}
-                                playing={false}
-                                pip={true}
-                                onEnded={() => {
-                                  if (selectedLesson) {
-                                    markLessonComplete(selectedLesson.id);
-                                  }
-                                }}
-                              />
-                            </div>
-                            {selectedLesson.materials_urls && selectedLesson.materials_urls.length > 0 && (
-                              <div className="mt-4">
-                                <h4 className="font-semibold mb-2">Additional Materials</h4>
-                                <div className="space-y-2">
-                                  {selectedLesson.materials_urls.map((url, index) => (
-                                    <a
-                                      key={index}
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="block p-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                                    >
-                                      Material {index + 1}
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : selectedLesson ? (
-                          <div className="text-center py-8">
-                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                            <p className="text-gray-500">
-                              This lesson doesn't have a video. Content coming soon!
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                            <p className="text-gray-500">
-                              Select a lesson from the curriculum to start learning
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {/* Video Transcripts Section */}
-                    {selectedLesson && selectedLesson.video_url && (
-                      <VideoTranscripts 
-                        lessonId={selectedLesson.id}
-                        onSeekTo={(time) => {
-                          // This would need to be implemented to seek the video player
-                          console.log('Seeking to time:', time);
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : (
+                <div className="space-y-6">
                   <Card>
-                    <CardContent className="text-center py-8">
-                      <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">You need to be enrolled to access this course content</p>
-                      <p className="text-sm text-gray-400">Please purchase this course through our main course page</p>
+                    <CardHeader>
+                      <CardTitle>
+                        {selectedLesson ? selectedLesson.title : 'Select a lesson to begin'}
+                      </CardTitle>
+                      {selectedLesson && selectedLesson.description && (
+                        <p className="text-muted-foreground">{selectedLesson.description}</p>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      {selectedLesson && selectedLesson.video_url ? (
+                        <div className="space-y-4">
+                          <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
+                            <ReactPlayer
+                              url={selectedLesson.video_url}
+                              width="100%"
+                              height="100%"
+                              controls={true}
+                              playing={false}
+                              pip={true}
+                              onEnded={() => {
+                                if (selectedLesson) {
+                                  markLessonComplete(selectedLesson.id);
+                                }
+                              }}
+                            />
+                          </div>
+                          {selectedLesson.materials_urls && selectedLesson.materials_urls.length > 0 && (
+                            <div className="mt-4">
+                              <h4 className="font-semibold mb-2">Additional Materials</h4>
+                              <div className="space-y-2">
+                                {selectedLesson.materials_urls.map((url, index) => (
+                                  <a
+                                    key={index}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block p-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                                  >
+                                    Material {index + 1}
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : selectedLesson ? (
+                        <div className="text-center py-8">
+                          <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                          <p className="text-gray-500">
+                            This lesson doesn't have a video. Content coming soon!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                          <p className="text-gray-500">
+                            Select a lesson from the curriculum to start learning
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                )}
+
+                  {/* Video Transcripts Section */}
+                  {selectedLesson && selectedLesson.video_url && (
+                    <VideoTranscripts 
+                      lessonId={selectedLesson.id}
+                      onSeekTo={(time) => {
+                        console.log('Seeking to time:', time);
+                      }}
+                    />
+                  )}
+                </div>
               </TabsContent>
               
               <TabsContent value="lesson-notes" className="space-y-6">
-                {enrolledUser ? (
-                  <LessonNotesTab 
-                    lessonId={selectedLesson?.id || ''} 
-                    currentVideoTime={0}
-                  />
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Enroll in this course to start taking lesson notes</p>
-                    </CardContent>
-                  </Card>
-                )}
+                <LessonNotesTab 
+                  lessonId={selectedLesson?.id || ''} 
+                  currentVideoTime={0}
+                />
               </TabsContent>
               
               <TabsContent value="reviews">
@@ -860,13 +838,13 @@ const CourseLearningPage = () => {
               </TabsContent>
               
               <TabsContent value="discussion">
-                {enrolledUser && selectedLesson ? (
+                {selectedLesson ? (
                   <LessonDiscussionTab lessonId={selectedLesson.id} />
                 ) : (
                   <Card>
                     <CardContent className="text-center py-8">
                       <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Enroll in this course to participate in lesson discussions</p>
+                      <p className="text-gray-500 mb-4">Select a lesson to participate in discussions</p>
                     </CardContent>
                   </Card>
                 )}

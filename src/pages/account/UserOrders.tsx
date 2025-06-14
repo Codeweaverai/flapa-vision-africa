@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -77,7 +78,6 @@ const UserOrders = () => {
             order.order_items.map(async (item: OrderItem) => {
               if (item.item_type === 'event_ticket') {
                 try {
-                  // Get the event ticket details
                   const { data: ticket } = await supabase
                     .from('event_tickets')
                     .select('event_id')
@@ -85,7 +85,6 @@ const UserOrders = () => {
                     .maybeSingle();
 
                   if (ticket) {
-                    // Get the event details
                     const { data: event } = await supabase
                       .from('events')
                       .select('title')
@@ -101,6 +100,23 @@ const UserOrders = () => {
                   }
                 } catch (err) {
                   console.error('Error fetching event details for item:', item.item_id, err);
+                }
+              } else if (item.item_type === 'course') {
+                try {
+                  const { data: course } = await supabase
+                    .from('courses')
+                    .select('title')
+                    .eq('id', item.item_id)
+                    .maybeSingle();
+
+                  if (course) {
+                    return {
+                      ...item,
+                      item_name: course.title
+                    };
+                  }
+                } catch (err) {
+                  console.error('Error fetching course details for item:', item.item_id, err);
                 }
               }
               return item;
@@ -169,7 +185,7 @@ const UserOrders = () => {
       
       if (data?.success) {
         toast.success('Tickets regenerated successfully');
-        loadOrders(); // Refresh the orders
+        loadOrders();
       } else {
         throw new Error(data?.error || 'Failed to regenerate tickets');
       }
