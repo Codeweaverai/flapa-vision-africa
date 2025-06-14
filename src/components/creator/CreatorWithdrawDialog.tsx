@@ -14,7 +14,7 @@ import { DollarSign, CreditCard, Smartphone } from 'lucide-react';
 import { requestCreatorPayout } from '@/services/creatorPaymentService';
 import { useAuth } from '@/contexts/AuthContext';
 import WithdrawDialog from './WithdrawDialog';
-import PawaPayPayoutDialog from './PawaPay PayoutDialog';
+import PawaPayPayoutDialog from './PawaPayPayoutDialog';
 
 interface CreatorWithdrawDialogProps {
   open: boolean;
