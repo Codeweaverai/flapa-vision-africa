@@ -115,27 +115,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           } else if (item.item_type === 'event_ticket') {
             try {
-              // Get the ticket and event details in a single optimized query
-              const { data: ticketWithEvent, error: ticketError } = await supabase
+              // First get the ticket details
+              const { data: ticket, error: ticketError } = await supabase
                 .from('event_tickets')
-                .select(`
-                  id,
-                  name,
-                  event_id,
-                  events!inner (
-                    id,
-                    title,
-                    image_url
-                  )
-                `)
+                .select('id, name, event_id')
                 .eq('id', item.item_id)
                 .maybeSingle();
               
-              if (!ticketError && ticketWithEvent?.events) {
-                // Always use the event title, not the ticket name
-                title = ticketWithEvent.events.title;
-                thumbnail_url = ticketWithEvent.events.image_url || '';
-                event_id = ticketWithEvent.events.id;
+              if (!ticketError && ticket) {
+                // Then get the event details using the event_id
+                const { data: event, error: eventError } = await supabase
+                  .from('events')
+                  .select('id, title, image_url')
+                  .eq('id', ticket.event_id)
+                  .maybeSingle();
+                
+                if (!eventError && event) {
+                  // Always use the event title, not the ticket name
+                  title = event.title;
+                  thumbnail_url = event.image_url || '';
+                  event_id = event.id;
+                } else {
+                  console.warn('Failed to fetch event details:', eventError);
+                  title = 'Event';
+                }
               } else {
                 console.warn('Failed to fetch event ticket details:', ticketError);
                 title = 'Event';
