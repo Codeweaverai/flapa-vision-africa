@@ -63,28 +63,69 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
 
 export async function fetchCreatorPaymentTransactions(creatorId: string): Promise<CreatorPaymentTransaction[]> {
   try {
-    const { data, error } = await supabase
+    // First get payment transactions for this creator
+    const { data: transactions, error } = await supabase
       .from('payment_transactions')
-      .select(`
-        *,
-        profiles!payment_transactions_user_id_fkey(username, full_name),
-        courses!payment_transactions_reference_id_fkey(title),
-        events!payment_transactions_reference_id_fkey(title)
-      `)
+      .select('*')
       .eq('creator_id', creatorId)
       .eq('status', 'completed')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+
+    // Get user profiles for customer names
+    const userIds = [...new Set(transactions.map(t => t.user_id))];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, full_name')
+      .in('id', userIds);
+
+    // Get course titles
+    const courseIds = transactions
+      .filter(t => t.reference_type === 'course')
+      .map(t => t.reference_id);
+    
+    let courses: any[] = [];
+    if (courseIds.length > 0) {
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('id, title')
+        .in('id', courseIds);
+      courses = courseData || [];
+    }
+
+    // Get event titles
+    const eventIds = transactions
+      .filter(t => t.reference_type === 'event')
+      .map(t => t.reference_id);
+    
+    let events: any[] = [];
+    if (eventIds.length > 0) {
+      const { data: eventData } = await supabase
+        .from('events')
+        .select('id, title')
+        .in('id', eventIds);
+      events = eventData || [];
+    }
+
     // Format the data with customer and item names
-    const formattedData: CreatorPaymentTransaction[] = (data || []).map(transaction => ({
-      ...transaction,
-      customer_name: transaction.profiles?.username || transaction.profiles?.full_name || 'Unknown Customer',
-      item_name: transaction.reference_type === 'course' 
-        ? transaction.courses?.title 
-        : transaction.events?.title || 'Unknown Item'
-    }));
+    const formattedData: CreatorPaymentTransaction[] = transactions.map(transaction => {
+      const profile = profiles?.find(p => p.id === transaction.user_id);
+      const course = courses.find(c => c.id === transaction.reference_id);
+      const event = events.find(e => e.id === transaction.reference_id);
+
+      return {
+        ...transaction,
+        customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
+        item_name: transaction.reference_type === 'course' 
+          ? course?.title 
+          : event?.title || 'Unknown Item'
+      };
+    });
 
     return formattedData;
   } catch (error) {
