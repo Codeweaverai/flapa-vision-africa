@@ -1,0 +1,214 @@
+
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from '@/components/ui/use-toast';
+
+export interface CreatorEarnings {
+  available_balance: number;
+  pending_balance: number;
+  total_earnings: number;
+  total_platform_fees: number;
+  course_revenue: number;
+  event_revenue: number;
+}
+
+export interface CreatorPaymentTransaction {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  reference_type: string;
+  reference_id: string;
+  creator_earning: number;
+  platform_fee_amount: number;
+  created_at: string;
+  user_id: string;
+  provider: string;
+  payout_eligible_date: string;
+  // UI-specific fields
+  customer_name?: string;
+  item_name?: string;
+}
+
+export interface PayoutRequest {
+  amount: number;
+  payout_method: 'stripe' | 'mobile_money';
+  mobile_money_details?: {
+    phone_number: string;
+    operator: string;
+    country: string;
+  };
+}
+
+export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEarnings> {
+  try {
+    const { data, error } = await supabase.rpc('calculate_creator_earnings', {
+      creator_user_id: creatorId
+    });
+
+    if (error) throw error;
+
+    return data[0] || {
+      available_balance: 0,
+      pending_balance: 0,
+      total_earnings: 0,
+      total_platform_fees: 0,
+      course_revenue: 0,
+      event_revenue: 0
+    };
+  } catch (error) {
+    console.error('Error fetching creator earnings:', error);
+    throw error;
+  }
+}
+
+export async function fetchCreatorPaymentTransactions(creatorId: string): Promise<CreatorPaymentTransaction[]> {
+  try {
+    const { data, error } = await supabase
+      .from('payment_transactions')
+      .select(`
+        *,
+        profiles!payment_transactions_user_id_fkey(username, full_name),
+        courses!payment_transactions_reference_id_fkey(title),
+        events!payment_transactions_reference_id_fkey(title)
+      `)
+      .eq('creator_id', creatorId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Format the data with customer and item names
+    const formattedData: CreatorPaymentTransaction[] = (data || []).map(transaction => ({
+      ...transaction,
+      customer_name: transaction.profiles?.username || transaction.profiles?.full_name || 'Unknown Customer',
+      item_name: transaction.reference_type === 'course' 
+        ? transaction.courses?.title 
+        : transaction.events?.title || 'Unknown Item'
+    }));
+
+    return formattedData;
+  } catch (error) {
+    console.error('Error fetching creator payment transactions:', error);
+    throw error;
+  }
+}
+
+export async function requestCreatorPayout(
+  creatorId: string, 
+  payoutRequest: PayoutRequest
+): Promise<boolean> {
+  try {
+    // Check available balance first
+    const earnings = await fetchCreatorEarnings(creatorId);
+    
+    if (payoutRequest.amount > earnings.available_balance) {
+      toast({
+        title: "Insufficient Balance",
+        description: "Requested amount exceeds available balance",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (payoutRequest.amount < 5) {
+      toast({
+        title: "Minimum Amount Required",
+        description: "Minimum payout amount is $5.00",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from('creator_payouts')
+      .insert({
+        creator_id: creatorId,
+        amount: payoutRequest.amount,
+        currency: 'usd',
+        payout_method: payoutRequest.payout_method,
+        method: payoutRequest.payout_method,
+        destination: payoutRequest.payout_method === 'stripe' 
+          ? 'Stripe Connect Account' 
+          : 'Mobile Money',
+        mobile_money_details: payoutRequest.mobile_money_details,
+        status: 'pending',
+        minimum_threshold_met: true
+      })
+      .select();
+
+    if (error) throw error;
+
+    // If it's a mobile money payout, call PawaPay service
+    if (payoutRequest.payout_method === 'mobile_money' && payoutRequest.mobile_money_details) {
+      try {
+        const { data: pawapayResult, error: pawapayError } = await supabase.functions.invoke('pawapay-payout', {
+          body: {
+            amount: payoutRequest.amount,
+            phone_number: payoutRequest.mobile_money_details.phone_number,
+            operator: payoutRequest.mobile_money_details.operator,
+            country: payoutRequest.mobile_money_details.country,
+            payout_id: data[0].id
+          }
+        });
+
+        if (pawapayError) {
+          // Update payout status to failed
+          await supabase
+            .from('creator_payouts')
+            .update({ status: 'failed' })
+            .eq('id', data[0].id);
+          
+          throw pawapayError;
+        }
+
+        // Update with PawaPay deposit ID
+        await supabase
+          .from('creator_payouts')
+          .update({ 
+            pawapay_deposit_id: pawapayResult.depositId,
+            status: 'processing'
+          })
+          .eq('id', data[0].id);
+      } catch (pawapayError) {
+        console.error('PawaPay payout error:', pawapayError);
+        toast({
+          title: "Mobile Money Payout Failed",
+          description: "Failed to process mobile money payout. Please try again.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
+    toast({
+      title: "Payout Requested",
+      description: `Your payout of $${payoutRequest.amount.toFixed(2)} has been requested via ${payoutRequest.payout_method === 'stripe' ? 'Stripe' : 'Mobile Money'}`,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error requesting creator payout:', error);
+    toast({
+      title: "Payout Error",
+      description: "Failed to process your payout request",
+      variant: "destructive"
+    });
+    return false;
+  }
+}
+
+export async function fetchCreatorPayouts(creatorId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('creator_payouts')
+      .select('*')
+      .eq('creator_id', creatorId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching creator payouts:', error);
+    throw error;
+  }
+}

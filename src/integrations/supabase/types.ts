@@ -733,6 +733,9 @@ export type Database = {
           id: string
           method: string
           minimum_threshold_met: boolean | null
+          mobile_money_details: Json | null
+          pawapay_deposit_id: string | null
+          payout_method: string | null
           provider_payout_id: string | null
           status: string
           stripe_payout_id: string | null
@@ -748,6 +751,9 @@ export type Database = {
           id?: string
           method: string
           minimum_threshold_met?: boolean | null
+          mobile_money_details?: Json | null
+          pawapay_deposit_id?: string | null
+          payout_method?: string | null
           provider_payout_id?: string | null
           status?: string
           stripe_payout_id?: string | null
@@ -763,6 +769,9 @@ export type Database = {
           id?: string
           method?: string
           minimum_threshold_met?: boolean | null
+          mobile_money_details?: Json | null
+          pawapay_deposit_id?: string | null
+          payout_method?: string | null
           provider_payout_id?: string | null
           status?: string
           stripe_payout_id?: string | null
@@ -2927,6 +2936,17 @@ export type Database = {
           pending_balance: number
           total_earnings: number
           total_platform_fees: number
+        }[]
+      }
+      calculate_creator_earnings: {
+        Args: { creator_user_id: string }
+        Returns: {
+          available_balance: number
+          pending_balance: number
+          total_earnings: number
+          total_platform_fees: number
+          course_revenue: number
+          event_revenue: number
         }[]
       }
       count_bookings_by_event: {
