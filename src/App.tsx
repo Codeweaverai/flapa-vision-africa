@@ -23,7 +23,7 @@ import ContactPage from "./pages/ContactPage";
 import LearningPage from "./pages/LearningPage";
 import AccountPage from "./pages/AccountPage";
 import CheckoutPage from "./pages/CheckoutPage";
-import CourseDetailPage from "./pages/CourseDetailPage";
+import CourseDetailPage from "./pages/Learning/CourseDetailPage";
 import EventDetailPage from "./pages/EventDetailPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PaymentCancelPage from "./pages/PaymentCancelPage";
@@ -34,7 +34,7 @@ import SpeakingPage from "./pages/SpeakingPage";
 import BecomeCreatorPage from "./pages/BecomeCreatorPage";
 import CreatorPublicProfile from "./pages/CreatorPublicProfile";
 import CoursePlayerPage from "./pages/CoursePlayerPage";
-import CourseLearningPage from "./pages/CourseLearningPage";
+import CourseLearningPage from "./pages/Learning/CourseLearningPage";
 import MediaPage from "./pages/MediaPage";
 import MediaPostDetailPage from "./pages/MediaPostDetailPage";
 import VenturesPage from "./pages/VenturesPage";
@@ -141,7 +141,7 @@ function App() {
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/verify" element={<VerifyPage />} />
                   <Route path="/courses" element={<CoursesPage />} />
-                  <Route path="/courses/:id" element={<CourseDetailPage />} />
+                  <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
                   <Route path="/events" element={<EventsPage />} />
                   <Route path="/events/:eventId" element={<EventDetailPage />} />
                   <Route path="/event-detail/:eventId" element={<EventDetailPage />} />
