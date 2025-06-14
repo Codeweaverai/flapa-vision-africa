@@ -143,7 +143,7 @@ function App() {
                   <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
                   <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
                   <Route path="/learning/course/:courseId" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
-                  <Route path="/course/:id" element={<CourseDetailPage />} />
+                  <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
                   <Route path="/courses" element={<CoursesPage />} />
                   <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
                   <Route path="/explore-courses" element={<ExploreCoursesPage />} />
