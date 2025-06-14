@@ -12,6 +12,7 @@ import {
   Mic,
   ClipboardCheck,
   Briefcase,
+  Package,
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -21,6 +22,7 @@ const AdminSidebar = () => {
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
     { name: 'Analytics', path: '/admin/analytics', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+    { name: 'Orders', path: '/admin/orders', icon: <Package className="mr-2 h-4 w-4" /> },
     { name: 'Events', path: '/admin/events', icon: <CalendarDays className="mr-2 h-4 w-4" /> },
     { name: 'Users', path: '/admin/users', icon: <Users className="mr-2 h-4 w-4" /> },
     { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="mr-2 h-4 w-4" /> },

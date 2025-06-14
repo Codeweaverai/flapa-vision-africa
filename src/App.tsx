@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -96,6 +95,7 @@ import AdminSpeaking from "./pages/admin/AdminSpeaking";
 import AdminCareers from "./pages/admin/AdminCareers";
 import AdminRegistrations from "./pages/admin/AdminRegistrations";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminOrders from "./pages/admin/AdminOrders";
 
 // Creator Pages
 import CreatorDashboard from "./pages/creator/CreatorDashboard";
@@ -117,6 +117,9 @@ import CreatorSettings from "./pages/creator/CreatorSettings";
 // Learning Pages
 import LearningCourseDetailPage from "./pages/learning/CourseDetailPage";
 import LearningCourseLearningPage from "./pages/learning/CourseLearningPage";
+
+// Admin Pages
+import AdminOrders from "./pages/admin/AdminOrders";
 
 const queryClient = new QueryClient();
 
@@ -221,6 +224,7 @@ function App() {
                   <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                   <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
                   <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                  <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
                   <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
                   <Route path="/admin/courses/create" element={<AdminRoute><AdminCourseCreate /></AdminRoute>} />
                   <Route path="/admin/courses/:id/edit" element={<AdminRoute><AdminCourseEdit /></AdminRoute>} />
