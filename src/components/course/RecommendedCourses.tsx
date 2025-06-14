@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Clock, Users, Star, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BookOpen, Clock, Users, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
@@ -18,34 +18,63 @@ interface Course {
   price: number;
   is_free: boolean;
   thumbnail_url?: string;
-  creator_id: string;
 }
 
-const CoursesSection = () => {
+interface RecommendedCoursesProps {
+  currentCourseId: string;
+  category?: string;
+}
+
+const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesProps) => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchRecommendedCourses = async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('courses')
           .select('*')
           .eq('is_published', true)
-          .order('created_at', { ascending: false })
-          .limit(6);
+          .neq('id', currentCourseId)
+          .limit(3);
+
+        // If we have a category, prioritize courses from the same category
+        if (category) {
+          query = query.eq('category', category);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
-        setCourses(data || []);
+
+        // If we don't have enough courses from the same category, fetch more
+        if (data && data.length < 3) {
+          const { data: moreCourses, error: moreError } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('is_published', true)
+            .neq('id', currentCourseId)
+            .limit(3 - data.length)
+            .order('created_at', { ascending: false });
+
+          if (!moreError && moreCourses) {
+            setCourses([...data, ...moreCourses]);
+          } else {
+            setCourses(data || []);
+          }
+        } else {
+          setCourses(data || []);
+        }
       } catch (error) {
-        console.error('Error fetching courses:', error);
+        console.error('Error fetching recommended courses:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCourses();
-  }, []);
+    fetchRecommendedCourses();
+  }, [currentCourseId, category]);
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -55,18 +84,13 @@ const CoursesSection = () => {
 
   if (loading) {
     return (
-      <section className="py-16 bg-gradient-to-br from-purple-50 to-orange-50">
+      <section className="py-16">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
-              Featured Courses
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Discover high-quality courses designed to accelerate your learning journey
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[...Array(6)].map((_, index) => (
+          <h2 className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
+            Recommended Courses
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[...Array(3)].map((_, index) => (
               <div key={index} className="animate-pulse">
                 <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-96">
                   <div className="bg-gray-300 h-48"></div>
@@ -84,19 +108,18 @@ const CoursesSection = () => {
     );
   }
 
+  if (courses.length === 0) {
+    return null;
+  }
+
   return (
     <section className="py-16 bg-gradient-to-br from-purple-50 to-orange-50">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
-            Featured Courses
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover high-quality courses designed to accelerate your learning journey
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+        <h2 className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
+          Recommended Courses
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {courses.map((course) => (
             <Card key={course.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-purple-200 hover:border-purple-300 overflow-hidden">
               <div className="relative h-48 overflow-hidden">
@@ -133,9 +156,9 @@ const CoursesSection = () => {
                 <CardTitle className="text-lg group-hover:text-purple-600 transition-colors line-clamp-2">
                   {course.title}
                 </CardTitle>
-                <CardDescription className="line-clamp-3">
+                <p className="text-sm text-gray-600 line-clamp-3">
                   {course.summary}
-                </CardDescription>
+                </p>
               </CardHeader>
               
               <CardContent className="pt-0">
@@ -159,7 +182,7 @@ const CoursesSection = () => {
           ))}
         </div>
 
-        <div className="text-center">
+        <div className="text-center mt-12">
           <Button asChild size="lg" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0">
             <Link to="/explore-courses">
               <BookOpen className="h-5 w-5 mr-2" />
@@ -168,8 +191,8 @@ const CoursesSection = () => {
           </Button>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
-export default CoursesSection;
+export default RecommendedCourses;

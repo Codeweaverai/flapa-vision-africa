@@ -96,7 +96,6 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import PaymentResultPage from './pages/PaymentResultPage';
 import PaymentCancelPage from './pages/PaymentCancelPage';
 import NotificationsPage from './pages/NotificationsPage';
-import CourseDetailPage from './pages/learning/CourseDetailPage';
 import CoursesPage from './pages/CoursesPage';
 import AnimationsPage from './pages/AnimationsPage';
 import LearnOurCulturePage from './pages/LearnOurCulturePage';
@@ -144,7 +143,7 @@ function App() {
                   <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
                   <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
                   <Route path="/learning/course/:courseId" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
-                  <Route path="/learning/course-detail/:courseId" element={<CourseDetailPage />} />
+                  <Route path="/course/:id" element={<CourseDetailPage />} />
                   <Route path="/courses" element={<CoursesPage />} />
                   <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
                   <Route path="/explore-courses" element={<ExploreCoursesPage />} />

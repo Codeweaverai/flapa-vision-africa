@@ -16,6 +16,8 @@ import CourseReviews from '@/components/course/CourseReviews';
 import ReactPlayer from 'react-player';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
+import CreatorCard from '@/components/course/CreatorCard';
+import RecommendedCourses from '@/components/course/RecommendedCourses';
 
 interface Course {
   id: string;
@@ -248,7 +250,7 @@ const CourseDetailPage = () => {
   const handleEnroll = async () => {
     if (!user) {
       toast.error('Please log in to enroll in courses');
-      navigate('/auth', { state: { from: `/courses/${courseId}` } });
+      navigate('/auth', { state: { from: `/course/${courseId}` } });
       return;
     }
     
@@ -315,7 +317,7 @@ const CourseDetailPage = () => {
   const handleEnrollNow = async () => {
     if (!user) {
       toast.error('Please log in to enroll in courses');
-      navigate('/auth', { state: { from: `/courses/${courseId}` } });
+      navigate('/auth', { state: { from: `/course/${courseId}` } });
       return;
     }
 
@@ -479,7 +481,8 @@ const CourseDetailPage = () => {
               </div>
               
               {/* Sidebar */}
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1 space-y-6">
+                {/* Purchase Card */}
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-purple-200 sticky top-6">
                   <div className="text-center mb-6">
                     {course?.is_free ? (
@@ -559,6 +562,9 @@ const CourseDetailPage = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Creator Card */}
+                {creator && <CreatorCard creator={creator} />}
               </div>
             </div>
           </div>
@@ -784,6 +790,12 @@ const CourseDetailPage = () => {
             </TabsContent>
           </Tabs>
         </div>
+        
+        {/* Recommended Courses Section */}
+        <RecommendedCourses 
+          currentCourseId={course.id} 
+          category={course.category} 
+        />
         
         {/* Add FloatingAIAssistant at the end before closing Layout */}
         <FloatingAIAssistant 
