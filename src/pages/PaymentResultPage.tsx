@@ -19,7 +19,7 @@ const PaymentResultPage = () => {
   const [itemId, setItemId] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState<string>('');
 
-  const sessionId = searchParams.get('session');
+  const sessionId = searchParams.get('session_id');
   const type = searchParams.get('type') as 'course' | 'event';
   const id = searchParams.get('id');
   const canceled = searchParams.get('canceled');
@@ -48,6 +48,8 @@ const PaymentResultPage = () => {
 
     const verifyPayment = async () => {
       try {
+        console.log("Verifying payment with:", { sessionId, userId: user.id, type, itemId: id });
+        
         const { data, error } = await supabase.functions.invoke('verify-payment', {
           body: {
             sessionId,
@@ -57,39 +59,14 @@ const PaymentResultPage = () => {
           }
         });
 
+        console.log("Verification response:", data, error);
+
         if (error) throw error;
 
         if (data?.success) {
           setSuccess(true);
           setItemTitle(data.title || '');
-          
-          // Update local enrollment or registration status
-          if (type === 'course') {
-            // Trigger course enrollment if needed
-            await supabase
-              .from('course_enrollments')
-              .upsert({
-                user_id: user.id,
-                course_id: id,
-                enrollment_date: new Date().toISOString(),
-                payment_status: 'paid',
-                payment_id: sessionId
-              });
-          } else if (type === 'event') {
-            // Trigger event registration if needed
-            await supabase
-              .from('registrations')
-              .upsert({
-                user_id: user.id,
-                event_id: id,
-                status: 'confirmed',
-                payment_status: 'paid',
-                payment_id: sessionId,
-                created_at: new Date().toISOString()
-              });
-          }
-
-          toast.success('Payment successful!');
+          toast.success(data.message || 'Payment successful!');
         } else {
           setSuccess(false);
           toast.error(data?.message || 'Unable to verify payment');
@@ -109,11 +86,11 @@ const PaymentResultPage = () => {
   const handleRedirect = () => {
     if (success) {
       if (itemType === 'course') {
-        navigate(`/courses/${itemId}`);
+        navigate(`/learning/course/${itemId}`);
       } else if (itemType === 'event') {
-        navigate(`/events/${itemId}`);
+        navigate(`/my-events`);
       } else {
-        navigate('/account');
+        navigate('/account/orders');
       }
     } else {
       navigate(-1);
@@ -138,12 +115,18 @@ const PaymentResultPage = () => {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-center">Please wait while we verify your payment...</p>
+              <p className="text-center">Please wait while we verify your payment and process your order...</p>
             ) : success ? (
               <div className="text-center space-y-2">
                 <p>Your payment has been processed successfully!</p>
                 {itemTitle && <p className="font-medium">{itemTitle}</p>}
                 <p>Thank you for your purchase.</p>
+                {itemType === 'event' && (
+                  <p className="text-sm text-blue-600">Your tickets and receipt are being generated and will be available in My Orders.</p>
+                )}
+                {itemType === 'course' && (
+                  <p className="text-sm text-blue-600">You now have access to the course materials.</p>
+                )}
               </div>
             ) : (
               <div className="text-center space-y-2">
@@ -158,8 +141,8 @@ const PaymentResultPage = () => {
                 ? itemType === 'course' 
                   ? 'Go to Course' 
                   : itemType === 'event' 
-                    ? 'Go to Event' 
-                    : 'Go to Account' 
+                    ? 'View My Events' 
+                    : 'View Orders' 
                 : 'Go Back'}
             </Button>
           </CardFooter>

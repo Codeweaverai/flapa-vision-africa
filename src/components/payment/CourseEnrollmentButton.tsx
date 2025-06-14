@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,7 +78,7 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
           currency: currency.toLowerCase(),
           title: courseName,
           creatorId,
-          successUrl: `${window.location.origin}/payment/success?type=course&id=${courseId}&session_id={CHECKOUT_SESSION_ID}`,
+          successUrl: `${window.location.origin}/payment/result?type=course&id=${courseId}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${window.location.origin}/learning/course-detail/${courseId}`
         }
       });

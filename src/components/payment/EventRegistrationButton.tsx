@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
-import EnhancedPaymentButton from './EnhancedPaymentButton';
+import { toast } from 'sonner';
 
 interface EventRegistrationButtonProps {
   eventId: string;
@@ -32,7 +32,6 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
   const handleFreeRegistration = async () => {
@@ -56,19 +55,45 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
 
       if (error) throw error;
 
-      toast({
-        title: "Registration Successful",
-        description: `You've successfully registered for ${eventName}`,
-      });
-
+      toast.success(`You've successfully registered for ${eventName}`);
       window.location.reload();
     } catch (error) {
       console.error('Registration error:', error);
-      toast({
-        title: "Registration Failed",
-        description: "Failed to register for the event. Please try again.",
-        variant: "destructive"
+      toast.error('Failed to register for the event. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaidRegistration = async () => {
+    if (!user) {
+      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
+        body: {
+          referenceType: 'event',
+          referenceId: eventId,
+          amount: Math.round(price * 100), // Convert to cents
+          currency: currency.toLowerCase(),
+          title: eventName,
+          creatorId,
+          successUrl: `${window.location.origin}/payment/result?type=event&id=${eventId}&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/events/${eventId}`
+        }
       });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error('Failed to initiate payment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -96,17 +121,14 @@ const EventRegistrationButton: React.FC<EventRegistrationButtonProps> = ({
   }
 
   return (
-    <EnhancedPaymentButton
-      referenceType="event"
-      referenceId={eventId}
-      amount={price}
-      currency={currency}
-      title={eventName}
-      creatorId={creatorId}
+    <Button 
+      onClick={handlePaidRegistration} 
+      disabled={loading}
       className={className}
+      variant={variant}
     >
-      Register - {currency} {price.toFixed(2)}
-    </EnhancedPaymentButton>
+      {loading ? "Processing..." : `Register - ${currency} ${price.toFixed(2)}`}
+    </Button>
   );
 };
 
