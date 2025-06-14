@@ -13,6 +13,18 @@ import CallToAction from '@/components/home/CallToAction';
 import LearningSection from '@/components/home/LearningSection';
 
 const HomePage = () => {
+  console.log('HomePage rendering with sections:');
+  console.log('- HeroSection');
+  console.log('- AboutSection');
+  console.log('- BrowseCategoriesSection');
+  console.log('- CoursesSection');
+  console.log('- CommunityAISection');
+  console.log('- EventsSection');
+  console.log('- PastEventsSection');
+  console.log('- LearningSection');
+  console.log('- MediaSection');
+  console.log('- CallToAction');
+
   return (
     <Layout>
       <HeroSection />
