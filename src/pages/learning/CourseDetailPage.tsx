@@ -48,6 +48,11 @@ interface Course {
     avatar_url?: string;
     bio?: string;
   };
+  course_preview?: {
+    id: string;
+    preview_video_url?: string;
+    preview_video_path?: string;
+  };
   course_modules: Array<{
     id: string;
     title: string;
@@ -163,6 +168,17 @@ const CourseDetailPage = () => {
         console.error('Error fetching creator:', creatorError);
       }
 
+      // Get course preview
+      const { data: previewData, error: previewError } = await supabase
+        .from('course_previews')
+        .select('id, preview_video_url, preview_video_path')
+        .eq('course_id', id)
+        .maybeSingle();
+
+      if (previewError) {
+        console.error('Error fetching course preview:', previewError);
+      }
+
       // Get course modules with lessons
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
@@ -249,6 +265,7 @@ const CourseDetailPage = () => {
       const completeCourse: Course = {
         ...courseData,
         profiles: creatorData || { id: courseData.creator_id, full_name: 'Unknown Creator' },
+        course_preview: previewData || undefined,
         course_modules: modulesData || [],
         course_learning_outcomes: outcomesData || [],
         course_reviews: reviewsWithProfiles || [],
