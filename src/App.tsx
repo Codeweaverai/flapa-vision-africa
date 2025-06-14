@@ -23,7 +23,7 @@ import ContactPage from "./pages/ContactPage";
 import LearningPage from "./pages/LearningPage";
 import AccountPage from "./pages/AccountPage";
 import CheckoutPage from "./pages/CheckoutPage";
-import CourseDetailPage from "./pages/CourseDetailPage";
+import CourseDetailPage from "./pages/Learning/CourseDetailPage";
 import EventDetailPage from "./pages/EventDetailPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PaymentCancelPage from "./pages/PaymentCancelPage";
