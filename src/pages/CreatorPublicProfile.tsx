@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -58,7 +57,7 @@ interface CreatorStats {
 }
 
 const CreatorPublicProfile: React.FC = () => {
-  const { creatorId } = useParams<{ creatorId: string }>();
+  const { id: creatorId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
