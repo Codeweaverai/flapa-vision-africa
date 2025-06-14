@@ -148,7 +148,7 @@ function App() {
                   <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
                   <Route path="/explore-courses" element={<ExploreCoursesPage />} />
                   <Route path="/events" element={<EventsPage />} />
-                  <Route path="/event/:eventId" element={<EventDetailPage />} />
+                  <Route path="/event-detail/:eventId" element={<EventDetailPage />} />
                   <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
                   <Route path="/explore-events" element={<ExploreEventsPage />} />
                   <Route path="/creator/:creatorId" element={<CreatorPublicProfile />} />
