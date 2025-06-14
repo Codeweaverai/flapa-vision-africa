@@ -115,10 +115,6 @@ import CreatorAnalytics from "./pages/creator/CreatorAnalytics";
 import CreatorPayments from "./pages/creator/CreatorPayments";
 import CreatorSettings from "./pages/creator/CreatorSettings";
 
-// Learning Pages
-import LearningCourseDetailPage from "./pages/learning/CourseDetailPage";
-import LearningCourseLearningPage from "./pages/learning/CourseLearningPage";
-
 const queryClient = new QueryClient();
 
 function App() {
@@ -197,9 +193,8 @@ function App() {
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
-                  {/* Learning Routes */}
-                  <Route path="/learning/course-detail/:id" element={<ProtectedRoute><LearningCourseDetailPage /></ProtectedRoute>} />
-                  <Route path="/learning/course/:id" element={<ProtectedRoute><LearningCourseLearningPage /></ProtectedRoute>} />
+                  {/* Learning Routes - Fixed to remove duplicates */}
+                  <Route path="/learning/course/:courseId" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
 
                   {/* Creator Routes */}
                   <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
