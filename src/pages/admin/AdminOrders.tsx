@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -69,14 +68,11 @@ const AdminOrders = () => {
     queryFn: async () => {
       console.log('Fetching orders...');
       
-      let query = supabase
+      // First get orders with order items
+      let ordersQuery = supabase
         .from('orders')
         .select(`
           *,
-          profiles!orders_user_id_fkey (
-            full_name,
-            username
-          ),
           order_items (
             id,
             item_type,
@@ -89,19 +85,41 @@ const AdminOrders = () => {
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
-        query = query.eq('payment_status', statusFilter);
+        ordersQuery = ordersQuery.eq('payment_status', statusFilter);
       }
 
-      const { data, error } = await query;
+      const { data: ordersData, error: ordersError } = await ordersQuery;
       
-      if (error) {
-        console.error('Error fetching orders:', error);
-        throw error;
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+        throw ordersError;
       }
       
-      console.log('Raw orders data:', data);
+      console.log('Raw orders data:', ordersData);
       
-      let filteredData = data || [];
+      // Get unique user IDs from orders
+      const userIds = [...new Set(ordersData?.map(order => order.user_id).filter(Boolean))];
+      
+      // Fetch profiles for these users
+      let profilesData: any[] = [];
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, username')
+          .in('id', userIds);
+          
+        if (!profilesError && profiles) {
+          profilesData = profiles;
+        }
+      }
+      
+      // Combine orders with profiles
+      const ordersWithProfiles = ordersData?.map(order => ({
+        ...order,
+        profiles: profilesData.find(profile => profile.id === order.user_id) || null
+      })) || [];
+      
+      let filteredData = ordersWithProfiles;
       
       if (searchTerm) {
         filteredData = filteredData.filter(order => 
