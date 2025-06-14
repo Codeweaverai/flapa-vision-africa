@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Package, Ticket, BookOpen } from 'lucide-react';
+import { CheckCircle, Package, Ticket, BookOpen, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
@@ -17,6 +17,7 @@ const CheckoutSuccessPage = () => {
   const { user } = useAuth();
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [verificationComplete, setVerificationComplete] = useState(false);
 
   const sessionId = searchParams.get('session_id');
 
@@ -27,16 +28,40 @@ const CheckoutSuccessPage = () => {
         return;
       }
 
-      try {
-        // Clear the cart immediately
-        await clearCart();
+      if (!sessionId) {
+        toast.error('Invalid session. Please try again.');
+        navigate('/checkout');
+        return;
+      }
 
-        if (sessionId) {
-          // Wait a moment for webhook processing
+      try {
+        console.log('Processing payment verification for session:', sessionId);
+        
+        // Verify payment and process order
+        const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-payment', {
+          body: {
+            sessionId,
+            userId: user.id
+          }
+        });
+
+        console.log('Verification response:', verificationData, verificationError);
+
+        if (verificationError) {
+          throw verificationError;
+        }
+
+        if (verificationData?.success) {
+          setVerificationComplete(true);
+          
+          // Clear the cart after successful verification
+          await clearCart();
+          
+          // Wait a moment for all processing to complete
           await new Promise(resolve => setTimeout(resolve, 2000));
 
           // Fetch order details using the session ID
-          const { data: order, error } = await supabase
+          const { data: order, error: orderError } = await supabase
             .from('orders')
             .select(`
               *,
@@ -48,23 +73,31 @@ const CheckoutSuccessPage = () => {
             .eq('user_id', user.id)
             .single();
 
-          if (error) {
-            console.error('Error fetching order:', error);
+          if (orderError) {
+            console.error('Error fetching order:', orderError);
           } else {
             setOrderDetails(order);
           }
-        }
 
-        toast.success('Payment successful! Your order has been confirmed.');
-        
-        // Auto-redirect to My Orders after 3 seconds
-        setTimeout(() => {
-          navigate('/account/orders');
-        }, 3000);
+          toast.success('Payment successful! Your order has been confirmed.');
+          
+          // Auto-redirect to My Orders after 5 seconds
+          setTimeout(() => {
+            navigate('/account/orders');
+          }, 5000);
+
+        } else {
+          throw new Error(verificationData?.message || 'Payment verification failed');
+        }
 
       } catch (error) {
         console.error('Error handling success:', error);
         toast.error('There was an issue processing your order. Please contact support.');
+        
+        // Redirect to orders page anyway in case the order was processed
+        setTimeout(() => {
+          navigate('/account/orders');
+        }, 3000);
       } finally {
         setLoading(false);
       }
@@ -78,8 +111,9 @@ const CheckoutSuccessPage = () => {
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Processing your order...</p>
+            <Loader2 className="animate-spin h-12 w-12 text-orange-600 mx-auto mb-4" />
+            <p className="text-gray-600">Processing your payment and generating tickets...</p>
+            <p className="text-sm text-gray-500 mt-2">This may take a few moments</p>
           </div>
         </div>
       </Layout>
@@ -120,12 +154,12 @@ const CheckoutSuccessPage = () => {
                       <div className="flex justify-between">
                         <span>Payment Status:</span>
                         <span className="text-green-600 font-semibold">
-                          {orderDetails.payment_status.toUpperCase()}
+                          COMPLETED
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Items:</span>
-                        <span>{orderDetails.order_items.length} item(s)</span>
+                        <span>{orderDetails.order_items?.length || 0} item(s)</span>
                       </div>
                     </div>
                   </div>
@@ -135,6 +169,7 @@ const CheckoutSuccessPage = () => {
                   <h3 className="font-semibold text-blue-800 mb-2">What's happening now?</h3>
                   <ul className="text-sm text-blue-700 space-y-1">
                     <li>✅ Payment processed successfully</li>
+                    <li>✅ Order confirmed and saved</li>
                     <li>📧 Confirmation email being sent</li>
                     <li>🎫 Tickets and receipts being generated</li>
                     <li>📚 Course access being activated</li>
