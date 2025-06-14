@@ -125,75 +125,140 @@ const CourseDetailPage = () => {
   const fetchCourse = async () => {
     try {
       setLoading(true);
+      console.log('Fetching course with ID:', id);
       
-      const { data, error } = await supabase
+      // First, get the basic course data
+      const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select(`
-          *,
-          profiles!courses_creator_id_fkey(
-            id,
-            full_name,
-            avatar_url,
-            bio
-          ),
-          course_modules(
-            id,
-            title,
-            description,
-            order_index,
-            lessons(
-              id,
-              title,
-              description,
-              order_index,
-              content_type,
-              video_url
-            )
-          ),
-          course_learning_outcomes(
-            id,
-            outcome,
-            order_index
-          ),
-          course_reviews(
-            id,
-            rating,
-            review_text,
-            created_at,
-            profiles!course_reviews_user_id_fkey(full_name, avatar_url)
-          ),
-          course_enrollments(
-            id,
-            enrollment_date
-          )
+          *
         `)
         .eq('id', id)
         .eq('is_published', true)
         .single();
 
-      if (error) {
-        console.error('Error fetching course:', error);
+      if (courseError) {
+        console.error('Error fetching course:', courseError);
         toast.error('Failed to load course');
         return;
       }
 
-      if (!data) {
+      if (!courseData) {
         toast.error('Course not found');
         navigate('/courses');
         return;
       }
 
-      // Transform the data to match our interface - profiles comes as array but we need single object
-      const courseData = {
-        ...data,
-        profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles
-      } as unknown as Course;
+      console.log('Course data:', courseData);
 
-      setCourse(courseData);
+      // Get creator profile
+      const { data: creatorData, error: creatorError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, bio')
+        .eq('id', courseData.creator_id)
+        .single();
+
+      if (creatorError) {
+        console.error('Error fetching creator:', creatorError);
+      }
+
+      // Get course modules with lessons
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('course_modules')
+        .select(`
+          id,
+          title,
+          description,
+          order_index,
+          lessons (
+            id,
+            title,
+            description,
+            order_index,
+            content_type,
+            video_url
+          )
+        `)
+        .eq('course_id', id)
+        .order('order_index', { ascending: true });
+
+      if (modulesError) {
+        console.error('Error fetching modules:', modulesError);
+      }
+
+      // Get learning outcomes
+      const { data: outcomesData, error: outcomesError } = await supabase
+        .from('course_learning_outcomes')
+        .select('id, outcome, order_index')
+        .eq('course_id', id)
+        .order('order_index', { ascending: true });
+
+      if (outcomesError) {
+        console.error('Error fetching outcomes:', outcomesError);
+      }
+
+      // Get course reviews with user profiles
+      const { data: reviewsData, error: reviewsError } = await supabase
+        .from('course_reviews')
+        .select(`
+          id,
+          rating,
+          review_text,
+          created_at,
+          user_id
+        `)
+        .eq('course_id', id)
+        .order('created_at', { ascending: false });
+
+      if (reviewsError) {
+        console.error('Error fetching reviews:', reviewsError);
+      }
+
+      // Get user profiles for reviews
+      let reviewsWithProfiles = [];
+      if (reviewsData && reviewsData.length > 0) {
+        const userIds = reviewsData.map(review => review.user_id);
+        const { data: reviewProfiles, error: reviewProfilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
+
+        if (!reviewProfilesError && reviewProfiles) {
+          reviewsWithProfiles = reviewsData.map(review => ({
+            ...review,
+            profiles: reviewProfiles.find(profile => profile.id === review.user_id) || {
+              full_name: 'Unknown User',
+              avatar_url: null
+            }
+          }));
+        }
+      }
+
+      // Get enrollments
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select('id, enrollment_date')
+        .eq('course_id', id);
+
+      if (enrollmentsError) {
+        console.error('Error fetching enrollments:', enrollmentsError);
+      }
+
+      // Combine all data
+      const completeCourse: Course = {
+        ...courseData,
+        profiles: creatorData || { id: courseData.creator_id, full_name: 'Unknown Creator' },
+        course_modules: modulesData || [],
+        course_learning_outcomes: outcomesData || [],
+        course_reviews: reviewsWithProfiles || [],
+        course_enrollments: enrollmentsData || []
+      };
+
+      setCourse(completeCourse);
 
       // Fetch creator profile with stats
-      if (data.creator_id) {
-        await fetchCreatorProfile(data.creator_id);
+      if (courseData.creator_id) {
+        await fetchCreatorProfile(courseData.creator_id);
       }
 
       // Check if user is enrolled
