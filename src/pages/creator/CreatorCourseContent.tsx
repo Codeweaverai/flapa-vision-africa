@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import CreatorLayout from '@/components/layout/CreatorLayout';
+import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -419,245 +419,252 @@ const CreatorCourseContent = () => {
 
   if (loading) {
     return (
-      <CreatorLayout title="Course Content">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <CreatorLayout>
+        <div>
+          <h1 className="text-2xl font-bold mb-6">Course Content</h1>
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
         </div>
       </CreatorLayout>
     );
   }
 
   return (
-    <CreatorLayout title="Course Content">
-      <div className="mb-6">
-        <Button variant="outline" onClick={() => navigate('/creator/courses')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Courses
-        </Button>
-      </div>
-
-      {/* Course Header */}
-      {course && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-2xl">{course.title}</CardTitle>
-                <CardDescription className="mt-2">
-                  {course.summary || course.description.substring(0, 100) + '...'}
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant={course.is_published ? "default" : "outline"}>
-                  {course.is_published ? "Published" : "Draft"}
-                </Badge>
-                {course.is_free ? (
-                  <Badge variant="secondary">Free</Badge>
-                ) : (
-                  <Badge variant="outline">${course.price}</Badge>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-      )}
-
-      <Tabs defaultValue="modules" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="modules">Modules & Lessons</TabsTrigger>
-          <TabsTrigger value="final-exam">Final Exam</TabsTrigger>
-        </TabsList>
+    <CreatorLayout>
+      <div>
+        <h1 className="text-2xl font-bold mb-6">Course Content</h1>
         
-        <TabsContent value="modules">
-          <Card>
+        <div className="mb-6">
+          <Button variant="outline" onClick={() => navigate('/creator/courses')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Courses
+          </Button>
+        </div>
+
+        {/* Course Header */}
+        {course && (
+          <Card className="mb-6">
             <CardHeader>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="flex items-center">
-                    <Book className="h-5 w-5 mr-2" />
-                    Course Content
-                  </CardTitle>
-                  <CardDescription>
-                    Organize your course into modules and lessons
+                  <CardTitle className="text-2xl">{course.title}</CardTitle>
+                  <CardDescription className="mt-2">
+                    {course.summary || course.description.substring(0, 100) + '...'}
                   </CardDescription>
                 </div>
-                <Button onClick={handleAddModule}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Module
-                </Button>
+                <div className="flex gap-2">
+                  <Badge variant={course.is_published ? "default" : "outline"}>
+                    {course.is_published ? "Published" : "Draft"}
+                  </Badge>
+                  {course.is_free ? (
+                    <Badge variant="secondary">Free</Badge>
+                  ) : (
+                    <Badge variant="outline">${course.price}</Badge>
+                  )}
+                </div>
               </div>
             </CardHeader>
-            <CardContent>
-              {modules.length === 0 ? (
-                <div className="text-center py-12 border border-dashed rounded-md">
-                  <h3 className="text-lg font-medium mb-2">No modules yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Start building your course by adding modules
-                  </p>
+          </Card>
+        )}
+
+        <Tabs defaultValue="modules" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="modules">Modules & Lessons</TabsTrigger>
+            <TabsTrigger value="final-exam">Final Exam</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="modules">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center">
+                      <Book className="h-5 w-5 mr-2" />
+                      Course Content
+                    </CardTitle>
+                    <CardDescription>
+                      Organize your course into modules and lessons
+                    </CardDescription>
+                  </div>
                   <Button onClick={handleAddModule}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add First Module
+                    Add Module
                   </Button>
                 </div>
-              ) : (
-                <EnhancedModuleAccordion modules={modules} />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="final-exam">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="flex items-center">
-                    <GraduationCap className="h-5 w-5 mr-2 text-orange-500" />
-                    Final Exam
-                  </CardTitle>
-                  <CardDescription>
-                    Create a comprehensive final exam to test student understanding
-                  </CardDescription>
-                </div>
-                {!finalExam && (
-                  <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Final Exam
-                  </Button>
+              </CardHeader>
+              <CardContent>
+                {modules.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed rounded-md">
+                    <h3 className="text-lg font-medium mb-2">No modules yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Start building your course by adding modules
+                    </p>
+                    <Button onClick={handleAddModule}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Module
+                    </Button>
+                  </div>
+                ) : (
+                  <EnhancedModuleAccordion modules={modules} />
                 )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!finalExam ? (
-                <div className="text-center py-12 border border-dashed rounded-md">
-                  <GraduationCap className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Final Exam Created</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create a comprehensive final exam with MCQ questions covering all course materials
-                  </p>
-                  <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Final Exam
-                  </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="final-exam">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center">
+                      <GraduationCap className="h-5 w-5 mr-2 text-orange-500" />
+                      Final Exam
+                    </CardTitle>
+                    <CardDescription>
+                      Create a comprehensive final exam to test student understanding
+                    </CardDescription>
+                  </div>
+                  {!finalExam && (
+                    <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Final Exam
+                    </Button>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <Card className="border-l-4 border-l-orange-500">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl">{finalExam.title}</CardTitle>
-                          {finalExam.description && (
-                            <CardDescription className="mt-2">{finalExam.description}</CardDescription>
-                          )}
+              </CardHeader>
+              <CardContent>
+                {!finalExam ? (
+                  <div className="text-center py-12 border border-dashed rounded-md">
+                    <GraduationCap className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Final Exam Created</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Create a comprehensive final exam with MCQ questions covering all course materials
+                    </p>
+                    <Button onClick={handleCreateFinalExam} className="bg-gradient-to-r from-orange-500 to-purple-600">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Final Exam
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Card className="border-l-4 border-l-orange-500">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-xl">{finalExam.title}</CardTitle>
+                            {finalExam.description && (
+                              <CardDescription className="mt-2">{finalExam.description}</CardDescription>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Badge variant={finalExam.is_published ? "default" : "outline"}>
+                              {finalExam.is_published ? "Published" : "Draft"}
+                            </Badge>
+                          </div>
                         </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Questions</p>
+                            <p className="text-lg font-semibold">{finalExam.question_count || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Time Limit</p>
+                            <p className="text-lg font-semibold">{finalExam.time_limit_minutes} min</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Passing Score</p>
+                            <p className="text-lg font-semibold">{finalExam.passing_score}%</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Status</p>
+                            <p className="text-lg font-semibold">{finalExam.is_published ? "Live" : "Draft"}</p>
+                          </div>
+                        </div>
+                        
                         <div className="flex gap-2">
-                          <Badge variant={finalExam.is_published ? "default" : "outline"}>
-                            {finalExam.is_published ? "Published" : "Draft"}
-                          </Badge>
+                          <Button onClick={handleEditFinalExam} variant="outline">
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button onClick={handleToggleExamPublished} variant="outline">
+                            <Eye className="h-4 w-4 mr-2" />
+                            {finalExam.is_published ? 'Unpublish' : 'Publish'}
+                          </Button>
+                          <Button onClick={handleDeleteFinalExam} variant="outline" className="text-red-600 hover:text-red-700">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Questions</p>
-                          <p className="text-lg font-semibold">{finalExam.question_count || 0}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Time Limit</p>
-                          <p className="text-lg font-semibold">{finalExam.time_limit_minutes} min</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Passing Score</p>
-                          <p className="text-lg font-semibold">{finalExam.passing_score}%</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Status</p>
-                          <p className="text-lg font-semibold">{finalExam.is_published ? "Live" : "Draft"}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button onClick={handleEditFinalExam} variant="outline">
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                        <Button onClick={handleToggleExamPublished} variant="outline">
-                          <Eye className="h-4 w-4 mr-2" />
-                          {finalExam.is_published ? 'Unpublish' : 'Publish'}
-                        </Button>
-                        <Button onClick={handleDeleteFinalExam} variant="outline" className="text-red-600 hover:text-red-700">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="bg-gradient-to-r from-orange-50 to-purple-50">
-                    <CardContent className="pt-6">
-                      <h4 className="font-medium mb-2">Exam Guidelines</h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Recommended: 60% Easy/Moderate questions (recall & understanding)</li>
-                        <li>• 30% Application-based questions (practical knowledge)</li>
-                        <li>• 10% Advanced/Critical-thinking questions</li>
-                        <li>• Students must achieve 70% average (including all quizzes) to pass</li>
-                        <li>• Certificates are generated automatically upon successful completion</li>
-                      </ul>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-gradient-to-r from-orange-50 to-purple-50">
+                      <CardContent className="pt-6">
+                        <h4 className="font-medium mb-2">Exam Guidelines</h4>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          <li>• Recommended: 60% Easy/Moderate questions (recall & understanding)</li>
+                          <li>• 30% Application-based questions (practical knowledge)</li>
+                          <li>• 10% Advanced/Critical-thinking questions</li>
+                          <li>• Students must achieve 70% average (including all quizzes) to pass</li>
+                          <li>• Certificates are generated automatically upon successful completion</li>
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-      {/* Module Form Dialog */}
-      {moduleDialogOpen && (
-        <ModuleFormDialog
-          open={moduleDialogOpen}
-          onOpenChange={setModuleDialogOpen}
-          courseId={id!}
-          onModuleSaved={handleModuleSaved}
-          editingModule={editingModule}
-          modules={modules}
-        />
-      )}
+        {/* Module Form Dialog */}
+        {moduleDialogOpen && (
+          <ModuleFormDialog
+            open={moduleDialogOpen}
+            onOpenChange={setModuleDialogOpen}
+            courseId={id!}
+            onModuleSaved={handleModuleSaved}
+            editingModule={editingModule}
+            modules={modules}
+          />
+        )}
 
-      {/* Lesson Form Dialog */}
-      {lessonDialogOpen && selectedModuleId && (
-        <LessonFormDialog
-          open={lessonDialogOpen}
-          onOpenChange={setLessonDialogOpen}
-          moduleId={selectedModuleId}
-          onLessonSaved={handleLessonSaved}
-          editingLesson={editingLesson}
-        />
-      )}
+        {/* Lesson Form Dialog */}
+        {lessonDialogOpen && selectedModuleId && (
+          <LessonFormDialog
+            open={lessonDialogOpen}
+            onOpenChange={setLessonDialogOpen}
+            moduleId={selectedModuleId}
+            onLessonSaved={handleLessonSaved}
+            editingLesson={editingLesson}
+          />
+        )}
 
-      {/* Quiz Form Dialog */}
-      {quizDialogOpen && selectedLessonId && selectedModuleId && (
-        <QuizFormDialog
-          open={quizDialogOpen}
-          onOpenChange={setQuizDialogOpen}
-          lessonId={selectedLessonId}
-          moduleId={selectedModuleId}
-          onQuizSaved={handleQuizSaved}
-        />
-      )}
+        {/* Quiz Form Dialog */}
+        {quizDialogOpen && selectedLessonId && selectedModuleId && (
+          <QuizFormDialog
+            open={quizDialogOpen}
+            onOpenChange={setQuizDialogOpen}
+            lessonId={selectedLessonId}
+            moduleId={selectedModuleId}
+            onQuizSaved={handleQuizSaved}
+          />
+        )}
 
-      {/* Final Exam Form Dialog */}
-      {finalExamDialogOpen && (
-        <FinalExamFormDialog
-          open={finalExamDialogOpen}
-          onOpenChange={setFinalExamDialogOpen}
-          courseId={id!}
-          onExamSaved={handleFinalExamSaved}
-          editingExam={editingFinalExam}
-        />
-      )}
+        {/* Final Exam Form Dialog */}
+        {finalExamDialogOpen && (
+          <FinalExamFormDialog
+            open={finalExamDialogOpen}
+            onOpenChange={setFinalExamDialogOpen}
+            courseId={id!}
+            onExamSaved={handleFinalExamSaved}
+            editingExam={editingFinalExam}
+          />
+        )}
+      </div>
     </CreatorLayout>
   );
 };

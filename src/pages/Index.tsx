@@ -2,7 +2,6 @@
 import Layout from '@/components/layout/Layout';
 import HeroSection from '@/components/home/HeroSection';
 import AboutSection from '@/components/home/AboutSection';
-import VenturesSection from '@/components/home/VenturesSection';
 import SpeakingSection from '@/components/home/SpeakingSection';
 import AnimationsSection from '@/components/home/AnimationsSection';
 import LearningSection from '@/components/home/LearningSection';
@@ -17,7 +16,6 @@ const Index = () => {
     <Layout>
       <HeroSection />
       <AboutSection />
-      <VenturesSection />
       <CoursesSection />
       <CommunityAISection />
       <MediaSection />
