@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Calendar, MapPin, Users, Clock, ArrowLeft, User, Globe, Linkedin, Twitter, Video, Star, MessageCircle, CheckCircle, Ticket } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, ArrowLeft, User, Globe, Linkedin, Twitter, Video, Star, CheckCircle, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -18,6 +18,8 @@ import EventRegistrationButton from '@/components/payment/EventRegistrationButto
 import { fetchEventSpeakers, fetchEventAgenda, KeynoteSpeaker, EventAgenda } from '@/services/eventManagementService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
+import EventReviewsTab from '@/components/event/EventReviewsTab';
+import RelatedEventsSection from '@/components/event/RelatedEventsSection';
 
 interface Event {
   id: string;
@@ -45,18 +47,6 @@ interface EventCreator {
   username: string;
 }
 
-interface EventReview {
-  id: string;
-  user_id: string;
-  rating: number;
-  review: string;
-  created_at: string;
-  profiles: {
-    full_name: string;
-    avatar_url: string;
-  };
-}
-
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -67,8 +57,8 @@ const EventDetailPage = () => {
   const [isUserRegistered, setIsUserRegistered] = useState(false);
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [agenda, setAgenda] = useState<EventAgenda[]>([]);
-  const [reviews, setReviews] = useState<EventReview[]>([]);
   const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
   const { user } = useAuth();
 
   // Helper function to safely convert currency string to CurrencyCode
@@ -93,7 +83,7 @@ const EventDetailPage = () => {
     if (event) {
       fetchRegistrationsCount();
       loadSpeakersAndAgenda();
-      fetchEventReviews();
+      fetchEventReviewStats();
       
       if (user) {
         checkUserRegistration();
@@ -222,6 +212,30 @@ const EventDetailPage = () => {
     }
   };
 
+  const fetchEventReviewStats = async () => {
+    if (!event) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('event_reviews')
+        .select('rating')
+        .eq('event_id', event.id);
+      
+      if (error) {
+        console.error('Error fetching review stats:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        const avg = data.reduce((sum, review) => sum + review.rating, 0) / data.length;
+        setAverageRating(Math.round(avg * 10) / 10);
+        setTotalReviews(data.length);
+      }
+    } catch (error) {
+      console.error('Error in fetchEventReviewStats:', error);
+    }
+  };
+
   const handleFreeRegistration = async () => {
     if (!user || !event) {
       toast.error('Please sign in to register for this event');
@@ -254,48 +268,6 @@ const EventDetailPage = () => {
     }
   };
 
-  const fetchEventReviews = async () => {
-    if (!event) return;
-    
-    try {
-      const { data: reviewsData, error } = await supabase
-        .from('event_reviews')
-        .select('id, user_id, rating, review, created_at')
-        .eq('event_id', event.id)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching reviews:', error);
-        return;
-      }
-      
-      // Fetch user profiles for reviews
-      if (reviewsData && reviewsData.length > 0) {
-        const userIds = reviewsData.map(review => review.user_id);
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', userIds);
-
-        const reviewsWithProfiles = reviewsData.map(review => ({
-          ...review,
-          profiles: profiles?.find(profile => profile.id === review.user_id) || {
-            full_name: 'Anonymous',
-            avatar_url: null
-          }
-        }));
-
-        setReviews(reviewsWithProfiles);
-        
-        // Calculate average rating
-        const avg = reviewsWithProfiles.reduce((sum, review) => sum + review.rating, 0) / reviewsWithProfiles.length;
-        setAverageRating(Math.round(avg * 10) / 10);
-      }
-    } catch (error) {
-      console.error('Error in fetchEventReviews:', error);
-    }
-  };
-
   const getSessionTypeColor = (type: string) => {
     switch (type) {
       case 'keynote': return 'bg-purple-100 text-purple-800';
@@ -305,17 +277,6 @@ const EventDetailPage = () => {
       case 'networking': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${
-          i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
-        }`}
-      />
-    ));
   };
 
   if (loading) {
@@ -600,55 +561,11 @@ const EventDetailPage = () => {
                 </TabsContent>
 
                 <TabsContent value="reviews" className="space-y-4">
-                  <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <MessageCircle className="h-5 w-5 text-orange-500" />
-                        Event Reviews
-                        {reviews.length > 0 && (
-                          <Badge variant="outline" className="ml-2">
-                            {averageRating} ★ ({reviews.length} reviews)
-                          </Badge>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {reviews.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-8">
-                          No reviews yet. Be the first to review this event!
-                        </p>
-                      ) : (
-                        <div className="space-y-4">
-                          {reviews.map((review) => (
-                            <div key={review.id} className="p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg">
-                              <div className="flex items-start gap-3">
-                                <Avatar className="w-10 h-10">
-                                  <AvatarImage src={review.profiles?.avatar_url} />
-                                  <AvatarFallback>
-                                    {review.profiles?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium text-gray-800">
-                                      {review.profiles?.full_name || 'Anonymous'}
-                                    </span>
-                                    <div className="flex">
-                                      {renderStars(review.rating)}
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">
-                                      {format(new Date(review.created_at), 'MMM d, yyyy')}
-                                    </span>
-                                  </div>
-                                  <p className="text-gray-700">{review.review}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <EventReviewsTab 
+                    eventId={event.id} 
+                    averageRating={averageRating}
+                    totalReviews={totalReviews}
+                  />
                 </TabsContent>
               </Tabs>
             </div>
@@ -769,7 +686,7 @@ const EventDetailPage = () => {
                     <span className="text-muted-foreground">Capacity</span>
                     <span className="font-semibold">{event.capacity || 'Unlimited'}</span>
                   </div>
-                  {reviews.length > 0 && (
+                  {totalReviews > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Rating</span>
                       <div className="flex items-center gap-1">
@@ -780,6 +697,12 @@ const EventDetailPage = () => {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Related Events */}
+              <RelatedEventsSection 
+                currentEventId={event.id} 
+                eventType={event.event_type} 
+              />
             </div>
           </div>
         </div>
