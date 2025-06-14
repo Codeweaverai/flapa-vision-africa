@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Calendar, MapPin, Users, Clock, ArrowLeft, User, Globe, Linkedin, Twitter, Video, Star, MessageCircle, CheckCircle, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -60,6 +59,7 @@ interface EventReview {
 
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [event, setEvent] = useState<Event | null>(null);
   const [creator, setCreator] = useState<EventCreator | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,85 +79,153 @@ const EventDetailPage = () => {
   };
 
   useEffect(() => {
-    if (!id) return;
-    
-    fetchEventDetails();
-    fetchRegistrationsCount();
-    fetchEventSpeakers(id).then(setSpeakers);
-    fetchEventAgenda(id).then(setAgenda);
-    fetchEventReviews();
-    
-    if (user) {
-      checkUserRegistration();
+    if (!id) {
+      console.error('No event ID provided');
+      navigate('/events');
+      return;
     }
-  }, [id, user]);
+    
+    console.log('Fetching event with ID:', id);
+    fetchEventDetails();
+  }, [id, navigate]);
+
+  useEffect(() => {
+    if (event) {
+      fetchRegistrationsCount();
+      loadSpeakersAndAgenda();
+      fetchEventReviews();
+      
+      if (user) {
+        checkUserRegistration();
+      }
+    }
+  }, [event, user]);
 
   const fetchEventDetails = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      console.log('Fetching event details for ID:', id);
+      
+      const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select('*')
         .eq('id', id)
         .single();
       
-      if (error) throw error;
-      setEvent(data as Event);
+      if (eventError) {
+        console.error('Error fetching event:', eventError);
+        toast.error('Event not found');
+        navigate('/events');
+        return;
+      }
+
+      if (!eventData) {
+        console.error('No event data returned');
+        toast.error('Event not found');
+        navigate('/events');
+        return;
+      }
+
+      console.log('Event data fetched:', eventData);
+      setEvent(eventData as Event);
       
-      // Fetch creator details
-      if (data.creator_id) {
-        const { data: creatorData, error: creatorError } = await supabase
-          .from('profiles')
-          .select('id, full_name, bio, avatar_url, username')
-          .eq('id', data.creator_id)
-          .single();
-        
-        if (!creatorError && creatorData) {
-          setCreator(creatorData);
-        }
+      // Fetch creator details if creator_id exists
+      if (eventData.creator_id) {
+        await fetchCreatorDetails(eventData.creator_id);
       }
     } catch (error) {
-      console.error('Error fetching event:', error);
+      console.error('Error in fetchEventDetails:', error);
       toast.error('Failed to load event details');
+      navigate('/events');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchRegistrationsCount = async () => {
+  const fetchCreatorDetails = async (creatorId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('event_bookings')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_id', id);
+      const { data: creatorData, error: creatorError } = await supabase
+        .from('profiles')
+        .select('id, full_name, bio, avatar_url, username')
+        .eq('id', creatorId)
+        .maybeSingle();
       
-      if (error) throw error;
-      setRegisteredCount(data?.length || 0);
+      if (creatorError) {
+        console.error('Error fetching creator:', creatorError);
+        return;
+      }
+
+      if (creatorData) {
+        setCreator(creatorData);
+      }
     } catch (error) {
-      console.error('Error fetching registrations count:', error);
+      console.error('Error in fetchCreatorDetails:', error);
+    }
+  };
+
+  const fetchRegistrationsCount = async () => {
+    if (!event) return;
+    
+    try {
+      const { count, error } = await supabase
+        .from('event_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', event.id)
+        .eq('status', 'confirmed');
+      
+      if (error) {
+        console.error('Error fetching registrations count:', error);
+        return;
+      }
+      
+      setRegisteredCount(count || 0);
+    } catch (error) {
+      console.error('Error in fetchRegistrationsCount:', error);
     }
   };
 
   const checkUserRegistration = async () => {
-    if (!user) return;
+    if (!user || !event) return;
     
     try {
       const { data, error } = await supabase
         .from('event_bookings')
-        .select()
-        .eq('event_id', id)
+        .select('id')
+        .eq('event_id', event.id)
         .eq('user_id', user.id)
         .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error checking registration:', error);
+        return;
+      }
+      
       setIsUserRegistered(!!data);
     } catch (error) {
-      console.error('Error checking registration:', error);
+      console.error('Error in checkUserRegistration:', error);
+    }
+  };
+
+  const loadSpeakersAndAgenda = async () => {
+    if (!event) return;
+    
+    try {
+      const [speakersData, agendaData] = await Promise.all([
+        fetchEventSpeakers(event.id),
+        fetchEventAgenda(event.id)
+      ]);
+      
+      setSpeakers(speakersData);
+      setAgenda(agendaData);
+    } catch (error) {
+      console.error('Error loading speakers and agenda:', error);
     }
   };
 
   const handleFreeRegistration = async () => {
     if (!user || !event) {
       toast.error('Please sign in to register for this event');
+      navigate('/auth');
       return;
     }
 
@@ -171,57 +239,60 @@ const EventDetailPage = () => {
           status: 'confirmed'
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Registration error:', error);
+        toast.error('Failed to register for event');
+        return;
+      }
 
       toast.success('Successfully registered for the event! Your free ticket has been issued.');
       setIsUserRegistered(true);
+      fetchRegistrationsCount(); // Refresh count
     } catch (error) {
-      console.error('Error registering for event:', error);
+      console.error('Error in handleFreeRegistration:', error);
       toast.error('Failed to register for event');
     }
   };
 
   const fetchEventReviews = async () => {
+    if (!event) return;
+    
     try {
-      const { data, error } = await supabase
+      const { data: reviewsData, error } = await supabase
         .from('event_reviews')
-        .select(`
-          id,
-          user_id,
-          rating,
-          review,
-          created_at
-        `)
-        .eq('event_id', id)
+        .select('id, user_id, rating, review, created_at')
+        .eq('event_id', event.id)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching reviews:', error);
+        return;
+      }
       
-      // Fetch user profiles separately
-      const reviewsWithProfiles = await Promise.all(
-        (data || []).map(async (review) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('id', review.user_id)
-            .single();
-          
-          return {
-            ...review,
-            profiles: profile || { full_name: 'Anonymous', avatar_url: null }
-          };
-        })
-      );
-      
-      setReviews(reviewsWithProfiles);
-      
-      // Calculate average rating
-      if (reviewsWithProfiles.length > 0) {
+      // Fetch user profiles for reviews
+      if (reviewsData && reviewsData.length > 0) {
+        const userIds = reviewsData.map(review => review.user_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
+
+        const reviewsWithProfiles = reviewsData.map(review => ({
+          ...review,
+          profiles: profiles?.find(profile => profile.id === review.user_id) || {
+            full_name: 'Anonymous',
+            avatar_url: null
+          }
+        }));
+
+        setReviews(reviewsWithProfiles);
+        
+        // Calculate average rating
         const avg = reviewsWithProfiles.reduce((sum, review) => sum + review.rating, 0) / reviewsWithProfiles.length;
         setAverageRating(Math.round(avg * 10) / 10);
       }
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('Error in fetchEventReviews:', error);
     }
   };
 
