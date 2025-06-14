@@ -610,27 +610,15 @@ const EventDetailPage = () => {
                       Get Free Ticket
                     </Button>
                   ) : (
-                    <div className="space-y-3">
-                      <AddToCartButton
-                        itemType="event_ticket"
-                        itemId={event.id}
-                        itemName={event.title}
-                        price={event.price}
-                        eventId={event.id}
-                        eventTitle={event.title}
-                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                      />
-                      <EventRegistrationButton
-                        eventId={event.id}
-                        eventName={event.title}
-                        isFree={event.is_free}
-                        price={event.price}
-                        currency={getCurrencyCode(event.currency)}
-                        isUserRegistered={isUserRegistered}
-                        className="w-full"
-                        variant="outline"
-                      />
-                    </div>
+                    <AddToCartButton
+                      itemType="event_ticket"
+                      itemId={event.id}
+                      itemName={event.title}
+                      price={event.price}
+                      eventId={event.id}
+                      eventTitle={event.title}
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                    />
                   )}
                 </CardContent>
               </Card>
