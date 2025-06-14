@@ -28,27 +28,37 @@ serve(async (req) => {
     } = payload;
 
     if (status === "COMPLETED" || status === "ACCEPTED") {
-      // Update order status
+      console.log("Processing successful payment for depositId:", depositId);
+
+      // Find order by payment_provider_id (depositId)
+      const { data: order, error: orderError } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .eq('payment_provider_id', depositId)
+        .single();
+
+      if (orderError || !order) {
+        console.error("Order not found for depositId:", depositId, orderError);
+        return new Response("Order not found", { status: 404 });
+      }
+
+      console.log("Found order:", order.id);
+
+      // Update order status to completed
       const { error: orderUpdateError } = await supabaseClient
         .from('orders')
         .update({
           payment_status: 'completed',
-          payment_provider_id: depositId,
           updated_at: new Date().toISOString()
         })
-        .eq('id', referenceId);
+        .eq('id', order.id);
 
       if (orderUpdateError) {
         console.error("Error updating order:", orderUpdateError);
         return new Response("Error updating order", { status: 500 });
       }
 
-      // Get order details for user_id
-      const { data: order } = await supabaseClient
-        .from('orders')
-        .select('user_id')
-        .eq('id', referenceId)
-        .single();
+      console.log("Order status updated to completed for order:", order.id);
 
       // Create payment transaction record
       await supabaseClient
@@ -56,7 +66,7 @@ serve(async (req) => {
         .insert({
           user_id: order.user_id,
           reference_type: 'order',
-          reference_id: referenceId,
+          reference_id: order.id,
           amount: parseFloat(amount),
           currency: currency,
           status: 'completed',
@@ -67,58 +77,54 @@ serve(async (req) => {
           metadata: payload
         });
 
-      // Clear the cart
-      if (order?.user_id) {
+      console.log("Payment transaction recorded");
+
+      // Clear the cart for this user
+      if (order.user_id) {
         await supabaseClient
           .from('carts')
           .delete()
           .eq('user_id', order.user_id);
+        console.log("Cart cleared for user:", order.user_id);
       }
 
-      console.log("PawaPay payment completed, starting fulfillment process");
-
-      // Trigger order fulfillment (tickets, receipts, enrollments)
+      // Generate tickets and receipts
       try {
-        const fulfillmentResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-tickets`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-          },
-          body: JSON.stringify({ orderId: referenceId })
+        console.log("Starting ticket generation for order:", order.id);
+        
+        const ticketResponse = await supabaseClient.functions.invoke('generate-tickets', {
+          body: { orderId: order.id }
         });
 
-        if (fulfillmentResponse.ok) {
-          console.log("Order fulfillment completed successfully");
-          
-          // Send confirmation email
-          try {
-            const emailResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-order-confirmation`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-              },
-              body: JSON.stringify({ orderId: referenceId })
-            });
-
-            if (emailResponse.ok) {
-              console.log("Order confirmation email sent successfully");
-            } else {
-              console.error("Failed to send confirmation email");
-            }
-          } catch (emailError) {
-            console.error("Error sending confirmation email:", emailError);
-          }
-          
+        if (ticketResponse.error) {
+          console.error("Failed to generate tickets:", ticketResponse.error);
         } else {
-          console.error("Order fulfillment failed");
+          console.log("Tickets generated successfully for order:", order.id);
         }
-      } catch (fulfillmentError) {
-        console.error("Error in order fulfillment:", fulfillmentError);
+      } catch (ticketError) {
+        console.error("Error generating tickets:", ticketError);
       }
 
-      console.log("Successfully processed PawaPay order:", referenceId);
+      // Send confirmation email
+      try {
+        console.log("Sending confirmation email for order:", order.id);
+        
+        const emailResponse = await supabaseClient.functions.invoke('send-order-confirmation', {
+          body: { orderId: order.id }
+        });
+
+        if (emailResponse.error) {
+          console.error("Failed to send confirmation email:", emailResponse.error);
+        } else {
+          console.log("Confirmation email sent for order:", order.id);
+        }
+      } catch (emailError) {
+        console.error("Error sending confirmation email:", emailError);
+      }
+
+      console.log("Successfully processed PawaPay payment for order:", order.id);
+    } else {
+      console.log("Payment not completed, status:", status);
     }
 
     return new Response(JSON.stringify({ status: "received" }), {

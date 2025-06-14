@@ -44,16 +44,15 @@ serve(async (req) => {
       });
     }
 
-    // Check if this is a cart-based order or individual item purchase
-    let orderId;
-    let isCartOrder = false;
-
-    // First check if there's an existing order with this session ID
-    const { data: existingOrder } = await supabaseClient
+    // Find existing order by stripe_session_id
+    let { data: existingOrder } = await supabaseClient
       .from('orders')
       .select('*')
       .eq('stripe_session_id', sessionId)
       .single();
+
+    let orderId;
+    let isCartOrder = false;
 
     if (existingOrder) {
       // This is a cart-based order
@@ -162,14 +161,15 @@ serve(async (req) => {
       console.log("Cleared cart for user:", userId);
     }
 
-    // Get order items to process fulfillment
+    // Process fulfillment - create enrollments and bookings
     const { data: orderItems } = await supabaseClient
       .from('order_items')
       .select('*')
       .eq('order_id', orderId);
 
     if (orderItems && orderItems.length > 0) {
-      // Process fulfillment for each item
+      console.log("Processing fulfillment for", orderItems.length, "items");
+      
       for (const item of orderItems) {
         if (item.item_type === 'course') {
           // Create course enrollment
@@ -216,6 +216,8 @@ serve(async (req) => {
 
       // Generate tickets and receipts
       try {
+        console.log("Generating tickets for order:", orderId);
+        
         const ticketResponse = await supabaseClient.functions.invoke('generate-tickets', {
           body: { orderId }
         });
