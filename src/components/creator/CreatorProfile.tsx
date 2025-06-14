@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -32,7 +33,7 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creatorId, className = 
   const [stats, setStats] = useState<CreatorStats>({
     totalCourses: 0,
     totalStudents: 0,
-    averageRating: 4.8,
+    averageRating: 0,
     totalReviews: 0
   });
   const [loading, setLoading] = useState(true);
@@ -40,6 +41,8 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creatorId, className = 
   useEffect(() => {
     const fetchCreatorData = async () => {
       try {
+        setLoading(true);
+
         // Fetch creator profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -58,11 +61,15 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creatorId, className = 
 
         if (coursesError) throw coursesError;
 
-        // Fetch total students (enrollments)
-        const courseIds = coursesData?.map(course => course.id) || [];
         let totalStudents = 0;
-        
-        if (courseIds.length > 0) {
+        let averageRating = 0;
+        let totalReviews = 0;
+
+        // If there are courses, fetch additional stats
+        if (coursesData && coursesData.length > 0) {
+          const courseIds = coursesData.map(course => course.id);
+          
+          // Get total enrollments (students)
           const { data: enrollmentsData, error: enrollmentsError } = await supabase
             .from('course_enrollments')
             .select('user_id')
@@ -72,14 +79,28 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creatorId, className = 
             const uniqueStudents = new Set(enrollmentsData.map(e => e.user_id));
             totalStudents = uniqueStudents.size;
           }
+
+          // Get all reviews for creator's courses
+          const { data: reviewsData, error: reviewsError } = await supabase
+            .from('course_reviews')
+            .select('rating')
+            .in('course_id', courseIds);
+
+          if (!reviewsError && reviewsData) {
+            totalReviews = reviewsData.length;
+            if (reviewsData.length > 0) {
+              averageRating = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
+              averageRating = Math.round(averageRating * 10) / 10;
+            }
+          }
         }
 
         setCreator(profileData);
         setStats({
           totalCourses: coursesData?.length || 0,
           totalStudents,
-          averageRating: 4.8, // This would be calculated from actual reviews
-          totalReviews: Math.floor(totalStudents * 0.3) // Estimated based on students
+          averageRating,
+          totalReviews
         });
       } catch (error) {
         console.error('Error fetching creator data:', error);

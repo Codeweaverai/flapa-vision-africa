@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Star, Users, BookOpen, Award, Globe, Mail } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
 interface CreatorProfile {
   id: string;
@@ -23,6 +24,79 @@ interface CreatorCardProps {
 }
 
 const CreatorCard = ({ creator }: CreatorCardProps) => {
+  const [coursesCount, setCoursesCount] = useState(0);
+  const [eventsCount, setEventsCount] = useState(0);
+  const [studentsCount, setStudentsCount] = useState(0);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCreatorStats = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch courses count
+        const { data: coursesData, error: coursesError } = await supabase
+          .from('courses')
+          .select('id')
+          .eq('creator_id', creator.id)
+          .eq('is_published', true);
+
+        if (coursesError) throw coursesError;
+
+        // Fetch events count
+        const { data: eventsData, error: eventsError } = await supabase
+          .from('events')
+          .select('id')
+          .eq('creator_id', creator.id);
+
+        if (eventsError) throw eventsError;
+
+        setCoursesCount(coursesData?.length || 0);
+        setEventsCount(eventsData?.length || 0);
+
+        // If there are courses, fetch additional stats
+        if (coursesData && coursesData.length > 0) {
+          const courseIds = coursesData.map(course => course.id);
+
+          // Get total enrollments (students)
+          const { data: enrollmentsData, error: enrollmentsError } = await supabase
+            .from('course_enrollments')
+            .select('user_id')
+            .in('course_id', courseIds);
+
+          if (!enrollmentsError && enrollmentsData) {
+            const uniqueStudents = new Set(enrollmentsData.map(e => e.user_id));
+            setStudentsCount(uniqueStudents.size);
+          }
+
+          // Get all reviews for creator's courses
+          const { data: reviewsData, error: reviewsError } = await supabase
+            .from('course_reviews')
+            .select('rating')
+            .in('course_id', courseIds);
+
+          if (!reviewsError && reviewsData) {
+            setTotalReviews(reviewsData.length);
+            if (reviewsData.length > 0) {
+              const avgRating = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
+              setAverageRating(Math.round(avgRating * 10) / 10);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching creator stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (creator.id) {
+      fetchCreatorStats();
+    }
+  }, [creator.id]);
+
   return (
     <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
       <CardContent className="p-6">
@@ -43,28 +117,36 @@ const CreatorCard = ({ creator }: CreatorCardProps) => {
             <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
               <div className="flex items-center justify-center mb-1">
                 <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                <span className="text-sm font-semibold">{creator.average_rating || 0}</span>
+                <span className="text-sm font-semibold">
+                  {loading ? '...' : averageRating || '0'}
+                </span>
               </div>
               <div className="text-xs text-purple-600">Rating</div>
             </div>
             <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
               <div className="flex items-center justify-center mb-1">
                 <BookOpen className="h-4 w-4 text-orange-500 mr-1" />
-                <span className="text-sm font-semibold">{creator.total_courses || 0}</span>
+                <span className="text-sm font-semibold">
+                  {loading ? '...' : coursesCount}
+                </span>
               </div>
               <div className="text-xs text-orange-600">Courses</div>
             </div>
             <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
               <div className="flex items-center justify-center mb-1">
                 <Users className="h-4 w-4 text-purple-500 mr-1" />
-                <span className="text-sm font-semibold">{creator.total_students || 0}</span>
+                <span className="text-sm font-semibold">
+                  {loading ? '...' : studentsCount}
+                </span>
               </div>
               <div className="text-xs text-purple-600">Students</div>
             </div>
             <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
               <div className="flex items-center justify-center mb-1">
                 <Award className="h-4 w-4 text-orange-500 mr-1" />
-                <span className="text-sm font-semibold">{creator.total_reviews || 0}</span>
+                <span className="text-sm font-semibold">
+                  {loading ? '...' : totalReviews}
+                </span>
               </div>
               <div className="text-xs text-orange-600">Reviews</div>
             </div>
@@ -86,7 +168,7 @@ const CreatorCard = ({ creator }: CreatorCardProps) => {
             asChild 
             className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600"
           >
-            <Link to={`/creator/${creator.id}`}>
+            <Link to={`/creator/profile/${creator.id}`}>
               <Globe className="w-4 h-4 mr-2" />
               View Profile
             </Link>
