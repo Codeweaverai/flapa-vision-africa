@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
@@ -336,58 +337,58 @@ const CreatorDashboard: React.FC = () => {
       <CreatorLayout title="Dashboard">
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="p-6">
+            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
               <div className="flex items-center space-x-2">
-                <DollarSign className="h-10 w-10 text-blue-500" />
+                <DollarSign className="h-10 w-10 text-orange-500" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <h3 className="text-2xl font-bold">
+                  <p className="text-sm text-gray-600">Total Revenue</p>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                     <PriceDisplay amount={revenueMetrics.totalRevenue} originalCurrency="USD" />
                   </h3>
                 </div>
               </div>
             </Card>
             
-            <Card className="p-6">
+            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
               <div className="flex items-center space-x-2">
-                <Users className="h-10 w-10 text-green-500" />
+                <Users className="h-10 w-10 text-purple-500" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Students</p>
-                  <h3 className="text-2xl font-bold">{engagementMetrics.totalStudents}</h3>
+                  <p className="text-sm text-gray-600">Total Students</p>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{engagementMetrics.totalStudents}</h3>
                 </div>
               </div>
             </Card>
             
-            <Card className="p-6">
+            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
               <div className="flex items-center space-x-2">
-                <BookOpen className="h-10 w-10 text-purple-500" />
+                <BookOpen className="h-10 w-10 text-orange-500" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Courses</p>
-                  <h3 className="text-2xl font-bold">{engagementMetrics.activeCourses}</h3>
+                  <p className="text-sm text-gray-600">Active Courses</p>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{engagementMetrics.activeCourses}</h3>
                 </div>
               </div>
             </Card>
             
-            <Card className="p-6">
+            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
               <div className="flex items-center space-x-2">
-                <Calendar className="h-10 w-10 text-amber-500" />
+                <Calendar className="h-10 w-10 text-purple-500" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Events</p>
-                  <h3 className="text-2xl font-bold">{events.length}</h3>
+                  <p className="text-sm text-gray-600">Active Events</p>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{events.length}</h3>
                 </div>
               </div>
             </Card>
           </div>
           
           <Tabs defaultValue="revenue" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="revenue">Revenue</TabsTrigger>
-              <TabsTrigger value="engagement">Engagement</TabsTrigger>
+            <TabsList className="mb-4 bg-white/80 backdrop-blur-sm">
+              <TabsTrigger value="revenue" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">Revenue</TabsTrigger>
+              <TabsTrigger value="engagement" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">Engagement</TabsTrigger>
             </TabsList>
             
             <TabsContent value="revenue" className="space-y-4">
-              <Card className="p-6">
-                <h3 className="text-lg font-medium mb-4">Revenue Overview</h3>
+              <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Revenue Overview</h3>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
@@ -400,20 +401,26 @@ const CreatorDashboard: React.FC = () => {
                       <Tooltip 
                         formatter={(value) => [`$${value}`, 'Revenue']}
                       />
-                      <Bar dataKey="revenue" fill="#8884d8" />
+                      <Bar dataKey="revenue" fill="url(#orangePurpleGradient)" />
+                      <defs>
+                        <linearGradient id="orangePurpleGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f97316" />
+                          <stop offset="100%" stopColor="#9333ea" />
+                        </linearGradient>
+                      </defs>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Course Revenue</h3>
+                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Course Revenue</h3>
                   <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                       <PriceDisplay amount={revenueMetrics.courseRevenue} originalCurrency="USD" />
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-gray-600">
                       {
                         revenueMetrics.totalRevenue > 0 
                           ? `${((revenueMetrics.courseRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
@@ -423,13 +430,13 @@ const CreatorDashboard: React.FC = () => {
                   </div>
                 </Card>
                 
-                <Card className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Event Revenue</h3>
+                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Event Revenue</h3>
                   <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                       <PriceDisplay amount={revenueMetrics.eventRevenue} originalCurrency="USD" />
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-gray-600">
                       {
                         revenueMetrics.totalRevenue > 0
                           ? `${((revenueMetrics.eventRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
@@ -446,14 +453,14 @@ const CreatorDashboard: React.FC = () => {
                 className="w-full"
               >
                 <CollapsibleTrigger asChild>
-                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-100 rounded">
-                    <ChevronDown className={`h-4 w-4 transition-transform ${showRevenueBySource ? 'transform rotate-180' : ''}`} />
-                    <span className="font-medium">Revenue by Source</span>
+                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-white/20 rounded backdrop-blur-sm">
+                    <ChevronDown className={`h-4 w-4 transition-transform text-white ${showRevenueBySource ? 'transform rotate-180' : ''}`} />
+                    <span className="font-medium text-white">Revenue by Source</span>
                   </div>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
-                  <Card className="p-6">
-                    <h3 className="text-lg font-medium mb-4">Revenue by Source</h3>
+                  <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                    <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Revenue by Source</h3>
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
@@ -466,7 +473,7 @@ const CreatorDashboard: React.FC = () => {
                           <Tooltip 
                             formatter={(value) => [`$${value}`, 'Revenue']}
                           />
-                          <Bar dataKey="value" fill="#82ca9d" />
+                          <Bar dataKey="value" fill="url(#orangePurpleGradient)" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -476,8 +483,8 @@ const CreatorDashboard: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="engagement" className="space-y-4">
-              <Card className="p-6">
-                <h3 className="text-lg font-medium mb-4">Student Engagement</h3>
+              <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Student Engagement</h3>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
@@ -488,26 +495,26 @@ const CreatorDashboard: React.FC = () => {
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip />
-                      <Line type="monotone" dataKey="engagement" stroke="#8884d8" />
+                      <Line type="monotone" dataKey="engagement" stroke="url(#orangePurpleGradient)" strokeWidth={3} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Course Completion Rate</h3>
+                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Course Completion Rate</h3>
                   <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold">{engagementMetrics.completionRate.toFixed(1)}%</p>
-                    <p className="text-sm text-muted-foreground">Average completion rate</p>
+                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{engagementMetrics.completionRate.toFixed(1)}%</p>
+                    <p className="text-sm text-gray-600">Average completion rate</p>
                   </div>
                 </Card>
                 
-                <Card className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Course Popularity</h3>
+                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Course Popularity</h3>
                   <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold">{courses.length > 0 ? (enrollments.length / courses.length).toFixed(1) : '0'}</p>
-                    <p className="text-sm text-muted-foreground">Avg. enrollments per course</p>
+                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{courses.length > 0 ? (enrollments.length / courses.length).toFixed(1) : '0'}</p>
+                    <p className="text-sm text-gray-600">Avg. enrollments per course</p>
                   </div>
                 </Card>
               </div>
@@ -518,14 +525,14 @@ const CreatorDashboard: React.FC = () => {
                 className="w-full"
               >
                 <CollapsibleTrigger asChild>
-                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-100 rounded">
-                    <ChevronDown className={`h-4 w-4 transition-transform ${showDetailedAnalytics ? 'transform rotate-180' : ''}`} />
-                    <span className="font-medium">Detailed Analytics</span>
+                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-white/20 rounded backdrop-blur-sm">
+                    <ChevronDown className={`h-4 w-4 transition-transform text-white ${showDetailedAnalytics ? 'transform rotate-180' : ''}`} />
+                    <span className="font-medium text-white">Detailed Analytics</span>
                   </div>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
-                  <Card className="p-6">
-                    <h3 className="text-lg font-medium mb-4">Analytics Controls</h3>
+                  <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                    <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Analytics Controls</h3>
                     <div className="space-y-4">
                       <div>
                         <h4 className="text-sm font-medium mb-2">Time Range</h4>
