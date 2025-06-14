@@ -68,10 +68,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
     try {
       console.log('Initiating PawaPay payment with:', {
         amount: Math.round(amount * 100),
-        currency: countryInfo.code === 'ZMB' ? 'ZMW' : 
-                  countryInfo.code === 'NGA' ? 'NGN' : 
-                  countryInfo.code === 'KEN' ? 'KES' : 
-                  countryInfo.code === 'UGA' ? 'UGX' : 'USD',
+        currency: currency,
         msisdn: formattedPhone,
         country: countryInfo.code,
         itemsCount: items.length
@@ -82,16 +79,10 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
         ? `${window.location.origin}/account/orders`
         : `${window.location.origin}/payment/success`;
 
-      // Map country code to currency
-      const paymentCurrency = countryInfo.code === 'ZMB' ? 'ZMW' : 
-                            countryInfo.code === 'NGA' ? 'NGN' : 
-                            countryInfo.code === 'KEN' ? 'KES' : 
-                            countryInfo.code === 'UGA' ? 'UGX' : 'USD';
-
       const { data, error } = await supabase.functions.invoke('create-pawapay-session', {
         body: {
           amount: Math.round(amount * 100), // Convert to cents
-          currency: paymentCurrency,
+          currency: currency,
           msisdn: formattedPhone,
           country: countryInfo.code,
           returnUrl,
@@ -166,7 +157,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
             <div className="text-center">
               <p className="text-sm text-gray-600">Total Amount</p>
               <p className="text-2xl font-bold text-gray-900">
-                <PriceDisplay amount={amount} originalCurrency="USD" />
+                <PriceDisplay amount={amount} originalCurrency={currency as any} />
               </p>
             </div>
           </div>

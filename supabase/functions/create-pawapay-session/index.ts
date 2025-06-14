@@ -27,8 +27,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { 
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false }
+      }
     );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
@@ -78,7 +81,12 @@ const handler = async (req: Request): Promise<Response> => {
     const depositId = crypto.randomUUID();
     console.log('Generated deposit ID:', depositId);
 
-    // Create order record in Supabase
+    // Create order record in Supabase using service role
+    const serviceRoleClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     const orderData = {
       user_id: user.id,
       total_amount: amount / 100, // Convert back from cents
@@ -86,12 +94,13 @@ const handler = async (req: Request): Promise<Response> => {
       payment_method: 'mobile_money',
       payment_status: 'pending',
       tax_amount: tax_amount || 0,
-      email: user.email || ''
+      email: user.email || '',
+      payment_provider_id: depositId
     };
 
     console.log('Creating order with data:', orderData);
 
-    const { data: order, error: orderError } = await supabaseClient
+    const { data: order, error: orderError } = await serviceRoleClient
       .from('orders')
       .insert(orderData)
       .select()
@@ -104,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Order created successfully:', order.id);
 
-    // Create order items
+    // Create order items using service role
     const orderItems = items.map((item: any) => ({
       order_id: order.id,
       item_id: item.item_id,
@@ -118,7 +127,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }));
 
-    const { error: itemsError } = await supabaseClient
+    const { error: itemsError } = await serviceRoleClient
       .from('order_items')
       .insert(orderItems);
 
@@ -141,36 +150,29 @@ const handler = async (req: Request): Promise<Response> => {
     const hasCourses = items.some((item: any) => item.item_type === 'course');
     const reason = hasEvents && hasCourses ? 'Course & Event' : hasEvents ? 'Event' : 'Course';
 
-    // Prepare metadata as per PawaPay documentation
+    // Prepare metadata as per PawaPay documentation (simplified)
     const metadata = [
       {
-        fieldName: 'orderId',
-        fieldValue: order.id,
-        isPII: false
+        "fieldName": "orderId",
+        "fieldValue": order.id
       },
       {
-        fieldName: 'userId',
-        fieldValue: user.id,
-        isPII: false
-      },
-      {
-        fieldName: 'depositId',
-        fieldValue: depositId,
-        isPII: false
+        "fieldName": "userId", 
+        "fieldValue": user.id
       }
     ];
 
     // Create PawaPay session with exact format from documentation
     const pawapayPayload = {
-      depositId,
-      returnUrl,
-      statementDescription,
-      amount: amount.toString(),
-      msisdn,
-      language: 'EN',
-      country,
-      reason,
-      metadata
+      "depositId": depositId,
+      "returnUrl": returnUrl,
+      "statementDescription": statementDescription,
+      "amount": Math.round(amount / 100).toString(), // Convert cents to major currency unit
+      "msisdn": msisdn,
+      "language": "EN",
+      "country": country,
+      "reason": reason,
+      "metadata": metadata
     };
 
     console.log('Creating PawaPay session with payload:', pawapayPayload);
@@ -191,23 +193,18 @@ const handler = async (req: Request): Promise<Response> => {
     if (!pawapayResponse.ok) {
       console.error('PawaPay API error:', pawapayResponse.status, responseText);
       
-      // Handle specific error responses as per documentation
       let errorMessage = 'Payment service error';
       
       try {
         const errorData = JSON.parse(responseText);
         
         if (pawapayResponse.status === 400) {
-          // 400 error format: {"errorId": "...", "errorCode": 1, "errorMessage": "INVALID_INPUT: ..."}
           errorMessage = `Invalid request: ${errorData.errorMessage || 'Bad request'}`;
         } else if (pawapayResponse.status === 401) {
-          // 401 error format: {"message": "Unauthorized"}
           errorMessage = 'Authentication failed with payment provider';
         } else if (pawapayResponse.status === 403) {
-          // 403 error format: {"message": "Missing Authentication Token"}
           errorMessage = 'Access denied by payment provider';
         } else if (pawapayResponse.status === 500) {
-          // 500 error format: {"errorId": "...", "errorCode": 0, "errorMessage": "Internal error"}
           errorMessage = 'Payment service temporarily unavailable';
         }
         
@@ -227,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Invalid response from payment provider');
     }
 
-    // Validate response format: {"redirectUrl": "https://paywith.pawapay.io/?token=..."}
+    // Validate response format
     if (!pawapayData.redirectUrl) {
       console.error('Missing redirectUrl in response:', pawapayData);
       throw new Error('Payment provider did not return a valid payment URL');
@@ -236,10 +233,9 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('PawaPay session created successfully:', pawapayData);
 
     // Update order with PawaPay session info
-    await supabaseClient
+    await serviceRoleClient
       .from('orders')
       .update({
-        payment_provider_id: depositId,
         receipt_url: pawapayData.redirectUrl
       })
       .eq('id', order.id);
