@@ -65,8 +65,8 @@ const TicketHolderForm: React.FC<TicketHolderFormProps> = ({
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Ticket Details - {eventTitle}</span>
-          <div className="flex items-center gap-2">
+          <span className="truncate mr-4">Ticket Details - {eventTitle}</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Button
               size="sm"
               variant="outline"
@@ -75,7 +75,7 @@ const TicketHolderForm: React.FC<TicketHolderFormProps> = ({
             >
               <Minus className="h-4 w-4" />
             </Button>
-            <span className="mx-2 font-medium">{quantity}</span>
+            <span className="mx-2 font-medium min-w-[2ch] text-center">{quantity}</span>
             <Button
               size="sm"
               variant="outline"
@@ -92,24 +92,26 @@ const TicketHolderForm: React.FC<TicketHolderFormProps> = ({
           <div key={index} className="p-4 border rounded-lg bg-gray-50">
             <h4 className="font-medium mb-3">Ticket {index + 1}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor={`name-${index}`}>Full Name *</Label>
+              <div className="min-h-[72px] flex flex-col">
+                <Label htmlFor={`name-${index}`} className="mb-2">Full Name *</Label>
                 <Input
                   id={`name-${index}`}
                   placeholder="Enter ticket holder name"
                   value={holders[index]?.name || ''}
                   onChange={(e) => updateHolder(index, 'name', e.target.value)}
                   required
+                  className="flex-1"
                 />
               </div>
-              <div>
-                <Label htmlFor={`email-${index}`}>Email (Optional)</Label>
+              <div className="min-h-[72px] flex flex-col">
+                <Label htmlFor={`email-${index}`} className="mb-2">Email (Optional)</Label>
                 <Input
                   id={`email-${index}`}
                   type="email"
                   placeholder="Enter email address"
                   value={holders[index]?.email || ''}
                   onChange={(e) => updateHolder(index, 'email', e.target.value)}
+                  className="flex-1"
                 />
               </div>
             </div>

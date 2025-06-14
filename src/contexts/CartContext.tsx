@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -104,80 +103,45 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .eq('id', item.item_id)
                 .maybeSingle();
               
-              if (courseError) {
-                console.error('Error fetching course:', courseError);
-                title = 'Course';
-              } else if (course) {
+              if (!courseError && course) {
                 title = course.title || 'Course';
                 thumbnail_url = course.thumbnail_url || '';
               } else {
                 title = 'Course';
               }
             } catch (err) {
-              console.error('Error in course query:', err);
+              console.error('Error fetching course:', err);
               title = 'Course';
             }
           } else if (item.item_type === 'event_ticket') {
             try {
-              // First get the ticket details
-              const { data: ticket, error: ticketError } = await supabase
+              // Get the ticket and event details in a single optimized query
+              const { data: ticketWithEvent, error: ticketError } = await supabase
                 .from('event_tickets')
-                .select('name, event_id')
+                .select(`
+                  id,
+                  name,
+                  event_id,
+                  events!inner (
+                    id,
+                    title,
+                    image_url
+                  )
+                `)
                 .eq('id', item.item_id)
                 .maybeSingle();
               
-              if (ticketError) {
-                console.error('Error fetching ticket:', ticketError);
-                // Try to get event directly if ticket fetch fails
-                try {
-                  const { data: event, error: eventError } = await supabase
-                    .from('events')
-                    .select('title, image_url')
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (event && !eventError) {
-                    title = event.title || 'Event';
-                    thumbnail_url = event.image_url || '';
-                  } else {
-                    title = 'Event';
-                  }
-                } catch (err) {
-                  title = 'Event';
-                }
-              } else if (ticket) {
-                event_id = ticket.event_id || '';
-                
-                // Get the event details to use event title instead of ticket name
-                if (ticket.event_id) {
-                  try {
-                    const { data: event, error: eventError } = await supabase
-                      .from('events')
-                      .select('title, image_url')
-                      .eq('id', ticket.event_id)
-                      .maybeSingle();
-                    
-                    if (eventError) {
-                      console.error('Error fetching event:', eventError);
-                      title = ticket.name || 'Event';
-                    } else if (event) {
-                      title = event.title || ticket.name || 'Event';
-                      thumbnail_url = event.image_url || '';
-                    } else {
-                      title = ticket.name || 'Event';
-                    }
-                  } catch (err) {
-                    console.error('Error in event query:', err);
-                    title = ticket.name || 'Event';
-                  }
-                } else {
-                  title = ticket.name || 'Event';
-                }
+              if (!ticketError && ticketWithEvent?.events) {
+                // Always use the event title, not the ticket name
+                title = ticketWithEvent.events.title;
+                thumbnail_url = ticketWithEvent.events.image_url || '';
+                event_id = ticketWithEvent.events.id;
               } else {
+                console.warn('Failed to fetch event ticket details:', ticketError);
                 title = 'Event';
               }
             } catch (err) {
-              console.error('Error in ticket query:', err);
+              console.error('Error fetching event ticket:', err);
               title = 'Event';
             }
           }
