@@ -15,13 +15,14 @@ const PaymentResultPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
-  const [itemType, setItemType] = useState<'course' | 'event' | null>(null);
+  const [itemType, setItemType] = useState<'course' | 'event' | 'mixed' | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState<string>('');
 
   const sessionId = searchParams.get('session_id');
-  const type = searchParams.get('type') as 'course' | 'event';
+  const type = searchParams.get('type') as 'course' | 'event' | 'mixed';
   const id = searchParams.get('id');
+  const orderId = searchParams.get('order_id');
   const canceled = searchParams.get('canceled');
 
   useEffect(() => {
@@ -37,7 +38,7 @@ const PaymentResultPage = () => {
       return;
     }
 
-    if (!sessionId || !type || !id) {
+    if (!sessionId) {
       setLoading(false);
       setSuccess(false);
       return;
@@ -48,14 +49,21 @@ const PaymentResultPage = () => {
 
     const verifyPayment = async () => {
       try {
-        console.log("Verifying payment with:", { sessionId, userId: user.id, type, itemId: id });
+        console.log("Verifying payment with:", { 
+          sessionId, 
+          userId: user.id, 
+          type, 
+          itemId: id, 
+          orderId 
+        });
         
         const { data, error } = await supabase.functions.invoke('verify-payment', {
           body: {
             sessionId,
             userId: user.id,
             type,
-            itemId: id
+            itemId: id,
+            orderId
           }
         });
 
@@ -81,7 +89,7 @@ const PaymentResultPage = () => {
     };
 
     verifyPayment();
-  }, [user, navigate, sessionId, type, id, canceled]);
+  }, [user, navigate, sessionId, type, id, orderId, canceled]);
 
   const handleRedirect = () => {
     if (success) {
@@ -89,6 +97,8 @@ const PaymentResultPage = () => {
         navigate(`/learning/course/${itemId}`);
       } else if (itemType === 'event') {
         navigate(`/my-events`);
+      } else if (itemType === 'mixed' || orderId) {
+        navigate('/account/orders');
       } else {
         navigate('/account/orders');
       }
@@ -121,11 +131,14 @@ const PaymentResultPage = () => {
                 <p>Your payment has been processed successfully!</p>
                 {itemTitle && <p className="font-medium">{itemTitle}</p>}
                 <p>Thank you for your purchase.</p>
-                {itemType === 'event' && (
+                {(itemType === 'event' || itemType === 'mixed') && (
                   <p className="text-sm text-blue-600">Your tickets and receipt are being generated and will be available in My Orders.</p>
                 )}
                 {itemType === 'course' && (
                   <p className="text-sm text-blue-600">You now have access to the course materials.</p>
+                )}
+                {itemType === 'mixed' && (
+                  <p className="text-sm text-blue-600">Your courses and events are now available.</p>
                 )}
               </div>
             ) : (
@@ -142,7 +155,7 @@ const PaymentResultPage = () => {
                   ? 'Go to Course' 
                   : itemType === 'event' 
                     ? 'View My Events' 
-                    : 'View Orders' 
+                    : 'View My Orders' 
                 : 'Go Back'}
             </Button>
           </CardFooter>
