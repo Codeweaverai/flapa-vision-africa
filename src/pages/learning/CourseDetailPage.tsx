@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -161,7 +160,7 @@ const CourseDetailPage = () => {
             rating,
             review_text,
             created_at,
-            profiles(full_name, avatar_url)
+            profiles!course_reviews_user_id_fkey(full_name, avatar_url)
           ),
           course_enrollments(
             id,
@@ -188,7 +187,7 @@ const CourseDetailPage = () => {
       const courseData = {
         ...data,
         profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles
-      } as Course;
+      } as unknown as Course;
 
       setCourse(courseData);
 
