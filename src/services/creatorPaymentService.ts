@@ -160,6 +160,24 @@ export async function requestCreatorPayout(
       return false;
     }
 
+    // Check if user has the required payout method set up
+    if (payoutRequest.payout_method === 'stripe') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('stripe_connect_id')
+        .eq('id', creatorId)
+        .single();
+
+      if (!profile?.stripe_connect_id) {
+        toast({
+          title: "Stripe Not Connected",
+          description: "Please connect your Stripe account first",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
     const { data, error } = await supabase
       .from('creator_payouts')
       .insert({
@@ -206,7 +224,7 @@ export async function requestCreatorPayout(
         await supabase
           .from('creator_payouts')
           .update({ 
-            pawapay_deposit_id: pawapayResult.depositId,
+            pawapay_deposit_id: pawapayResult.payoutId,
             status: 'processing'
           })
           .eq('id', data[0].id);
@@ -221,9 +239,19 @@ export async function requestCreatorPayout(
       }
     }
 
+    // If it's a Stripe payout, we'll handle it differently
+    if (payoutRequest.payout_method === 'stripe') {
+      // For Stripe Connect, the payout will be processed by Stripe automatically
+      // We just mark it as processing since Stripe handles the actual transfer
+      await supabase
+        .from('creator_payouts')
+        .update({ status: 'processing' })
+        .eq('id', data[0].id);
+    }
+
     toast({
       title: "Payout Requested",
-      description: `Your payout of $${payoutRequest.amount.toFixed(2)} has been requested via ${payoutRequest.payout_method === 'stripe' ? 'Stripe' : 'Mobile Money'}`,
+      description: `Your payout of $${payoutRequest.amount.toFixed(2)} has been requested via ${payoutRequest.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}`,
     });
 
     return true;

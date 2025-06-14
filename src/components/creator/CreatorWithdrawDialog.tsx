@@ -11,10 +11,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, CreditCard, Smartphone } from 'lucide-react';
-import { requestCreatorPayout } from '@/services/creatorPaymentService';
 import { useAuth } from '@/contexts/AuthContext';
 import WithdrawDialog from './WithdrawDialog';
 import PawaPayPayoutDialog from './PawaPayPayoutDialog';
+import PayoutMethodSetupDialog from './PayoutMethodSetupDialog';
 
 interface CreatorWithdrawDialogProps {
   open: boolean;
@@ -33,6 +33,8 @@ const CreatorWithdrawDialog: React.FC<CreatorWithdrawDialogProps> = ({
 }) => {
   const [stripeDialogOpen, setStripeDialogOpen] = useState(false);
   const [mobileMoneyDialogOpen, setMobileMoneyDialogOpen] = useState(false);
+  const [setupDialogOpen, setSetupDialogOpen] = useState(false);
+  const { user } = useAuth();
 
   const handleStripeWithdraw = () => {
     onOpenChange(false);
@@ -42,6 +44,11 @@ const CreatorWithdrawDialog: React.FC<CreatorWithdrawDialogProps> = ({
   const handleMobileMoneyWithdraw = () => {
     onOpenChange(false);
     setMobileMoneyDialogOpen(true);
+  };
+
+  const handleSetupPayout = () => {
+    onOpenChange(false);
+    setSetupDialogOpen(true);
   };
 
   return (
@@ -107,6 +114,20 @@ const CreatorWithdrawDialog: React.FC<CreatorWithdrawDialogProps> = ({
                   Processing: 5-30 minutes
                 </div>
               </Button>
+
+              <Button 
+                variant="outline" 
+                className="w-full h-auto p-4 flex flex-col items-start space-y-2"
+                onClick={handleSetupPayout}
+              >
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-5 w-5" />
+                  <span className="font-medium">Setup Payout Method</span>
+                </div>
+                <div className="text-sm text-muted-foreground text-left">
+                  Configure your preferred payout method
+                </div>
+              </Button>
             </div>
 
             {availableBalance < 5 && (
@@ -141,6 +162,13 @@ const CreatorWithdrawDialog: React.FC<CreatorWithdrawDialogProps> = ({
         onOpenChange={setMobileMoneyDialogOpen}
         availableBalance={availableBalance}
         currency={currency}
+        onSuccess={onSuccess}
+      />
+
+      {/* Payout Method Setup Dialog */}
+      <PayoutMethodSetupDialog
+        open={setupDialogOpen}
+        onOpenChange={setSetupDialogOpen}
         onSuccess={onSuccess}
       />
     </>
