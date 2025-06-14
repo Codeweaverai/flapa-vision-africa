@@ -184,7 +184,13 @@ const CourseDetailPage = () => {
         return;
       }
 
-      setCourse(data as Course);
+      // Transform the data to match our interface - profiles comes as array but we need single object
+      const courseData = {
+        ...data,
+        profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles
+      } as Course;
+
+      setCourse(courseData);
 
       // Fetch creator profile with stats
       if (data.creator_id) {
