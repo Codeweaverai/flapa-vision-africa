@@ -3,12 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, Mail } from 'lucide-react';
+import { Calendar, Download, Package, Ticket, Eye, Printer, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
 
 interface Order {
   id: string;
@@ -31,12 +30,15 @@ interface Order {
     ticket_holder_name: string;
     pdf_url: string;
     ticket_status: string;
+    events?: {
+      title: string;
+      start_time: string;
+    };
   }>;
 }
 
 const UserOrders = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,10 @@ const UserOrders = () => {
         .select(`
           *,
           order_items (*),
-          generated_tickets (*)
+          generated_tickets (
+            *,
+            events (title, start_time)
+          )
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -69,21 +74,35 @@ const UserOrders = () => {
     }
   };
 
-  const handleDownloadReceipt = (receiptUrl: string, orderNumber: string) => {
+  const handleDownloadReceipt = (receiptUrl: string) => {
     if (receiptUrl) {
-      window.open(receiptUrl, '_blank');
+      const newWindow = window.open();
+      if (newWindow) {
+        if (receiptUrl.startsWith('data:text/html;base64,')) {
+          newWindow.document.write(atob(receiptUrl.split(',')[1]));
+        } else {
+          newWindow.location.href = receiptUrl;
+        }
+        newWindow.document.close();
+      }
+      toast.success('Receipt opened in new window');
     } else {
       toast.error('Receipt not available');
     }
   };
 
-  const handleViewTickets = (orderId: string) => {
-    navigate(`/tickets/${orderId}`);
-  };
-
-  const handlePrintTicket = (ticketUrl: string) => {
-    if (ticketUrl) {
-      window.open(ticketUrl, '_blank');
+  const handleDownloadTicket = (ticket: any) => {
+    if (ticket.pdf_url) {
+      const newWindow = window.open();
+      if (newWindow) {
+        if (ticket.pdf_url.startsWith('data:text/html;base64,')) {
+          newWindow.document.write(atob(ticket.pdf_url.split(',')[1]));
+        } else {
+          newWindow.location.href = ticket.pdf_url;
+        }
+        newWindow.document.close();
+      }
+      toast.success('Ticket opened in new window');
     } else {
       toast.error('Ticket not available');
     }
@@ -91,14 +110,20 @@ const UserOrders = () => {
 
   const handleRegenerateTickets = async (orderId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('generate-tickets', {
+      toast.info('Regenerating tickets...');
+      
+      const { data, error } = await supabase.functions.invoke('generate-event-tickets', {
         body: { orderId }
       });
 
       if (error) throw error;
       
-      toast.success('Tickets regenerated successfully');
-      loadOrders(); // Refresh the orders
+      if (data?.success) {
+        toast.success('Tickets regenerated successfully');
+        loadOrders(); // Refresh the orders
+      } else {
+        throw new Error(data?.error || 'Failed to regenerate tickets');
+      }
     } catch (error) {
       console.error('Error regenerating tickets:', error);
       toast.error('Failed to regenerate tickets');
@@ -143,12 +168,6 @@ const UserOrders = () => {
                 <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
                 <h2 className="text-xl font-semibold mb-4">No orders found</h2>
                 <p className="text-gray-600 mb-6">You haven't made any purchases yet.</p>
-                <Button 
-                  onClick={() => navigate('/courses')}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600"
-                >
-                  Browse Courses
-                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -230,17 +249,18 @@ const UserOrders = () => {
                               {tickets.slice(0, 3).map((ticket) => (
                                 <div key={ticket.id} className="flex items-center justify-between p-2 bg-white rounded border">
                                   <div>
-                                    <div className="font-medium text-sm">{ticket.ticket_holder_name}</div>
-                                    <div className="text-xs text-gray-600">Code: {ticket.ticket_code}</div>
+                                    <div className="font-medium text-sm">{ticket.events?.title || 'Event'}</div>
+                                    <div className="text-xs text-gray-600">{ticket.ticket_holder_name}</div>
+                                    <div className="text-xs text-gray-500">Code: {ticket.ticket_code}</div>
                                   </div>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handlePrintTicket(ticket.pdf_url)}
+                                    onClick={() => handleDownloadTicket(ticket)}
                                     className="border-green-300 text-green-700 hover:bg-green-50"
                                   >
-                                    <Printer className="h-3 w-3 mr-1" />
-                                    Print
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    View
                                   </Button>
                                 </div>
                               ))}
@@ -263,35 +283,24 @@ const UserOrders = () => {
                         {/* Receipt Download */}
                         <Button
                           variant="outline"
-                          onClick={() => handleDownloadReceipt(order.receipt_url, order.id.slice(-8).toUpperCase())}
+                          onClick={() => handleDownloadReceipt(order.receipt_url)}
                           className="border-blue-300 text-blue-700 hover:bg-blue-50"
                           disabled={!order.receipt_url}
                         >
                           <FileText className="h-4 w-4 mr-2" />
-                          Download Receipt
+                          View Receipt
                         </Button>
 
                         {/* Ticket Actions */}
                         {hasEventTickets && (
-                          <>
-                            <Button
-                              onClick={() => handleViewTickets(order.id)}
-                              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-                              disabled={tickets.length === 0}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Tickets
-                            </Button>
-                            
-                            <Button
-                              variant="outline"
-                              onClick={() => handleRegenerateTickets(order.id)}
-                              className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                            >
-                              <Ticket className="h-4 w-4 mr-2" />
-                              Regenerate Tickets
-                            </Button>
-                          </>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleRegenerateTickets(order.id)}
+                            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                          >
+                            <Ticket className="h-4 w-4 mr-2" />
+                            Regenerate Tickets
+                          </Button>
                         )}
                       </div>
                     </CardContent>

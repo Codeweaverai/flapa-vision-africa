@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Package, Ticket, BookOpen, Loader2 } from 'lucide-react';
+import { CheckCircle, Package, Ticket, BookOpen, Loader2, Download, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
@@ -16,8 +16,9 @@ const CheckoutSuccessPage = () => {
   const { clearCart } = useCart();
   const { user } = useAuth();
   const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [verificationComplete, setVerificationComplete] = useState(false);
+  const [generatingTickets, setGeneratingTickets] = useState(false);
 
   const sessionId = searchParams.get('session_id');
 
@@ -35,9 +36,9 @@ const CheckoutSuccessPage = () => {
       }
 
       try {
-        console.log('Processing payment verification for session:', sessionId);
+        console.log('Processing payment success for session:', sessionId);
         
-        // Verify payment and process order
+        // Verify payment first
         const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-payment', {
           body: {
             sessionId,
@@ -45,59 +46,69 @@ const CheckoutSuccessPage = () => {
           }
         });
 
-        console.log('Verification response:', verificationData, verificationError);
-
-        if (verificationError) {
-          throw verificationError;
+        if (verificationError || !verificationData?.success) {
+          throw new Error('Payment verification failed');
         }
 
-        if (verificationData?.success) {
-          setVerificationComplete(true);
-          
-          // Clear the cart after successful verification
-          await clearCart();
-          
-          // Wait a moment for all processing to complete
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        // Fetch order details
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (*)
+          `)
+          .eq('stripe_session_id', sessionId)
+          .eq('user_id', user.id)
+          .single();
 
-          // Fetch order details using the session ID
-          const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              order_items (
-                *
-              )
-            `)
-            .eq('stripe_session_id', sessionId)
-            .eq('user_id', user.id)
-            .single();
+        if (orderError || !order) {
+          throw new Error('Order not found');
+        }
 
-          if (orderError) {
-            console.error('Error fetching order:', orderError);
-          } else {
-            setOrderDetails(order);
+        setOrderDetails(order);
+
+        // Check if order has event tickets that need generation
+        const hasEventTickets = order.order_items.some((item: any) => item.item_type === 'event_ticket');
+        
+        if (hasEventTickets) {
+          setGeneratingTickets(true);
+          
+          // Generate tickets and receipts
+          const { data: ticketData, error: ticketError } = await supabase.functions.invoke('generate-event-tickets', {
+            body: { orderId: order.id }
+          });
+
+          if (ticketError) {
+            console.error('Error generating tickets:', ticketError);
+            toast.error('Failed to generate tickets. Please contact support.');
+          } else if (ticketData?.success) {
+            toast.success('Tickets and receipt generated successfully!');
+            
+            // Fetch generated tickets
+            const { data: generatedTickets } = await supabase
+              .from('generated_tickets')
+              .select(`
+                *,
+                events (title, start_time, location)
+              `)
+              .eq('order_id', order.id);
+
+            if (generatedTickets) {
+              setTickets(generatedTickets);
+            }
           }
-
-          toast.success('Payment successful! Your order has been confirmed.');
           
-          // Auto-redirect to My Orders after 5 seconds
-          setTimeout(() => {
-            navigate('/account/orders');
-          }, 5000);
-
-        } else {
-          throw new Error(verificationData?.message || 'Payment verification failed');
+          setGeneratingTickets(false);
         }
+
+        // Clear cart after successful processing
+        await clearCart();
+        
+        toast.success('Payment successful! Your order has been confirmed.');
 
       } catch (error) {
         console.error('Error handling success:', error);
         toast.error('There was an issue processing your order. Please contact support.');
-        
-        // Redirect to orders page anyway in case the order was processed
-        setTimeout(() => {
-          navigate('/account/orders');
-        }, 3000);
       } finally {
         setLoading(false);
       }
@@ -106,14 +117,39 @@ const CheckoutSuccessPage = () => {
     handleSuccess();
   }, [sessionId, user, navigate, clearCart]);
 
+  const downloadTicket = (ticket: any) => {
+    if (ticket.pdf_url) {
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(atob(ticket.pdf_url.split(',')[1]));
+        newWindow.document.close();
+      }
+      toast.success('Ticket opened in new window');
+    } else {
+      toast.error('Ticket not available for download');
+    }
+  };
+
+  const downloadReceipt = () => {
+    if (orderDetails?.receipt_url) {
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(atob(orderDetails.receipt_url.split(',')[1]));
+        newWindow.document.close();
+      }
+      toast.success('Receipt opened in new window');
+    } else {
+      toast.error('Receipt not available');
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="animate-spin h-12 w-12 text-orange-600 mx-auto mb-4" />
-            <p className="text-gray-600">Processing your payment and generating tickets...</p>
-            <p className="text-sm text-gray-500 mt-2">This may take a few moments</p>
+            <p className="text-gray-600">Processing your payment...</p>
           </div>
         </div>
       </Layout>
@@ -134,7 +170,7 @@ const CheckoutSuccessPage = () => {
                   Payment Successful!
                 </CardTitle>
                 <p className="text-green-700">
-                  Thank you for your purchase. Your order has been confirmed and is being processed.
+                  Thank you for your purchase. Your order has been confirmed.
                 </p>
               </CardHeader>
               
@@ -149,13 +185,7 @@ const CheckoutSuccessPage = () => {
                       </div>
                       <div className="flex justify-between">
                         <span>Total Amount:</span>
-                        <span className="font-semibold">${orderDetails.total_amount.toFixed(2)} USD</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Payment Status:</span>
-                        <span className="text-green-600 font-semibold">
-                          COMPLETED
-                        </span>
+                        <span className="font-semibold">${orderDetails.total_amount.toFixed(2)} {orderDetails.currency}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Items:</span>
@@ -165,28 +195,44 @@ const CheckoutSuccessPage = () => {
                   </div>
                 )}
 
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-800 mb-2">What's happening now?</h3>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>✅ Payment processed successfully</li>
-                    <li>✅ Order confirmed and saved</li>
-                    <li>📧 Confirmation email being sent</li>
-                    <li>🎫 Tickets and receipts being generated</li>
-                    <li>📚 Course access being activated</li>
-                  </ul>
-                </div>
+                {generatingTickets && (
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div className="flex items-center">
+                      <Loader2 className="animate-spin h-5 w-5 text-blue-600 mr-3" />
+                      <span className="text-blue-800">Generating your tickets and receipt...</span>
+                    </div>
+                  </div>
+                )}
+
+                {tickets.length > 0 && (
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <h3 className="font-semibold text-green-800 mb-3 flex items-center">
+                      <Ticket className="h-5 w-5 mr-2" />
+                      Your Event Tickets ({tickets.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {tickets.map((ticket) => (
+                        <div key={ticket.id} className="flex items-center justify-between p-3 bg-white rounded border">
+                          <div>
+                            <div className="font-medium">{ticket.events?.title}</div>
+                            <div className="text-sm text-gray-600">{ticket.ticket_holder_name}</div>
+                            <div className="text-xs text-gray-500">Code: {ticket.ticket_code}</div>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => downloadTicket(ticket)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="text-center space-y-4">
-                  <p className="text-gray-600">
-                    You will receive a confirmation email shortly with your receipt and any tickets.
-                  </p>
-                  
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800">
-                      🚀 Redirecting you to My Orders in a few seconds...
-                    </p>
-                  </div>
-                  
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button 
                       onClick={() => navigate('/account/orders')}
@@ -196,6 +242,19 @@ const CheckoutSuccessPage = () => {
                       View My Orders
                     </Button>
                     
+                    {orderDetails?.receipt_url && (
+                      <Button 
+                        onClick={downloadReceipt}
+                        variant="outline"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Download Receipt
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button 
                       onClick={() => navigate('/my-courses')}
                       variant="outline"
