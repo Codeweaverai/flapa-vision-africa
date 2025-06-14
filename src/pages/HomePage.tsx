@@ -10,6 +10,7 @@ import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
 import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
+import CallToAction from '@/components/home/LearningSection';
 
 const HomePage = () => {
   return (
@@ -21,6 +22,7 @@ const HomePage = () => {
       <CommunityAISection />
       <EventsSection />
       <PastEventsSection />
+      <LearningSection />
       <MediaSection />
       <CallToAction />
     </Layout>
