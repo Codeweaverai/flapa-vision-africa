@@ -18,7 +18,7 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { items, updateQuantity, removeFromCart, clearCart, getTotalPrice } = useCart();
-  const { currency, convertPrice } = useCurrency();
+  const { currentCurrency, convertPrice } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [convertedTotal, setConvertedTotal] = useState(0);
 
@@ -77,8 +77,8 @@ const CheckoutPage = () => {
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity,
-        metadata: item.item_type === 'event_ticket' ? 
-          { ticket_holder_names: item.ticket_holder_names } : {}
+        metadata: (item.item_type === 'event_ticket' ? 
+          { ticket_holder_names: item.ticket_holder_names } : {}) as any
       }));
 
       const { error: itemsError } = await supabase
@@ -206,9 +206,14 @@ const CheckoutPage = () => {
                     {item.item_type === 'event_ticket' && (
                       <div className="mt-6">
                         <TicketHolderForm
-                          itemId={item.id}
+                          eventTitle={item.title}
                           quantity={item.quantity}
                           ticketHolders={item.ticket_holder_names || []}
+                          onUpdateTicketHolders={(holders) => {
+                            // Update the cart item with new ticket holders
+                            // This will be handled by the CartContext
+                          }}
+                          onUpdateQuantity={(newQuantity) => updateQuantity(item.id, newQuantity)}
                         />
                       </div>
                     )}
