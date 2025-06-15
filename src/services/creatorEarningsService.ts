@@ -71,17 +71,21 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
         // Check if this event ticket belongs to the creator's event
         const { data: eventTicket } = await supabase
           .from('event_tickets')
-          .select(`
-            id,
-            event_id,
-            events!inner(id, title, creator_id)
-          `)
+          .select('id, event_id')
           .eq('id', item.item_id)
-          .eq('events.creator_id', creatorId)
           .maybeSingle();
         
         if (eventTicket) {
-          creatorItems.push({ ...item, eventTicket });
+          const { data: event } = await supabase
+            .from('events')
+            .select('id, title, creator_id')
+            .eq('id', eventTicket.event_id)
+            .eq('creator_id', creatorId)
+            .maybeSingle();
+          
+          if (event) {
+            creatorItems.push({ ...item, eventTicket: { ...eventTicket, event } });
+          }
         }
       }
     }
@@ -200,18 +204,22 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
         // Check if this event ticket belongs to the creator's event
         const { data: eventTicket } = await supabase
           .from('event_tickets')
-          .select(`
-            id,
-            event_id,
-            events!inner(id, title, creator_id)
-          `)
+          .select('id, event_id')
           .eq('id', item.item_id)
-          .eq('events.creator_id', creatorId)
           .maybeSingle();
         
-        if (eventTicket && eventTicket.events) {
-          itemName = eventTicket.events.title;
-          belongsToCreator = true;
+        if (eventTicket) {
+          const { data: event } = await supabase
+            .from('events')
+            .select('id, title, creator_id')
+            .eq('id', eventTicket.event_id)
+            .eq('creator_id', creatorId)
+            .maybeSingle();
+          
+          if (event) {
+            itemName = event.title;
+            belongsToCreator = true;
+          }
         }
       }
 

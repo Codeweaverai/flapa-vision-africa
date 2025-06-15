@@ -53,20 +53,25 @@ import {
   setupInboxMessageListener 
 } from '@/services/notificationService';
 
-// Add missing notification service function
+// Add missing notification service function with error handling
 const fetchUserNotifications = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching notifications:', error);
+    if (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Network error fetching notifications:', error);
     return [];
   }
-
-  return data || [];
 };
 
 const Navbar = () => {
@@ -84,42 +89,57 @@ const Navbar = () => {
       loadNotificationCount();
       fetchUserProfile();
 
-      const unsubscribeNotifications = setupNotificationListener(user.id, (notification) => {
-        console.log('New notification:', notification);
-        loadNotificationCount();
-      });
-
-      const unsubscribeMessages = setupInboxMessageListener(user.id, (message) => {
-        console.log('New inbox message:', message);
-        
-        supabase
-          .from('notifications')
-          .insert({
-            user_id: user.id,
-            content: `New message: ${message.subject}`,
-            type: 'message',
-            related_id: message.id
-          });
-      });
-
-      // Subscribe to community notifications
-      const communityChannel = supabase
-        .channel('community-notifications')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
-        }, () => {
+      try {
+        const unsubscribeNotifications = setupNotificationListener(user.id, (notification) => {
+          console.log('New notification:', notification);
           loadNotificationCount();
-        })
-        .subscribe();
-      
-      return () => {
-        unsubscribeNotifications();
-        unsubscribeMessages();
-        supabase.removeChannel(communityChannel);
-      };
+        });
+
+        const unsubscribeMessages = setupInboxMessageListener(user.id, (message) => {
+          console.log('New inbox message:', message);
+          
+          supabase
+            .from('notifications')
+            .insert({
+              user_id: user.id,
+              content: `New message: ${message.subject}`,
+              type: 'message',
+              related_id: message.id
+            })
+            .catch(error => console.error('Error creating notification:', error));
+        });
+
+        // Subscribe to community notifications with error handling
+        const communityChannel = supabase
+          .channel('community-notifications')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`
+          }, () => {
+            loadNotificationCount();
+          })
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('Successfully subscribed to notifications');
+            } else if (status === 'CHANNEL_ERROR') {
+              console.error('Error subscribing to notifications channel');
+            }
+          });
+        
+        return () => {
+          try {
+            unsubscribeNotifications();
+            unsubscribeMessages();
+            supabase.removeChannel(communityChannel);
+          } catch (error) {
+            console.error('Error cleaning up subscriptions:', error);
+          }
+        };
+      } catch (error) {
+        console.error('Error setting up real-time subscriptions:', error);
+      }
     }
   }, [user]);
 
@@ -140,16 +160,21 @@ const Navbar = () => {
 
       setUserProfile(data);
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
+      console.error('Network error in fetchUserProfile:', error);
     }
   };
 
   const loadNotificationCount = async () => {
     if (!user) return;
     
-    const notifications = await fetchUserNotifications(user.id);
-    const unreadCount = notifications.filter(n => !n.is_read).length;
-    setUnreadNotifications(unreadCount);
+    try {
+      const notifications = await fetchUserNotifications(user.id);
+      const unreadCount = notifications.filter(n => !n.is_read).length;
+      setUnreadNotifications(unreadCount);
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+      setUnreadNotifications(0);
+    }
   };
 
   const navLinks = [
@@ -168,8 +193,12 @@ const Navbar = () => {
   ];
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const isActive = (path: string) => {

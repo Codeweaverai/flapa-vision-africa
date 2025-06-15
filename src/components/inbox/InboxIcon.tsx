@@ -16,22 +16,36 @@ const InboxIcon: React.FC = () => {
     if (user) {
       loadUnreadCount();
 
-      // Set up realtime subscription for new messages
-      const channel = supabase
-        .channel('inbox_unread')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'inbox_messages',
-          filter: `recipient_id=eq.${user.id}`
-        }, () => {
-          loadUnreadCount();
-        })
-        .subscribe();
+      try {
+        // Set up realtime subscription for new messages with error handling
+        const channel = supabase
+          .channel('inbox_unread')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'inbox_messages',
+            filter: `recipient_id=eq.${user.id}`
+          }, () => {
+            loadUnreadCount();
+          })
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('Successfully subscribed to inbox messages');
+            } else if (status === 'CHANNEL_ERROR') {
+              console.error('Error subscribing to inbox messages channel');
+            }
+          });
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+        return () => {
+          try {
+            supabase.removeChannel(channel);
+          } catch (error) {
+            console.error('Error removing inbox subscription:', error);
+          }
+        };
+      } catch (error) {
+        console.error('Error setting up inbox subscription:', error);
+      }
     }
   }, [user]);
 
@@ -52,7 +66,8 @@ const InboxIcon: React.FC = () => {
 
       setUnreadCount(data?.length || 0);
     } catch (error) {
-      console.error('Error in loadUnreadCount:', error);
+      console.error('Network error in loadUnreadCount:', error);
+      // Don't update count if there's a network error
     }
   };
 
