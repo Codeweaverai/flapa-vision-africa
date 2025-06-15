@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -196,6 +197,7 @@ const UserOrders = () => {
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-300';
       case 'pending':
+      case 'processing':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'failed':
         return 'bg-red-100 text-red-800 border-red-300';
@@ -350,7 +352,7 @@ const UserOrders = () => {
                               </div>
                             ) : (
                               <div className="text-sm text-gray-600">
-                                Tickets are being generated...
+                                {order.payment_status === 'completed' ? 'Tickets are being generated...' : 'Tickets will be generated after payment completion'}
                               </div>
                             )}
                           </div>
@@ -370,7 +372,7 @@ const UserOrders = () => {
                           </Button>
 
                           {/* Ticket Actions */}
-                          {hasEventTickets && (
+                          {hasEventTickets && order.payment_status === 'completed' && (
                             <Button
                               variant="outline"
                               onClick={() => handleRegenerateTickets(order.id)}

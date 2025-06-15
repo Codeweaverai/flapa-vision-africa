@@ -50,20 +50,11 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
     setLoading(true);
     try {
-      let returnUrl;
-      if (courseId) {
-        returnUrl = `${window.location.origin}/payment/result?type=course&id=${courseId}`;
-      } else if (eventId) {
-        returnUrl = `${window.location.origin}/payment/result?type=event&id=${eventId}`;
-      } else {
-        returnUrl = `${window.location.origin}/payment/result`;
-      }
-
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           courseId,
           eventId,
-          returnUrl
+          payment_method: 'stripe'
         }
       });
 
@@ -72,6 +63,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
       }
 
       if (data?.url) {
+        // Redirect to Stripe checkout
         window.location.href = data.url;
       } else {
         throw new Error("No checkout URL returned");

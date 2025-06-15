@@ -16,8 +16,7 @@ const generateTicketCode = (): string => {
   return `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
 };
 
-const generateReceiptHTML = (order: any, profile: any, items: any[]): string => {
-  const customerName = profile?.full_name || profile?.username || 'Customer';
+const generateReceiptHTML = (order: any, customerName: string, items: any[]): string => {
   const orderNumber = order.id.slice(-8).toUpperCase();
   
   return `
@@ -172,19 +171,25 @@ serve(async (req) => {
     const { orderId } = await req.json()
     console.log('Generating tickets and receipt for order:', orderId)
 
-    // Get order details with user information
+    // Get order details
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select(`
-        *,
-        profiles:user_id (full_name, username)
-      `)
+      .select('*')
       .eq('id', orderId)
       .single()
 
     if (orderError || !order) {
-      throw new Error('Order not found')
+      throw new Error(`Order not found: ${orderError?.message || 'No order data'}`)
     }
+
+    // Get user profile separately
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('full_name, username')
+      .eq('id', order.user_id)
+      .single()
+
+    const customerName = profile?.full_name || profile?.username || 'Customer'
 
     // Get order items
     const { data: orderItems, error: orderItemsError } = await supabaseClient
@@ -196,10 +201,8 @@ serve(async (req) => {
       throw new Error('Failed to fetch order items')
     }
 
-    const customerName = order.profiles?.full_name || order.profiles?.username || 'Customer'
-    
     // Generate and store receipt
-    const receiptHTML = generateReceiptHTML(order, order.profiles, orderItems)
+    const receiptHTML = generateReceiptHTML(order, customerName, orderItems)
     
     const { error: receiptUpdateError } = await supabaseClient
       .from('orders')
