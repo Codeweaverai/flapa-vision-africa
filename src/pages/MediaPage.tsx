@@ -80,7 +80,7 @@ const MediaPage = () => {
               width="100%"
               height="100%"
               light={post.image_url || true}
-              controls={false}
+              controls={true}
               playing={false}
               className="rounded-t-lg overflow-hidden"
             />

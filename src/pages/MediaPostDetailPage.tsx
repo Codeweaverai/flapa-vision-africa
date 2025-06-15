@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -8,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calendar, User, Clock, Play, FileText, Headphones, Eye, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
+import ReactPlayer from 'react-player/lazy';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 interface MediaPost {
   id: string;
@@ -226,21 +227,17 @@ const MediaPostDetailPage = () => {
                 {post.media_url && (
                   <div className="bg-gradient-to-br from-orange-50 to-purple-50 p-6 rounded-2xl border border-orange-200">
                     {post.post_type === 'video' ? (
-                      <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Button
-                            size="lg"
-                            className="rounded-full w-20 h-20 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                            onClick={() => {
-                              if (post.media_url) {
-                                window.open(post.media_url, '_blank');
-                              }
-                            }}
-                          >
-                            <Play className="h-10 w-10" />
-                          </Button>
-                        </div>
-                      </div>
+                      <AspectRatio ratio={16 / 9} className="bg-black rounded-xl overflow-hidden">
+                        <ReactPlayer
+                          url={post.media_url}
+                          width="100%"
+                          height="100%"
+                          controls
+                          playing={false}
+                          light={post.image_url}
+                          playIcon={<div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center backdrop-blur-sm hover:scale-110 transition-transform"><Play className="h-10 w-10 text-gray-800 ml-1" /></div>}
+                        />
+                      </AspectRatio>
                     ) : post.post_type === 'podcast' ? (
                       <div className="text-center">
                         <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center">
