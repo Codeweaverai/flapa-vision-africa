@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -77,6 +76,36 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
     try {
       setLoading(true);
       
+      // First create a Stripe Connect account if user doesn't have one
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('stripe_connect_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!profile?.stripe_connect_id) {
+        // Create Stripe Connect account first
+        const { data: accountData, error: accountError } = await supabase.functions.invoke('create-stripe-connect-account', {
+          body: { userId: user?.id }
+        });
+
+        if (accountError) throw accountError;
+
+        if (!accountData?.accountId) {
+          throw new Error('Failed to create Stripe Connect account');
+        }
+
+        // Update profile with Stripe Connect ID
+        await supabase
+          .from('profiles')
+          .update({ 
+            stripe_connect_id: accountData.accountId,
+            payout_method: 'stripe'
+          })
+          .eq('id', user?.id);
+      }
+
+      // Now create account session
       const { data, error } = await supabase.functions.invoke('create-stripe-account-session');
 
       if (error) throw error;
