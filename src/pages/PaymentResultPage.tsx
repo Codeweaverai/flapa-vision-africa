@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 
@@ -15,111 +14,44 @@ const PaymentResultPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
-  const [itemType, setItemType] = useState<'course' | 'event' | 'order' | null>(null);
-  const [itemId, setItemId] = useState<string | null>(null);
-  const [itemTitle, setItemTitle] = useState<string>('');
-  const [orderId, setOrderId] = useState<string | null>(null);
 
   const sessionId = searchParams.get('session_id');
-  const type = searchParams.get('type') as 'course' | 'event';
-  const id = searchParams.get('id');
   const canceled = searchParams.get('canceled');
 
   useEffect(() => {
+    console.log('[PAYMENT-RESULT] Page loaded with:', { sessionId, canceled, user: !!user });
+    
     if (canceled) {
+      console.log('[PAYMENT-RESULT] Payment was canceled');
       setLoading(false);
       setSuccess(false);
+      toast.error('Payment was canceled');
       return;
     }
 
     if (!user) {
+      console.log('[PAYMENT-RESULT] No user found, redirecting to auth');
       toast.error("You need to be logged in");
       navigate('/auth');
       return;
     }
 
     if (!sessionId) {
+      console.log('[PAYMENT-RESULT] No session ID found');
       setLoading(false);
       setSuccess(false);
+      toast.error('Invalid payment session');
       return;
     }
 
-    const verifyPayment = async () => {
-      try {
-        console.log("Verifying payment with session:", sessionId);
-        
-        const requestBody: any = {
-          sessionId,
-          userId: user.id
-        };
-
-        // Add type and itemId if they exist (individual purchases)
-        if (type && id) {
-          requestBody.type = type;
-          requestBody.itemId = id;
-          setItemType(type);
-          setItemId(id);
-        } else {
-          // This is likely a cart-based order
-          setItemType('order');
-        }
-
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: requestBody
-        });
-
-        console.log("Verification response:", data, error);
-
-        if (error) throw error;
-
-        if (data?.success) {
-          setSuccess(true);
-          setItemTitle(data.title || 'Your Order');
-          setOrderId(data.orderId);
-          
-          // Show specific success message based on fulfillment
-          if (data.fulfillmentResults && data.fulfillmentResults.length > 0) {
-            const courses = data.fulfillmentResults.filter((r: any) => r.type === 'course').length;
-            const events = data.fulfillmentResults.filter((r: any) => r.type === 'event').length;
-            
-            let message = 'Payment successful! ';
-            if (courses > 0) message += `Enrolled in ${courses} course(s). `;
-            if (events > 0) message += `Registered for ${events} event(s). `;
-            
-            toast.success(message);
-          } else {
-            toast.success(data.message || 'Payment successful!');
-          }
-
-          // Redirect to checkout success page for better UX
-          setTimeout(() => {
-            navigate(`/checkout/success?session_id=${sessionId}`);
-          }, 2000);
-        } else {
-          setSuccess(false);
-          toast.error(data?.message || 'Unable to verify payment');
-        }
-      } catch (error) {
-        console.error('Error verifying payment:', error);
-        toast.error('Failed to verify payment');
-        setSuccess(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    verifyPayment();
-  }, [user, navigate, sessionId, type, id, canceled]);
+    // Redirect immediately to checkout success for processing
+    console.log('[PAYMENT-RESULT] Redirecting to checkout success for processing');
+    navigate(`/checkout/success?session_id=${sessionId}`, { replace: true });
+  }, [user, navigate, sessionId, canceled]);
 
   const handleRedirect = () => {
     if (success) {
-      if (itemType === 'course') {
-        navigate(`/learning/course/${itemId}`);
-      } else if (itemType === 'event') {
-        navigate(`/my-events`);
-      } else {
-        navigate('/account/orders');
-      }
+      navigate('/account/orders');
     } else {
       navigate(-1);
     }
@@ -138,44 +70,26 @@ const PaymentResultPage = () => {
               ) : (
                 <XCircle className="h-8 w-8 text-red-500 mr-2" />
               )}
-              {loading ? 'Processing Payment' : success ? 'Payment Successful' : 'Payment Failed'}
+              {loading ? 'Redirecting...' : success ? 'Payment Successful' : 'Payment Issues'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-center">Please wait while we verify your payment and complete your order...</p>
+              <p className="text-center">Redirecting you to process your order...</p>
             ) : success ? (
               <div className="text-center space-y-2">
                 <p>Your payment has been processed successfully!</p>
-                {itemTitle && <p className="font-medium">{itemTitle}</p>}
-                {orderId && <p className="text-sm text-gray-600">Order ID: {orderId.slice(-8).toUpperCase()}</p>}
-                <p>You will be redirected to the success page shortly.</p>
-                {itemType === 'event' && (
-                  <p className="text-sm text-blue-600">Your tickets and receipt are being generated and will be available in My Orders.</p>
-                )}
-                {itemType === 'course' && (
-                  <p className="text-sm text-blue-600">You now have access to the course materials.</p>
-                )}
-                {itemType === 'order' && (
-                  <p className="text-sm text-blue-600">Your order is complete. Tickets and receipts are being generated and will be available in My Orders.</p>
-                )}
               </div>
             ) : (
               <div className="text-center space-y-2">
-                <p>We couldn't process your payment at this time.</p>
+                <p>There was an issue with your payment.</p>
                 <p>Please try again or contact support for assistance.</p>
               </div>
             )}
           </CardContent>
           <CardFooter className="flex justify-center">
             <Button onClick={handleRedirect} disabled={loading}>
-              {success 
-                ? itemType === 'course' 
-                  ? 'Go to Course' 
-                  : itemType === 'event' 
-                    ? 'View My Events' 
-                    : 'View My Orders' 
-                : 'Go Back'}
+              {success ? 'View My Orders' : 'Go Back'}
             </Button>
           </CardFooter>
         </Card>

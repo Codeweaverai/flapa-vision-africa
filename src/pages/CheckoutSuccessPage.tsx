@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Package, Ticket, BookOpen, Loader2, Download, FileText } from 'lucide-react';
+import { CheckCircle, Package, Ticket, BookOpen, Loader2, Download, FileText, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
@@ -20,155 +20,171 @@ const CheckoutSuccessPage = () => {
   const [loading, setLoading] = useState(true);
   const [fulfillmentResults, setFulfillmentResults] = useState<any[]>([]);
   const [verificationAttempts, setVerificationAttempts] = useState(0);
-  const maxRetries = 3;
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 5;
 
   const sessionId = searchParams.get('session_id');
 
   const verifyPaymentWithRetry = async (attempt = 1): Promise<any> => {
     try {
-      console.log(`Payment verification attempt ${attempt}/${maxRetries}`);
+      console.log(`[CHECKOUT-SUCCESS] Payment verification attempt ${attempt}/${maxRetries} for session: ${sessionId}`);
       
       const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-payment', {
         body: {
           sessionId,
-          userId: user?.id
+          userId: user?.id,
+          retry: attempt > 1
         }
       });
 
+      console.log(`[CHECKOUT-SUCCESS] Verification attempt ${attempt} response:`, { verificationData, verificationError });
+
       if (verificationError) {
-        console.error(`Verification attempt ${attempt} failed:`, verificationError);
+        console.error(`[CHECKOUT-SUCCESS] Verification attempt ${attempt} failed:`, verificationError);
         if (attempt < maxRetries) {
-          // Wait 2 seconds before retry
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          const waitTime = Math.min(2000 * attempt, 10000); // Progressive delay
+          console.log(`[CHECKOUT-SUCCESS] Waiting ${waitTime}ms before retry ${attempt + 1}`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
           return verifyPaymentWithRetry(attempt + 1);
         }
-        throw new Error('Payment verification failed after multiple attempts');
+        throw new Error(`Payment verification failed after ${maxRetries} attempts: ${verificationError.message}`);
       }
 
       if (!verificationData?.success) {
-        console.error(`Verification attempt ${attempt} unsuccessful:`, verificationData);
+        console.error(`[CHECKOUT-SUCCESS] Verification attempt ${attempt} unsuccessful:`, verificationData);
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          const waitTime = Math.min(2000 * attempt, 10000);
+          console.log(`[CHECKOUT-SUCCESS] Waiting ${waitTime}ms before retry ${attempt + 1}`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
           return verifyPaymentWithRetry(attempt + 1);
         }
-        throw new Error('Payment verification was not successful');
+        throw new Error(`Payment verification was not successful after ${maxRetries} attempts`);
       }
 
+      console.log(`[CHECKOUT-SUCCESS] Payment verification successful on attempt ${attempt}`);
       return verificationData;
     } catch (error) {
-      console.error(`Verification attempt ${attempt} error:`, error);
+      console.error(`[CHECKOUT-SUCCESS] Verification attempt ${attempt} error:`, error);
       if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        const waitTime = Math.min(2000 * attempt, 10000);
+        console.log(`[CHECKOUT-SUCCESS] Waiting ${waitTime}ms before retry ${attempt + 1}`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         return verifyPaymentWithRetry(attempt + 1);
       }
       throw error;
     }
   };
 
-  useEffect(() => {
-    const handleSuccess = async () => {
-      if (!user) {
-        console.log('No user found, redirecting to auth');
-        navigate('/auth');
-        return;
-      }
+  const handleSuccess = async () => {
+    if (!user) {
+      console.log('[CHECKOUT-SUCCESS] No user found, redirecting to auth');
+      navigate('/auth');
+      return;
+    }
 
-      if (!sessionId) {
-        console.error('No session ID found');
-        toast.error('Invalid session. Please try again.');
-        navigate('/checkout');
-        return;
-      }
+    if (!sessionId) {
+      console.error('[CHECKOUT-SUCCESS] No session ID found');
+      toast.error('Invalid session. Please try again.');
+      navigate('/checkout');
+      return;
+    }
 
-      try {
-        console.log('Processing payment success for session:', sessionId);
-        setVerificationAttempts(prev => prev + 1);
+    try {
+      console.log('[CHECKOUT-SUCCESS] Processing payment success for session:', sessionId);
+      setVerificationAttempts(prev => prev + 1);
+      
+      // Use retry logic for payment verification
+      const verificationData = await verifyPaymentWithRetry();
+
+      console.log('[CHECKOUT-SUCCESS] Payment verified successfully:', verificationData);
+      
+      setFulfillmentResults(verificationData.fulfillmentResults || []);
+
+      // Fetch order details using the order ID from verification
+      if (verificationData.orderId) {
+        console.log('[CHECKOUT-SUCCESS] Fetching order details for:', verificationData.orderId);
         
-        // Use retry logic for payment verification
-        const verificationData = await verifyPaymentWithRetry();
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (*)
+          `)
+          .eq('id', verificationData.orderId)
+          .single();
 
-        console.log('Payment verified successfully:', verificationData);
-        
-        setFulfillmentResults(verificationData.fulfillmentResults || []);
-
-        // Fetch order details using the order ID from verification
-        if (verificationData.orderId) {
-          const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              order_items (*)
-            `)
-            .eq('id', verificationData.orderId)
-            .single();
-
-          if (orderError) {
-            console.error('Error fetching order details:', orderError);
-          } else {
-            setOrderDetails(order);
-            console.log('Order details loaded:', order);
-          }
-
-          // Check for generated tickets
-          const { data: generatedTickets } = await supabase
-            .from('generated_tickets')
-            .select(`
-              *,
-              events (title, start_time, location)
-            `)
-            .eq('order_id', verificationData.orderId);
-
-          if (generatedTickets) {
-            setTickets(generatedTickets);
-            console.log('Tickets loaded:', generatedTickets);
-          }
-        }
-
-        // Clear cart after successful processing
-        await clearCart();
-        
-        // Show success message based on fulfillment results
-        if (verificationData.fulfillmentResults && verificationData.fulfillmentResults.length > 0) {
-          const courses = verificationData.fulfillmentResults.filter((r: any) => r.type === 'course').length;
-          const events = verificationData.fulfillmentResults.filter((r: any) => r.type === 'event').length;
-          
-          let message = 'Payment successful! ';
-          if (courses > 0) message += `Enrolled in ${courses} course(s). `;
-          if (events > 0) message += `Registered for ${events} event(s). `;
-          
-          toast.success(message);
+        if (orderError) {
+          console.error('[CHECKOUT-SUCCESS] Error fetching order details:', orderError);
         } else {
-          toast.success('Payment successful! Your order has been confirmed.');
+          setOrderDetails(order);
+          console.log('[CHECKOUT-SUCCESS] Order details loaded:', order);
         }
 
-        console.log('Success page processing completed');
+        // Check for generated tickets
+        const { data: generatedTickets } = await supabase
+          .from('generated_tickets')
+          .select(`
+            *,
+            events (title, start_time, location)
+          `)
+          .eq('order_id', verificationData.orderId);
 
-      } catch (error) {
-        console.error('Error handling success:', error);
-        toast.error('There was an issue processing your order. Please contact support if the problem persists.');
-        
-        // If all retries failed, redirect to a support page or show manual retry option
-        if (verificationAttempts >= maxRetries) {
-          console.log('Max retries reached, offering manual retry');
+        if (generatedTickets) {
+          setTickets(generatedTickets);
+          console.log('[CHECKOUT-SUCCESS] Tickets loaded:', generatedTickets);
         }
-      } finally {
-        setLoading(false);
       }
-    };
 
+      // Clear cart after successful processing
+      await clearCart();
+      
+      // Show success message based on fulfillment results
+      if (verificationData.fulfillmentResults && verificationData.fulfillmentResults.length > 0) {
+        const courses = verificationData.fulfillmentResults.filter((r: any) => r.type === 'course').length;
+        const events = verificationData.fulfillmentResults.filter((r: any) => r.type === 'event').length;
+        
+        let message = 'Payment successful! ';
+        if (courses > 0) message += `Enrolled in ${courses} course(s). `;
+        if (events > 0) message += `Registered for ${events} event(s). `;
+        
+        toast.success(message);
+      } else {
+        toast.success('Payment successful! Your order has been confirmed.');
+      }
+
+      console.log('[CHECKOUT-SUCCESS] Success page processing completed');
+
+    } catch (error) {
+      console.error('[CHECKOUT-SUCCESS] Error handling success:', error);
+      toast.error('There was an issue processing your order. Please contact support if the problem persists.');
+      
+      // If all retries failed, show manual retry option
+      if (verificationAttempts >= maxRetries) {
+        console.log('[CHECKOUT-SUCCESS] Max retries reached, offering manual retry');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     handleSuccess();
-  }, [sessionId, user, navigate, clearCart, verificationAttempts]);
+  }, [sessionId, user, navigate, clearCart]);
 
   const manualRetry = async () => {
+    console.log('[CHECKOUT-SUCCESS] Manual retry initiated');
     setLoading(true);
+    setRetryCount(prev => prev + 1);
     setVerificationAttempts(0);
+    
     try {
       const verificationData = await verifyPaymentWithRetry();
       if (verificationData?.success) {
-        window.location.reload(); // Reload the page to start fresh
+        console.log('[CHECKOUT-SUCCESS] Manual retry successful, reloading page');
+        window.location.reload();
       }
     } catch (error) {
-      console.error('Manual retry failed:', error);
+      console.error('[CHECKOUT-SUCCESS] Manual retry failed:', error);
       toast.error('Retry failed. Please contact support.');
     } finally {
       setLoading(false);
@@ -213,6 +229,11 @@ const CheckoutSuccessPage = () => {
                 Verification attempt {verificationAttempts} of {maxRetries}
               </p>
             )}
+            {retryCount > 0 && (
+              <p className="text-sm text-blue-600 mt-1">
+                Manual retry #{retryCount}
+              </p>
+            )}
           </div>
         </div>
       </Layout>
@@ -241,16 +262,27 @@ const CheckoutSuccessPage = () => {
                 {/* Show manual retry if verification failed */}
                 {verificationAttempts >= maxRetries && !fulfillmentResults.length && (
                   <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                    <h3 className="font-semibold text-yellow-800 mb-2">Processing Delayed</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="h-5 w-5 text-yellow-600" />
+                      <h3 className="font-semibold text-yellow-800">Processing Delayed</h3>
+                    </div>
                     <p className="text-yellow-700 text-sm mb-3">
                       Your payment was successful, but order processing is taking longer than usual.
                     </p>
                     <Button 
                       onClick={manualRetry}
+                      disabled={loading}
                       variant="outline"
                       className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
                     >
-                      Retry Processing
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Retrying...
+                        </>
+                      ) : (
+                        'Retry Processing'
+                      )}
                     </Button>
                   </div>
                 )}
