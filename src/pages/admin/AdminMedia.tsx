@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -5,16 +6,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMediaPosts, deleteMediaPost, MediaPost } from '@/services/mediaService';
-import { Pencil, Trash, Plus, FileText, Mic, Files } from 'lucide-react';
+import { Pencil, Trash, Plus, FileText, Mic, Files, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import VideoPodcastForm from '@/components/admin/VideoPodcastForm';
 
 const AdminMedia = () => {
   const navigate = useNavigate();
   const [newsPosts, setNewsPosts] = useState<MediaPost[]>([]);
   const [podcastPosts, setPodcastPosts] = useState<MediaPost[]>([]);
   const [resourcePosts, setResourcePosts] = useState<MediaPost[]>([]);
+  const [showVideoPodcastForm, setShowVideoPodcastForm] = useState(false);
   const [loading, setLoading] = useState({
     news: true,
     podcasts: true,
@@ -63,6 +67,11 @@ const AdminMedia = () => {
 
   const handleCreate = (type: 'news' | 'podcast' | 'resource') => {
     navigate(`/admin/media/create`, { state: { type } });
+  };
+
+  const handleVideoPodcastSuccess = () => {
+    setShowVideoPodcastForm(false);
+    loadPosts(); // Refresh the posts list
   };
 
   const formatCategoryName = (category: string | undefined): string => {
@@ -163,9 +172,12 @@ const AdminMedia = () => {
         </TabsContent>
 
         <TabsContent value="podcasts">
-          <div className="mb-4">
-            <Button onClick={() => handleCreate('podcast')} className="flex items-center">
-              <Plus className="h-4 w-4 mr-2" /> Create Podcast
+          <div className="mb-4 flex gap-3">
+            <Button onClick={() => setShowVideoPodcastForm(true)} className="flex items-center bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+              <Video className="h-4 w-4 mr-2" /> Create Video Podcast
+            </Button>
+            <Button onClick={() => handleCreate('podcast')} variant="outline" className="flex items-center">
+              <Plus className="h-4 w-4 mr-2" /> Create Audio Podcast
             </Button>
           </div>
           
@@ -208,6 +220,19 @@ const AdminMedia = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Video Podcast Form Dialog */}
+      <Dialog open={showVideoPodcastForm} onOpenChange={setShowVideoPodcastForm}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Create Video Podcast</DialogTitle>
+          </DialogHeader>
+          <VideoPodcastForm
+            onSuccess={handleVideoPodcastSuccess}
+            onCancel={() => setShowVideoPodcastForm(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
