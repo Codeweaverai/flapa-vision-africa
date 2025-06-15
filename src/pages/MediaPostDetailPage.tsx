@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -133,6 +134,19 @@ const MediaPostDetailPage = () => {
     }
   };
 
+  // Check if the media URL is a video that can be played by ReactPlayer
+  const isVideoContent = (mediaUrl?: string) => {
+    if (!mediaUrl) return false;
+    return ReactPlayer.canPlay(mediaUrl) && (
+      mediaUrl.includes('youtube') || 
+      mediaUrl.includes('vimeo') || 
+      mediaUrl.includes('.mp4') || 
+      mediaUrl.includes('.webm') || 
+      mediaUrl.includes('.mov') ||
+      post.post_type === 'video'
+    );
+  };
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
@@ -226,7 +240,7 @@ const MediaPostDetailPage = () => {
                 {/* Media Player Section */}
                 {post.media_url && (
                   <div className="bg-gradient-to-br from-orange-50 to-purple-50 p-6 rounded-2xl border border-orange-200">
-                    {post.post_type === 'video' ? (
+                    {isVideoContent(post.media_url) ? (
                       <AspectRatio ratio={16 / 9} className="bg-black rounded-xl overflow-hidden">
                         <ReactPlayer
                           url={post.media_url}
@@ -238,7 +252,7 @@ const MediaPostDetailPage = () => {
                           playIcon={<div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center backdrop-blur-sm hover:scale-110 transition-transform"><Play className="h-10 w-10 text-gray-800 ml-1" /></div>}
                         />
                       </AspectRatio>
-                    ) : post.post_type === 'podcast' ? (
+                    ) : (
                       <div className="text-center">
                         <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center">
                           <Headphones className="h-10 w-10 text-white" />
@@ -248,7 +262,7 @@ const MediaPostDetailPage = () => {
                           Your browser does not support the audio element.
                         </audio>
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 )}
 
@@ -262,7 +276,7 @@ const MediaPostDetailPage = () => {
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
-                  {post.media_url && post.post_type !== 'podcast' && (
+                  {post.media_url && !isVideoContent(post.media_url) && (
                     <Button 
                       asChild 
                       className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold"
@@ -273,17 +287,8 @@ const MediaPostDetailPage = () => {
                         rel="noopener noreferrer"
                         className="flex items-center gap-2"
                       >
-                        {post.post_type === 'video' ? (
-                          <>
-                            <Play className="h-4 w-4" />
-                            Watch Video
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-4 w-4" />
-                            View Content
-                          </>
-                        )}
+                        <Eye className="h-4 w-4" />
+                        View Content
                       </a>
                     </Button>
                   )}
