@@ -18,6 +18,7 @@ const PaymentResultPage = () => {
   const [itemType, setItemType] = useState<'course' | 'event' | 'order' | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState<string>('');
+  const [orderId, setOrderId] = useState<string | null>(null);
 
   const sessionId = searchParams.get('session_id');
   const type = searchParams.get('type') as 'course' | 'event';
@@ -47,13 +48,12 @@ const PaymentResultPage = () => {
       try {
         console.log("Verifying payment with session:", sessionId);
         
-        // For cart-based checkout, we don't have type and id
         const requestBody: any = {
           sessionId,
           userId: user.id
         };
 
-        // Add type and itemId only if they exist (individual purchases)
+        // Add type and itemId if they exist (individual purchases)
         if (type && id) {
           requestBody.type = type;
           requestBody.itemId = id;
@@ -75,7 +75,21 @@ const PaymentResultPage = () => {
         if (data?.success) {
           setSuccess(true);
           setItemTitle(data.title || 'Your Order');
-          toast.success(data.message || 'Payment successful!');
+          setOrderId(data.orderId);
+          
+          // Show specific success message based on fulfillment
+          if (data.fulfillmentResults && data.fulfillmentResults.length > 0) {
+            const courses = data.fulfillmentResults.filter((r: any) => r.type === 'course').length;
+            const events = data.fulfillmentResults.filter((r: any) => r.type === 'event').length;
+            
+            let message = 'Payment successful! ';
+            if (courses > 0) message += `Enrolled in ${courses} course(s). `;
+            if (events > 0) message += `Registered for ${events} event(s). `;
+            
+            toast.success(message);
+          } else {
+            toast.success(data.message || 'Payment successful!');
+          }
         } else {
           setSuccess(false);
           toast.error(data?.message || 'Unable to verify payment');
@@ -124,11 +138,12 @@ const PaymentResultPage = () => {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-center">Please wait while we verify your payment and process your order...</p>
+              <p className="text-center">Please wait while we verify your payment and complete your order...</p>
             ) : success ? (
               <div className="text-center space-y-2">
                 <p>Your payment has been processed successfully!</p>
                 {itemTitle && <p className="font-medium">{itemTitle}</p>}
+                {orderId && <p className="text-sm text-gray-600">Order ID: {orderId.slice(-8).toUpperCase()}</p>}
                 <p>Thank you for your purchase.</p>
                 {itemType === 'event' && (
                   <p className="text-sm text-blue-600">Your tickets and receipt are being generated and will be available in My Orders.</p>
