@@ -2049,13 +2049,21 @@ export type Database = {
           content: string
           created_at: string | null
           duration_minutes: number | null
+          episode_number: string | null
+          file_storage_path: string | null
+          guest_names: string | null
           id: string
           image_url: string | null
           is_published: boolean | null
+          media_type: string | null
           media_url: string | null
           post_type: string
           published_at: string | null
+          recording_date: string | null
+          scheduled_publish_at: string | null
+          series_name: string | null
           summary: string | null
+          tags: string[] | null
           title: string
           updated_at: string | null
         }
@@ -2065,13 +2073,21 @@ export type Database = {
           content: string
           created_at?: string | null
           duration_minutes?: number | null
+          episode_number?: string | null
+          file_storage_path?: string | null
+          guest_names?: string | null
           id?: string
           image_url?: string | null
           is_published?: boolean | null
+          media_type?: string | null
           media_url?: string | null
           post_type: string
           published_at?: string | null
+          recording_date?: string | null
+          scheduled_publish_at?: string | null
+          series_name?: string | null
           summary?: string | null
+          tags?: string[] | null
           title: string
           updated_at?: string | null
         }
@@ -2081,13 +2097,21 @@ export type Database = {
           content?: string
           created_at?: string | null
           duration_minutes?: number | null
+          episode_number?: string | null
+          file_storage_path?: string | null
+          guest_names?: string | null
           id?: string
           image_url?: string | null
           is_published?: boolean | null
+          media_type?: string | null
           media_url?: string | null
           post_type?: string
           published_at?: string | null
+          recording_date?: string | null
+          scheduled_publish_at?: string | null
+          series_name?: string | null
           summary?: string | null
+          tags?: string[] | null
           title?: string
           updated_at?: string | null
         }

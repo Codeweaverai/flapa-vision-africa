@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, ArrowRight, Play, FileText, Headphones, Eye, Star } from 'lucide-react';
+import { Calendar, Clock, ArrowRight, Play, FileText, Headphones, Eye, Star, Video } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { supabase } from '@/lib/supabaseClient';
+import { getMediaPosts } from '@/services/mediaService';
 
 interface MediaPost {
   id: string;
@@ -18,6 +18,7 @@ interface MediaPost {
   duration_minutes?: number;
   published_at: string;
   category?: string;
+  file_storage_path?: string;
 }
 
 const MediaSection = () => {
@@ -30,30 +31,26 @@ const MediaSection = () => {
 
   const fetchMediaPosts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('media_posts')
-        .select('*')
-        .eq('is_published', true)
-        .order('published_at', { ascending: false })
-        .limit(3);
+      // Get latest posts from all types
+      const [newsData, videoPodcastData, audioPodcastData] = await Promise.all([
+        getMediaPosts('news'),
+        getMediaPosts('podcast', false, 'video'), // Video podcasts
+        getMediaPosts('podcast', false, 'audio')  // Audio podcasts
+      ]);
 
-      if (error) throw error;
+      // Combine and take the latest 3 posts
+      const allPosts = [
+        ...newsData.map(post => ({ ...post, post_type: 'article' as const })),
+        ...videoPodcastData.map(post => ({ ...post, post_type: 'video' as const })),
+        ...audioPodcastData.map(post => ({ ...post, post_type: 'podcast' as const }))
+      ];
 
-      // Map the database response to match our interface types
-      const mappedPosts = data?.map(post => ({
-        id: post.id,
-        title: post.title,
-        summary: post.summary,
-        content: post.content,
-        post_type: post.post_type as 'article' | 'video' | 'podcast',
-        image_url: post.image_url,
-        media_url: post.media_url,
-        duration_minutes: post.duration_minutes,
-        published_at: post.published_at,
-        category: post.category
-      })) || [];
+      // Sort by published date and take latest 3
+      const sortedPosts = allPosts
+        .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
+        .slice(0, 3);
 
-      setPosts(mappedPosts);
+      setPosts(sortedPosts);
     } catch (error) {
       console.error('Error fetching media posts:', error);
       // Fallback to mock data if there's an error
@@ -102,7 +99,7 @@ const MediaSection = () => {
   const getPostIcon = (type: string) => {
     switch (type) {
       case 'video':
-        return <Play className="h-4 w-4" />;
+        return <Video className="h-4 w-4" />;
       case 'podcast':
         return <Headphones className="h-4 w-4" />;
       default:
@@ -168,21 +165,19 @@ const MediaSection = () => {
                     <AspectRatio ratio={16/9}>
                       <div className={`w-full h-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center`}>
                         <span className="text-white opacity-80 text-6xl">
-                          {post.post_type === 'video' && <Play className="h-16 w-16" />}
-                          {post.post_type === 'podcast' && <Headphones className="h-16 w-16" />}
-                          {post.post_type === 'article' && <FileText className="h-16 w-16" />}
+                          {getPostIcon(post.post_type)}
                         </span>
                       </div>
                     </AspectRatio>
                   )}
                   
-                  {/* Overlay Badges */}
                   <div className="absolute top-4 left-4 flex flex-col gap-2">
                     <Badge 
                       className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 font-semibold"
                     >
                       <span className="mr-1">{getPostIcon(post.post_type)}</span>
-                      {post.post_type.charAt(0).toUpperCase() + post.post_type.slice(1)}
+                      {post.post_type === 'video' ? 'Video' : 
+                       post.post_type === 'podcast' ? 'Podcast' : 'Article'}
                     </Badge>
                   </div>
                   
@@ -197,7 +192,6 @@ const MediaSection = () => {
                     </div>
                   )}
 
-                  {/* Duration for video/podcast */}
                   {post.duration_minutes && (
                     <div className="absolute bottom-4 right-4 bg-black/70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -205,10 +199,8 @@ const MediaSection = () => {
                     </div>
                   )}
 
-                  {/* Gradient Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   
-                  {/* Quality Indicator */}
                   <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="flex items-center gap-1 text-white text-sm font-medium">
                       <Star className="h-4 w-4 fill-current text-yellow-400" />
@@ -270,7 +262,6 @@ const MediaSection = () => {
           </div>
         )}
 
-        {/* CTA Section */}
         <div className="text-center">
           <Button 
             asChild 

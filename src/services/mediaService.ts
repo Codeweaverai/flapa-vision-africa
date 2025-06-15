@@ -1,9 +1,8 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 
-// Define MediaPost type
+// Define MediaPost type with new podcast fields
 export interface MediaPost {
   id: string;
   title: string;
@@ -19,6 +18,15 @@ export interface MediaPost {
   author_id?: string;
   duration_minutes?: number;
   is_published: boolean;
+  // New podcast-specific fields
+  guest_names?: string;
+  recording_date?: string;
+  episode_number?: string;
+  series_name?: string;
+  tags?: string[];
+  media_type?: 'external_url' | 'uploaded_file';
+  file_storage_path?: string;
+  scheduled_publish_at?: string;
 }
 
 // Define MediaCategory type - keeping for backwards compatibility but not actively used anymore
@@ -44,12 +52,13 @@ export const createMediaPost = async (
 
     let imageUrl: string | undefined = postData.image_url;
     let mediaUrl: string | undefined = postData.media_url;
+    let fileStoragePath: string | undefined;
 
     // Upload image if provided
     if (imageFile) {
       const imagePath = `${postData.post_type}/${uuidv4()}-${imageFile.name}`;
       const { data: imageData, error: imageError } = await supabase.storage
-        .from('media-images')
+        .from('podcast-covers')
         .upload(imagePath, imageFile);
 
       if (imageError) {
@@ -60,7 +69,7 @@ export const createMediaPost = async (
 
       // Get public URL for the image
       const { data: urlData } = await supabase.storage
-        .from('media-images')
+        .from('podcast-covers')
         .getPublicUrl(imagePath);
 
       imageUrl = urlData.publicUrl;
@@ -68,7 +77,17 @@ export const createMediaPost = async (
 
     // Upload media file if provided (for podcasts and resources)
     if (mediaFile) {
-      const bucketName = postData.post_type === 'podcast' ? 'podcast-audio' : 'resource-files';
+      // Determine bucket based on file type and post type
+      let bucketName = 'podcast-audio';
+      if (postData.post_type === 'podcast') {
+        // Check if it's a video or audio file
+        if (mediaFile.type.startsWith('video/')) {
+          bucketName = 'podcast-videos';
+        } else if (mediaFile.type.startsWith('audio/')) {
+          bucketName = 'podcast-audio';
+        }
+      }
+      
       const mediaPath = `${postData.post_type}/${uuidv4()}-${mediaFile.name}`;
       const { data: mediaData, error: mediaError } = await supabase.storage
         .from(bucketName)
@@ -86,6 +105,7 @@ export const createMediaPost = async (
         .getPublicUrl(mediaPath);
 
       mediaUrl = urlData.publicUrl;
+      fileStoragePath = `${bucketName}/${mediaPath}`;
     }
 
     // Get the current user
@@ -95,7 +115,7 @@ export const createMediaPost = async (
       return null;
     }
 
-    // Create the post object, now including category directly in the post
+    // Create the post object with new podcast fields
     const post = {
       title: postData.title,
       content: postData.content,
@@ -106,7 +126,15 @@ export const createMediaPost = async (
       media_url: mediaUrl,
       author_id: userData.user.id,
       duration_minutes: postData.duration_minutes,
-      is_published: postData.is_published ?? true
+      is_published: postData.is_published ?? true,
+      guest_names: postData.guest_names,
+      recording_date: postData.recording_date,
+      episode_number: postData.episode_number,
+      series_name: postData.series_name,
+      tags: postData.tags,
+      media_type: mediaFile ? 'uploaded_file' : 'external_url',
+      file_storage_path: fileStoragePath,
+      scheduled_publish_at: postData.scheduled_publish_at
     };
 
     // Insert the post
@@ -141,12 +169,13 @@ export const updateMediaPost = async (
   try {
     let imageUrl: string | undefined = postData.image_url;
     let mediaUrl: string | undefined = postData.media_url;
+    let fileStoragePath: string | undefined = postData.file_storage_path;
 
     // Upload new image if provided
     if (imageFile) {
       const imagePath = `${postData.post_type}/${uuidv4()}-${imageFile.name}`;
       const { data: imageData, error: imageError } = await supabase.storage
-        .from('media-images')
+        .from('podcast-covers')
         .upload(imagePath, imageFile);
 
       if (imageError) {
@@ -157,7 +186,7 @@ export const updateMediaPost = async (
 
       // Get public URL for the image
       const { data: urlData } = await supabase.storage
-        .from('media-images')
+        .from('podcast-covers')
         .getPublicUrl(imagePath);
 
       imageUrl = urlData.publicUrl;
@@ -165,7 +194,15 @@ export const updateMediaPost = async (
 
     // Upload new media file if provided
     if (mediaFile) {
-      const bucketName = postData.post_type === 'podcast' ? 'podcast-audio' : 'resource-files';
+      let bucketName = 'podcast-audio';
+      if (postData.post_type === 'podcast') {
+        if (mediaFile.type.startsWith('video/')) {
+          bucketName = 'podcast-videos';
+        } else if (mediaFile.type.startsWith('audio/')) {
+          bucketName = 'podcast-audio';
+        }
+      }
+      
       const mediaPath = `${postData.post_type}/${uuidv4()}-${mediaFile.name}`;
       const { data: mediaData, error: mediaError } = await supabase.storage
         .from(bucketName)
@@ -183,13 +220,16 @@ export const updateMediaPost = async (
         .getPublicUrl(mediaPath);
 
       mediaUrl = urlData.publicUrl;
+      fileStoragePath = `${bucketName}/${mediaPath}`;
     }
 
-    // Update the post, including category directly in the post
+    // Update the post with new podcast fields
     const updateData = {
       ...postData,
       image_url: imageUrl,
       media_url: mediaUrl,
+      file_storage_path: fileStoragePath,
+      media_type: mediaFile ? 'uploaded_file' : (postData.media_url ? 'external_url' : postData.media_type),
       updated_at: new Date().toISOString()
     };
 
@@ -238,10 +278,11 @@ export const deleteMediaPost = async (id: string): Promise<boolean> => {
   }
 };
 
-// Get media posts with optional filtering by type
+// Get media posts with optional filtering by type and better podcast categorization
 export const getMediaPosts = async (
   type?: 'news' | 'podcast' | 'resource',
-  includeUnpublished = false
+  includeUnpublished = false,
+  podcastFilter?: 'video' | 'audio'
 ): Promise<MediaPost[]> => {
   try {
     let query = supabase
@@ -265,7 +306,30 @@ export const getMediaPosts = async (
       return [];
     }
 
-    return data as unknown as MediaPost[];
+    let posts = data as unknown as MediaPost[];
+
+    // Filter podcasts by video/audio if specified
+    if (type === 'podcast' && podcastFilter) {
+      posts = posts.filter(post => {
+        if (podcastFilter === 'video') {
+          // Video podcasts: either has video URL or uploaded video file
+          return post.media_url?.includes('youtube') || 
+                 post.media_url?.includes('vimeo') || 
+                 post.file_storage_path?.includes('podcast-videos') ||
+                 post.category === 'video-podcast';
+        } else if (podcastFilter === 'audio') {
+          // Audio podcasts: uploaded audio files or non-video URLs
+          return post.file_storage_path?.includes('podcast-audio') ||
+                 (!post.media_url?.includes('youtube') && 
+                  !post.media_url?.includes('vimeo') && 
+                  !post.file_storage_path?.includes('podcast-videos') &&
+                  post.category !== 'video-podcast');
+        }
+        return true;
+      });
+    }
+
+    return posts;
   } catch (error: any) {
     console.error('Error in getMediaPosts:', error);
     toast.error(`Failed to fetch media posts: ${error.message || 'Unknown error'}`);
@@ -276,7 +340,6 @@ export const getMediaPosts = async (
 // Get a single media post by ID
 export const getMediaPostById = async (id: string): Promise<MediaPost | null> => {
   try {
-    // Get the post
     const { data: post, error } = await supabase
       .from('media_posts')
       .select('*')
@@ -309,7 +372,6 @@ export const getMediaCategories = async (): Promise<MediaCategory[]> => {
       return [];
     }
 
-    // Make sure we always return an array, even if data is null
     return (data as MediaCategory[]) || [];
   } catch (error: any) {
     console.error('Error in getMediaCategories:', error);

@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar, Clock, Play, FileText, Headphones, Eye, Star, Search, Filter } from 'lucide-react';
+import { Calendar, Clock, Play, FileText, Headphones, Eye, Star, Search, Video } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { supabase } from '@/lib/supabaseClient';
+import { getMediaPosts } from '@/services/mediaService';
 
 interface MediaPost {
   id: string;
@@ -21,6 +21,7 @@ interface MediaPost {
   duration_minutes?: number;
   published_at: string;
   category?: string;
+  file_storage_path?: string;
 }
 
 const MediaPage = () => {
@@ -28,7 +29,6 @@ const MediaPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   useEffect(() => {
     fetchMediaPosts();
@@ -36,28 +36,21 @@ const MediaPage = () => {
 
   const fetchMediaPosts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('media_posts')
-        .select('*')
-        .eq('is_published', true)
-        .order('published_at', { ascending: false });
+      // Get all posts and categorize them properly
+      const [newsData, videoPodcastData, audioPodcastData] = await Promise.all([
+        getMediaPosts('news'),
+        getMediaPosts('podcast', false, 'video'), // Video podcasts
+        getMediaPosts('podcast', false, 'audio')  // Audio podcasts
+      ]);
 
-      if (error) throw error;
+      // Map posts to correct display types
+      const allPosts = [
+        ...newsData.map(post => ({ ...post, post_type: 'article' as const })),
+        ...videoPodcastData.map(post => ({ ...post, post_type: 'video' as const })),
+        ...audioPodcastData.map(post => ({ ...post, post_type: 'podcast' as const }))
+      ];
 
-      const mappedPosts = data?.map(post => ({
-        id: post.id,
-        title: post.title,
-        summary: post.summary,
-        content: post.content,
-        post_type: post.post_type as 'article' | 'video' | 'podcast',
-        image_url: post.image_url,
-        media_url: post.media_url,
-        duration_minutes: post.duration_minutes,
-        published_at: post.published_at,
-        category: post.category
-      })) || [];
-
-      setPosts(mappedPosts);
+      setPosts(allPosts);
     } catch (error) {
       console.error('Error fetching media posts:', error);
     } finally {
@@ -68,7 +61,7 @@ const MediaPage = () => {
   const getPostIcon = (type: string) => {
     switch (type) {
       case 'video':
-        return <Play className="h-4 w-4" />;
+        return <Video className="h-4 w-4" />;
       case 'podcast':
         return <Headphones className="h-4 w-4" />;
       default:
@@ -80,18 +73,14 @@ const MediaPage = () => {
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          post.summary?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'all' || post.post_type === selectedType;
-    const matchesCategory = selectedCategory === 'all' || post.category === selectedCategory;
     
-    return matchesSearch && matchesType && matchesCategory;
+    return matchesSearch && matchesType;
   });
-
-  const categories = [...new Set(posts.map(post => post.category).filter(Boolean))];
 
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-8">
-          {/* Header */}
           <div className="text-center mb-12">
             <div className="relative">
               <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
@@ -104,7 +93,6 @@ const MediaPage = () => {
             </p>
           </div>
 
-          {/* Search and Filters */}
           <div className="mb-8">
             <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
               <CardContent className="p-6">
@@ -149,7 +137,7 @@ const MediaPage = () => {
                         : 'border-orange-200 text-gray-600 hover:bg-orange-50'
                       }
                     >
-                      <Play className="h-4 w-4 mr-2" />
+                      <Video className="h-4 w-4 mr-2" />
                       Videos
                     </Button>
                     <Button
@@ -169,7 +157,6 @@ const MediaPage = () => {
             </Card>
           </div>
 
-          {/* Content Grid */}
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[...Array(6)].map((_, i) => (
@@ -211,19 +198,17 @@ const MediaPage = () => {
                       <AspectRatio ratio={16/9}>
                         <div className="w-full h-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center">
                           <span className="text-white opacity-80 text-6xl">
-                            {post.post_type === 'video' && <Play className="h-16 w-16" />}
-                            {post.post_type === 'podcast' && <Headphones className="h-16 w-16" />}
-                            {post.post_type === 'article' && <FileText className="h-16 w-16" />}
+                            {getPostIcon(post.post_type)}
                           </span>
                         </div>
                       </AspectRatio>
                     )}
                     
-                    {/* Overlay Badges */}
                     <div className="absolute top-4 left-4 flex flex-col gap-2">
                       <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 font-semibold">
                         <span className="mr-1">{getPostIcon(post.post_type)}</span>
-                        {post.post_type.charAt(0).toUpperCase() + post.post_type.slice(1)}
+                        {post.post_type === 'video' ? 'Video' : 
+                         post.post_type === 'podcast' ? 'Podcast' : 'Article'}
                       </Badge>
                     </div>
                     
@@ -242,10 +227,8 @@ const MediaPage = () => {
                       </div>
                     )}
 
-                    {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     
-                    {/* Quality Indicator */}
                     <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="flex items-center gap-1 text-white text-sm font-medium">
                         <Star className="h-4 w-4 fill-current text-yellow-400" />

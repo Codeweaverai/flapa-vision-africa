@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -84,10 +83,16 @@ ${formData.tags ? `**Topics:** ${formData.tags}` : ''}
         content: podcastContent,
         summary: formData.description.substring(0, 200) + (formData.description.length > 200 ? '...' : ''),
         post_type: 'podcast' as const,
-        category: 'podcast',
+        category: 'video-podcast', // Mark as video podcast
         media_url: formData.videoUrl || undefined,
-        duration_minutes: undefined, // Will be set after video analysis if needed
-        is_published: formData.publishStatus === 'published'
+        duration_minutes: undefined,
+        is_published: formData.publishStatus === 'published',
+        guest_names: formData.guestName,
+        recording_date: formData.recordingDate ? format(formData.recordingDate, 'yyyy-MM-dd') : undefined,
+        episode_number: formData.episodeNumber,
+        series_name: formData.category ? seriesOptions.find(s => s.value === formData.category)?.label : undefined,
+        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : undefined,
+        scheduled_publish_at: formData.scheduleDate ? formData.scheduleDate.toISOString() : undefined
       };
 
       const result = await createMediaPost(postData, coverImageFile, videoFile);
@@ -316,8 +321,8 @@ ${formData.tags ? `**Topics:** ${formData.tags}` : ''}
                 🖼️ Podcast Cover Image
               </Label>
               <FileUpload
-                bucket="course-thumbnails"
-                path="podcast-covers"
+                bucket="podcast-covers"
+                path="video-podcasts"
                 accept="image/*"
                 maxSize={10}
                 onUploadComplete={handleCoverImageUpload}
