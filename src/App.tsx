@@ -52,7 +52,6 @@ import ExploreCoursesPage from "./pages/ExploreCoursesPage";
 import ExploreEventsPage from "./pages/ExploreEventsPage";
 import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
-import PaymentResultPage from "./pages/PaymentResultPage";
 import CheckoutSuccessPage from "./pages/CheckoutSuccessPage";
 import HelpCenterPage from "./pages/HelpCenterPage";
 import CareersPage from "./pages/careers";
@@ -162,7 +161,6 @@ function App() {
                   <Route path="/blog/:id" element={<BlogPostPage />} />
                   <Route path="/payment/success" element={<PaymentSuccessPage />} />
                   <Route path="/payment/cancel" element={<PaymentCancelPage />} />
-                  <Route path="/payment/result" element={<PaymentResultPage />} />
                   <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
                   <Route path="/ticket/:id" element={<TicketDetailPage />} />
                   <Route path="/help" element={<HelpCenterPage />} />
