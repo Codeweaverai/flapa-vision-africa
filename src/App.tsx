@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -90,6 +89,7 @@ import AdminEventEdit from "./pages/admin/AdminEventEdit";
 import AdminEventRegistrations from "./pages/admin/AdminEventRegistrations";
 import AdminMedia from "./pages/admin/AdminMedia";
 import AdminMediaForm from "./pages/admin/AdminMediaForm";
+import AdminSupportInbox from "./pages/admin/AdminSupportInbox";
 import AdminConsultations from "./pages/admin/AdminConsultations";
 import AdminSpeaking from "./pages/admin/AdminSpeaking";
 import AdminCareers from "./pages/admin/AdminCareers";
@@ -228,6 +228,7 @@ function App() {
                   <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
                   <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
                   <Route path="/admin/media/:id/edit" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+                  <Route path="/admin/support-inbox" element={<AdminRoute><AdminSupportInbox /></AdminRoute>} />
                   <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
                   <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
                   <Route path="/admin/careers" element={<AdminRoute><AdminCareers /></AdminRoute>} />

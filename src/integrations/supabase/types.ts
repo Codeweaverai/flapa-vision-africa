@@ -60,6 +60,45 @@ export type Database = {
           },
         ]
       }
+      broadcast_messages: {
+        Row: {
+          admin_id: string
+          content: string
+          created_at: string
+          id: string
+          message_type: string
+          priority: string
+          sent_at: string | null
+          status: string
+          subject: string
+          total_recipients: number | null
+        }
+        Insert: {
+          admin_id: string
+          content: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          priority?: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          total_recipients?: number | null
+        }
+        Update: {
+          admin_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          priority?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          total_recipients?: number | null
+        }
+        Relationships: []
+      }
       carts: {
         Row: {
           created_at: string | null
@@ -2932,6 +2971,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      broadcast_message_to_all_users: {
+        Args: {
+          p_admin_id: string
+          p_subject: string
+          p_content: string
+          p_message_type?: string
+          p_priority?: string
+        }
+        Returns: string
+      }
       calculate_creator_balance: {
         Args: { creator_user_id: string }
         Returns: {
