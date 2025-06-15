@@ -50,7 +50,14 @@ const AdminSupportInbox: React.FC = () => {
         .limit(20);
 
       if (error) throw error;
-      setBroadcastHistory(data || []);
+      
+      // Cast the data to fix the priority type issue
+      const typedData = data?.map(item => ({
+        ...item,
+        priority: item.priority as 'low' | 'normal' | 'high' | 'urgent'
+      })) || [];
+      
+      setBroadcastHistory(typedData);
     } catch (error) {
       console.error('Error loading broadcast history:', error);
       toast.error('Failed to load broadcast history');

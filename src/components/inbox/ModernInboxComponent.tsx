@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, MessageSquare, Broadcast, User, Clock, CheckCircle2 } from 'lucide-react';
+import { Send, MessageSquare, Radio, User, Clock, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -25,7 +25,7 @@ interface InboxMessage {
   sender_profile?: {
     full_name: string;
     avatar_url: string;
-  };
+  } | null;
 }
 
 const ModernInboxComponent: React.FC = () => {
@@ -95,7 +95,7 @@ const ModernInboxComponent: React.FC = () => {
         .from('inbox_messages')
         .select(`
           *,
-          sender_profile:sender_id (
+          sender_profile:profiles!sender_id (
             full_name,
             avatar_url
           )
@@ -141,7 +141,7 @@ const ModernInboxComponent: React.FC = () => {
 
   const getMessageIcon = (messageType: string, senderId: string | null) => {
     if (messageType === 'broadcast' || !senderId) {
-      return <Broadcast className="h-4 w-4 text-purple-500" />;
+      return <Radio className="h-4 w-4 text-purple-500" />;
     }
     return <MessageSquare className="h-4 w-4 text-blue-500" />;
   };
@@ -161,14 +161,10 @@ const ModernInboxComponent: React.FC = () => {
 
     try {
       // First, find the recipient user by email
-      const { data: recipients, error: recipientError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', (
-          await supabase.auth.admin.listUsers()
-        ).data.users.find(u => u.email === newMessage.recipient_email)?.id);
-
-      if (recipientError || !recipients?.length) {
+      const { data: authUsers } = await supabase.auth.admin.listUsers();
+      const recipientUser = authUsers.users.find((u: any) => u.email === newMessage.recipient_email);
+      
+      if (!recipientUser) {
         toast.error('Recipient not found');
         return;
       }
@@ -177,7 +173,7 @@ const ModernInboxComponent: React.FC = () => {
         .from('inbox_messages')
         .insert({
           sender_id: user.id,
-          recipient_id: recipients[0].id,
+          recipient_id: recipientUser.id,
           subject: newMessage.subject,
           content: newMessage.content,
           message_type: 'direct'
@@ -242,7 +238,7 @@ const ModernInboxComponent: React.FC = () => {
                           </Avatar>
                         ) : (
                           <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
-                            <Broadcast className="h-4 w-4 text-purple-600" />
+                            <Radio className="h-4 w-4 text-purple-600" />
                           </div>
                         )}
                       </div>
