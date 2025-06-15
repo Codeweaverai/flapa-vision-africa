@@ -164,7 +164,7 @@ const MediaPostDetailPage = () => {
 
             {/* Main Content */}
             <Card className="bg-white/90 backdrop-blur-sm shadow-2xl border-0 overflow-hidden">
-              {/* Hero Section */}
+              {/* Hero Section - Always show image thumbnail */}
               <div className="relative">
                 {post.image_url ? (
                   <div className="relative h-80 overflow-hidden">
@@ -253,7 +253,17 @@ const MediaPostDetailPage = () => {
                         />
                       </AspectRatio>
                     ) : (
-                      <div className="text-center">
+                      <div className="text-center space-y-4">
+                        {/* Show image thumbnail for audio content */}
+                        {post.image_url && (
+                          <div className="w-48 h-48 mx-auto rounded-xl overflow-hidden mb-4">
+                            <img
+                              src={post.image_url}
+                              alt={post.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
                         <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center">
                           <Headphones className="h-10 w-10 text-white" />
                         </div>

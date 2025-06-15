@@ -70,38 +70,30 @@ const MediaPage = () => {
   };
 
   const renderMediaContent = (post: MediaPost) => {
-    if (post.post_type === 'video' && post.media_url) {
-      // Check if it's a video URL that ReactPlayer can handle
-      if (ReactPlayer.canPlay(post.media_url)) {
-        return (
-          <AspectRatio ratio={16/9}>
-            <ReactPlayer
-              url={post.media_url}
-              width="100%"
-              height="100%"
-              light={post.image_url || true}
-              controls={true}
-              playing={false}
-              className="rounded-t-lg overflow-hidden"
-            />
-          </AspectRatio>
-        );
-      }
-    }
-
-    // Fallback to image or placeholder
+    // Always show image thumbnail first, then overlay play button for videos
     if (post.image_url) {
       return (
         <AspectRatio ratio={16/9}>
-          <img
-            src={post.image_url}
-            alt={post.title}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-          />
+          <div className="relative w-full h-full">
+            <img
+              src={post.image_url}
+              alt={post.title}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            />
+            {/* Show play overlay for video content */}
+            {post.post_type === 'video' && (
+              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center backdrop-blur-sm">
+                  <Play className="h-8 w-8 text-gray-800 ml-1" />
+                </div>
+              </div>
+            )}
+          </div>
         </AspectRatio>
       );
     }
 
+    // Fallback to gradient background with icon
     return (
       <AspectRatio ratio={16/9}>
         <div className="w-full h-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center">
