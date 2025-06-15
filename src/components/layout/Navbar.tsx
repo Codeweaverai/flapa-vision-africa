@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -98,6 +97,7 @@ const Navbar = () => {
         const unsubscribeMessages = setupInboxMessageListener(user.id, (message) => {
           console.log('New inbox message:', message);
           
+          // Create notification for new message with proper error handling
           supabase
             .from('notifications')
             .insert({
@@ -106,7 +106,12 @@ const Navbar = () => {
               type: 'message',
               related_id: message.id
             })
-            .catch(error => console.error('Error creating notification:', error));
+            .then(({ error }) => {
+              if (error) {
+                console.error('Error creating notification:', error);
+              }
+            })
+            .catch(error => console.error('Network error creating notification:', error));
         });
 
         // Subscribe to community notifications with error handling
