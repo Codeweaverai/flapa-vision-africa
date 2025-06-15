@@ -33,8 +33,8 @@ const PLATFORM_FEE_RATE = 0.08;
 
 export async function calculateCreatorEarningsFromOrders(creatorId: string): Promise<CreatorEarningsData> {
   try {
-    // Get course order items
-    const { data: courseItems, error: courseError } = await supabase
+    // Get all order items from completed orders
+    const { data: allOrderItems, error: orderError } = await supabase
       .from('order_items')
       .select(`
         *,
@@ -45,37 +45,46 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
           payment_status,
           total_amount,
           created_at
-        ),
-        courses!inner(id, title, creator_id)
+        )
       `)
-      .eq('courses.creator_id', creatorId)
-      .eq('orders.payment_status', 'completed')
-      .eq('item_type', 'course');
+      .eq('orders.payment_status', 'completed');
 
-    // Get event order items
-    const { data: eventItems, error: eventError } = await supabase
-      .from('order_items')
-      .select(`
-        *,
-        orders!inner(
-          id,
-          user_id,
-          email,
-          payment_status,
-          total_amount,
-          created_at
-        ),
-        event_tickets!inner(id, event_id, events!inner(id, title, creator_id))
-      `)
-      .eq('event_tickets.events.creator_id', creatorId)
-      .eq('orders.payment_status', 'completed')
-      .eq('item_type', 'event_ticket');
+    if (orderError) throw orderError;
 
-    if (courseError && eventError) {
-      throw courseError || eventError;
+    // Filter items that belong to this creator
+    const creatorItems = [];
+    
+    for (const item of allOrderItems || []) {
+      if (item.item_type === 'course') {
+        // Check if this course belongs to the creator
+        const { data: course } = await supabase
+          .from('courses')
+          .select('id, title, creator_id')
+          .eq('id', item.item_id)
+          .eq('creator_id', creatorId)
+          .maybeSingle();
+        
+        if (course) {
+          creatorItems.push({ ...item, course });
+        }
+      } else if (item.item_type === 'event_ticket') {
+        // Check if this event ticket belongs to the creator's event
+        const { data: eventTicket } = await supabase
+          .from('event_tickets')
+          .select(`
+            id,
+            event_id,
+            events!inner(id, title, creator_id)
+          `)
+          .eq('id', item.item_id)
+          .eq('events.creator_id', creatorId)
+          .maybeSingle();
+        
+        if (eventTicket) {
+          creatorItems.push({ ...item, eventTicket });
+        }
+      }
     }
-
-    const allItems = [...(courseItems || []), ...(eventItems || [])];
 
     let totalEarnings = 0;
     let totalPlatformFees = 0;
@@ -87,7 +96,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
 
-    allItems?.forEach(item => {
+    creatorItems.forEach(item => {
       const itemTotal = Number(item.total_price);
       const platformFee = itemTotal * PLATFORM_FEE_RATE;
       const creatorEarning = itemTotal - platformFee;
@@ -137,8 +146,8 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
 export async function fetchCreatorTransactions(creatorId: string): Promise<CreatorTransaction[]> {
   try {
-    // First, get course transactions
-    const { data: courseItems, error: courseError } = await supabase
+    // Get all order items from completed orders
+    const { data: allOrderItems, error: orderError } = await supabase
       .from('order_items')
       .select(`
         *,
@@ -149,90 +158,95 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
           payment_status,
           total_amount,
           created_at
-        ),
-        courses!inner(id, title, creator_id)
+        )
       `)
-      .eq('courses.creator_id', creatorId)
       .eq('orders.payment_status', 'completed')
-      .eq('item_type', 'course')
       .order('created_at', { ascending: false });
 
-    // Then, get event transactions
-    const { data: eventItems, error: eventError } = await supabase
-      .from('order_items')
-      .select(`
-        *,
-        orders!inner(
-          id,
-          user_id,
-          email,
-          payment_status,
-          total_amount,
-          created_at
-        ),
-        event_tickets!inner(id, event_id, events!inner(id, title, creator_id))
-      `)
-      .eq('event_tickets.events.creator_id', creatorId)
-      .eq('orders.payment_status', 'completed')
-      .eq('item_type', 'event_ticket')
-      .order('created_at', { ascending: false });
+    if (orderError) throw orderError;
 
-    if (courseError && eventError) {
-      throw courseError || eventError;
-    }
-
-    const allItems = [...(courseItems || []), ...(eventItems || [])];
-
-    if (!allItems || allItems.length === 0) {
+    if (!allOrderItems || allOrderItems.length === 0) {
       return [];
     }
 
+    // Filter and enhance items that belong to this creator
+    const creatorTransactions: CreatorTransaction[] = [];
+    
     // Get user profiles for customer names
-    const userIds = [...new Set(allItems.map(item => item.orders.user_id))];
+    const userIds = [...new Set(allOrderItems.map(item => item.orders.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, username, full_name')
       .in('id', userIds);
 
-    const transactions: CreatorTransaction[] = allItems?.map(item => {
-      const itemTotal = Number(item.total_price);
-      const platformFee = itemTotal * PLATFORM_FEE_RATE;
-      const creatorEarning = itemTotal - platformFee;
-
-      // Find the profile for this user
-      const profile = profiles?.find(p => p.id === item.orders.user_id);
-
-      // Get item name from courses or events
+    for (const item of allOrderItems) {
       let itemName = item.item_name;
-      if (item.item_type === 'course' && 'courses' in item && item.courses) {
-        itemName = item.courses.title;
-      } else if (item.item_type === 'event_ticket' && 'event_tickets' in item && item.event_tickets?.events) {
-        itemName = item.event_tickets.events.title;
+      let belongsToCreator = false;
+
+      if (item.item_type === 'course') {
+        // Check if this course belongs to the creator
+        const { data: course } = await supabase
+          .from('courses')
+          .select('id, title, creator_id')
+          .eq('id', item.item_id)
+          .eq('creator_id', creatorId)
+          .maybeSingle();
+        
+        if (course) {
+          itemName = course.title;
+          belongsToCreator = true;
+        }
+      } else if (item.item_type === 'event_ticket') {
+        // Check if this event ticket belongs to the creator's event
+        const { data: eventTicket } = await supabase
+          .from('event_tickets')
+          .select(`
+            id,
+            event_id,
+            events!inner(id, title, creator_id)
+          `)
+          .eq('id', item.item_id)
+          .eq('events.creator_id', creatorId)
+          .maybeSingle();
+        
+        if (eventTicket && eventTicket.events) {
+          itemName = eventTicket.events.title;
+          belongsToCreator = true;
+        }
       }
 
-      return {
-        id: item.id,
-        order_id: item.orders.id,
-        customer_email: item.orders.email,
-        customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
-        item_type: item.item_type as 'course' | 'event_ticket',
-        item_name: itemName,
-        item_id: item.item_id,
-        quantity: item.quantity,
-        unit_price: Number(item.unit_price),
-        total_amount: itemTotal,
-        creator_earning: creatorEarning,
-        platform_fee: platformFee,
-        payment_status: item.orders.payment_status,
-        created_at: item.orders.created_at,
-        order_total: Number(item.orders.total_amount)
-      };
-    }) || [];
+      if (belongsToCreator) {
+        const itemTotal = Number(item.total_price);
+        const platformFee = itemTotal * PLATFORM_FEE_RATE;
+        const creatorEarning = itemTotal - platformFee;
+
+        // Find the profile for this user
+        const profile = profiles?.find(p => p.id === item.orders.user_id);
+
+        creatorTransactions.push({
+          id: item.id,
+          order_id: item.orders.id,
+          customer_email: item.orders.email,
+          customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
+          item_type: item.item_type as 'course' | 'event_ticket',
+          item_name: itemName,
+          item_id: item.item_id,
+          quantity: item.quantity,
+          unit_price: Number(item.unit_price),
+          total_amount: itemTotal,
+          creator_earning: creatorEarning,
+          platform_fee: platformFee,
+          payment_status: item.orders.payment_status,
+          created_at: item.orders.created_at,
+          order_total: Number(item.orders.total_amount)
+        });
+      }
+    }
 
     // Sort by created_at descending
-    transactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    creatorTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    return transactions;
+    return creatorTransactions;
   } catch (error) {
     console.error('Error fetching creator transactions:', error);
     throw error;
