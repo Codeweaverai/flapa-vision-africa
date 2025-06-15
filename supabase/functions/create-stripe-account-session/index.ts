@@ -52,7 +52,7 @@ serve(async (req) => {
     
     if (!profile.stripe_connect_id) {
       return new Response(
-        JSON.stringify({ error: 'No Stripe Connect account found' }),
+        JSON.stringify({ error: 'No Stripe Connect account found. Please create an account first.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
@@ -62,18 +62,20 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     });
     
-    // Create an account session
+    // Create an account session for the Connect embedded component
     const session = await stripe.accountSessions.create({
       account: profile.stripe_connect_id,
       components: {
         account_onboarding: {
           enabled: true,
         },
-        payment_details: {
+        payments: {
+          enabled: true,
+        },
+        payouts: {
           enabled: true,
         },
       },
-      permissions: ['account_onboarding', 'financial_information', 'payment_methods'],
     });
     
     return new Response(

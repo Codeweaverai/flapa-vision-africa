@@ -114,7 +114,8 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
 export async function fetchCreatorTransactions(creatorId: string): Promise<CreatorTransaction[]> {
   try {
-    const { data: orderItems, error } = await supabase
+    // First, get course transactions
+    const { data: courseItems, error: courseError } = await supabase
       .from('order_items')
       .select(`
         *,
@@ -126,27 +127,51 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
           total_amount,
           created_at
         ),
-        courses(id, title, creator_id),
-        events(id, title, creator_id)
+        courses!inner(id, title, creator_id)
       `)
-      .or(`courses.creator_id.eq.${creatorId},events.creator_id.eq.${creatorId}`)
+      .eq('courses.creator_id', creatorId)
       .eq('orders.payment_status', 'completed')
+      .eq('item_type', 'course')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    // Then, get event transactions
+    const { data: eventItems, error: eventError } = await supabase
+      .from('order_items')
+      .select(`
+        *,
+        orders!inner(
+          id,
+          user_id,
+          email,
+          payment_status,
+          total_amount,
+          created_at
+        ),
+        events!inner(id, title, creator_id)
+      `)
+      .eq('events.creator_id', creatorId)
+      .eq('orders.payment_status', 'completed')
+      .eq('item_type', 'event_ticket')
+      .order('created_at', { ascending: false });
 
-    if (!orderItems || orderItems.length === 0) {
+    if (courseError && eventError) {
+      throw courseError || eventError;
+    }
+
+    const allItems = [...(courseItems || []), ...(eventItems || [])];
+
+    if (!allItems || allItems.length === 0) {
       return [];
     }
 
     // Get user profiles for customer names
-    const userIds = [...new Set(orderItems.map(item => item.orders.user_id))];
+    const userIds = [...new Set(allItems.map(item => item.orders.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, username, full_name')
       .in('id', userIds);
 
-    const transactions: CreatorTransaction[] = orderItems?.map(item => {
+    const transactions: CreatorTransaction[] = allItems?.map(item => {
       const itemTotal = Number(item.total_price);
       const platformFee = itemTotal * PLATFORM_FEE_RATE;
       const creatorEarning = itemTotal - platformFee;
@@ -154,13 +179,21 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
       // Find the profile for this user
       const profile = profiles?.find(p => p.id === item.orders.user_id);
 
+      // Get item name from courses or events
+      let itemName = item.item_name;
+      if (item.courses && item.courses.length > 0) {
+        itemName = item.courses[0].title;
+      } else if (item.events && item.events.length > 0) {
+        itemName = item.events[0].title;
+      }
+
       return {
         id: item.id,
         order_id: item.orders.id,
         customer_email: item.orders.email,
         customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
         item_type: item.item_type as 'course' | 'event_ticket',
-        item_name: item.item_name,
+        item_name: itemName,
         item_id: item.item_id,
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
@@ -172,6 +205,9 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
         order_total: Number(item.orders.total_amount)
       };
     }) || [];
+
+    // Sort by created_at descending
+    transactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return transactions;
   } catch (error) {

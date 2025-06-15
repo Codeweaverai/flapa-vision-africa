@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -80,23 +79,15 @@ const UserOrders = () => {
                 try {
                   const { data: ticket } = await supabase
                     .from('event_tickets')
-                    .select('event_id')
+                    .select('event_id, events(title)')
                     .eq('id', item.item_id)
                     .maybeSingle();
 
-                  if (ticket) {
-                    const { data: event } = await supabase
-                      .from('events')
-                      .select('title')
-                      .eq('id', ticket.event_id)
-                      .maybeSingle();
-
-                    if (event) {
-                      return {
-                        ...item,
-                        item_name: event.title
-                      };
-                    }
+                  if (ticket && ticket.events) {
+                    return {
+                      ...item,
+                      item_name: ticket.events.title
+                    };
                   }
                 } catch (err) {
                   console.error('Error fetching event details for item:', item.item_id, err);
