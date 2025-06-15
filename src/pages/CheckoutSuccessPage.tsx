@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
@@ -18,17 +19,62 @@ const CheckoutSuccessPage = () => {
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [fulfillmentResults, setFulfillmentResults] = useState<any[]>([]);
+  const [verificationAttempts, setVerificationAttempts] = useState(0);
+  const maxRetries = 3;
 
   const sessionId = searchParams.get('session_id');
+
+  const verifyPaymentWithRetry = async (attempt = 1): Promise<any> => {
+    try {
+      console.log(`Payment verification attempt ${attempt}/${maxRetries}`);
+      
+      const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-payment', {
+        body: {
+          sessionId,
+          userId: user?.id
+        }
+      });
+
+      if (verificationError) {
+        console.error(`Verification attempt ${attempt} failed:`, verificationError);
+        if (attempt < maxRetries) {
+          // Wait 2 seconds before retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return verifyPaymentWithRetry(attempt + 1);
+        }
+        throw new Error('Payment verification failed after multiple attempts');
+      }
+
+      if (!verificationData?.success) {
+        console.error(`Verification attempt ${attempt} unsuccessful:`, verificationData);
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return verifyPaymentWithRetry(attempt + 1);
+        }
+        throw new Error('Payment verification was not successful');
+      }
+
+      return verificationData;
+    } catch (error) {
+      console.error(`Verification attempt ${attempt} error:`, error);
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return verifyPaymentWithRetry(attempt + 1);
+      }
+      throw error;
+    }
+  };
 
   useEffect(() => {
     const handleSuccess = async () => {
       if (!user) {
+        console.log('No user found, redirecting to auth');
         navigate('/auth');
         return;
       }
 
       if (!sessionId) {
+        console.error('No session ID found');
         toast.error('Invalid session. Please try again.');
         navigate('/checkout');
         return;
@@ -36,18 +82,10 @@ const CheckoutSuccessPage = () => {
 
       try {
         console.log('Processing payment success for session:', sessionId);
+        setVerificationAttempts(prev => prev + 1);
         
-        // Use the consolidated verify-payment function
-        const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-payment', {
-          body: {
-            sessionId,
-            userId: user.id
-          }
-        });
-
-        if (verificationError || !verificationData?.success) {
-          throw new Error('Payment verification failed');
-        }
+        // Use retry logic for payment verification
+        const verificationData = await verifyPaymentWithRetry();
 
         console.log('Payment verified successfully:', verificationData);
         
@@ -68,6 +106,7 @@ const CheckoutSuccessPage = () => {
             console.error('Error fetching order details:', orderError);
           } else {
             setOrderDetails(order);
+            console.log('Order details loaded:', order);
           }
 
           // Check for generated tickets
@@ -81,6 +120,7 @@ const CheckoutSuccessPage = () => {
 
           if (generatedTickets) {
             setTickets(generatedTickets);
+            console.log('Tickets loaded:', generatedTickets);
           }
         }
 
@@ -88,7 +128,7 @@ const CheckoutSuccessPage = () => {
         await clearCart();
         
         // Show success message based on fulfillment results
-        if (verificationData.fulfillmentResults) {
+        if (verificationData.fulfillmentResults && verificationData.fulfillmentResults.length > 0) {
           const courses = verificationData.fulfillmentResults.filter((r: any) => r.type === 'course').length;
           const events = verificationData.fulfillmentResults.filter((r: any) => r.type === 'event').length;
           
@@ -101,16 +141,39 @@ const CheckoutSuccessPage = () => {
           toast.success('Payment successful! Your order has been confirmed.');
         }
 
+        console.log('Success page processing completed');
+
       } catch (error) {
         console.error('Error handling success:', error);
-        toast.error('There was an issue processing your order. Please contact support.');
+        toast.error('There was an issue processing your order. Please contact support if the problem persists.');
+        
+        // If all retries failed, redirect to a support page or show manual retry option
+        if (verificationAttempts >= maxRetries) {
+          console.log('Max retries reached, offering manual retry');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     handleSuccess();
-  }, [sessionId, user, navigate, clearCart]);
+  }, [sessionId, user, navigate, clearCart, verificationAttempts]);
+
+  const manualRetry = async () => {
+    setLoading(true);
+    setVerificationAttempts(0);
+    try {
+      const verificationData = await verifyPaymentWithRetry();
+      if (verificationData?.success) {
+        window.location.reload(); // Reload the page to start fresh
+      }
+    } catch (error) {
+      console.error('Manual retry failed:', error);
+      toast.error('Retry failed. Please contact support.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const downloadTicket = (ticket: any) => {
     if (ticket.pdf_url) {
@@ -145,6 +208,11 @@ const CheckoutSuccessPage = () => {
           <div className="text-center">
             <Loader2 className="animate-spin h-12 w-12 text-orange-600 mx-auto mb-4" />
             <p className="text-gray-600">Processing your payment and completing your order...</p>
+            {verificationAttempts > 1 && (
+              <p className="text-sm text-gray-500 mt-2">
+                Verification attempt {verificationAttempts} of {maxRetries}
+              </p>
+            )}
           </div>
         </div>
       </Layout>
@@ -170,6 +238,23 @@ const CheckoutSuccessPage = () => {
               </CardHeader>
               
               <CardContent className="p-6 space-y-6">
+                {/* Show manual retry if verification failed */}
+                {verificationAttempts >= maxRetries && !fulfillmentResults.length && (
+                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                    <h3 className="font-semibold text-yellow-800 mb-2">Processing Delayed</h3>
+                    <p className="text-yellow-700 text-sm mb-3">
+                      Your payment was successful, but order processing is taking longer than usual.
+                    </p>
+                    <Button 
+                      onClick={manualRetry}
+                      variant="outline"
+                      className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                    >
+                      Retry Processing
+                    </Button>
+                  </div>
+                )}
+
                 {/* Fulfillment Summary */}
                 {fulfillmentResults.length > 0 && (
                   <div className="bg-green-50 rounded-lg p-4">
@@ -212,7 +297,9 @@ const CheckoutSuccessPage = () => {
                       </div>
                       <div className="flex justify-between">
                         <span>Status:</span>
-                        <span className="text-green-600 font-semibold">Completed</span>
+                        <span className="text-green-600 font-semibold">
+                          {orderDetails.payment_status === 'completed' ? 'Completed' : 'Processing'}
+                        </span>
                       </div>
                     </div>
                   </div>

@@ -8,7 +8,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Helper logging function
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[VERIFY-PAYMENT] ${step}${detailsStr}`);
@@ -20,11 +19,11 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, userId, type, itemId } = await req.json();
-    logStep("Payment verification started", { sessionId, userId, type, itemId });
+    const { sessionId, userId, orderId, retry } = await req.json();
+    logStep("Payment verification started", { sessionId, userId, orderId, retry });
 
-    if (!sessionId) {
-      throw new Error("Session ID is required");
+    if (!sessionId && !orderId) {
+      throw new Error("Session ID or Order ID is required");
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -37,148 +36,152 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Retrieve the checkout session from Stripe
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-    logStep("Retrieved Stripe session", { sessionId: session.id, status: session.payment_status });
+    let session;
+    let targetOrderId = orderId;
 
-    if (session.payment_status !== "paid") {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        message: "Payment not completed" 
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
-    }
+    if (sessionId) {
+      // Retrieve the checkout session from Stripe
+      session = await stripe.checkout.sessions.retrieve(sessionId);
+      logStep("Retrieved Stripe session", { sessionId: session.id, status: session.payment_status });
 
-    // Check if we already processed this session to prevent duplicate processing
-    const { data: existingProcessing } = await supabaseClient
-      .from('orders')
-      .select('id, payment_status')
-      .eq('stripe_session_id', sessionId)
-      .single();
-
-    if (existingProcessing?.payment_status === 'completed') {
-      logStep("Payment already processed", { orderId: existingProcessing.id });
-      return new Response(JSON.stringify({
-        success: true,
-        message: "Payment already processed",
-        orderId: existingProcessing.id
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    let orderId;
-    let isCartOrder = false;
-
-    if (existingProcessing) {
-      // This is a cart-based order that needs completion
-      orderId = existingProcessing.id;
-      isCartOrder = true;
-      logStep("Found existing cart order", { orderId });
-    } else if (session.metadata?.order_id) {
-      // Order ID from metadata
-      orderId = session.metadata.order_id;
-      logStep("Using order ID from metadata", { orderId });
-    } else {
-      // Create a new order for individual item purchase
-      const { data: orderData, error: orderError } = await supabaseClient
-        .from('orders')
-        .insert({
-          user_id: userId,
-          email: session.customer_details?.email || 'unknown@example.com',
-          total_amount: session.amount_total / 100,
-          currency: session.currency?.toUpperCase() || 'USD',
-          payment_status: 'processing', // Set to processing first
-          payment_method: 'stripe',
-          stripe_session_id: sessionId,
-          stripe_payment_intent_id: session.payment_intent
-        })
-        .select()
-        .single();
-
-      if (orderError) {
-        logStep("Error creating order", { error: orderError });
-        throw orderError;
+      if (session.payment_status !== "paid") {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          message: "Payment not completed" 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
       }
 
-      orderId = orderData.id;
-      logStep("Created new order", { orderId });
+      // Check for existing order with this session
+      const { data: existingOrder } = await supabaseClient
+        .from('orders')
+        .select('id, payment_status')
+        .eq('stripe_session_id', sessionId)
+        .single();
 
-      // Create order item for individual purchase
-      let itemName = "Unknown Item";
-      let itemPrice = session.amount_total / 100;
-
-      if (type === 'course') {
-        const { data: course } = await supabaseClient
-          .from('courses')
-          .select('title, price')
-          .eq('id', itemId)
-          .single();
+      if (existingOrder) {
+        targetOrderId = existingOrder.id;
+        if (existingOrder.payment_status === 'completed') {
+          logStep("Payment already processed", { orderId: existingOrder.id });
+          return new Response(JSON.stringify({
+            success: true,
+            message: "Payment already processed",
+            orderId: existingOrder.id
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else if (session.metadata?.order_id) {
+        targetOrderId = session.metadata.order_id;
+      } else {
+        // Create new order for individual purchase
+        const { type, item_id, user_id } = session.metadata || {};
         
-        if (course) {
-          itemName = course.title;
-          itemPrice = course.price || itemPrice;
+        if (!type || !item_id || !user_id) {
+          throw new Error("Invalid session metadata for individual purchase");
         }
 
-        await supabaseClient
-          .from('order_items')
+        let itemName = "Unknown Item";
+        let itemPrice = session.amount_total / 100;
+
+        if (type === 'course') {
+          const { data: course } = await supabaseClient
+            .from('courses')
+            .select('title, price')
+            .eq('id', item_id)
+            .single();
+          
+          if (course) {
+            itemName = course.title;
+            itemPrice = course.price || itemPrice;
+          }
+        } else if (type === 'event') {
+          const { data: event } = await supabaseClient
+            .from('events')
+            .select('title, price')
+            .eq('id', item_id)
+            .single();
+          
+          if (event) {
+            itemName = event.title;
+            itemPrice = event.price || itemPrice;
+          }
+        }
+
+        // Create order for individual purchase
+        const { data: newOrder, error: orderError } = await supabaseClient
+          .from('orders')
           .insert({
-            order_id: orderId,
-            item_id: itemId,
+            user_id: user_id,
+            email: session.customer_details?.email || 'unknown@example.com',
+            total_amount: session.amount_total / 100,
+            currency: session.currency?.toUpperCase() || 'USD',
+            payment_status: 'processing',
+            payment_method: 'stripe',
+            stripe_session_id: sessionId,
+            stripe_payment_intent_id: session.payment_intent
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+        targetOrderId = newOrder.id;
+        logStep("Created new order", { orderId: targetOrderId });
+
+        // Create order item
+        let orderItemData;
+        if (type === 'course') {
+          orderItemData = {
+            order_id: targetOrderId,
+            item_id: item_id,
             item_type: 'course',
             item_name: itemName,
             quantity: 1,
             unit_price: itemPrice,
             total_price: itemPrice
-          });
-
-        logStep("Created course order item", { itemId, itemName });
-      } else if (type === 'event') {
-        const { data: event } = await supabaseClient
-          .from('events')
-          .select('id, title, price')
-          .eq('id', itemId)
-          .single();
-        
-        if (event) {
-          itemName = event.title;
-          itemPrice = event.price || itemPrice;
-
-          // Get the default event ticket for this event
+          };
+        } else if (type === 'event') {
+          // Get event ticket for event
           const { data: eventTicket } = await supabaseClient
             .from('event_tickets')
             .select('id')
-            .eq('event_id', event.id)
+            .eq('event_id', item_id)
             .limit(1)
             .single();
 
+          orderItemData = {
+            order_id: targetOrderId,
+            item_id: eventTicket?.id || item_id,
+            item_type: 'event_ticket',
+            item_name: itemName,
+            quantity: 1,
+            unit_price: itemPrice,
+            total_price: itemPrice
+          };
+        }
+
+        if (orderItemData) {
           await supabaseClient
             .from('order_items')
-            .insert({
-              order_id: orderId,
-              item_id: eventTicket?.id || itemId,
-              item_type: 'event_ticket',
-              item_name: itemName,
-              quantity: 1,
-              unit_price: itemPrice,
-              total_price: itemPrice
-            });
-
-          logStep("Created event order item", { itemId, itemName });
+            .insert(orderItemData);
+          logStep("Created order item", { itemType: type, itemId: item_id });
         }
       }
     }
 
-    // Begin transaction-like processing
-    logStep("Starting order fulfillment", { orderId });
+    if (!targetOrderId) {
+      throw new Error("No order found for processing");
+    }
+
+    logStep("Starting order fulfillment", { orderId: targetOrderId });
 
     // Get all order items for fulfillment
     const { data: orderItems, error: itemsError } = await supabaseClient
       .from('order_items')
       .select('*')
-      .eq('order_id', orderId);
+      .eq('order_id', targetOrderId);
 
     if (itemsError || !orderItems || orderItems.length === 0) {
       logStep("Error fetching order items", { error: itemsError });
@@ -187,8 +190,20 @@ serve(async (req) => {
 
     logStep("Processing fulfillment for items", { itemCount: orderItems.length });
 
-    // Process each order item for fulfillment
+    // Get order details for user_id
+    const { data: order, error: orderFetchError } = await supabaseClient
+      .from('orders')
+      .select('user_id, email')
+      .eq('id', targetOrderId)
+      .single();
+
+    if (orderFetchError || !order) {
+      throw new Error("Order not found");
+    }
+
     const fulfillmentResults = [];
+
+    // Process each order item for fulfillment
     for (const item of orderItems) {
       try {
         if (item.item_type === 'course') {
@@ -196,10 +211,10 @@ serve(async (req) => {
           const { data: enrollment, error: enrollmentError } = await supabaseClient
             .from('course_enrollments')
             .upsert({
-              user_id: userId,
+              user_id: order.user_id,
               course_id: item.item_id,
               payment_status: 'completed',
-              order_id: orderId,
+              order_id: targetOrderId,
               enrollment_date: new Date().toISOString()
             }, {
               onConflict: 'user_id,course_id'
@@ -228,7 +243,7 @@ serve(async (req) => {
             const { data: booking, error: bookingError } = await supabaseClient
               .from('event_bookings')
               .upsert({
-                user_id: userId,
+                user_id: order.user_id,
                 event_id: eventTicket.event_id,
                 event_ticket_id: item.item_id,
                 status: 'confirmed',
@@ -236,7 +251,7 @@ serve(async (req) => {
                 payment_amount: item.total_price,
                 payment_currency: 'USD',
                 ticket_quantity: item.quantity,
-                order_id: orderId,
+                order_id: targetOrderId,
                 booking_date: new Date().toISOString()
               }, {
                 onConflict: 'user_id,event_id,order_id'
@@ -259,90 +274,65 @@ serve(async (req) => {
       }
     }
 
-    // Only mark order as completed if all fulfillments succeeded
+    // Update order status to completed
+    const updateData: any = {
+      payment_status: 'completed',
+      updated_at: new Date().toISOString()
+    };
+
+    if (sessionId && session) {
+      updateData.stripe_session_id = sessionId;
+      updateData.stripe_payment_intent_id = session.payment_intent;
+    }
+
     const { error: orderUpdateError } = await supabaseClient
       .from('orders')
-      .update({
-        payment_status: 'completed',
-        stripe_session_id: sessionId,
-        stripe_payment_intent_id: session.payment_intent,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId);
+      .update(updateData)
+      .eq('id', targetOrderId);
 
     if (orderUpdateError) {
       logStep("Error updating order status", { error: orderUpdateError });
       throw orderUpdateError;
     }
 
-    logStep("Order marked as completed", { orderId });
+    logStep("Order marked as completed", { orderId: targetOrderId });
 
     // Clear user's cart if this was a cart order
-    if (isCartOrder && userId) {
+    if (order.user_id) {
       await supabaseClient
         .from('carts')
         .delete()
-        .eq('user_id', userId);
-      logStep("Cleared user cart", { userId });
+        .eq('user_id', order.user_id);
+      logStep("Cleared user cart", { userId: order.user_id });
     }
 
-    // Generate tickets asynchronously (don't wait for this)
+    // Generate tickets for events (background task)
     const hasEventTickets = orderItems.some(item => item.item_type === 'event_ticket');
     if (hasEventTickets) {
-      // Use background task for ticket generation
-      const ticketGeneration = async () => {
-        try {
-          logStep("Starting ticket generation", { orderId });
-          const ticketResponse = await supabaseClient.functions.invoke('generate-event-tickets', {
-            body: { orderId }
-          });
+      try {
+        logStep("Starting ticket generation", { orderId: targetOrderId });
+        const ticketResponse = await supabaseClient.functions.invoke('generate-event-tickets', {
+          body: { orderId: targetOrderId }
+        });
 
-          if (ticketResponse.error) {
-            logStep("Ticket generation failed", { error: ticketResponse.error });
-          } else {
-            logStep("Tickets generated successfully", { orderId });
-          }
-        } catch (error) {
-          logStep("Error in ticket generation", { error });
+        if (ticketResponse.error) {
+          logStep("Ticket generation failed", { error: ticketResponse.error });
+        } else {
+          logStep("Tickets generated successfully", { orderId: targetOrderId });
         }
-      };
-
-      // Don't await this - let it run in background
-      ticketGeneration();
+      } catch (error) {
+        logStep("Error in ticket generation", { error });
+      }
     }
 
-    // Return success response
-    let responseData = { 
+    const responseData = { 
       success: true, 
       message: "Payment verified and order completed successfully",
-      orderId: orderId,
+      orderId: targetOrderId,
       fulfillmentResults
     };
 
-    if (type === 'course') {
-      const { data: course } = await supabaseClient
-        .from('courses')
-        .select('title')
-        .eq('id', itemId)
-        .single();
-
-      responseData.title = course?.title || "Course";
-      responseData.message = "Successfully enrolled in course";
-    } else if (type === 'event') {
-      const { data: event } = await supabaseClient
-        .from('events')
-        .select('title')
-        .eq('id', itemId)
-        .single();
-
-      responseData.title = event?.title || "Event";
-      responseData.message = "Successfully registered for event";
-    } else if (isCartOrder) {
-      responseData.message = "Order completed successfully";
-      responseData.title = "Your Order";
-    }
-
-    logStep("Payment verification completed successfully", { orderId, fulfillmentCount: fulfillmentResults.length });
+    logStep("Payment verification completed successfully", { orderId: targetOrderId, fulfillmentCount: fulfillmentResults.length });
 
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -8,15 +8,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    logStep("Starting checkout session creation");
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -24,220 +27,187 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Get authenticated user
-    const authHeader = req.headers.get("Authorization")!;
+    const { courseId, eventId, returnUrl, payment_method = 'stripe' } = await req.json();
+    logStep("Request data", { courseId, eventId, payment_method });
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("No authorization header provided");
+    }
+
     const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
-    const user = data.user;
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError) throw new Error(`Authentication error: ${userError.message}`);
+    
+    const user = userData.user;
+    if (!user?.email) throw new Error("User not authenticated or email not available");
+    logStep("User authenticated", { userId: user.id, email: user.email });
 
-    if (!user?.email) {
-      throw new Error("User not authenticated");
+    if (payment_method !== 'stripe') {
+      throw new Error('Only Stripe payments supported in this function');
     }
 
-    const { 
-      payment_method = 'stripe',
-      success_url,
-      cancel_url
-    } = await req.json();
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16",
+    });
 
-    // Fetch cart items for the user
-    const { data: cartItems, error: cartError } = await supabaseClient
-      .from('carts')
-      .select('*')
-      .eq('user_id', user.id);
-
-    if (cartError) throw cartError;
-    if (!cartItems || cartItems.length === 0) {
-      throw new Error("Cart is empty");
+    // Check for existing customer
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    let customerId;
+    if (customers.data.length > 0) {
+      customerId = customers.data[0].id;
+      logStep("Found existing Stripe customer", { customerId });
     }
 
-    // Calculate totals
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const taxRate = 0.1; // 10% tax
-    const taxAmount = subtotal * taxRate;
-    const totalAmount = subtotal + taxAmount;
+    let sessionData;
+    const origin = req.headers.get("origin") || "http://localhost:3000";
 
-    // Create order record
-    const { data: order, error: orderError } = await supabaseClient
-      .from('orders')
-      .insert({
-        user_id: user.id,
-        email: user.email,
-        total_amount: totalAmount,
-        tax_amount: taxAmount,
-        currency: 'USD',
-        payment_method: payment_method,
-        payment_status: 'pending'
-      })
-      .select()
-      .single();
+    if (courseId || eventId) {
+      // Individual item purchase
+      let itemData;
+      let itemName;
+      let itemPrice;
 
-    if (orderError) throw orderError;
-
-    // Create order items
-    const orderItems = cartItems.map((item: any) => ({
-      order_id: order.id,
-      item_type: item.item_type,
-      item_id: item.item_id,
-      item_name: `Item ${item.item_id}`, // Will be updated with actual names
-      quantity: item.quantity,
-      unit_price: item.price,
-      total_price: item.price * item.quantity,
-      metadata: {
-        ticket_holder_names: item.ticket_holder_names || []
-      }
-    }));
-
-    const { error: orderItemsError } = await supabaseClient
-      .from('order_items')
-      .insert(orderItems);
-
-    if (orderItemsError) throw orderItemsError;
-
-    // Get item details and update order items with proper names
-    for (const item of cartItems) {
-      let itemName = 'Unknown Item';
-      
-      if (item.item_type === 'course') {
-        const { data: course } = await supabaseClient
+      if (courseId) {
+        const { data: course, error: courseError } = await supabaseClient
           .from('courses')
-          .select('title')
-          .eq('id', item.item_id)
+          .select('title, price')
+          .eq('id', courseId)
           .single();
-        itemName = course?.title || 'Course';
-      } else if (item.item_type === 'event_ticket') {
-        const { data: ticket } = await supabaseClient
-          .from('event_tickets')
-          .select('name, event:events(title)')
-          .eq('id', item.item_id)
+
+        if (courseError) throw new Error(`Course not found: ${courseError.message}`);
+        
+        itemData = course;
+        itemName = course.title;
+        itemPrice = course.price || 0;
+        logStep("Course data retrieved", { courseId, title: itemName, price: itemPrice });
+      } else if (eventId) {
+        const { data: event, error: eventError } = await supabaseClient
+          .from('events')
+          .select('title, price')
+          .eq('id', eventId)
           .single();
-        itemName = ticket?.event?.title || ticket?.name || 'Event Ticket';
+
+        if (eventError) throw new Error(`Event not found: ${eventError.message}`);
+        
+        itemData = event;
+        itemName = event.title;
+        itemPrice = event.price || 0;
+        logStep("Event data retrieved", { eventId, title: itemName, price: itemPrice });
       }
 
-      await supabaseClient
-        .from('order_items')
-        .update({ item_name: itemName })
-        .eq('order_id', order.id)
-        .eq('item_id', item.item_id);
-    }
-
-    if (payment_method === 'stripe') {
-      // Check if customer exists
-      const customers = await stripe.customers.list({ 
-        email: user.email, 
-        limit: 1 
-      });
-
-      let customerId;
-      if (customers.data.length > 0) {
-        customerId = customers.data[0].id;
-      } else {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          metadata: {
-            user_id: user.id,
-            order_id: order.id
-          }
-        });
-        customerId = customer.id;
-      }
-
-      // Create line items for Stripe
-      const lineItems = cartItems.map((item: any) => ({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: `Item ${item.item_id}`,
-            metadata: {
-              item_type: item.item_type,
-              item_id: item.item_id,
-              order_id: order.id
-            }
+      sessionData = {
+        customer: customerId,
+        customer_email: customerId ? undefined : user.email,
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: { name: itemName },
+            unit_amount: Math.round(itemPrice * 100), // Convert to cents
           },
-          unit_amount: Math.round(item.price * 100), // Convert to cents
+          quantity: 1,
+        }],
+        mode: "payment",
+        metadata: {
+          user_id: user.id,
+          type: courseId ? 'course' : 'event',
+          item_id: courseId || eventId
+        },
+        success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/checkout?canceled=true`,
+      };
+    } else {
+      // Cart-based purchase
+      const { data: cartItems, error: cartError } = await supabaseClient
+        .from('carts')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (cartError || !cartItems || cartItems.length === 0) {
+        throw new Error('No items in cart');
+      }
+
+      logStep("Cart items retrieved", { itemCount: cartItems.length });
+
+      // Create order first for cart-based purchase
+      const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      
+      const { data: order, error: orderError } = await supabaseClient
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          email: user.email,
+          total_amount: totalAmount,
+          currency: 'USD',
+          payment_status: 'processing',
+          payment_method: 'stripe'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw new Error(`Failed to create order: ${orderError.message}`);
+      logStep("Order created", { orderId: order.id, totalAmount });
+
+      // Create order items
+      const orderItems = cartItems.map(item => ({
+        order_id: order.id,
+        item_id: item.item_id,
+        item_type: item.item_type,
+        item_name: `${item.item_type} Item`,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      }));
+
+      const { error: itemsError } = await supabaseClient
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw new Error(`Failed to create order items: ${itemsError.message}`);
+      logStep("Order items created", { itemCount: orderItems.length });
+
+      // Create Stripe line items
+      const lineItems = cartItems.map(item => ({
+        price_data: {
+          currency: "usd",
+          product_data: { name: `${item.item_type} - ${item.item_id}` },
+          unit_amount: Math.round(item.price * 100),
         },
         quantity: item.quantity,
       }));
 
-      // Add tax as a line item
-      if (taxAmount > 0) {
-        lineItems.push({
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Tax',
-            },
-            unit_amount: Math.round(taxAmount * 100),
-          },
-          quantity: 1,
-        });
-      }
-
-      // Create checkout session
-      const session = await stripe.checkout.sessions.create({
+      sessionData = {
         customer: customerId,
+        customer_email: customerId ? undefined : user.email,
         line_items: lineItems,
         mode: "payment",
-        success_url: success_url || `${req.headers.get("origin")}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancel_url || `${req.headers.get("origin")}/checkout`,
         metadata: {
           user_id: user.id,
-          order_id: order.id
-        }
-      });
-
-      // Update order with Stripe session ID
-      await supabaseClient
-        .from('orders')
-        .update({ 
-          payment_provider_id: session.id,
-          stripe_session_id: session.id 
-        })
-        .eq('id', order.id);
-
-      return new Response(
-        JSON.stringify({ 
-          url: session.url, 
           order_id: order.id,
-          session_id: session.id 
-        }),
-        { 
-          headers: { 
-            ...corsHeaders, 
-            "Content-Type": "application/json" 
-          },
-          status: 200 
-        }
-      );
-    } else {
-      // For PawaPay or other payment methods, return order info
-      return new Response(
-        JSON.stringify({ 
-          order_id: order.id,
-          total_amount: totalAmount,
-          currency: 'USD'
-        }),
-        { 
-          headers: { 
-            ...corsHeaders, 
-            "Content-Type": "application/json" 
-          },
-          status: 200 
-        }
-      );
+          type: 'cart'
+        },
+        success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/checkout?canceled=true`,
+      };
     }
 
+    const session = await stripe.checkout.sessions.create(sessionData);
+    logStep("Stripe session created", { sessionId: session.id, url: session.url });
+
+    return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   } catch (error) {
-    console.error('Error creating checkout session:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        },
-        status: 500 
-      }
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR in checkout session creation", { message: errorMessage });
+    
+    return new Response(JSON.stringify({ 
+      success: false, 
+      message: errorMessage 
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });

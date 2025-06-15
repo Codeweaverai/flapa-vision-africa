@@ -90,6 +90,11 @@ const PaymentResultPage = () => {
           } else {
             toast.success(data.message || 'Payment successful!');
           }
+
+          // Redirect to checkout success page for better UX
+          setTimeout(() => {
+            navigate(`/checkout/success?session_id=${sessionId}`);
+          }, 2000);
         } else {
           setSuccess(false);
           toast.error(data?.message || 'Unable to verify payment');
@@ -144,7 +149,7 @@ const PaymentResultPage = () => {
                 <p>Your payment has been processed successfully!</p>
                 {itemTitle && <p className="font-medium">{itemTitle}</p>}
                 {orderId && <p className="text-sm text-gray-600">Order ID: {orderId.slice(-8).toUpperCase()}</p>}
-                <p>Thank you for your purchase.</p>
+                <p>You will be redirected to the success page shortly.</p>
                 {itemType === 'event' && (
                   <p className="text-sm text-blue-600">Your tickets and receipt are being generated and will be available in My Orders.</p>
                 )}
