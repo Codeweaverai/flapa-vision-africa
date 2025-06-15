@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import ReactPlayer from 'react-player';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,6 +67,50 @@ const MediaPage = () => {
       default:
         return <FileText className="h-4 w-4" />;
     }
+  };
+
+  const renderMediaContent = (post: MediaPost) => {
+    if (post.post_type === 'video' && post.media_url) {
+      // Check if it's a video URL that ReactPlayer can handle
+      if (ReactPlayer.canPlay(post.media_url)) {
+        return (
+          <AspectRatio ratio={16/9}>
+            <ReactPlayer
+              url={post.media_url}
+              width="100%"
+              height="100%"
+              light={post.image_url || true}
+              controls={false}
+              playing={false}
+              className="rounded-t-lg overflow-hidden"
+            />
+          </AspectRatio>
+        );
+      }
+    }
+
+    // Fallback to image or placeholder
+    if (post.image_url) {
+      return (
+        <AspectRatio ratio={16/9}>
+          <img
+            src={post.image_url}
+            alt={post.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          />
+        </AspectRatio>
+      );
+    }
+
+    return (
+      <AspectRatio ratio={16/9}>
+        <div className="w-full h-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center">
+          <span className="text-white opacity-80 text-6xl">
+            {getPostIcon(post.post_type)}
+          </span>
+        </div>
+      </AspectRatio>
+    );
   };
 
   const filteredPosts = posts.filter(post => {
@@ -186,23 +230,7 @@ const MediaPage = () => {
                   className="group hover:shadow-2xl transition-all duration-300 overflow-hidden border-0 bg-white/90 backdrop-blur-sm hover:-translate-y-2"
                 >
                   <div className="relative overflow-hidden">
-                    {post.image_url ? (
-                      <AspectRatio ratio={16/9}>
-                        <img
-                          src={post.image_url}
-                          alt={post.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        />
-                      </AspectRatio>
-                    ) : (
-                      <AspectRatio ratio={16/9}>
-                        <div className="w-full h-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center">
-                          <span className="text-white opacity-80 text-6xl">
-                            {getPostIcon(post.post_type)}
-                          </span>
-                        </div>
-                      </AspectRatio>
-                    )}
+                    {renderMediaContent(post)}
                     
                     <div className="absolute top-4 left-4 flex flex-col gap-2">
                       <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 font-semibold">
@@ -224,6 +252,14 @@ const MediaPage = () => {
                       <div className="absolute bottom-4 right-4 bg-black/70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {post.duration_minutes}m
+                      </div>
+                    )}
+
+                    {post.post_type === 'video' && post.media_url && (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/20">
+                        <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center backdrop-blur-sm">
+                          <Play className="h-8 w-8 text-gray-800 ml-1" />
+                        </div>
                       </div>
                     )}
 
