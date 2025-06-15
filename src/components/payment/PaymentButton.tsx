@@ -50,6 +50,8 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
     setLoading(true);
     try {
+      console.log('[PAYMENT-BUTTON] Initiating payment for:', { courseId, eventId });
+      
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           courseId,
@@ -58,22 +60,25 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
         }
       });
 
+      console.log('[PAYMENT-BUTTON] Checkout session response:', { data, error });
+
       if (error) {
         throw error;
       }
 
       if (data?.url) {
-        // Redirect to Stripe checkout
+        console.log('[PAYMENT-BUTTON] Redirecting to Stripe checkout:', data.url);
+        // Redirect to Stripe checkout - this should naturally redirect to our success URL after payment
         window.location.href = data.url;
       } else {
         throw new Error("No checkout URL returned");
       }
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error('[PAYMENT-BUTTON] Payment error:', error);
       toast.error("Payment initialization failed. Please try again.");
-    } finally {
       setLoading(false);
     }
+    // Note: We don't set loading to false here because we're redirecting away from the page
   };
 
   return (
