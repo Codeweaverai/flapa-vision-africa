@@ -94,24 +94,26 @@ const Navbar = () => {
           loadNotificationCount();
         });
 
-        const unsubscribeMessages = setupInboxMessageListener(user.id, (message) => {
+        const unsubscribeMessages = setupInboxMessageListener(user.id, async (message) => {
           console.log('New inbox message:', message);
           
           // Create notification for new message with proper error handling
-          supabase
-            .from('notifications')
-            .insert({
-              user_id: user.id,
-              content: `New message: ${message.subject}`,
-              type: 'message',
-              related_id: message.id
-            })
-            .then(({ error }) => {
-              if (error) {
-                console.error('Error creating notification:', error);
-              }
-            })
-            .catch(error => console.error('Network error creating notification:', error));
+          try {
+            const { error } = await supabase
+              .from('notifications')
+              .insert({
+                user_id: user.id,
+                content: `New message: ${message.subject}`,
+                type: 'message',
+                related_id: message.id
+              });
+
+            if (error) {
+              console.error('Error creating notification:', error);
+            }
+          } catch (error) {
+            console.error('Network error creating notification:', error);
+          }
         });
 
         // Subscribe to community notifications with error handling
