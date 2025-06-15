@@ -91,24 +91,45 @@ const ModernInboxComponent: React.FC = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First, get the messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from('inbox_messages')
-        .select(`
-          *,
-          sender_profile:profiles!sender_id (
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('recipient_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      // Handle the case where sender_profile might be null for broadcast messages
-      const processedMessages = (data || []).map(msg => ({
+      if (messagesError) throw messagesError;
+
+      if (!messagesData) {
+        setMessages([]);
+        return;
+      }
+
+      // Get unique sender IDs (excluding null for broadcast messages)
+      const senderIds = [...new Set(messagesData
+        .filter(msg => msg.sender_id)
+        .map(msg => msg.sender_id)
+      )];
+
+      // Fetch sender profiles if there are any
+      let profilesData = [];
+      if (senderIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', senderIds);
+
+        if (!profilesError && profiles) {
+          profilesData = profiles;
+        }
+      }
+
+      // Map messages with their sender profiles
+      const processedMessages = messagesData.map(msg => ({
         ...msg,
-        sender_profile: msg.sender_profile || null
+        sender_profile: msg.sender_id 
+          ? profilesData.find(profile => profile.id === msg.sender_id) || null
+          : null
       }));
       
       setMessages(processedMessages);
