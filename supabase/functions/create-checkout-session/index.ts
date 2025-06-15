@@ -61,6 +61,10 @@ serve(async (req) => {
 
     let sessionData;
     const origin = req.headers.get("origin") || "http://localhost:3000";
+    const successUrl = `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${origin}/checkout?canceled=true`;
+    
+    logStep("Setting up URLs", { successUrl, cancelUrl });
 
     if (courseId || eventId) {
       // Individual item purchase
@@ -113,8 +117,8 @@ serve(async (req) => {
           type: courseId ? 'course' : 'event',
           item_id: courseId || eventId
         },
-        success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/checkout?canceled=true`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       };
     } else {
       // Cart-based purchase
@@ -186,8 +190,8 @@ serve(async (req) => {
           order_id: order.id,
           type: 'cart'
         },
-        success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/checkout?canceled=true`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       };
     }
 
