@@ -42,13 +42,16 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
 
     setLoading(true);
     try {
-      // First check if user is already enrolled to prevent 409 conflicts
+      console.log('Starting free enrollment for user:', user.id, 'course:', courseId);
+      
+      // Check for existing enrollment with more detailed logging
       const { data: existingEnrollment, error: checkError } = await supabase
         .from('course_enrollments')
-        .select('id')
+        .select('id, user_id, course_id, payment_status')
         .eq('user_id', user.id)
-        .eq('course_id', courseId)
-        .maybeSingle();
+        .eq('course_id', courseId);
+
+      console.log('Existing enrollment check result:', { existingEnrollment, checkError });
 
       if (checkError) {
         console.error('Error checking enrollment:', checkError);
@@ -56,42 +59,59 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
         return;
       }
 
-      if (existingEnrollment) {
-        // User is already enrolled
+      // If any enrollment exists (regardless of payment status), consider user enrolled
+      if (existingEnrollment && existingEnrollment.length > 0) {
+        console.log('User already has enrollment:', existingEnrollment[0]);
         toast.success(`You are already enrolled in ${courseName}`);
         window.location.reload();
         return;
       }
 
+      console.log('No existing enrollment found, proceeding with insertion...');
+
       // Proceed with enrollment
-      const { error } = await supabase
+      const enrollmentData = {
+        user_id: user.id,
+        course_id: courseId,
+        payment_status: 'completed',
+        enrollment_date: new Date().toISOString()
+      };
+
+      console.log('Inserting enrollment with data:', enrollmentData);
+
+      const { data: newEnrollment, error: insertError } = await supabase
         .from('course_enrollments')
-        .insert({
-          user_id: user.id,
-          course_id: courseId,
-          payment_status: 'completed',
-          enrollment_date: new Date().toISOString()
+        .insert(enrollmentData)
+        .select();
+
+      console.log('Insert result:', { newEnrollment, insertError });
+
+      if (insertError) {
+        console.error('Enrollment error details:', {
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint
         });
 
-      if (error) {
         // Handle specific error cases
-        if (error.code === '23505') { // Unique constraint violation
-          // User might have enrolled in another tab/window
+        if (insertError.code === '23505') { // Unique constraint violation
+          console.log('Unique constraint violation detected');
           toast.success(`You are already enrolled in ${courseName}`);
           window.location.reload();
           return;
         }
         
-        console.error('Enrollment error:', error);
-        toast.error('Failed to enroll in the course. Please try again.');
+        toast.error(`Failed to enroll: ${insertError.message}`);
         return;
       }
 
+      console.log('Enrollment successful:', newEnrollment);
       toast.success(`You've successfully enrolled in ${courseName}`);
       window.location.reload();
     } catch (error) {
-      console.error('Enrollment error:', error);
-      toast.error('Failed to enroll in the course. Please try again.');
+      console.error('Unexpected enrollment error:', error);
+      toast.error('An unexpected error occurred during enrollment');
     } finally {
       setLoading(false);
     }
