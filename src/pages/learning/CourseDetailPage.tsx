@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -381,16 +382,50 @@ const CourseDetailPage = () => {
     try {
       setEnrollmentLoading(true);
       
+      // First check if user is already enrolled to prevent 409 conflicts
+      const { data: existingEnrollment, error: checkError } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('course_id', course.id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking enrollment:', checkError);
+        toast.error('Failed to check enrollment status');
+        return;
+      }
+
+      if (existingEnrollment) {
+        // User is already enrolled
+        setIsEnrolled(true);
+        toast.success('You are already enrolled in this course!');
+        navigate(`/learning/course/${course.id}`);
+        return;
+      }
+
+      // Proceed with enrollment
       const { error } = await supabase
         .from('course_enrollments')
         .insert({
           user_id: currentUser.id,
           course_id: course.id,
-          payment_status: 'completed'
+          payment_status: 'completed',
+          enrollment_date: new Date().toISOString()
         });
 
       if (error) {
-        toast.error('Failed to enroll in course');
+        // Handle specific error cases
+        if (error.code === '23505') { // Unique constraint violation
+          // User might have enrolled in another tab/window
+          setIsEnrolled(true);
+          toast.success('You are already enrolled in this course!');
+          navigate(`/learning/course/${course.id}`);
+          return;
+        }
+        
+        console.error('Enrollment error:', error);
+        toast.error('Failed to enroll in course. Please try again.');
         return;
       }
 

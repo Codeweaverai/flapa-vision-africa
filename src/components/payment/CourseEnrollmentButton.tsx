@@ -42,15 +42,50 @@ const CourseEnrollmentButton: React.FC<CourseEnrollmentButtonProps> = ({
 
     setLoading(true);
     try {
+      // First check if user is already enrolled to prevent 409 conflicts
+      const { data: existingEnrollment, error: checkError } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking enrollment:', checkError);
+        toast.error('Failed to check enrollment status');
+        return;
+      }
+
+      if (existingEnrollment) {
+        // User is already enrolled
+        toast.success(`You are already enrolled in ${courseName}`);
+        window.location.reload();
+        return;
+      }
+
+      // Proceed with enrollment
       const { error } = await supabase
         .from('course_enrollments')
         .insert({
           user_id: user.id,
           course_id: courseId,
-          payment_status: 'completed'
+          payment_status: 'completed',
+          enrollment_date: new Date().toISOString()
         });
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific error cases
+        if (error.code === '23505') { // Unique constraint violation
+          // User might have enrolled in another tab/window
+          toast.success(`You are already enrolled in ${courseName}`);
+          window.location.reload();
+          return;
+        }
+        
+        console.error('Enrollment error:', error);
+        toast.error('Failed to enroll in the course. Please try again.');
+        return;
+      }
 
       toast.success(`You've successfully enrolled in ${courseName}`);
       window.location.reload();
