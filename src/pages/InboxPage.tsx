@@ -1,7 +1,7 @@
 
 import React from 'react';
 import Layout from '@/components/layout/Layout';
-import InboxComponent from '@/components/inbox/InboxComponent';
+import ModernInboxComponent from '@/components/inbox/ModernInboxComponent';
 
 const InboxPage: React.FC = () => {
   return (
@@ -14,7 +14,7 @@ const InboxPage: React.FC = () => {
             </h1>
             <p className="text-gray-600 mt-2">Connect with learners, creators, and experts</p>
           </div>
-          <InboxComponent />
+          <ModernInboxComponent />
         </div>
       </div>
     </Layout>
