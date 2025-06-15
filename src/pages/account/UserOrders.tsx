@@ -62,7 +62,7 @@ const UserOrders = () => {
           order_items (*),
           generated_tickets (
             *,
-            events (title, start_time)
+            events!generated_tickets_event_id_fkey (title, start_time)
           )
         `)
         .eq('user_id', user?.id)
@@ -79,7 +79,7 @@ const UserOrders = () => {
                 try {
                   const { data: ticket } = await supabase
                     .from('event_tickets')
-                    .select('event_id, events(title)')
+                    .select('event_id, events!event_tickets_event_id_fkey(title)')
                     .eq('id', item.item_id)
                     .maybeSingle();
 

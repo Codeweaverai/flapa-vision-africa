@@ -33,8 +33,8 @@ const PLATFORM_FEE_RATE = 0.08;
 
 export async function calculateCreatorEarningsFromOrders(creatorId: string): Promise<CreatorEarningsData> {
   try {
-    // Get all orders with items related to this creator's courses and events
-    const { data: orderItems, error } = await supabase
+    // Get course order items
+    const { data: courseItems, error: courseError } = await supabase
       .from('order_items')
       .select(`
         *,
@@ -46,13 +46,36 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
           total_amount,
           created_at
         ),
-        courses(id, title, creator_id),
-        events(id, title, creator_id)
+        courses!inner(id, title, creator_id)
       `)
-      .or(`courses.creator_id.eq.${creatorId},events.creator_id.eq.${creatorId}`)
-      .eq('orders.payment_status', 'completed');
+      .eq('courses.creator_id', creatorId)
+      .eq('orders.payment_status', 'completed')
+      .eq('item_type', 'course');
 
-    if (error) throw error;
+    // Get event order items
+    const { data: eventItems, error: eventError } = await supabase
+      .from('order_items')
+      .select(`
+        *,
+        orders!inner(
+          id,
+          user_id,
+          email,
+          payment_status,
+          total_amount,
+          created_at
+        ),
+        event_tickets!inner(id, event_id, events!inner(id, title, creator_id))
+      `)
+      .eq('event_tickets.events.creator_id', creatorId)
+      .eq('orders.payment_status', 'completed')
+      .eq('item_type', 'event_ticket');
+
+    if (courseError && eventError) {
+      throw courseError || eventError;
+    }
+
+    const allItems = [...(courseItems || []), ...(eventItems || [])];
 
     let totalEarnings = 0;
     let totalPlatformFees = 0;
@@ -64,7 +87,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
 
-    orderItems?.forEach(item => {
+    allItems?.forEach(item => {
       const itemTotal = Number(item.total_price);
       const platformFee = itemTotal * PLATFORM_FEE_RATE;
       const creatorEarning = itemTotal - platformFee;
@@ -147,9 +170,9 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
           total_amount,
           created_at
         ),
-        events!inner(id, title, creator_id)
+        event_tickets!inner(id, event_id, events!inner(id, title, creator_id))
       `)
-      .eq('events.creator_id', creatorId)
+      .eq('event_tickets.events.creator_id', creatorId)
       .eq('orders.payment_status', 'completed')
       .eq('item_type', 'event_ticket')
       .order('created_at', { ascending: false });
@@ -181,10 +204,10 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
 
       // Get item name from courses or events
       let itemName = item.item_name;
-      if (item.courses && item.courses.length > 0) {
-        itemName = item.courses[0].title;
-      } else if (item.events && item.events.length > 0) {
-        itemName = item.events[0].title;
+      if (item.item_type === 'course' && 'courses' in item && item.courses) {
+        itemName = item.courses.title;
+      } else if (item.item_type === 'event_ticket' && 'event_tickets' in item && item.event_tickets?.events) {
+        itemName = item.event_tickets.events.title;
       }
 
       return {
