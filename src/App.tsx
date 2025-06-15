@@ -202,10 +202,10 @@ function App() {
                   <Route path="/creator/courses/:id/content" element={<ProtectedRoute><CreatorCourseContent /></ProtectedRoute>} />
                   <Route path="/creator/events" element={<ProtectedRoute><CreatorEvents /></ProtectedRoute>} />
                   <Route path="/creator/events/create" element={<ProtectedRoute><CreatorEventCreate /></ProtectedRoute>} />
-                  <Route path="/creator/events/:id/edit" element={<ProtectedRoute><CreatorEventEdit /></ProtectedRoute>} />
-                  <Route path="/creator/events/:id/registrations" element={<ProtectedRoute><CreatorEventRegistrations /></ProtectedRoute>} />
-                  <Route path="/creator/events/:id/agenda" element={<ProtectedRoute><CreatorEventAgenda /></ProtectedRoute>} />
-                  <Route path="/creator/events/:id/speakers" element={<ProtectedRoute><CreatorEventSpeakers /></ProtectedRoute>} />
+                  <Route path="/creator/events/edit/:eventId" element={<ProtectedRoute><CreatorEventEdit /></ProtectedRoute>} />
+                  <Route path="/creator/events/registrations/:eventId" element={<ProtectedRoute><CreatorEventRegistrations /></ProtectedRoute>} />
+                  <Route path="/creator/events/:eventId/agenda" element={<ProtectedRoute><CreatorEventAgenda /></ProtectedRoute>} />
+                  <Route path="/creator/events/:eventId/speakers" element={<ProtectedRoute><CreatorEventSpeakers /></ProtectedRoute>} />
                   <Route path="/creator/students" element={<ProtectedRoute><CreatorStudents /></ProtectedRoute>} />
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
@@ -223,8 +223,8 @@ function App() {
                   <Route path="/admin/courses/:id/content" element={<AdminRoute><AdminCourseContent /></AdminRoute>} />
                   <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
                   <Route path="/admin/events/create" element={<AdminRoute><AdminEventCreate /></AdminRoute>} />
-                  <Route path="/admin/events/:id/edit" element={<AdminRoute><AdminEventEdit /></AdminRoute>} />
-                  <Route path="/admin/events/:id/registrations" element={<AdminRoute><AdminEventRegistrations /></AdminRoute>} />
+                  <Route path="/admin/events/edit/:eventId" element={<AdminRoute><AdminEventEdit /></AdminRoute>} />
+                  <Route path="/admin/events/registrations/:eventId" element={<AdminRoute><AdminEventRegistrations /></AdminRoute>} />
                   <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
                   <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
                   <Route path="/admin/media/:id/edit" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
