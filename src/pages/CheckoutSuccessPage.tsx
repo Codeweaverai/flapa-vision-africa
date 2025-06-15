@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
@@ -56,7 +55,7 @@ const CheckoutSuccessPage = () => {
 
         // Fetch order details using the order ID from verification
         if (verificationData.orderId) {
-          const { data: order, error: orderError } = await supabaseClient
+          const { data: order, error: orderError } = await supabase
             .from('orders')
             .select(`
               *,
@@ -72,7 +71,7 @@ const CheckoutSuccessPage = () => {
           }
 
           // Check for generated tickets
-          const { data: generatedTickets } = await supabaseClient
+          const { data: generatedTickets } = await supabase
             .from('generated_tickets')
             .select(`
               *,
