@@ -34,7 +34,7 @@ const ModernInboxComponent: React.FC = () => {
   const [selectedMessage, setSelectedMessage] = useState<InboxMessage | null>(null);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState({
-    recipient_email: '',
+    recipient_username: '',
     subject: '',
     content: ''
   });
@@ -104,7 +104,14 @@ const ModernInboxComponent: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      // Handle the case where sender_profile might be null for broadcast messages
+      const processedMessages = (data || []).map(msg => ({
+        ...msg,
+        sender_profile: msg.sender_profile || null
+      }));
+      
+      setMessages(processedMessages);
     } catch (error) {
       console.error('Error loading messages:', error);
       toast.error('Failed to load messages');
@@ -154,18 +161,21 @@ const ModernInboxComponent: React.FC = () => {
   };
 
   const sendMessage = async () => {
-    if (!user || !newMessage.recipient_email.trim() || !newMessage.subject.trim() || !newMessage.content.trim()) {
+    if (!user || !newMessage.recipient_username.trim() || !newMessage.subject.trim() || !newMessage.content.trim()) {
       toast.error('Please fill in all fields');
       return;
     }
 
     try {
-      // First, find the recipient user by email
-      const { data: authUsers } = await supabase.auth.admin.listUsers();
-      const recipientUser = authUsers.users.find((u: any) => u.email === newMessage.recipient_email);
-      
-      if (!recipientUser) {
-        toast.error('Recipient not found');
+      // Find recipient by username
+      const { data: recipientData, error: recipientError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', newMessage.recipient_username.trim())
+        .single();
+
+      if (recipientError || !recipientData) {
+        toast.error('User not found with that username');
         return;
       }
 
@@ -173,7 +183,7 @@ const ModernInboxComponent: React.FC = () => {
         .from('inbox_messages')
         .insert({
           sender_id: user.id,
-          recipient_id: recipientUser.id,
+          recipient_id: recipientData.id,
           subject: newMessage.subject,
           content: newMessage.content,
           message_type: 'direct'
@@ -182,7 +192,7 @@ const ModernInboxComponent: React.FC = () => {
       if (error) throw error;
 
       toast.success('Message sent successfully!');
-      setNewMessage({ recipient_email: '', subject: '', content: '' });
+      setNewMessage({ recipient_username: '', subject: '', content: '' });
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
@@ -313,11 +323,11 @@ const ModernInboxComponent: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Recipient Email</label>
+                <label className="text-sm font-medium">Recipient Username</label>
                 <Input
-                  placeholder="user@example.com"
-                  value={newMessage.recipient_email}
-                  onChange={(e) => setNewMessage({ ...newMessage, recipient_email: e.target.value })}
+                  placeholder="username"
+                  value={newMessage.recipient_username}
+                  onChange={(e) => setNewMessage({ ...newMessage, recipient_username: e.target.value })}
                 />
               </div>
               <div>
