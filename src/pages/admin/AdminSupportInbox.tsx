@@ -30,7 +30,12 @@ const AdminSupportInbox: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [broadcastHistory, setBroadcastHistory] = useState<BroadcastMessage[]>([]);
-  const [formData, setFormData] = useState({
+  const [directMessageForm, setDirectMessageForm] = useState({
+    recipient_username: '',
+    subject: '',
+    content: ''
+  });
+  const [broadcastForm, setBroadcastForm] = useState({
     subject: '',
     content: '',
     priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
@@ -65,7 +70,7 @@ const AdminSupportInbox: React.FC = () => {
   };
 
   const handleBroadcast = async () => {
-    if (!user || !formData.subject.trim() || !formData.content.trim()) {
+    if (!user || !broadcastForm.subject.trim() || !broadcastForm.content.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -74,10 +79,10 @@ const AdminSupportInbox: React.FC = () => {
     try {
       const { data, error } = await supabase.rpc('broadcast_message_to_all_users', {
         p_admin_id: user.id,
-        p_subject: formData.subject,
-        p_content: formData.content,
-        p_message_type: formData.message_type,
-        p_priority: formData.priority
+        p_subject: broadcastForm.subject,
+        p_content: broadcastForm.content,
+        p_message_type: broadcastForm.message_type,
+        p_priority: broadcastForm.priority
       });
 
       if (error) throw error;
@@ -85,7 +90,7 @@ const AdminSupportInbox: React.FC = () => {
       toast.success('Broadcast message sent successfully to all users!');
       
       // Reset form
-      setFormData({
+      setBroadcastForm({
         subject: '',
         content: '',
         priority: 'normal',
@@ -98,6 +103,56 @@ const AdminSupportInbox: React.FC = () => {
     } catch (error) {
       console.error('Error sending broadcast:', error);
       toast.error('Failed to send broadcast message');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDirectMessage = async () => {
+    if (!user || !directMessageForm.recipient_username.trim() || !directMessageForm.subject.trim() || !directMessageForm.content.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Find recipient by username
+      const { data: recipientData, error: recipientError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', directMessageForm.recipient_username.trim())
+        .single();
+
+      if (recipientError || !recipientData) {
+        toast.error('User not found with that username');
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('inbox_messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: recipientData.id,
+          subject: directMessageForm.subject,
+          content: directMessageForm.content,
+          message_type: 'direct'
+        });
+
+      if (error) throw error;
+
+      toast.success('Direct message sent successfully!');
+      
+      // Reset form
+      setDirectMessageForm({
+        recipient_username: '',
+        subject: '',
+        content: ''
+      });
+
+    } catch (error) {
+      console.error('Error sending direct message:', error);
+      toast.error('Failed to send direct message');
     } finally {
       setLoading(false);
     }
@@ -124,28 +179,89 @@ const AdminSupportInbox: React.FC = () => {
   return (
     <AdminLayout title="Support Inbox">
       <div className="space-y-6">
-        {/* Broadcast Message Form */}
+        {/* Send Direct Message */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
+              Send Direct Message
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="recipient_username">Recipient Username</Label>
+                <Input
+                  id="recipient_username"
+                  placeholder="Enter username"
+                  value={directMessageForm.recipient_username}
+                  onChange={(e) => setDirectMessageForm({ ...directMessageForm, recipient_username: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="direct_subject">Subject</Label>
+                <Input
+                  id="direct_subject"
+                  placeholder="Enter message subject"
+                  value={directMessageForm.subject}
+                  onChange={(e) => setDirectMessageForm({ ...directMessageForm, subject: e.target.value })}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="direct_content">Message Content</Label>
+              <Textarea
+                id="direct_content"
+                placeholder="Enter your message here..."
+                value={directMessageForm.content}
+                onChange={(e) => setDirectMessageForm({ ...directMessageForm, content: e.target.value })}
+                rows={4}
+              />
+            </div>
+
+            <Button 
+              onClick={handleDirectMessage} 
+              disabled={loading || !directMessageForm.recipient_username.trim() || !directMessageForm.subject.trim() || !directMessageForm.content.trim()}
+              className="w-full md:w-auto"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Direct Message
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Broadcast Message Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
               Send Broadcast Message
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="subject">Subject</Label>
+                <Label htmlFor="broadcast_subject">Subject</Label>
                 <Input
-                  id="subject"
+                  id="broadcast_subject"
                   placeholder="Enter message subject"
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  value={broadcastForm.subject}
+                  onChange={(e) => setBroadcastForm({ ...broadcastForm, subject: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
-                <Select value={formData.priority} onValueChange={(value: any) => setFormData({ ...formData, priority: value })}>
+                <Select value={broadcastForm.priority} onValueChange={(value: any) => setBroadcastForm({ ...broadcastForm, priority: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -160,19 +276,19 @@ const AdminSupportInbox: React.FC = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="content">Message Content</Label>
+              <Label htmlFor="broadcast_content">Message Content</Label>
               <Textarea
-                id="content"
+                id="broadcast_content"
                 placeholder="Enter your broadcast message here..."
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                value={broadcastForm.content}
+                onChange={(e) => setBroadcastForm({ ...broadcastForm, content: e.target.value })}
                 rows={4}
               />
             </div>
 
             <Button 
               onClick={handleBroadcast} 
-              disabled={loading || !formData.subject.trim() || !formData.content.trim()}
+              disabled={loading || !broadcastForm.subject.trim() || !broadcastForm.content.trim()}
               className="w-full md:w-auto"
             >
               {loading ? (
@@ -195,13 +311,13 @@ const AdminSupportInbox: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Broadcast History
+              Message History
             </CardTitle>
           </CardHeader>
           <CardContent>
             {broadcastHistory.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No broadcast messages sent yet
+                No messages sent yet
               </div>
             ) : (
               <div className="space-y-4">
