@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -227,7 +228,7 @@ function App() {
                   <Route path="/admin/events/registrations/:eventId" element={<AdminRoute><AdminEventRegistrations /></AdminRoute>} />
                   <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
                   <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
-                  <Route path="/admin/media/:id/edit" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+                  <Route path="/admin/media/edit/:id" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
                   <Route path="/admin/support-inbox" element={<AdminRoute><AdminSupportInbox /></AdminRoute>} />
                   <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
                   <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
