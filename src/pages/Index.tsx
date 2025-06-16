@@ -9,6 +9,7 @@ import MediaSection from '@/components/home/MediaSection';
 import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
 import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
+import CreatorsSection from '@/components/home/CreatorsSection';
 
 const Index = () => {
   return (
@@ -21,6 +22,7 @@ const Index = () => {
       <MediaSection />
       <LearningSection />
       <EventsSection />
+      <CreatorSection />
       <CallToAction />
     </Layout>
   );
