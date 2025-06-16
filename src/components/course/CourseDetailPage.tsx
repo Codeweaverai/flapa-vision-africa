@@ -289,11 +289,11 @@ const CourseDetailPage = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-4 sm:py-8">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-300 rounded w-3/4"></div>
+            <div className="h-6 sm:h-8 bg-gray-300 rounded w-3/4"></div>
             <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-            <div className="h-64 bg-gray-300 rounded"></div>
+            <div className="h-48 sm:h-64 bg-gray-300 rounded"></div>
           </div>
         </div>
       </Layout>
@@ -303,9 +303,9 @@ const CourseDetailPage = () => {
   if (!course) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Course not found</h1>
-          <p className="text-gray-600 mt-2">The course you're looking for doesn't exist or has been removed.</p>
+        <div className="container mx-auto px-4 py-4 sm:py-8 text-center">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Course not found</h1>
+          <p className="text-gray-600 mt-2 text-sm sm:text-base">The course you're looking for doesn't exist or has been removed.</p>
           <Button onClick={() => navigate('/courses')} className="mt-4">
             Browse Courses
           </Button>
@@ -323,45 +323,47 @@ const CourseDetailPage = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="container mx-auto px-4 py-4 sm:py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-8">
+            <div className="lg:col-span-2 space-y-4 sm:space-y-8">
               {/* Course Header */}
               <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4 mb-6">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-start gap-4 mb-6">
                     {course.thumbnail_url && (
                       <img
                         src={course.thumbnail_url}
                         alt={course.title}
-                        className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
+                        className="w-full sm:w-24 sm:h-24 h-48 rounded-lg object-cover flex-shrink-0"
                       />
                     )}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="secondary">{course.category}</Badge>
-                        <Badge variant="outline">{course.difficulty_level}</Badge>
+                    <div className="flex-1 w-full">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <Badge variant="secondary" className="text-xs sm:text-sm">{course.category}</Badge>
+                        <Badge variant="outline" className="text-xs sm:text-sm">{course.difficulty_level}</Badge>
                         {course.certificate_enabled && (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs sm:text-sm">
                             <Award className="w-3 h-3 mr-1" />
                             Certificate
                           </Badge>
                         )}
                       </div>
-                      <h1 className="text-3xl font-bold text-gray-900 mb-2">{course.title}</h1>
-                      <p className="text-gray-600 mb-4">{course.summary}</p>
+                      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 leading-tight">{course.title}</h1>
+                      <p className="text-gray-600 mb-4 text-sm sm:text-base">{course.summary}</p>
                       
                       {/* Course Stats */}
-                      <div className="flex items-center gap-6 text-sm text-gray-600">
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-600">
                         <div className="flex items-center gap-1">
                           <Star className="w-4 h-4 text-yellow-500" />
                           <span>{averageRating.toFixed(1)}</span>
-                          <span>({course.course_reviews.length} reviews)</span>
+                          <span className="hidden sm:inline">({course.course_reviews.length} reviews)</span>
+                          <span className="sm:hidden">({course.course_reviews.length})</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          <span>{course.course_enrollments.length} students</span>
+                          <span className="hidden sm:inline">{course.course_enrollments.length} students</span>
+                          <span className="sm:hidden">{course.course_enrollments.length}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
@@ -369,7 +371,8 @@ const CourseDetailPage = () => {
                         </div>
                         <div className="flex items-center gap-1">
                           <BookOpen className="w-4 h-4" />
-                          <span>{totalLessons} lessons</span>
+                          <span className="hidden sm:inline">{totalLessons} lessons</span>
+                          <span className="sm:hidden">{totalLessons}</span>
                         </div>
                       </div>
                     </div>
@@ -377,50 +380,50 @@ const CourseDetailPage = () => {
 
                   {/* Instructor */}
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                    <Avatar>
+                    <Avatar className="w-10 h-10 sm:w-12 sm:h-12">
                       <AvatarImage src={course.profiles[0]?.avatar_url} />
                       <AvatarFallback>
                         {course.profiles[0]?.full_name?.charAt(0) || 'I'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm text-gray-600">Instructor</p>
-                      <p className="font-semibold">{course.profiles[0]?.full_name || 'Unknown'}</p>
+                      <p className="text-xs sm:text-sm text-gray-600">Instructor</p>
+                      <p className="font-semibold text-sm sm:text-base">{course.profiles[0]?.full_name || 'Unknown'}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Course Tabs */}
-              <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
-                  <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                  <TabsTrigger value="instructor">Instructor</TabsTrigger>
+              <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+                <TabsList className="grid w-full grid-cols-4 h-auto">
+                  <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-2">Overview</TabsTrigger>
+                  <TabsTrigger value="curriculum" className="text-xs sm:text-sm px-2 py-2">Curriculum</TabsTrigger>
+                  <TabsTrigger value="reviews" className="text-xs sm:text-sm px-2 py-2">Reviews</TabsTrigger>
+                  <TabsTrigger value="instructor" className="text-xs sm:text-sm px-2 py-2">Instructor</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="overview" className="space-y-6">
+                <TabsContent value="overview" className="space-y-4 sm:space-y-6">
                   <Card>
-                    <CardContent className="p-6">
-                      <h3 className="text-xl font-semibold mb-4">About this course</h3>
+                    <CardContent className="p-4 sm:p-6">
+                      <h3 className="text-lg sm:text-xl font-semibold mb-4">About this course</h3>
                       <div className="prose max-w-none">
-                        <p className="text-gray-700 leading-relaxed">{course.description}</p>
+                        <p className="text-gray-700 leading-relaxed text-sm sm:text-base">{course.description}</p>
                       </div>
                     </CardContent>
                   </Card>
 
                   {course.course_learning_outcomes.length > 0 && (
                     <Card>
-                      <CardContent className="p-6">
-                        <h3 className="text-xl font-semibold mb-4">What you'll learn</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <CardContent className="p-4 sm:p-6">
+                        <h3 className="text-lg sm:text-xl font-semibold mb-4">What you'll learn</h3>
+                        <div className="grid grid-cols-1 gap-3">
                           {course.course_learning_outcomes
                             .sort((a, b) => a.order_index - b.order_index)
                             .map((outcome) => (
                               <div key={outcome.id} className="flex items-start gap-2">
-                                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span className="text-gray-700">{outcome.outcome}</span>
+                                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                <span className="text-gray-700 text-sm sm:text-base">{outcome.outcome}</span>
                               </div>
                             ))}
                         </div>
@@ -431,26 +434,26 @@ const CourseDetailPage = () => {
 
                 <TabsContent value="curriculum">
                   <Card>
-                    <CardContent className="p-6">
-                      <h3 className="text-xl font-semibold mb-4">Course curriculum</h3>
+                    <CardContent className="p-4 sm:p-6">
+                      <h3 className="text-lg sm:text-xl font-semibold mb-4">Course curriculum</h3>
                       <div className="space-y-4">
                         {course.course_modules
                           .sort((a, b) => a.order_index - b.order_index)
                           .map((module, moduleIndex) => (
-                            <div key={module.id} className="border rounded-lg p-4">
-                              <h4 className="font-semibold text-lg mb-2">
+                            <div key={module.id} className="border rounded-lg p-3 sm:p-4">
+                              <h4 className="font-semibold text-base sm:text-lg mb-2">
                                 Module {moduleIndex + 1}: {module.title}
                               </h4>
                               {module.description && (
-                                <p className="text-gray-600 text-sm mb-3">{module.description}</p>
+                                <p className="text-gray-600 text-xs sm:text-sm mb-3">{module.description}</p>
                               )}
                               <div className="space-y-2">
                                 {module.lessons
                                   .sort((a, b) => a.order_index - b.order_index)
                                   .map((lesson, lessonIndex) => (
                                     <div key={lesson.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
-                                      <Play className="w-4 h-4 text-blue-500" />
-                                      <span className="text-sm">
+                                      <Play className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 flex-shrink-0" />
+                                      <span className="text-xs sm:text-sm flex-1">
                                         {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
                                       </span>
                                       {lesson.content_type === 'video' && (
@@ -472,21 +475,21 @@ const CourseDetailPage = () => {
 
                 <TabsContent value="instructor">
                   <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-4 mb-6">
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 mb-6">
                         <Avatar className="w-16 h-16">
                           <AvatarImage src={course.profiles[0]?.avatar_url} />
                           <AvatarFallback className="text-lg">
                             {course.profiles[0]?.full_name?.charAt(0) || 'I'}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <h3 className="text-xl font-semibold">{course.profiles[0]?.full_name || 'Unknown'}</h3>
+                        <div className="text-center sm:text-left">
+                          <h3 className="text-lg sm:text-xl font-semibold">{course.profiles[0]?.full_name || 'Unknown'}</h3>
                           <p className="text-gray-600">Course Instructor</p>
                         </div>
                       </div>
                       <div className="text-gray-700">
-                        <p>Meet your instructor and learn more about their expertise and teaching style.</p>
+                        <p className="text-sm sm:text-base">Meet your instructor and learn more about their expertise and teaching style.</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -495,21 +498,21 @@ const CourseDetailPage = () => {
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6 order-first lg:order-last">
               {/* Price and Enrollment Card */}
-              <Card className="sticky top-6">
-                <CardContent className="p-6">
-                  <div className="text-center mb-6">
+              <Card className="lg:sticky lg:top-6">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-center mb-4 sm:mb-6">
                     {course.is_free ? (
-                      <div className="text-3xl font-bold text-green-600">Free</div>
+                      <div className="text-2xl sm:text-3xl font-bold text-green-600">Free</div>
                     ) : (
-                      <div className="text-3xl font-bold text-gray-900">${course.price}</div>
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900">${course.price}</div>
                     )}
                   </div>
 
                   {isEnrolled ? (
                     <Button 
-                      className="w-full mb-4" 
+                      className="w-full mb-4 text-sm sm:text-base py-2 sm:py-3" 
                       onClick={() => navigate(`/learning/courses/${course.id}`)}
                     >
                       <BookOpen className="w-4 h-4 mr-2" />
@@ -518,7 +521,7 @@ const CourseDetailPage = () => {
                   ) : (
                     <div className="space-y-3">
                       <Button 
-                        className="w-full" 
+                        className="w-full text-sm sm:text-base py-2 sm:py-3" 
                         onClick={handleEnrollNow}
                         disabled={enrollmentLoading}
                       >
@@ -533,7 +536,7 @@ const CourseDetailPage = () => {
                       {!course.is_free && (
                         <Button 
                           variant="outline" 
-                          className="w-full"
+                          className="w-full text-sm sm:text-base py-2 sm:py-3"
                           onClick={handleAddToCart}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
@@ -543,7 +546,7 @@ const CourseDetailPage = () => {
                     </div>
                   )}
 
-                  <div className="text-center text-sm text-gray-600 mt-4">
+                  <div className="text-center text-xs sm:text-sm text-gray-600 mt-4 space-y-1">
                     <p>30-day money-back guarantee</p>
                     <p>Full lifetime access</p>
                   </div>
@@ -552,28 +555,28 @@ const CourseDetailPage = () => {
 
               {/* Course Features */}
               <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">This course includes:</h3>
+                <CardContent className="p-4 sm:p-6">
+                  <h3 className="font-semibold mb-4 text-sm sm:text-base">This course includes:</h3>
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-xs sm:text-sm">
+                      <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
                       <span>{Math.floor(course.duration_minutes / 60)} hours on-demand video</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <BookOpen className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-xs sm:text-sm">
+                      <BookOpen className="w-4 h-4 text-gray-500 flex-shrink-0" />
                       <span>{totalLessons} lessons</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Globe className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-xs sm:text-sm">
+                      <Globe className="w-4 h-4 text-gray-500 flex-shrink-0" />
                       <span>Full lifetime access</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-xs sm:text-sm">
+                      <Users className="w-4 h-4 text-gray-500 flex-shrink-0" />
                       <span>Access on mobile and desktop</span>
                     </div>
                     {course.certificate_enabled && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Award className="w-4 h-4 text-gray-500" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <Award className="w-4 h-4 text-gray-500 flex-shrink-0" />
                         <span>Certificate of completion</span>
                       </div>
                     )}
@@ -584,8 +587,8 @@ const CourseDetailPage = () => {
               {/* Tags */}
               {course.tags && course.tags.length > 0 && (
                 <Card>
-                  <CardContent className="p-6">
-                    <h3 className="font-semibold mb-4">Tags</h3>
+                  <CardContent className="p-4 sm:p-6">
+                    <h3 className="font-semibold mb-4 text-sm sm:text-base">Tags</h3>
                     <div className="flex flex-wrap gap-2">
                       {course.tags.map((tag, index) => (
                         <Badge key={index} variant="outline" className="text-xs">

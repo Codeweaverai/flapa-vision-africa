@@ -11,6 +11,7 @@ import MediaSection from '@/components/home/MediaSection';
 import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
 import LearningSection from '@/components/home/LearningSection';
+import CreatorsSection from '@/components/home/CreatorsSection';
 
 const HomePage = () => {
   console.log('HomePage rendering with sections:');
@@ -18,6 +19,7 @@ const HomePage = () => {
   console.log('- AboutSection');
   console.log('- BrowseCategoriesSection');
   console.log('- CoursesSection');
+  console.log('- CreatorsSection');
   console.log('- CommunityAISection');
   console.log('- EventsSection');
   console.log('- PastEventsSection');
@@ -31,6 +33,7 @@ const HomePage = () => {
       <AboutSection />
       <BrowseCategoriesSection />
       <CoursesSection />
+      <CreatorsSection />
       <CommunityAISection />
       <EventsSection />
       <PastEventsSection />
