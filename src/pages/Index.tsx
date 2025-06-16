@@ -22,7 +22,7 @@ const Index = () => {
       <MediaSection />
       <LearningSection />
       <EventsSection />
-      <CreatorSection />
+      <CreatorsSection />
       <CallToAction />
     </Layout>
   );
