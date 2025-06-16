@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,16 +24,13 @@ import {
   CheckCircle2,
   GraduationCap,
   ArrowRight,
-  ArrowLeft,
-  XCircle,
-  RotateCcw
+  ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviews from '@/components/course/CourseReviews';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
-import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
 import FloatingAIAssistant from '@/components/course/FloatingAIAssistant';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import LessonDiscussionTab from '@/components/course/LessonDiscussionTab';
