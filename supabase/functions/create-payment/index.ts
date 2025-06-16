@@ -188,9 +188,9 @@ serve(async (req) => {
       });
     }
     
-    // Get the origin for return URL
+    // Get the origin for return URL - Use checkout/success route
     const origin = req.headers.get('origin') || Deno.env.get('FRONTEND_URL') || 'http://localhost:5173';
-    const returnUrl = `${origin}/payment-result?txnId=${paymentTransaction.id}&type=${referenceType}&id=${referenceId}`;
+    const returnUrl = `${origin}/checkout/success?session_id=mobile_payment_${paymentTransaction.id}&type=${referenceType}&id=${referenceId}`;
     
     // Prepare PawaPay widget session request
     const sessionRequestBody = {
@@ -299,7 +299,7 @@ serve(async (req) => {
       console.log('Using mock PawaPay response for development');
       
       // This is a mock response for testing purposes only
-      const mockRedirectUrl = `${origin}/payment-result?txnId=${paymentTransaction.id}&type=${referenceType}&id=${referenceId}&status=success`;
+      const mockRedirectUrl = `${origin}/checkout/success?session_id=mobile_payment_${paymentTransaction.id}&type=${referenceType}&id=${referenceId}&status=success`;
       
       return new Response(
         JSON.stringify({

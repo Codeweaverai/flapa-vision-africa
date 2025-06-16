@@ -38,9 +38,94 @@ serve(async (req) => {
 
     let session;
     let targetOrderId = orderId;
+    let paymentMethod = 'stripe';
 
-    if (sessionId) {
-      // Retrieve the checkout session from Stripe
+    // Check if this is a mobile payment session
+    if (sessionId && sessionId.startsWith('mobile_payment_')) {
+      logStep("Processing mobile payment verification", { sessionId });
+      paymentMethod = 'mobile_money';
+      
+      // Extract payment transaction ID from session ID
+      const paymentTransactionId = sessionId.replace('mobile_payment_', '');
+      
+      // Get payment transaction details
+      const { data: paymentTransaction } = await supabaseClient
+        .from('payment_transactions')
+        .select('*')
+        .eq('id', paymentTransactionId)
+        .single();
+
+      if (!paymentTransaction) {
+        throw new Error("Payment transaction not found");
+      }
+
+      // For mobile payments, simulate completion for development
+      // In production, this would be handled by PawaPay webhook
+      logStep("Simulating mobile payment completion", { transactionId: paymentTransactionId });
+      
+      // Update payment transaction to completed
+      await supabaseClient
+        .from('payment_transactions')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentTransactionId);
+
+      // Update reference status based on type
+      if (paymentTransaction.reference_type === 'consultation') {
+        await supabaseClient
+          .from('consultation_bookings')
+          .update({
+            payment_status: 'completed',
+            status: 'confirmed'
+          })
+          .eq('id', paymentTransaction.reference_id);
+      } else if (paymentTransaction.reference_type === 'event') {
+        await supabaseClient
+          .from('registrations')
+          .update({
+            payment_status: 'completed',
+            status: 'confirmed'
+          })
+          .eq('id', paymentTransaction.reference_id);
+      }
+
+      // Create a mock order for mobile payment if none exists
+      const { data: existingOrder } = await supabaseClient
+        .from('orders')
+        .select('id')
+        .eq('payment_provider_id', paymentTransactionId)
+        .single();
+
+      if (!existingOrder) {
+        const { data: newOrder, error: orderError } = await supabaseClient
+          .from('orders')
+          .insert({
+            user_id: paymentTransaction.user_id,
+            email: 'mobile_payment@example.com',
+            total_amount: paymentTransaction.amount,
+            currency: paymentTransaction.currency,
+            payment_status: 'completed',
+            payment_method: 'mobile_money',
+            payment_provider_id: paymentTransactionId,
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (orderError) {
+          logStep("Error creating mobile payment order", { error: orderError });
+        } else {
+          targetOrderId = newOrder.id;
+          logStep("Created mobile payment order", { orderId: targetOrderId });
+        }
+      } else {
+        targetOrderId = existingOrder.id;
+      }
+
+    } else if (sessionId) {
+      // Handle Stripe payments
       session = await stripe.checkout.sessions.retrieve(sessionId);
       logStep("Retrieved Stripe session", { sessionId: session.id, status: session.payment_status });
 
