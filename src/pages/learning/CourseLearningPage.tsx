@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -148,6 +149,8 @@ const CourseLearningPage = () => {
   const [showExamModal, setShowExamModal] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
   const [examResults, setExamResults] = useState<FinalExamResult[]>([]);
+  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [lessonProgress, setLessonProgress] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (courseId) {
@@ -156,6 +159,7 @@ const CourseLearningPage = () => {
         fetchEnrollmentData();
         fetchProgress();
         fetchExamResults();
+        fetchLessonProgress();
       }
     }
   }, [courseId, user]);
@@ -321,6 +325,65 @@ const CourseLearningPage = () => {
     }
   };
 
+  const fetchLessonProgress = async () => {
+    if (!user || !courseId || !enrollment) return;
+    
+    try {
+      const { data: progressData, error } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id, is_completed, last_position_seconds')
+        .eq('enrollment_id', enrollment.id);
+
+      if (!error && progressData) {
+        const completed = progressData
+          .filter(p => p.is_completed)
+          .map(p => p.lesson_id);
+        
+        const progressMap = progressData.reduce((acc, p) => {
+          acc[p.lesson_id] = p.last_position_seconds || 0;
+          return acc;
+        }, {} as Record<string, number>);
+
+        setCompletedLessons(completed);
+        setLessonProgress(progressMap);
+      }
+    } catch (error) {
+      console.error('Error fetching lesson progress:', error);
+    }
+  };
+
+  const updateCourseProgress = async () => {
+    if (!user || !courseId || !modules.length) return;
+
+    try {
+      const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
+      const completedCount = completedLessons.length;
+      const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+
+      const { error } = await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          progress_percentage: progressPercentage,
+          last_lesson_completed: selectedLesson?.id || null,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+
+      if (!error) {
+        setProgress(prev => prev ? { ...prev, progress_percentage: progressPercentage } : null);
+      }
+    } catch (error) {
+      console.error('Error updating course progress:', error);
+    }
+  };
+
+  useEffect(() => {
+    updateCourseProgress();
+  }, [completedLessons, user, courseId, modules]);
+
   const markAllLessonsComplete = async () => {
     if (!user || !courseId || !modules.length || !enrollment) {
       toast.error('Unable to mark lessons complete');
@@ -404,6 +467,7 @@ const CourseLearningPage = () => {
       if (error) throw error;
 
       // Update local state
+      setCompletedLessons(prev => [...new Set([...prev, lessonId])]);
       setModules(prevModules =>
         prevModules.map(module => ({
           ...module,
@@ -418,6 +482,40 @@ const CourseLearningPage = () => {
       console.error('Error marking lesson complete:', error);
       toast.error('Failed to mark lesson complete');
     }
+  };
+
+  const updateLessonProgress = async (lessonId: string, position: number) => {
+    if (!user || !enrollment) return;
+
+    try {
+      const { error } = await supabase
+        .from('lesson_progress')
+        .upsert({
+          enrollment_id: enrollment.id,
+          lesson_id: lessonId,
+          last_position_seconds: position,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'enrollment_id,lesson_id'
+        });
+
+      if (!error) {
+        setLessonProgress(prev => ({ ...prev, [lessonId]: position }));
+      }
+    } catch (error) {
+      console.error('Error updating lesson progress:', error);
+    }
+  };
+
+  const handleVideoProgress = (lessonId: string, played: number, playedSeconds: number) => {
+    // Auto-save progress every 10 seconds
+    if (Math.floor(playedSeconds) % 10 === 0) {
+      updateLessonProgress(lessonId, playedSeconds);
+    }
+  };
+
+  const handleVideoEnded = (lessonId: string) => {
+    markLessonComplete(lessonId);
   };
 
   const getNextLesson = () => {
@@ -528,394 +626,438 @@ const CourseLearningPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-      </div>
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        </div>
+      </Layout>
     );
   }
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
-          <Link to="/learning">
-            <Button>Back to Learning</Button>
-          </Link>
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
+            <Link to="/learning">
+              <Button>Back to Learning</Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Course Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Badge variant="secondary">{course.category}</Badge>
-            <Badge variant="outline">{course.difficulty_level}</Badge>
-            {course.is_free && <Badge className="bg-green-500">Free</Badge>}
-          </div>
-          
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">{course.title}</h1>
-          <p className="text-xl text-gray-600 mb-6">{course.summary}</p>
-          
-          <div className="flex flex-wrap items-center gap-6 text-gray-600">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              <span>{course.duration_minutes} minutes</span>
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
+          {/* Course Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Badge variant="secondary">{course.category}</Badge>
+              <Badge variant="outline">{course.difficulty_level}</Badge>
+              {course.is_free && <Badge className="bg-green-500">Free</Badge>}
             </div>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              <span>{modules.length} modules</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              <span>{enrollmentCount} students</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-              <span>{averageRating.toFixed(1)} ({reviewCount} reviews)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Progress Bar for Enrolled Users */}
-        {enrolledUser && (
-          <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Your Progress</h3>
-                <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
+            
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">{course.title}</h1>
+            <p className="text-xl text-gray-600 mb-6">{course.summary}</p>
+            
+            <div className="flex flex-wrap items-center gap-6 text-gray-600">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                <span>{course.duration_minutes} minutes</span>
               </div>
-              <Progress value={progressPercentage} className="h-3" />
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-gray-600">
-                  Keep going! You're doing great.
-                </p>
-                <div className="flex gap-2">
-                  {isNotComplete && hasLessons && (
-                    <Button
-                      onClick={markAllLessonsComplete}
-                      disabled={markingComplete}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {markingComplete ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                      )}
-                      {markingComplete ? 'Marking Complete...' : 'Mark All Complete'}
-                    </Button>
-                  )}
-                  
-                  {(!hasLessons || progressPercentage === 100) && finalExam && (
-                    <div className="flex gap-2">
-                      {hasPassedExam ? (
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => window.location.href = `/course/${courseId}/results`}
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            <Award className="h-4 w-4 mr-2" />
-                            View Results
-                          </Button>
-                          <Button
-                            onClick={() => window.location.href = `/learning`}
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            Continue Learning
-                          </Button>
-                        </div>
-                      ) : latestExamResult && !latestExamResult.passed ? (
-                        <Button
-                          onClick={handleTakeExam}
-                          size="sm"
-                          className="bg-orange-600 hover:bg-orange-700 text-white"
-                        >
-                          <GraduationCap className="h-4 w-4 mr-2" />
-                          Retake Exam (Attempt {(examResults.length || 0) + 1})
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={handleTakeExam}
-                          size="sm"
-                          className="bg-orange-600 hover:bg-orange-700 text-white"
-                        >
-                          <GraduationCap className="h-4 w-4 mr-2" />
-                          Take Final Exam
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                <span>{modules.length} modules</span>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                <span>{enrollmentCount} students</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                <span>{averageRating.toFixed(1)} ({reviewCount} reviews)</span>
+              </div>
+            </div>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Course Curriculum Sidebar */}
-          <div className="lg:col-span-4">
-            <Card className="sticky top-4">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Course Curriculum
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CourseModuleList 
-                  modules={modules}
-                  onLessonSelect={handleLessonSelect}
-                  currentLessonId={selectedLesson?.id}
-                  completedLessons={[]}
-                  onQuizStart={(quizId) => {
-                    console.log('Starting quiz:', quizId);
-                  }}
-                />
-                
-                {finalExam && (
-                  <div className="mt-4 p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Award className="h-5 w-5 text-orange-600" />
-                        <span className="font-semibold text-orange-800">Final Exam</span>
-                      </div>
-                      <Badge variant="outline" className="text-orange-700">
-                        {finalExam.passing_score}% to pass
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-orange-600 mt-2">{finalExam.description}</p>
-                    <Button 
-                      size="sm" 
-                      className="mt-3 bg-orange-600 hover:bg-orange-700"
-                      onClick={handleTakeExam}
-                    >
-                      {latestExamResult && !latestExamResult.passed ? 'Retake Exam' : 'Take Final Exam'}
-                    </Button>
+          {/* Enhanced Progress Bar for Enrolled Users */}
+          {enrolledUser && (
+            <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Your Progress</h3>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
+                    <p className="text-sm text-gray-600">
+                      {completedLessons.length} of {modules.reduce((total, module) => total + module.lessons.length, 0)} lessons
+                    </p>
                   </div>
-                )}
+                </div>
+                <Progress value={progressPercentage} className="h-3 mb-4" />
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">
+                    {progressPercentage === 100 ? 'Course completed! 🎉' : 'Keep going! You\'re doing great.'}
+                  </p>
+                  <div className="flex gap-2">
+                    {isNotComplete && hasLessons && (
+                      <Button
+                        onClick={markAllLessonsComplete}
+                        disabled={markingComplete}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {markingComplete ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                        )}
+                        {markingComplete ? 'Marking Complete...' : 'Mark All Complete'}
+                      </Button>
+                    )}
+                    
+                    {(!hasLessons || progressPercentage === 100) && finalExam && (
+                      <div className="flex gap-2">
+                        {hasPassedExam ? (
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => window.location.href = `/course/${courseId}/results`}
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <Award className="h-4 w-4 mr-2" />
+                              View Results
+                            </Button>
+                            <Button
+                              onClick={() => window.location.href = `/learning`}
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Continue Learning
+                            </Button>
+                          </div>
+                        ) : latestExamResult && !latestExamResult.passed ? (
+                          <Button
+                            onClick={handleTakeExam}
+                            size="sm"
+                            className="bg-orange-600 hover:bg-orange-700 text-white"
+                          >
+                            <GraduationCap className="h-4 w-4 mr-2" />
+                            Retake Exam (Attempt {(examResults.length || 0) + 1})
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={handleTakeExam}
+                            size="sm"
+                            className="bg-orange-600 hover:bg-orange-700 text-white"
+                          >
+                            <GraduationCap className="h-4 w-4 mr-2" />
+                            Take Final Exam
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          </div>
+          )}
 
-          {/* Main Content */}
-          <div className="lg:col-span-8">
-            {/* Lesson Navigation */}
-            {selectedLesson && (
-              <div className="flex justify-between items-center mb-4">
-                <Button 
-                  variant="outline" 
-                  onClick={handlePreviousLesson}
-                  disabled={!getPreviousLesson()}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Previous Lesson
-                </Button>
-                
-                <div className="text-center">
-                  <h2 className="font-semibold text-lg">{selectedLesson.title}</h2>
-                </div>
-                
-                <Button 
-                  onClick={handleNextLesson}
-                  disabled={!getNextLesson()}
-                  className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700"
-                >
-                  Next Lesson
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-
-            <Tabs defaultValue="content" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="content" className="flex items-center gap-2">
-                  <Play className="h-4 w-4" />
-                  Content
-                </TabsTrigger>
-                <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
-                  <StickyNote className="h-4 w-4" />
-                  Notes
-                </TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                <TabsTrigger value="discussion">Discussion</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="content" className="space-y-6">
-                <div className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>
-                        {selectedLesson ? selectedLesson.title : 'Select a lesson to begin'}
-                      </CardTitle>
-                      {selectedLesson && selectedLesson.description && (
-                        <p className="text-muted-foreground">{selectedLesson.description}</p>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      {selectedLesson && selectedLesson.video_url ? (
-                        <div className="space-y-4">
-                          <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
-                            <ReactPlayer
-                              url={selectedLesson.video_url}
-                              width="100%"
-                              height="100%"
-                              controls={true}
-                              playing={false}
-                              pip={true}
-                              onEnded={() => {
-                                if (selectedLesson) {
-                                  markLessonComplete(selectedLesson.id);
-                                }
-                              }}
-                            />
-                          </div>
-                          {selectedLesson.materials_urls && selectedLesson.materials_urls.length > 0 && (
-                            <div className="mt-4">
-                              <h4 className="font-semibold mb-2">Additional Materials</h4>
-                              <div className="space-y-2">
-                                {selectedLesson.materials_urls.map((url, index) => (
-                                  <a
-                                    key={index}
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block p-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                                  >
-                                    Material {index + 1}
-                                  </a>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Course Curriculum Sidebar */}
+            <div className="lg:col-span-4">
+              <Card className="sticky top-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    Course Curriculum
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CourseModuleList 
+                    modules={modules}
+                    onLessonSelect={handleLessonSelect}
+                    currentLessonId={selectedLesson?.id}
+                    completedLessons={completedLessons}
+                    onQuizStart={(quizId) => {
+                      console.log('Starting quiz:', quizId);
+                    }}
+                  />
+                  
+                  {finalExam && (
+                    <div className="mt-4 p-4 border border-orange-200 rounded-lg bg-orange-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Award className="h-5 w-5 text-orange-600" />
+                          <span className="font-semibold text-orange-800">Final Exam</span>
                         </div>
-                      ) : selectedLesson ? (
-                        <div className="text-center py-8">
-                          <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                          <p className="text-gray-500">
-                            This lesson doesn't have a video. Content coming soon!
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                          <p className="text-gray-500">
-                            Select a lesson from the curriculum to start learning
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Video Transcripts Section */}
-                  {selectedLesson && selectedLesson.video_url && (
-                    <VideoTranscripts 
-                      lessonId={selectedLesson.id}
-                      onSeekTo={(time) => {
-                        console.log('Seeking to time:', time);
-                      }}
-                    />
+                        <Badge variant="outline" className="text-orange-700">
+                          {finalExam.passing_score}% to pass
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-orange-600 mt-2">{finalExam.description}</p>
+                      <Button 
+                        size="sm" 
+                        className="mt-3 bg-orange-600 hover:bg-orange-700"
+                        onClick={handleTakeExam}
+                      >
+                        {latestExamResult && !latestExamResult.passed ? 'Retake Exam' : 'Take Final Exam'}
+                      </Button>
+                    </div>
                   )}
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="lesson-notes" className="space-y-6">
-                <LessonNotesTab 
-                  lessonId={selectedLesson?.id || ''} 
-                  currentVideoTime={0}
-                />
-              </TabsContent>
-              
-              <TabsContent value="reviews">
-                <CourseReviews courseId={courseId!} />
-              </TabsContent>
-              
-              <TabsContent value="discussion">
-                {selectedLesson ? (
-                  <LessonDiscussionTab lessonId={selectedLesson.id} />
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Select a lesson to participate in discussions</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Instructor Card */}
-        {instructor && (
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Your Instructor
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={instructor.avatar_url || undefined} />
-                  <AvatarFallback>
-                    {instructor.full_name?.charAt(0) || 'I'}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="font-semibold">{instructor.full_name}</h4>
-                  <p className="text-sm text-gray-600">Course Creator</p>
+            {/* Main Content */}
+            <div className="lg:col-span-8">
+              {/* Lesson Navigation */}
+              {selectedLesson && (
+                <div className="flex justify-between items-center mb-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={handlePreviousLesson}
+                    disabled={!getPreviousLesson()}
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Previous Lesson
+                  </Button>
+                  
+                  <div className="text-center">
+                    <h2 className="font-semibold text-lg">{selectedLesson.title}</h2>
+                    {completedLessons.includes(selectedLesson.id) && (
+                      <Badge variant="secondary" className="mt-1">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Completed
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    onClick={handleNextLesson}
+                    disabled={!getNextLesson()}
+                    className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700"
+                  >
+                    Next Lesson
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-              
-              {instructor.bio && (
-                <p className="text-sm text-gray-700">{instructor.bio}</p>
               )}
-              
-              <div className="flex gap-2">
-                <Link to={`/creator/profile/${instructor.id}`}>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    View Profile
-                  </Button>
-                </Link>
-                <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    Send Message
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Final Exam Modal */}
-        {finalExam && (
-          <FinalExamModal
-            isOpen={showExamModal}
-            onClose={() => setShowExamModal(false)}
-            exam={finalExam}
-            enrollmentId={enrollment?.id || ''}
-            onExamComplete={handleExamComplete}
+              <Tabs defaultValue="content" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="content" className="flex items-center gap-2">
+                    <Play className="h-4 w-4" />
+                    Content
+                  </TabsTrigger>
+                  <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
+                    <StickyNote className="h-4 w-4" />
+                    Notes
+                  </TabsTrigger>
+                  <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                  <TabsTrigger value="discussion">Discussion</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="content" className="space-y-6">
+                  <div className="space-y-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>
+                          {selectedLesson ? selectedLesson.title : 'Select a lesson to begin'}
+                        </CardTitle>
+                        {selectedLesson && selectedLesson.description && (
+                          <p className="text-muted-foreground">{selectedLesson.description}</p>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        {selectedLesson && selectedLesson.video_url ? (
+                          <div className="space-y-4">
+                            <div className="w-full aspect-video rounded-lg overflow-hidden bg-black">
+                              <ReactPlayer
+                                url={selectedLesson.video_url}
+                                width="100%"
+                                height="100%"
+                                controls={true}
+                                playing={false}
+                                pip={true}
+                                onProgress={({ played, playedSeconds }) => {
+                                  handleVideoProgress(selectedLesson.id, played, playedSeconds);
+                                }}
+                                onEnded={() => handleVideoEnded(selectedLesson.id)}
+                                onSeek={(seconds) => updateLessonProgress(selectedLesson.id, seconds)}
+                              />
+                            </div>
+                            
+                            {/* Progress indicator for current lesson */}
+                            {lessonProgress[selectedLesson.id] && (
+                              <div className="text-sm text-gray-600">
+                                <p>Last watched: {Math.floor(lessonProgress[selectedLesson.id] / 60)}m {Math.floor(lessonProgress[selectedLesson.id] % 60)}s</p>
+                              </div>
+                            )}
+
+                            {!completedLessons.includes(selectedLesson.id) && (
+                              <Button
+                                onClick={() => markLessonComplete(selectedLesson.id)}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Mark as Complete
+                              </Button>
+                            )}
+
+                            {selectedLesson.materials_urls && selectedLesson.materials_urls.length > 0 && (
+                              <div className="mt-4">
+                                <h4 className="font-semibold mb-2">Additional Materials</h4>
+                                <div className="space-y-2">
+                                  {selectedLesson.materials_urls.map((url, index) => (
+                                    <a
+                                      key={index}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block p-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                      Material {index + 1}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : selectedLesson ? (
+                          <div className="text-center py-8">
+                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                            <p className="text-gray-500">
+                              This lesson doesn't have a video. Content coming soon!
+                            </p>
+                            {!completedLessons.includes(selectedLesson.id) && (
+                              <Button
+                                onClick={() => markLessonComplete(selectedLesson.id)}
+                                className="mt-4 bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Mark as Complete
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Play className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                            <p className="text-gray-500">
+                              Select a lesson from the curriculum to start learning
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Video Transcripts Section */}
+                    {selectedLesson && selectedLesson.video_url && (
+                      <VideoTranscripts 
+                        lessonId={selectedLesson.id}
+                        onSeekTo={(time) => {
+                          console.log('Seeking to time:', time);
+                        }}
+                      />
+                    )}
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="lesson-notes" className="space-y-6">
+                  <LessonNotesTab 
+                    lessonId={selectedLesson?.id || ''} 
+                    currentVideoTime={lessonProgress[selectedLesson?.id || ''] || 0}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="reviews">
+                  <CourseReviews courseId={courseId!} />
+                </TabsContent>
+                
+                <TabsContent value="discussion">
+                  {selectedLesson ? (
+                    <LessonDiscussionTab lessonId={selectedLesson.id} />
+                  ) : (
+                    <Card>
+                      <CardContent className="text-center py-8">
+                        <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-500 mb-4">Select a lesson to participate in discussions</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
+
+          {/* Instructor Card */}
+          {instructor && (
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Your Instructor
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={instructor.avatar_url || undefined} />
+                    <AvatarFallback>
+                      {instructor.full_name?.charAt(0) || 'I'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h4 className="font-semibold">{instructor.full_name}</h4>
+                    <p className="text-sm text-gray-600">Course Creator</p>
+                  </div>
+                </div>
+                
+                {instructor.bio && (
+                  <p className="text-sm text-gray-700">{instructor.bio}</p>
+                )}
+                
+                <div className="flex gap-2">
+                  <Link to={`/creator/profile/${instructor.id}`}>
+                    <Button variant="outline" size="sm" className="flex-1">
+                      View Profile
+                    </Button>
+                  </Link>
+                  <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
+                    <Button variant="outline" size="sm" className="flex-1">
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      Send Message
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Final Exam Modal */}
+          {finalExam && (
+            <FinalExamModal
+              isOpen={showExamModal}
+              onClose={() => setShowExamModal(false)}
+              exam={finalExam}
+              enrollmentId={enrollment?.id || ''}
+              onExamComplete={handleExamComplete}
+            />
+          )}
+
+          {/* Add FloatingAIAssistant at the end */}
+          <FloatingAIAssistant 
+            lessonTitle={`Course: ${course?.title}`}
+            lessonContent={course?.description}
+            courseId={course?.id}
           />
-        )}
-
-        {/* Add FloatingAIAssistant at the end */}
-        <FloatingAIAssistant 
-          lessonTitle={`Course: ${course?.title}`}
-          lessonContent={course?.description}
-          courseId={course?.id}
-        />
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
