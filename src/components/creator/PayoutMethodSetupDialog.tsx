@@ -37,6 +37,7 @@ const MOBILE_OPERATORS = {
   ZMB: [
     { name: 'MTN Zambia', code: 'MTN_MOMO_ZMB' },
     { name: 'Airtel Zambia', code: 'AIRTEL_OAPI_ZMB' },
+    { name: 'Zamtel Zambia', code: 'ZAMTEL_ZMB' },
   ],
   NGA: [
     { name: 'MTN Nigeria', code: 'MTN_MOMO_NGA' },
