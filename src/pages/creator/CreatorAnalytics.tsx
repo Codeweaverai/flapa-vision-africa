@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -9,7 +8,7 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { Badge } from '@/components/ui/badge';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
-import { fetchCreatorEarnings } from '@/services/creatorPaymentService';
+import { calculateCreatorEarningsFromOrders } from '@/services/creatorEarningsService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface AnalyticsData {
@@ -55,8 +54,8 @@ const CreatorAnalytics: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get creator earnings from payment transactions
-      const earnings = await fetchCreatorEarnings(user.id);
+      // Get creator earnings from orders
+      const earnings = await calculateCreatorEarningsFromOrders(user.id);
 
       // Get total courses
       const { data: courses } = await supabase
@@ -96,17 +95,28 @@ const CreatorAnalytics: React.FC = () => {
         .order('booking_date', { ascending: false })
         .limit(10);
 
-      // Get payment transactions for monthly revenue
-      const { data: paymentTransactions } = await supabase
-        .from('payment_transactions')
-        .select('*')
-        .eq('creator_id', user.id)
-        .eq('status', 'completed')
-        .gte('created_at', subDays(new Date(), 180).toISOString())
-        .order('created_at', { ascending: true });
+      // Get order items for monthly revenue calculation
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          orders!inner(
+            id,
+            user_id,
+            email,
+            total_amount,
+            currency,
+            payment_status,
+            payment_method,
+            created_at
+          )
+        `)
+        .eq('orders.payment_status', 'completed')
+        .gte('orders.created_at', subDays(new Date(), 180).toISOString())
+        .order('orders.created_at', { ascending: true });
 
-      // Process monthly revenue data
-      const monthlyRevenue = processMonthlyRevenue(paymentTransactions || []);
+      // Process monthly revenue data from creator's order items
+      const monthlyRevenue = await processMonthlyRevenue(orderItems || [], user.id);
 
       // Get top courses by enrollment
       const { data: topCoursesData } = await supabase
@@ -162,14 +172,52 @@ const CreatorAnalytics: React.FC = () => {
     }
   };
 
-  const processMonthlyRevenue = (transactions: any[]) => {
+  const processMonthlyRevenue = async (orderItems: any[], creatorId: string) => {
     const monthlyData: { [key: string]: number } = {};
+    const PLATFORM_FEE_RATE = 0.08;
     
-    transactions.forEach(tx => {
-      const month = format(new Date(tx.created_at), 'MMM yyyy');
-      const earning = Number(tx.creator_earning || 0);
-      monthlyData[month] = (monthlyData[month] || 0) + earning;
-    });
+    for (const item of orderItems) {
+      let isCreatorItem = false;
+      
+      if (item.item_type === 'course') {
+        const { data: course } = await supabase
+          .from('courses')
+          .select('creator_id')
+          .eq('id', item.item_id)
+          .single();
+        
+        if (course && course.creator_id === creatorId) {
+          isCreatorItem = true;
+        }
+      } else if (item.item_type === 'event_ticket') {
+        const { data: ticket } = await supabase
+          .from('event_tickets')
+          .select('event_id')
+          .eq('id', item.item_id)
+          .single();
+        
+        if (ticket) {
+          const { data: event } = await supabase
+            .from('events')
+            .select('creator_id')
+            .eq('id', ticket.event_id)
+            .single();
+          
+          if (event && event.creator_id === creatorId) {
+            isCreatorItem = true;
+          }
+        }
+      }
+      
+      if (isCreatorItem) {
+        const month = format(new Date(item.orders.created_at), 'MMM yyyy');
+        const itemTotal = Number(item.total_price);
+        const platformFee = itemTotal * PLATFORM_FEE_RATE;
+        const creatorEarning = itemTotal - platformFee;
+        
+        monthlyData[month] = (monthlyData[month] || 0) + creatorEarning;
+      }
+    }
 
     return Object.entries(monthlyData).map(([month, revenue]) => ({
       month,
