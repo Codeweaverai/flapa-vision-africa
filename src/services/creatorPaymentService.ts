@@ -179,8 +179,11 @@ export async function fetchCreatorPaymentTransactions(creatorId: string): Promis
         itemName = course.title;
       } else if (transaction.reference_type === 'event' && event) {
         itemName = event.title;
-      } else if (transaction.metadata?.item_name) {
-        itemName = transaction.metadata.item_name;
+      } else if (transaction.metadata && typeof transaction.metadata === 'object' && transaction.metadata !== null) {
+        const metadata = transaction.metadata as Record<string, any>;
+        if (metadata.item_name) {
+          itemName = metadata.item_name;
+        }
       }
 
       return {

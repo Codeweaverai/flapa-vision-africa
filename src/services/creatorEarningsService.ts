@@ -168,19 +168,26 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
         itemName = course.title;
       } else if (tx.reference_type === 'event' && event) {
         itemName = event.title;
-      } else if (tx.metadata?.item_name) {
-        itemName = tx.metadata.item_name;
+      } else if (tx.metadata && typeof tx.metadata === 'object' && tx.metadata !== null) {
+        const metadata = tx.metadata as Record<string, any>;
+        if (metadata.item_name) {
+          itemName = metadata.item_name;
+        }
       }
+
+      const metadata = tx.metadata && typeof tx.metadata === 'object' && tx.metadata !== null 
+        ? tx.metadata as Record<string, any> 
+        : {};
 
       return {
         id: tx.id,
-        order_id: tx.metadata?.order_id || 'N/A',
+        order_id: metadata.order_id || 'N/A',
         customer_email: 'N/A', // Will get from order if needed
         customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
         item_type: tx.reference_type === 'course' ? 'course' : 'event',
         item_name: itemName,
         item_id: tx.reference_id,
-        quantity: tx.metadata?.quantity || 1,
+        quantity: metadata.quantity || 1,
         unit_price: Number(tx.amount),
         total_amount: Number(tx.amount),
         creator_earning: Number(tx.creator_earning || 0),
