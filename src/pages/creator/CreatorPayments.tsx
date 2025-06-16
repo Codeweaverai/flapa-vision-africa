@@ -14,14 +14,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { 
-  fetchCreatorPayouts
+  fetchCreatorPayouts,
+  fetchCreatorEarnings,
+  fetchCreatorPaymentTransactions
 } from '@/services/creatorPaymentService';
 import { 
-  calculateCreatorEarningsFromOrders,
-  fetchCreatorTransactions,
-  getCreatorPayoutMethod,
-  CreatorEarningsData,
-  CreatorTransaction
+  getCreatorPayoutMethod
 } from '@/services/creatorEarningsService';
 import CreatorWithdrawDialog from '@/components/creator/CreatorWithdrawDialog';
 import PayoutMethodSetupDialog from '@/components/creator/PayoutMethodSetupDialog';
@@ -29,9 +27,9 @@ import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 const CreatorPayments: React.FC = () => {
-  const [transactions, setTransactions] = useState<CreatorTransaction[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
-  const [earnings, setEarnings] = useState<CreatorEarningsData>({
+  const [earnings, setEarnings] = useState({
     available_balance: 0,
     pending_balance: 0,
     total_earnings: 0,
@@ -87,9 +85,9 @@ const CreatorPayments: React.FC = () => {
       setLoadingEarnings(true);
       
       const [transactionsData, payoutsData, earningsData] = await Promise.all([
-        fetchCreatorTransactions(user.id),
+        fetchCreatorPaymentTransactions(user.id),
         fetchCreatorPayouts(user.id),
-        calculateCreatorEarningsFromOrders(user.id)
+        fetchCreatorEarnings(user.id)
       ]);
       
       setTransactions(transactionsData);
@@ -139,7 +137,7 @@ const CreatorPayments: React.FC = () => {
     switch (type) {
       case 'course':
         return 'Course Purchase';
-      case 'event_ticket':
+      case 'event':
         return 'Event Registration';
       case 'consultation':
         return 'Consultation Booking';
@@ -336,9 +334,9 @@ const CreatorPayments: React.FC = () => {
           <TabsContent value="transactions" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Customer Orders & Transactions</CardTitle>
+                <CardTitle>Customer Payment Transactions</CardTitle>
                 <CardDescription>
-                  View all completed orders from customers for your courses and events
+                  View all completed payment transactions from customers for your courses and events
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -357,18 +355,18 @@ const CreatorPayments: React.FC = () => {
                           <TableHead>Customer</TableHead>
                           <TableHead>Item</TableHead>
                           <TableHead>Type</TableHead>
-                          <TableHead>Qty</TableHead>
-                          <TableHead>Total Amount</TableHead>
+                          <TableHead>Amount</TableHead>
                           <TableHead>Your Earning</TableHead>
                           <TableHead>Platform Fee</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Payout Date</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {transactions.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
-                              No customer transactions found
+                              No payment transactions found
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -378,26 +376,34 @@ const CreatorPayments: React.FC = () => {
                                 {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
                               </TableCell>
                               <TableCell>
-                                <div>
-                                  <div>{transaction.customer_name || 'Unknown'}</div>
-                                  <div className="text-xs text-muted-foreground">{transaction.customer_email}</div>
-                                </div>
+                                <div>{transaction.customer_name || 'Unknown'}</div>
                               </TableCell>
-                              <TableCell className="max-w-[200px] truncate">
-                                {transaction.item_name}
-                              </TableCell>
-                              <TableCell>{getPaymentTypeLabel(transaction.item_type)}</TableCell>
-                              <TableCell>{transaction.quantity}</TableCell>
                               <TableCell>
-                                <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
+                                <div className="font-medium">{transaction.item_name}</div>
                               </TableCell>
-                              <TableCell className="text-green-600 font-medium">
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {getPaymentTypeLabel(transaction.reference_type)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <PriceDisplay amount={transaction.amount} originalCurrency="USD" />
+                              </TableCell>
+                              <TableCell className="font-medium text-green-600">
                                 <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" />
                               </TableCell>
-                              <TableCell className="text-gray-500">
-                                <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" />
+                              <TableCell className="text-muted-foreground">
+                                <PriceDisplay amount={transaction.platform_fee_amount} originalCurrency="USD" />
                               </TableCell>
-                              <TableCell>{getStatusBadge(transaction.payment_status)}</TableCell>
+                              <TableCell>
+                                {getStatusBadge(transaction.status)}
+                              </TableCell>
+                              <TableCell>
+                                {transaction.payout_eligible_date ? 
+                                  format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
+                                  'N/A'
+                                }
+                              </TableCell>
                             </TableRow>
                           ))
                         )}
@@ -406,10 +412,6 @@ const CreatorPayments: React.FC = () => {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline">Export CSV</Button>
-                <Button variant="outline" onClick={loadPaymentData}>Refresh</Button>
-              </CardFooter>
             </Card>
           </TabsContent>
           
@@ -418,7 +420,7 @@ const CreatorPayments: React.FC = () => {
               <CardHeader>
                 <CardTitle>Payout History</CardTitle>
                 <CardDescription>
-                  View all your withdrawal requests and payouts
+                  Track your withdrawal requests and their status
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -434,17 +436,18 @@ const CreatorPayments: React.FC = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Date</TableHead>
+                          <TableHead>Amount</TableHead>
                           <TableHead>Method</TableHead>
                           <TableHead>Destination</TableHead>
-                          <TableHead>Amount</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Transaction ID</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {payouts.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                              No payout transactions found
+                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                              No payouts requested yet
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -453,14 +456,23 @@ const CreatorPayments: React.FC = () => {
                               <TableCell>
                                 {format(new Date(payout.created_at), 'MMM dd, yyyy')}
                               </TableCell>
-                              <TableCell className="capitalize">
-                                {payout.payout_method === 'mobile_money' ? 'Mobile Money' : 'Stripe'}
+                              <TableCell className="font-medium">
+                                <PriceDisplay amount={payout.amount} originalCurrency="USD" />
                               </TableCell>
-                              <TableCell>{payout.destination}</TableCell>
                               <TableCell>
-                                <PriceDisplay amount={payout.amount} originalCurrency={payout.currency as any} />
+                                <Badge variant="outline">
+                                  {payout.method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
+                                </Badge>
                               </TableCell>
-                              <TableCell>{getStatusBadge(payout.status)}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {payout.destination}
+                              </TableCell>
+                              <TableCell>
+                                {getStatusBadge(payout.status)}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {payout.stripe_payout_id || payout.pawapay_deposit_id || 'N/A'}
+                              </TableCell>
                             </TableRow>
                           ))
                         )}
@@ -474,12 +486,12 @@ const CreatorPayments: React.FC = () => {
         </Tabs>
       </div>
 
-      {/* Creator Withdraw Dialog with Multiple Payment Methods */}
+      {/* Withdraw Dialog */}
       <CreatorWithdrawDialog
         open={isWithdrawDialogOpen}
         onOpenChange={setIsWithdrawDialogOpen}
         availableBalance={earnings.available_balance}
-        currency="USD"
+        currency={currentCurrency}
         onSuccess={loadPaymentData}
       />
 
@@ -487,10 +499,7 @@ const CreatorPayments: React.FC = () => {
       <PayoutMethodSetupDialog
         open={isSetupDialogOpen}
         onOpenChange={setIsSetupDialogOpen}
-        onSuccess={() => {
-          loadPayoutMethod();
-          loadPaymentData();
-        }}
+        onSuccess={loadPayoutMethod}
       />
     </CreatorLayout>
   );

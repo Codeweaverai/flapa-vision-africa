@@ -13,6 +13,9 @@ const logStep = (step: string, details?: any) => {
   console.log(`[VERIFY-PAYMENT] ${step}${detailsStr}`);
 };
 
+// Platform fee rate (8%)
+const PLATFORM_FEE_RATE = 0.08;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -278,7 +281,7 @@ serve(async (req) => {
     // Get order details for user_id
     const { data: order, error: orderFetchError } = await supabaseClient
       .from('orders')
-      .select('user_id, email')
+      .select('user_id, email, total_amount, currency')
       .eq('id', targetOrderId)
       .single();
 
@@ -288,10 +291,23 @@ serve(async (req) => {
 
     const fulfillmentResults = [];
 
-    // Process each order item for fulfillment
+    // Process each order item for fulfillment and track creator earnings
     for (const item of orderItems) {
       try {
+        let creatorId = null;
+        
         if (item.item_type === 'course') {
+          // Get course creator
+          const { data: course } = await supabaseClient
+            .from('courses')
+            .select('creator_id')
+            .eq('id', item.item_id)
+            .single();
+          
+          if (course) {
+            creatorId = course.creator_id;
+          }
+
           // Create course enrollment
           const { data: enrollment, error: enrollmentError } = await supabaseClient
             .from('course_enrollments')
@@ -324,6 +340,17 @@ serve(async (req) => {
             .single();
 
           if (eventTicket) {
+            // Get event creator
+            const { data: event } = await supabaseClient
+              .from('events')
+              .select('creator_id')
+              .eq('id', eventTicket.event_id)
+              .single();
+            
+            if (event) {
+              creatorId = event.creator_id;
+            }
+
             // Create event booking
             const { data: booking, error: bookingError } = await supabaseClient
               .from('event_bookings')
@@ -351,6 +378,48 @@ serve(async (req) => {
 
             fulfillmentResults.push({ type: 'event', item_id: item.item_id, booking_id: booking.id });
             logStep("Created event booking", { eventId: eventTicket.event_id, bookingId: booking.id });
+          }
+        }
+
+        // Create payment transaction record for creator earnings tracking
+        if (creatorId) {
+          const itemTotal = Number(item.total_price);
+          const platformFee = itemTotal * PLATFORM_FEE_RATE;
+          const creatorEarning = itemTotal - platformFee;
+          
+          // Set payout eligible date (7 days from now)
+          const payoutEligibleDate = new Date();
+          payoutEligibleDate.setDate(payoutEligibleDate.getDate() + 7);
+
+          const { error: paymentTxError } = await supabaseClient
+            .from('payment_transactions')
+            .insert({
+              user_id: order.user_id,
+              creator_id: creatorId,
+              reference_type: item.item_type === 'course' ? 'course' : 'event',
+              reference_id: item.item_id,
+              amount: itemTotal,
+              currency: order.currency || 'USD',
+              status: 'completed',
+              provider: paymentMethod,
+              creator_earning: creatorEarning,
+              platform_fee_amount: platformFee,
+              payout_eligible_date: payoutEligibleDate.toISOString(),
+              metadata: {
+                order_id: targetOrderId,
+                item_name: item.item_name,
+                quantity: item.quantity
+              }
+            });
+
+          if (paymentTxError) {
+            logStep("Error creating payment transaction", { error: paymentTxError });
+          } else {
+            logStep("Created payment transaction for creator", { 
+              creatorId, 
+              earning: creatorEarning, 
+              platformFee 
+            });
           }
         }
       } catch (fulfillmentError) {

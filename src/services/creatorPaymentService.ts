@@ -41,19 +41,75 @@ export interface PayoutRequest {
 
 export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEarnings> {
   try {
-    const { data, error } = await supabase.rpc('calculate_creator_earnings', {
-      creator_user_id: creatorId
-    });
+    // Get all payment transactions for this creator
+    const { data: paymentTransactions, error } = await supabase
+      .from('payment_transactions')
+      .select('*')
+      .eq('creator_id', creatorId)
+      .eq('status', 'completed');
 
     if (error) throw error;
 
-    return data[0] || {
-      available_balance: 0,
-      pending_balance: 0,
-      total_earnings: 0,
-      total_platform_fees: 0,
-      course_revenue: 0,
-      event_revenue: 0
+    if (!paymentTransactions || paymentTransactions.length === 0) {
+      return {
+        available_balance: 0,
+        pending_balance: 0,
+        total_earnings: 0,
+        total_platform_fees: 0,
+        course_revenue: 0,
+        event_revenue: 0
+      };
+    }
+
+    let totalEarnings = 0;
+    let totalPlatformFees = 0;
+    let courseRevenue = 0;
+    let eventRevenue = 0;
+    let availableBalance = 0;
+    let pendingBalance = 0;
+
+    const now = new Date();
+
+    paymentTransactions.forEach(tx => {
+      const creatorEarning = Number(tx.creator_earning || 0);
+      const platformFee = Number(tx.platform_fee_amount || 0);
+      
+      totalEarnings += creatorEarning;
+      totalPlatformFees += platformFee;
+
+      // Check if this is a course or event
+      if (tx.reference_type === 'course') {
+        courseRevenue += creatorEarning;
+      } else if (tx.reference_type === 'event') {
+        eventRevenue += creatorEarning;
+      }
+
+      // Check if payment is eligible for withdrawal based on payout_eligible_date
+      const payoutEligibleDate = new Date(tx.payout_eligible_date || tx.created_at);
+      if (payoutEligibleDate <= now) {
+        availableBalance += creatorEarning;
+      } else {
+        pendingBalance += creatorEarning;
+      }
+    });
+
+    // Subtract completed payouts from available balance
+    const { data: completedPayouts } = await supabase
+      .from('creator_payouts')
+      .select('amount')
+      .eq('creator_id', creatorId)
+      .eq('status', 'completed');
+
+    const totalPayouts = completedPayouts?.reduce((sum, payout) => sum + Number(payout.amount), 0) || 0;
+    availableBalance = Math.max(0, availableBalance - totalPayouts);
+
+    return {
+      available_balance: availableBalance,
+      pending_balance: pendingBalance,
+      total_earnings: totalEarnings,
+      total_platform_fees: totalPlatformFees,
+      course_revenue: courseRevenue,
+      event_revenue: eventRevenue
     };
   } catch (error) {
     console.error('Error fetching creator earnings:', error);
@@ -63,7 +119,7 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
 
 export async function fetchCreatorPaymentTransactions(creatorId: string): Promise<CreatorPaymentTransaction[]> {
   try {
-    // First get payment transactions for this creator
+    // Get payment transactions for this creator
     const { data: transactions, error } = await supabase
       .from('payment_transactions')
       .select('*')
@@ -118,12 +174,19 @@ export async function fetchCreatorPaymentTransactions(creatorId: string): Promis
       const course = courses.find(c => c.id === transaction.reference_id);
       const event = events.find(e => e.id === transaction.reference_id);
 
+      let itemName = 'Unknown Item';
+      if (transaction.reference_type === 'course' && course) {
+        itemName = course.title;
+      } else if (transaction.reference_type === 'event' && event) {
+        itemName = event.title;
+      } else if (transaction.metadata?.item_name) {
+        itemName = transaction.metadata.item_name;
+      }
+
       return {
         ...transaction,
         customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
-        item_name: transaction.reference_type === 'course' 
-          ? course?.title 
-          : event?.title || 'Unknown Item'
+        item_name: itemName
       };
     });
 
