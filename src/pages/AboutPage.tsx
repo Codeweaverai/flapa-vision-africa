@@ -268,7 +268,7 @@ const AboutPage = () => {
               Join thousands of learners who are already transforming their lives through education.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/explore/courses">
+              <Link to="/explore-courses">
                 <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
                   Start Learning Today
                 </Button>
