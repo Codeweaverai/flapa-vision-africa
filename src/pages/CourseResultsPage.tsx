@@ -1,171 +1,134 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
-import Layout from '@/components/layout/Layout';
 import { 
   Award, 
   Download, 
-  Calendar, 
+  Share2, 
   CheckCircle, 
-  Star,
-  TrendingUp,
+  XCircle, 
+  BookOpen,
   GraduationCap,
-  Target
+  ArrowLeft,
+  Trophy
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface ExamResult {
+interface Course {
   id: string;
+  title: string;
+  description: string;
+}
+
+interface FinalExamResult {
+  id: string;
+  exam_id: string;
+  user_id: string;
+  enrollment_id: string;
+  course_id: string;
   score: number;
   percentage_score: number;
   passed: boolean;
+  attempt_number: number;
   quiz_scores: number[];
   final_grade: number;
+  created_at: string;
   completed_at: string;
-  course: {
-    title: string;
-    thumbnail_url?: string;
-  };
-  exam: {
-    title: string;
-    passing_score: number;
-  };
 }
 
 interface Certificate {
   id: string;
+  enrollment_id: string;
   verification_code: string;
-  issue_date: string;
   pdf_url?: string;
-  course_title?: string;
+  issue_date: string;
 }
 
 const CourseResultsPage = () => {
+  const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [examResults, setExamResults] = useState<ExamResult[]>([]);
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [examResults, setExamResults] = useState<FinalExamResult[]>([]);
+  const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showCertificateModal, setShowCertificateModal] = useState(false);
-  const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
+    if (courseId && user) {
+      fetchData();
     }
-    loadResults();
-  }, [user]);
+  }, [courseId, user]);
 
-  const loadResults = async () => {
+  const fetchData = async () => {
     try {
-      // Fetch exam results with proper error handling
+      // Fetch course
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('id, title, description')
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw courseError;
+      setCourse(courseData);
+
+      // Fetch exam results
       const { data: resultsData, error: resultsError } = await supabase
         .from('final_exam_results')
-        .select(`
-          *,
-          course:courses!final_exam_results_course_id_fkey(title, thumbnail_url),
-          exam:final_exams!final_exam_results_exam_id_fkey(title, passing_score)
-        `)
+        .select('*')
         .eq('user_id', user!.id)
-        .order('completed_at', { ascending: false });
+        .eq('course_id', courseId)
+        .order('attempt_number', { ascending: false });
 
-      if (resultsError) {
-        console.error('Error fetching exam results:', resultsError);
-      } else {
-        // Transform the data to match our interface
-        const transformedResults: ExamResult[] = resultsData?.map(result => {
-          // Safely convert quiz_scores from Json to number[]
-          let quizScores: number[] = [];
-          if (Array.isArray(result.quiz_scores)) {
-            quizScores = result.quiz_scores.map((score: any) => {
-              const numScore = Number(score);
-              return isNaN(numScore) ? 0 : numScore;
-            });
-          }
+      if (resultsError) throw resultsError;
+      setExamResults(resultsData || []);
 
-          return {
-            id: result.id,
-            score: result.score,
-            percentage_score: result.percentage_score,
-            passed: result.passed,
-            quiz_scores: quizScores,
-            final_grade: result.final_grade,
-            completed_at: result.completed_at,
-            course: {
-              title: result.course?.title || 'Unknown Course',
-              thumbnail_url: result.course?.thumbnail_url
-            },
-            exam: {
-              title: result.exam?.title || 'Final Exam',
-              passing_score: result.exam?.passing_score || 70
-            }
-          };
-        }) || [];
-        
-        setExamResults(transformedResults);
-      }
-
-      // Fetch certificates with better error handling
-      const { data: userEnrollments, error: enrollmentError } = await supabase
+      // Fetch certificate
+      const { data: enrollmentData } = await supabase
         .from('course_enrollments')
-        .select('id, course_id, courses!course_enrollments_course_id_fkey(title)')
-        .eq('user_id', user!.id);
+        .select('id')
+        .eq('user_id', user!.id)
+        .eq('course_id', courseId)
+        .single();
 
-      if (enrollmentError) {
-        console.error('Error fetching enrollments:', enrollmentError);
-      } else if (userEnrollments && userEnrollments.length > 0) {
-        const enrollmentIds = userEnrollments.map(e => e.id);
-        
-        const { data: certificatesData, error: certificatesError } = await supabase
+      if (enrollmentData) {
+        const { data: certData } = await supabase
           .from('certificates')
           .select('*')
-          .in('enrollment_id', enrollmentIds)
-          .order('issue_date', { ascending: false });
+          .eq('enrollment_id', enrollmentData.id)
+          .maybeSingle();
 
-        if (certificatesError) {
-          console.error('Error fetching certificates:', certificatesError);
-        } else {
-          // Transform certificates with course titles
-          const transformedCertificates: Certificate[] = certificatesData?.map(cert => {
-            const enrollment = userEnrollments.find(e => e.id === cert.enrollment_id);
-            return {
-              id: cert.id,
-              verification_code: cert.verification_code,
-              issue_date: cert.issue_date,
-              pdf_url: cert.pdf_url || undefined,
-              course_title: enrollment?.courses?.title || 'Course Certificate'
-            };
-          }) || [];
-          
-          setCertificates(transformedCertificates);
+        if (certData) {
+          setCertificate(certData);
         }
       }
-
     } catch (error) {
-      console.error('Error loading results:', error);
-      toast.error('Failed to load results');
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load course results');
     } finally {
       setLoading(false);
     }
   };
 
-  const generateCertificateHTML = (certificate: Certificate) => {
-    const currentDate = new Date(certificate.issue_date).toLocaleDateString('en-US', {
+  const downloadCertificate = () => {
+    if (!course || !user) return;
+
+    const studentName = user.user_metadata?.full_name || user.email || 'Student';
+    const currentDate = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
 
-    return `
+    const latestResult = examResults[0];
+    const finalGrade = latestResult?.final_grade || latestResult?.percentage_score || 0;
+
+    const certificateHTML = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -243,6 +206,15 @@ const CourseResultsPage = () => {
                 color: #6b7280;
                 margin: 20px 0;
             }
+            .grade-badge {
+                display: inline-block;
+                background: linear-gradient(45deg, #f59e0b, #8b5cf6);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 25px;
+                font-weight: bold;
+                margin: 20px 0;
+            }
             .signature {
                 margin-top: 50px;
                 display: flex;
@@ -269,15 +241,6 @@ const CourseResultsPage = () => {
                 color: #6b7280;
                 margin-bottom: 10px;
             }
-            .date-section {
-                flex: 1;
-                min-width: 200px;
-                text-align: center;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: flex-end;
-            }
             .verification {
                 margin-top: 30px;
                 font-size: 0.8rem;
@@ -291,9 +254,10 @@ const CourseResultsPage = () => {
             <div class="logo">🎓 SkillPulse</div>
             <div class="title">Certificate of Completion</div>
             <div class="subtitle">This is to certify that</div>
-            <div class="recipient">${user?.user_metadata?.full_name || 'Student'}</div>
+            <div class="recipient">${studentName}</div>
             <div class="completion">has successfully completed the course</div>
-            <div class="course">"${certificate.course_title}"</div>
+            <div class="course">"${course.title}"</div>
+            <div class="grade-badge">Final Grade: ${finalGrade}%</div>
             <div class="completion">demonstrating professional competency and commitment to continuous learning</div>
             <div class="signature">
                 <div class="signature-section">
@@ -302,29 +266,26 @@ const CourseResultsPage = () => {
                         Authorized Signature
                     </div>
                 </div>
-                <div class="date-section">
+                <div style="flex: 1; min-width: 200px; text-align: center;">
                     <div style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">${currentDate}</div>
                     <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
                 </div>
             </div>
             <div class="verification">
-                Verification Code: ${certificate.verification_code}<br>
+                Verification Code: ${certificate?.verification_code || 'SP-GENERATED'}<br>
                 This certificate can be verified at skillpulse.com/verify
             </div>
         </div>
     </body>
     </html>
     `;
-  };
 
-  const downloadCertificate = (certificate: Certificate) => {
-    const certificateHTML = generateCertificateHTML(certificate);
     const blob = new Blob([certificateHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${certificate.course_title?.replace(/\s+/g, '_')}_Certificate.html`;
+    link.download = `${course.title.replace(/\s+/g, '_')}_Certificate.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -333,244 +294,144 @@ const CourseResultsPage = () => {
     toast.success('Certificate downloaded successfully!');
   };
 
-  const viewCertificate = (certificate: Certificate) => {
-    setSelectedCertificate(certificate);
-    setShowCertificateModal(true);
+  const shareOnLinkedIn = () => {
+    if (!course || !examResults.length) return;
+    
+    const finalGrade = examResults[0]?.final_grade || examResults[0]?.percentage_score || 0;
+    const text = `I'm excited to share that I've successfully completed "${course.title}" with a final grade of ${finalGrade}%! 🎓 #ProfessionalDevelopment #SkillPulse #ContinuousLearning`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.origin)}&summary=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
-          <div className="container mx-auto px-4 py-16">
-            <div className="flex justify-center items-center min-h-[400px]">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-            </div>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!course || !examResults.length) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">No results found</h1>
+            <Link to="/learning">
+              <Button>Back to Learning</Button>
+            </Link>
           </div>
         </div>
       </Layout>
     );
   }
 
+  const latestResult = examResults[0];
+  const hasPassed = latestResult?.passed;
+
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
-        <div className="container mx-auto px-4 py-16">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-center mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-              Your Course Results
-            </h1>
-            <p className="text-center text-gray-600 text-lg">
-              Track your progress and achievements
-            </p>
+            <Link to={`/learning/course/${courseId}`} className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700 mb-4">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Course
+            </Link>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Course Results</h1>
+            <h2 className="text-2xl text-gray-600">{course.title}</h2>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Exam Results */}
-            <div className="space-y-6">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-6 w-6 text-purple-600" />
-                    Exam Results
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {examResults.length > 0 ? (
-                    examResults.map((result) => (
-                      <div
-                        key={result.id}
-                        className={`p-4 rounded-lg border-l-4 ${
-                          result.passed
-                            ? 'bg-green-50 border-green-500'
-                            : 'bg-red-50 border-red-500'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold text-lg">
-                            {result.course.title}
-                          </h3>
-                          <Badge
-                            variant={result.passed ? 'default' : 'destructive'}
-                            className={result.passed ? 'bg-green-500' : ''}
-                          >
-                            {result.passed ? 'PASSED' : 'FAILED'}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 mb-3">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-purple-600">
-                              {result.percentage_score}%
-                            </div>
-                            <div className="text-sm text-gray-500">Exam Score</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-orange-600">
-                              {result.final_grade}%
-                            </div>
-                            <div className="text-sm text-gray-500">Final Grade</div>
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>Quiz Average</span>
-                            <span>
-                              {result.quiz_scores.length > 0
-                                ? Math.round(result.quiz_scores.reduce((a, b) => a + b, 0) / result.quiz_scores.length)
-                                : 0}%
-                            </span>
-                          </div>
-                          <Progress
-                            value={
-                              result.quiz_scores.length > 0
-                                ? result.quiz_scores.reduce((a, b) => a + b, 0) / result.quiz_scores.length
-                                : 0
-                            }
-                            className="h-2"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {new Date(result.completed_at).toLocaleDateString()}
-                          </span>
-                          <span>
-                            Passing: {result.exam.passing_score}%
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <Target className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500">No exam results yet</p>
+          {/* Results Summary */}
+          <Card className={`mb-8 ${hasPassed ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                {hasPassed ? (
+                  <>
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-green-800">Congratulations! You Passed!</h3>
+                      <p className="text-green-600">You have successfully completed the course</p>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-8 w-8 text-red-600" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-red-800">Course Not Completed</h3>
+                      <p className="text-red-600">You need 70% or higher to pass</p>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <div className="text-center mb-4">
+                <div className="text-3xl font-bold mb-2">
+                  <span className={hasPassed ? 'text-green-600' : 'text-red-600'}>
+                    {latestResult.final_grade || latestResult.percentage_score}%
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">Final Grade</p>
+              </div>
 
-            {/* Certificates */}
-            <div className="space-y-6">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-6 w-6 text-orange-600" />
-                    Certificates
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {certificates.length > 0 ? (
-                    certificates.map((certificate) => (
-                      <div
-                        key={certificate.id}
-                        className="p-4 rounded-lg border-2 border-orange-200 bg-orange-50"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <GraduationCap className="h-8 w-8 text-orange-600" />
-                            <div>
-                              <h3 className="font-semibold">{certificate.course_title}</h3>
-                              <p className="text-sm text-gray-600">
-                                Verification: {certificate.verification_code}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => viewCertificate(certificate)}
-                              size="sm"
-                              variant="outline"
-                              className="border-orange-300 text-orange-700 hover:bg-orange-100"
-                            >
-                              View
-                            </Button>
-                            <Button
-                              onClick={() => downloadCertificate(certificate)}
-                              size="sm"
-                              className="bg-orange-600 hover:bg-orange-700"
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Issued on {new Date(certificate.issue_date).toLocaleDateString()}
-                        </div>
+              <Progress value={latestResult.final_grade || latestResult.percentage_score} className="h-3 mb-4" />
+              
+              {hasPassed && (
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={downloadCertificate}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Certificate
+                  </Button>
+                  <Button onClick={shareOnLinkedIn} variant="outline">
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share on LinkedIn
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Exam History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5" />
+                Exam History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {examResults.map((result, index) => (
+                  <div key={result.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Badge variant={result.passed ? "default" : "destructive"}>
+                        Attempt {result.attempt_number}
+                      </Badge>
+                      <div>
+                        <p className="font-medium">
+                          {result.passed ? 'Passed' : 'Failed'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {new Date(result.completed_at).toLocaleDateString()}
+                        </p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <Award className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500">No certificates earned yet</p>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Complete courses to earn certificates
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold">
+                        {result.final_grade || result.percentage_score}%
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        Exam Score: {result.score}%
                       </p>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Overall Statistics */}
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-6 w-6 text-purple-600" />
-                    Overall Statistics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {examResults.filter(r => r.passed).length}
-                      </div>
-                      <div className="text-sm text-gray-600">Courses Completed</div>
-                    </div>
-                    <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {examResults.length > 0
-                          ? Math.round(examResults.reduce((sum, r) => sum + r.final_grade, 0) / examResults.length)
-                          : 0}%
-                      </div>
-                      <div className="text-sm text-gray-600">Average Grade</div>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Certificate Preview Modal */}
-          <Dialog open={showCertificateModal} onOpenChange={setShowCertificateModal}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle>Certificate Preview</DialogTitle>
-                <DialogDescription>
-                  Preview of your course completion certificate
-                </DialogDescription>
-              </DialogHeader>
-              {selectedCertificate && (
-                <div 
-                  className="border rounded-lg p-4 bg-white"
-                  dangerouslySetInnerHTML={{ 
-                    __html: generateCertificateHTML(selectedCertificate)
-                      .replace('<html>', '<div>')
-                      .replace('</html>', '</div>')
-                      .replace(/<head>.*?<\/head>/s, '')
-                      .replace('<body>', '')
-                      .replace('</body>', '')
-                  }}
-                />
-              )}
-            </DialogContent>
-          </Dialog>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </Layout>
