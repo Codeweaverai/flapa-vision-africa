@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -65,6 +66,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyPage from "./pages/VerifyPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
+import CreatorsPage from "./pages/CreatorsPage";
 
 // User Account Pages
 import UserProfile from "./pages/account/UserProfile";
@@ -120,10 +122,10 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <CurrencyProvider>
-        <AuthProvider>
-          <CartProvider>
-            <Toaster />
-            <BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>
+            <CartProvider>
+              <Toaster />
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Index />} />
@@ -170,6 +172,7 @@ const App = () => (
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/terms" element={<TermsOfServicePage />} />
                 <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
+                <Route path="/creators" element={<CreatorsPage />} />
 
                 {/* Protected Routes */}
                 <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
@@ -237,9 +240,9 @@ const App = () => (
                 {/* 404 Route */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
-            </BrowserRouter>
-          </CartProvider>
-        </AuthProvider>
+            </CartProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </CurrencyProvider>
     </TooltipProvider>
   </QueryClientProvider>
