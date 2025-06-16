@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,7 +36,7 @@ interface FinalExamResult {
   percentage_score: number;
   passed: boolean;
   attempt_number: number;
-  quiz_scores: number[];
+  quiz_scores: any; // Changed from number[] to any to handle Json type
   final_grade: number;
   created_at: string;
   completed_at: string;
