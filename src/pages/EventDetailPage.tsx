@@ -4,11 +4,13 @@ import { supabase } from '@/lib/supabaseClient';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, Users, Globe, Star, User } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar, Clock, MapPin, Users, Globe, Star, User, MessageSquare, Calendar as CalendarIcon, HelpCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import EventDetailActions from '@/components/event/EventDetailActions';
 import RelatedEventsSection from '@/components/event/RelatedEventsSection';
 import RecommendedEventsSection from '@/components/event/RecommendedEventsSection';
+import EventReviewsTab from '@/components/event/EventReviewsTab';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode } from '@/constants/currencies';
@@ -36,6 +38,33 @@ interface Event {
   };
 }
 
+interface KeynoteSpeaker {
+  id: string;
+  name: string;
+  title?: string;
+  bio?: string;
+  image_url?: string;
+  speaking_topic?: string;
+  linkedin_url?: string;
+  twitter_url?: string;
+  website_url?: string;
+}
+
+interface AgendaItem {
+  id: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  speaker_id?: string;
+  location?: string;
+  session_type: string;
+  speaker?: {
+    name: string;
+    title?: string;
+  };
+}
+
 const EventDetailPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const { user } = useAuth();
@@ -44,12 +73,16 @@ const EventDetailPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationCount, setRegistrationCount] = useState(0);
+  const [keynoteSpeakers, setKeynoteSpeakers] = useState<KeynoteSpeaker[]>([]);
+  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
 
   useEffect(() => {
     if (eventId) {
       fetchEventDetails();
       fetchRegistrationStatus();
       fetchRegistrationCount();
+      fetchKeynoteSpeakers();
+      fetchAgenda();
     }
   }, [eventId, user]);
 
@@ -133,6 +166,49 @@ const EventDetailPage = () => {
       setRegistrationCount(total);
     } catch (error) {
       console.error('Error fetching registration count:', error);
+    }
+  };
+
+  const fetchKeynoteSpeakers = async () => {
+    if (!eventId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('keynote_speakers')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('order_index', { ascending: true });
+
+      if (error) throw error;
+      setKeynoteSpeakers(data || []);
+    } catch (error) {
+      console.error('Error fetching keynote speakers:', error);
+    }
+  };
+
+  const fetchAgenda = async () => {
+    if (!eventId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('event_agenda')
+        .select(`
+          *,
+          keynote_speakers(name, title)
+        `)
+        .eq('event_id', eventId)
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedAgenda = data?.map(item => ({
+        ...item,
+        speaker: item.keynote_speakers || undefined
+      })) || [];
+
+      setAgenda(formattedAgenda);
+    } catch (error) {
+      console.error('Error fetching agenda:', error);
     }
   };
 
@@ -272,6 +348,122 @@ const EventDetailPage = () => {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Tabs for additional content */}
+              <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
+                <Tabs defaultValue="overview" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="speakers">
+                      <User className="h-4 w-4 mr-2" />
+                      Speakers
+                    </TabsTrigger>
+                    <TabsTrigger value="agenda">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      Agenda
+                    </TabsTrigger>
+                    <TabsTrigger value="reviews">
+                      <Star className="h-4 w-4 mr-2" />
+                      Reviews
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="overview" className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Event Overview</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium mb-2">What to Expect</h4>
+                        <p className="text-gray-600">
+                          Join us for an engaging {event.event_type} that will provide valuable insights and networking opportunities.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Who Should Attend</h4>
+                        <p className="text-gray-600">
+                          This event is perfect for professionals, students, and anyone interested in learning more about the topic.
+                        </p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="speakers" className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Keynote Speakers</h3>
+                    {keynoteSpeakers.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {keynoteSpeakers.map((speaker) => (
+                          <div key={speaker.id} className="p-4 border rounded-lg">
+                            <div className="flex items-start gap-4">
+                              {speaker.image_url ? (
+                                <img
+                                  src={speaker.image_url}
+                                  alt={speaker.name}
+                                  className="w-16 h-16 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
+                                  {speaker.name.charAt(0)}
+                                </div>
+                              )}
+                              <div className="flex-1">
+                                <h4 className="font-semibold">{speaker.name}</h4>
+                                {speaker.title && (
+                                  <p className="text-sm text-purple-600 mb-2">{speaker.title}</p>
+                                )}
+                                {speaker.speaking_topic && (
+                                  <p className="text-sm font-medium mb-2">Topic: {speaker.speaking_topic}</p>
+                                )}
+                                {speaker.bio && (
+                                  <p className="text-sm text-gray-600 line-clamp-3">{speaker.bio}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600">Speaker information will be updated soon.</p>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="agenda" className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Event Agenda</h3>
+                    {agenda.length > 0 ? (
+                      <div className="space-y-4">
+                        {agenda.map((item) => (
+                          <div key={item.id} className="p-4 border rounded-lg">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-semibold">{item.title}</h4>
+                              <Badge variant="outline">
+                                {format(parseISO(item.start_time), 'h:mm a')} - {format(parseISO(item.end_time), 'h:mm a')}
+                              </Badge>
+                            </div>
+                            {item.description && (
+                              <p className="text-gray-600 mb-2">{item.description}</p>
+                            )}
+                            <div className="flex items-center gap-4 text-sm text-gray-500">
+                              {item.speaker && (
+                                <span>Speaker: {item.speaker.name}</span>
+                              )}
+                              {item.location && (
+                                <span>Location: {item.location}</span>
+                              )}
+                              <Badge variant="secondary" className="text-xs">
+                                {item.session_type}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600">Detailed agenda will be available soon.</p>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="reviews" className="p-6">
+                    <EventReviewsTab eventId={event.id} />
+                  </TabsContent>
+                </Tabs>
+              </Card>
             </div>
 
             {/* Sidebar */}
@@ -311,7 +503,7 @@ const EventDetailPage = () => {
                 </Card>
               )}
 
-              {/* Registration Actions */}
+              {/* Registration Actions - Now includes Add to Cart */}
               <EventDetailActions 
                 event={event} 
                 isRegistered={isRegistered}
