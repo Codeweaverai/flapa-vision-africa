@@ -70,7 +70,14 @@ const AdminContactSubmissions = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSubmissions(data || []);
+      
+      // Type assertion to ensure the status field matches our interface
+      const typedSubmissions = (data || []).map(submission => ({
+        ...submission,
+        status: submission.status as 'new' | 'in_progress' | 'resolved'
+      }));
+      
+      setSubmissions(typedSubmissions);
     } catch (error) {
       console.error('Error fetching submissions:', error);
       toast.error('Failed to load contact submissions');
@@ -95,7 +102,7 @@ const AdminContactSubmissions = () => {
       setSubmissions(prev => 
         prev.map(sub => 
           sub.id === submissionId 
-            ? { ...sub, status: status as any, admin_notes: notes, updated_at: new Date().toISOString() }
+            ? { ...sub, status: status as 'new' | 'in_progress' | 'resolved', admin_notes: notes, updated_at: new Date().toISOString() }
             : sub
         )
       );

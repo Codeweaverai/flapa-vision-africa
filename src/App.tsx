@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -97,6 +98,7 @@ import AdminCareers from "./pages/admin/AdminCareers";
 import AdminRegistrations from "./pages/admin/AdminRegistrations";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminOrders from "./pages/admin/AdminOrders";
+import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
 
 // Creator Pages
 import CreatorDashboard from "./pages/creator/CreatorDashboard";
