@@ -60,7 +60,7 @@ const RecommendedEventsSection: React.FC<RecommendedEventsSectionProps> = ({
           currency,
           capacity,
           creator_id,
-          profiles!events_creator_id_fkey(full_name)
+          profiles(full_name)
         `)
         .neq('id', currentEventId)
         .gte('start_time', new Date().toISOString())
@@ -95,7 +95,7 @@ const RecommendedEventsSection: React.FC<RecommendedEventsSectionProps> = ({
               currency,
               capacity,
               creator_id,
-              profiles!events_creator_id_fkey(full_name)
+              profiles(full_name)
             `)
             .neq('id', currentEventId)
             .gte('start_time', new Date().toISOString())

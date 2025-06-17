@@ -13,6 +13,7 @@ import RecommendedEventsSection from '@/components/event/RecommendedEventsSectio
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode } from '@/constants/currencies';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Event {
   id: string;
@@ -38,15 +39,20 @@ interface Event {
 
 const EventDetailPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
+  const { user } = useAuth();
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [registrationCount, setRegistrationCount] = useState(0);
 
   useEffect(() => {
     if (eventId) {
       fetchEventDetails();
+      fetchRegistrationStatus();
+      fetchRegistrationCount();
     }
-  }, [eventId]);
+  }, [eventId, user]);
 
   const fetchEventDetails = async () => {
     try {
@@ -55,7 +61,7 @@ const EventDetailPage = () => {
         .from('events')
         .select(`
           *,
-          profiles!events_creator_id_fkey(
+          profiles(
             full_name,
             avatar_url,
             bio
@@ -69,7 +75,7 @@ const EventDetailPage = () => {
       if (data) {
         setEvent({
           ...data,
-          creator: data.profiles
+          creator: data.profiles || {}
         });
       }
     } catch (error) {
@@ -77,6 +83,46 @@ const EventDetailPage = () => {
       setError('Failed to load event details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRegistrationStatus = async () => {
+    if (!user || !eventId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .eq('status', 'confirmed')
+        .single();
+
+      if (data) {
+        setIsRegistered(true);
+      }
+    } catch (error) {
+      // User not registered, which is fine
+      setIsRegistered(false);
+    }
+  };
+
+  const fetchRegistrationCount = async () => {
+    if (!eventId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select('ticket_quantity')
+        .eq('event_id', eventId)
+        .eq('status', 'confirmed');
+
+      if (error) throw error;
+
+      const total = data?.reduce((sum, booking) => sum + (booking.ticket_quantity || 0), 0) || 0;
+      setRegistrationCount(total);
+    } catch (error) {
+      console.error('Error fetching registration count:', error);
     }
   };
 
@@ -256,7 +302,11 @@ const EventDetailPage = () => {
               )}
 
               {/* Registration Actions */}
-              <EventDetailActions event={event} />
+              <EventDetailActions 
+                event={event} 
+                isRegistered={isRegistered}
+                registrationCount={registrationCount}
+              />
 
               {/* Related Events */}
               <RelatedEventsSection 
