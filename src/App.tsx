@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -110,15 +111,11 @@ import CreatorEventEdit from "./pages/creator/CreatorEventEdit";
 import CreatorEventRegistrations from "./pages/creator/CreatorEventRegistrations";
 import CreatorEventAgenda from "./pages/creator/CreatorEventAgenda";
 import CreatorEventSpeakers from "./pages/creator/CreatorEventSpeakers";
+import CreatorEventTickets from "./pages/creator/CreatorEventTickets";
 import CreatorStudents from "./pages/creator/CreatorStudents";
 import CreatorAnalytics from "./pages/creator/CreatorAnalytics";
 import CreatorPayments from "./pages/creator/CreatorPayments";
 import CreatorSettings from "./pages/creator/CreatorSettings";
-
-// Add these imports at the top with the other creator imports
-import CreatorEventSpeakers from '@/pages/creator/CreatorEventSpeakers';
-import CreatorEventAgenda from '@/pages/creator/CreatorEventAgenda';
-import CreatorEventTickets from '@/pages/creator/CreatorEventTickets';
 
 const queryClient = new QueryClient();
 
@@ -212,6 +209,7 @@ const App = () => (
                 <Route path="/creator/events/registrations/:eventId" element={<ProtectedRoute><CreatorEventRegistrations /></ProtectedRoute>} />
                 <Route path="/creator/events/:eventId/agenda" element={<ProtectedRoute><CreatorEventAgenda /></ProtectedRoute>} />
                 <Route path="/creator/events/:eventId/speakers" element={<ProtectedRoute><CreatorEventSpeakers /></ProtectedRoute>} />
+                <Route path="/creator/events/:eventId/tickets" element={<ProtectedRoute><CreatorEventTickets /></ProtectedRoute>} />
                 <Route path="/creator/students" element={<ProtectedRoute><CreatorStudents /></ProtectedRoute>} />
                 <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                 <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
