@@ -237,6 +237,7 @@ const App = () => (
                 <Route path="/admin/careers" element={<AdminRoute><AdminCareers /></AdminRoute>} />
                 <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
                 <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+                <Route path="/admin/contact-submissions" element={<AdminRoute><AdminContactSubmissions /></AdminRoute>} />
 
                 {/* 404 Route */}
                 <Route path="*" element={<NotFoundPage />} />

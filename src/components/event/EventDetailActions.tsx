@@ -5,14 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, MapPin, Users, Clock, Plus, Minus, CalendarPlus } from 'lucide-react';
-import AddToCartButton from '@/components/cart/AddToCartButton';
+import { Calendar, MapPin, Users, Clock, Plus, Minus, CalendarPlus, ShoppingCart } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCurrency } from '@/contexts/CurrencyContext';
+import { useCart } from '@/contexts/CartContext';
 import { useNavigate } from 'react-router-dom';
+import PriceDisplay from '@/components/currency/PriceDisplay';
+import { CurrencyCode } from '@/constants/currencies';
 
 interface EventTicket {
   id: string;
@@ -49,49 +50,22 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
   registrationCount
 }) => {
   const { user } = useAuth();
-  const { formatPrice, convertPrice } = useCurrency();
+  const { addToCart } = useCart();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<EventTicket[]>([]);
   const [selectedTickets, setSelectedTickets] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
-  const [convertedPrices, setConvertedPrices] = useState<Record<string, number>>({});
-  const [convertingPrices, setConvertingPrices] = useState(false);
+  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchTickets();
   }, [event.id]);
 
-  useEffect(() => {
-    if (tickets.length > 0) {
-      convertTicketPrices();
-    }
-  }, [tickets]);
-
-  const convertTicketPrices = async () => {
-    setConvertingPrices(true);
-    const priceMap: Record<string, number> = {};
-    
-    try {
-      for (const ticket of tickets) {
-        try {
-          const convertedPrice = await convertPrice(ticket.price, 'USD');
-          priceMap[ticket.id] = convertedPrice;
-        } catch (error) {
-          console.error('Error converting price for ticket:', ticket.id, error);
-          priceMap[ticket.id] = ticket.price;
-        }
-      }
-      setConvertedPrices(priceMap);
-    } catch (error) {
-      console.error('Error in convertTicketPrices:', error);
-      tickets.forEach(ticket => {
-        priceMap[ticket.id] = ticket.price;
-      });
-      setConvertedPrices(priceMap);
-    } finally {
-      setConvertingPrices(false);
-    }
+  const getCurrencyCode = (currency?: string): CurrencyCode => {
+    if (!currency) return 'USD';
+    const upperCurrency = currency.toUpperCase() as CurrencyCode;
+    return ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY'].includes(upperCurrency) ? upperCurrency : 'USD';
   };
 
   const fetchTickets = async () => {
@@ -154,6 +128,75 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
     navigate('/auth', { state: { redirectTo: window.location.pathname } });
   };
 
+  const handleAddToCart = async (ticket: EventTicket, quantity: number) => {
+    if (!user) {
+      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      return;
+    }
+
+    if (quantity <= 0) {
+      toast.error('Please select a valid quantity');
+      return;
+    }
+
+    setAddingToCart(prev => ({ ...prev, [ticket.id]: true }));
+    
+    try {
+      await addToCart({
+        item_type: 'event_ticket',
+        item_id: ticket.id,
+        title: `${event.title} - ${ticket.name}`,
+        quantity,
+        price: ticket.price,
+        event_id: event.id,
+        ticket_holder_names: []
+      });
+      
+      toast.success(`Added ${quantity} ticket(s) to cart`);
+      
+      // Reset quantity for this ticket
+      setSelectedTickets(prev => ({ ...prev, [ticket.id]: 0 }));
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add ticket to cart');
+    } finally {
+      setAddingToCart(prev => ({ ...prev, [ticket.id]: false }));
+    }
+  };
+
+  const handleAddEventToCart = async () => {
+    if (!user) {
+      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      return;
+    }
+
+    if (!event.price || event.price <= 0) {
+      toast.error('Invalid event price');
+      return;
+    }
+
+    setAddingToCart(prev => ({ ...prev, [event.id]: true }));
+    
+    try {
+      await addToCart({
+        item_type: 'event_ticket',
+        item_id: event.id,
+        title: event.title,
+        quantity: 1,
+        price: event.price,
+        event_id: event.id,
+        ticket_holder_names: []
+      });
+      
+      toast.success('Added event to cart');
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add event to cart');
+    } finally {
+      setAddingToCart(prev => ({ ...prev, [event.id]: false }));
+    }
+  };
+
   const updateTicketQuantity = (ticketId: string, quantity: number) => {
     setSelectedTickets(prev => ({
       ...prev,
@@ -203,7 +246,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
   }
 
   return (
-    <Card className="sticky top-24">
+    <Card className="sticky top-24 border-0 bg-white/80 backdrop-blur-sm shadow-xl">
       <CardHeader>
         <CardTitle className="text-lg">Event Details</CardTitle>
       </CardHeader>
@@ -237,7 +280,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
         <Button 
           onClick={addToGoogleCalendar}
           variant="outline"
-          className="w-full flex items-center gap-2"
+          className="w-full flex items-center gap-2 bg-gradient-to-r from-orange-100 to-purple-100 hover:from-orange-200 hover:to-purple-200 border-orange-200"
         >
           <CalendarPlus className="h-4 w-4" />
           Add to Google Calendar
@@ -276,7 +319,6 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                       {tickets.map((ticket) => {
                         const availableQty = getAvailableQuantity(ticket);
                         const selectedQty = selectedTickets[ticket.id] || 0;
-                        const convertedPrice = convertedPrices[ticket.id] || ticket.price;
                         
                         return (
                           <Card key={ticket.id} className="border-2">
@@ -297,7 +339,12 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-bold">{formatPrice(convertedPrice)}</p>
+                                  <p className="font-bold">
+                                    <PriceDisplay 
+                                      amount={ticket.price} 
+                                      originalCurrency="USD" 
+                                    />
+                                  </p>
                                 </div>
                               </div>
 
@@ -342,16 +389,18 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
 
                               {/* Add to Cart Button for each ticket type */}
                               {selectedQty > 0 && (
-                                <AddToCartButton
-                                  itemType="event_ticket"
-                                  itemId={ticket.id}
-                                  itemName={`${event.title} - ${ticket.name}`}
-                                  price={convertedPrice}
-                                  ticketType={ticket.ticket_type}
-                                  eventId={event.id}
-                                  eventTitle={event.title}
-                                  className="w-full"
-                                />
+                                <Button
+                                  onClick={() => handleAddToCart(ticket, selectedQty)}
+                                  disabled={addingToCart[ticket.id]}
+                                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                                >
+                                  {addingToCart[ticket.id] ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                                  ) : (
+                                    <ShoppingCart className="h-4 w-4 mr-2" />
+                                  )}
+                                  Add to Cart
+                                </Button>
                               )}
                             </CardContent>
                           </Card>
@@ -365,19 +414,25 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                         <div className="space-y-4">
                           <div className="text-center">
                             <div className="text-2xl font-bold text-primary mb-4">
-                              {formatPrice(event.price)}
+                              <PriceDisplay 
+                                amount={event.price} 
+                                originalCurrency={getCurrencyCode(event.currency)} 
+                              />
                             </div>
                           </div>
                           
-                          <AddToCartButton
-                            itemType="event_ticket"
-                            itemId={event.id}
-                            itemName={event.title}
-                            price={event.price}
-                            eventId={event.id}
-                            eventTitle={event.title}
-                            className="w-full"
-                          />
+                          <Button
+                            onClick={handleAddEventToCart}
+                            disabled={addingToCart[event.id]}
+                            className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                          >
+                            {addingToCart[event.id] ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                            ) : (
+                              <ShoppingCart className="h-4 w-4 mr-2" />
+                            )}
+                            Add to Cart
+                          </Button>
                         </div>
                       ) : (
                         <div className="text-center text-gray-600">
