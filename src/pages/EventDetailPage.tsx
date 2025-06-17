@@ -133,7 +133,10 @@ const EventDetailPage = () => {
   };
 
   const fetchRegistrationStatus = async () => {
-    if (!user || !eventId) return;
+    if (!user || !eventId) {
+      setIsRegistered(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -142,13 +145,17 @@ const EventDetailPage = () => {
         .eq('event_id', eventId)
         .eq('user_id', user.id)
         .eq('status', 'confirmed')
-        .single();
+        .maybeSingle();
 
-      if (data) {
-        setIsRegistered(true);
+      if (error) {
+        console.error('Error checking registration status:', error);
+        setIsRegistered(false);
+        return;
       }
+
+      setIsRegistered(!!data);
     } catch (error) {
-      // User not registered, which is fine
+      console.error('Error in fetchRegistrationStatus:', error);
       setIsRegistered(false);
     }
   };

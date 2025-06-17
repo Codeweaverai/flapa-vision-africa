@@ -1,21 +1,24 @@
 
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, Users, Calendar, Plus, UserPlus, Clock } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
+import { Plus, Calendar, MapPin, Users, Edit, Trash2, Eye, UserCheck, CalendarIcon, Ticket } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { Event, fetchCreatorEvents, deleteEvent } from '@/services/eventService';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, parseISO, isPast } from 'date-fns';
+import { Event } from '@/services/eventService';
 
 const CreatorEvents = () => {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const { toast } = useToast();
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -28,188 +31,229 @@ const CreatorEvents = () => {
     
     setLoading(true);
     try {
-      const eventsData = await fetchCreatorEvents(user.id);
-      setEvents(eventsData);
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('creator_id', user.id)
+        .order('start_time', { ascending: false });
+
+      if (error) throw error;
+      setEvents(data || []);
     } catch (error) {
       console.error('Error loading events:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load events",
-        variant: "destructive"
-      });
+      toast.error('Failed to load events');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteEvent = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this event?')) return;
-    
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+      return;
+    }
+
     try {
-      const success = await deleteEvent(id);
-      if (success) {
-        setEvents(events.filter(event => event.id !== id));
-        toast({
-          title: "Event Deleted",
-          description: "Event has been deleted successfully",
-        });
-      }
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventId);
+
+      if (error) throw error;
+      
+      await loadEvents();
+      toast.success('Event deleted successfully');
     } catch (error) {
       console.error('Error deleting event:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete event",
-        variant: "destructive"
-      });
+      toast.error('Failed to delete event');
     }
   };
 
-  const getEventTypeLabel = (type: string) => {
-    switch (type) {
-      case 'webinar':
-        return 'Online Webinar';
-      case 'in-person':
-        return 'In-Person Event';
-      case 'mentorship':
-        return 'Mentorship Session';
+  const filteredEvents = events.filter(event =>
+    event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    event.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getEventStatus = (event: Event) => {
+    const now = new Date();
+    const startTime = new Date(event.start_time);
+    const endTime = new Date(event.end_time);
+
+    if (now < startTime) return 'upcoming';
+    if (now >= startTime && now <= endTime) return 'ongoing';
+    return 'completed';
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'upcoming':
+        return <Badge className="bg-blue-100 text-blue-800">Upcoming</Badge>;
+      case 'ongoing':
+        return <Badge className="bg-green-100 text-green-800">Ongoing</Badge>;
+      case 'completed':
+        return <Badge className="bg-gray-100 text-gray-800">Completed</Badge>;
       default:
-        return type;
+        return null;
     }
   };
+
+  if (loading) {
+    return (
+      <CreatorLayout title="My Events">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </CreatorLayout>
+    );
+  }
 
   return (
     <CreatorLayout title="My Events">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <p className="text-muted-foreground">Manage your events and workshops</p>
+          <h1 className="text-2xl font-bold text-gray-900">My Events</h1>
+          <p className="text-gray-600">Manage your events and track registrations</p>
         </div>
-        <Button asChild>
-          <Link to="/creator/events/create">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Event
-          </Link>
+        <Button onClick={() => navigate('/creator/events/create')}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Event
         </Button>
       </div>
-      
-      {loading ? (
-        <div className="flex justify-center my-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.length === 0 ? (
-            <div className="col-span-full">
-              <Card className="border-dashed">
-                <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
-                  <div className="mb-4 rounded-full bg-primary/10 p-6">
-                    <Calendar className="h-8 w-8 text-primary" />
-                  </div>
-                  <CardTitle className="mb-2">No events yet</CardTitle>
-                  <p className="text-muted-foreground mb-6">
-                    Get started by creating your first event
-                  </p>
-                  <Button asChild>
-                    <Link to="/creator/events/create">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Event
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
+
+      <div className="mb-6">
+        <Input
+          placeholder="Search events..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+
+      {filteredEvents.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
+            <div className="mb-4 rounded-full bg-primary/10 p-6">
+              <Calendar className="h-8 w-8 text-primary" />
             </div>
-          ) : (
-            events.map((event) => {
-              const isPastEvent = isPast(new Date(event.end_time || event.start_time));
-              
-              return (
-                <Card key={event.id} className={isPastEvent ? 'opacity-70' : ''}>
-                  <div className="relative">
-                    {event.image_url ? (
-                      <img
-                        src={event.image_url}
-                        alt={event.title}
-                        className="w-full h-48 object-cover rounded-t-lg"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-muted flex items-center justify-center rounded-t-lg">
-                        <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
+            <CardTitle className="mb-2">No events yet</CardTitle>
+            <p className="text-muted-foreground mb-6">
+              {searchTerm ? 'No events match your search criteria.' : 'Create your first event to get started'}
+            </p>
+            {!searchTerm && (
+              <Button onClick={() => navigate('/creator/events/create')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Event
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredEvents.map((event) => (
+            <Card key={event.id} className="relative overflow-hidden">
+              {event.image_url && (
+                <div className="h-48 bg-cover bg-center" style={{ backgroundImage: `url(${event.image_url})` }} />
+              )}
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle className="text-lg line-clamp-1">{event.title}</CardTitle>
+                      {getStatusBadge(getEventStatus(event))}
+                    </div>
+                    <div className="flex items-center text-sm text-muted-foreground mb-2">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      {format(parseISO(event.start_time), 'MMM d, yyyy')}
+                    </div>
+                    {event.location && (
+                      <div className="flex items-center text-sm text-muted-foreground mb-2">
+                        <MapPin className="w-4 h-4 mr-1" />
+                        <span className="line-clamp-1">{event.location}</span>
                       </div>
                     )}
-                    <div className="absolute top-2 right-2">
-                      <Badge
-                        variant={isPastEvent ? "outline" : "default"}
-                      >
-                        {isPastEvent ? "Past Event" : "Upcoming"}
-                      </Badge>
-                    </div>
+                    {event.capacity && (
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Users className="w-4 h-4 mr-1" />
+                        {event.capacity} capacity
+                      </div>
+                    )}
                   </div>
-                  
-                  <CardHeader>
-                    <div className="flex justify-between items-center mb-2">
-                      <Badge variant="outline">
-                        {getEventTypeLabel(event.event_type)}
-                      </Badge>
-                      <Badge variant={event.is_free ? "secondary" : "outline"}>
-                        {event.is_free ? "Free" : `${event.currency?.toUpperCase()} ${event.price}`}
-                      </Badge>
-                    </div>
-                    <CardTitle className="line-clamp-2">{event.title}</CardTitle>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {format(parseISO(event.start_time), 'MMM d, yyyy h:mm a')}
-                    </div>
-                  </CardHeader>
-                  
-                  <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/edit/${event.id}`}>
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Link>
-                    </Button>
-                    
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/${event.id}/speakers`}>
-                        <UserPlus className="h-4 w-4 mr-1" />
-                        Speakers
-                      </Link>
-                    </Button>
-                    
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/${event.id}/agenda`}>
-                        <Clock className="h-4 w-4 mr-1" />
-                        Agenda
-                      </Link>
-                    </Button>
-                    
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/creator/events/registrations/${event.id}`}>
-                        <Users className="h-4 w-4 mr-1" />
-                        Event Registrations
-                      </Link>
-                    </Button>
-                    
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/events/${event.id}`} target="_blank">
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Link>
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteEvent(event.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })
-          )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                  {event.description}
+                </p>
+                
+                <div className="flex items-center gap-2 mb-4">
+                  <Badge variant={event.is_free ? "secondary" : "default"}>
+                    {event.is_free ? "Free" : `$${event.price}`}
+                  </Badge>
+                  <Badge variant="outline">{event.event_type}</Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/creator/events/edit/${event.id}`)}
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/event/${event.id}`)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/creator/events/registrations/${event.id}`)}
+                  >
+                    <UserCheck className="h-4 w-4 mr-1" />
+                    Registrations
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/creator/events/${event.id}/agenda`)}
+                  >
+                    <CalendarIcon className="h-4 w-4 mr-1" />
+                    Agenda
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/creator/events/${event.id}/speakers`)}
+                  >
+                    <Users className="h-4 w-4 mr-1" />
+                    Speakers
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/creator/events/${event.id}/tickets`)}
+                  >
+                    <Ticket className="h-4 w-4 mr-1" />
+                    Tickets
+                  </Button>
+                </div>
+
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => handleDeleteEvent(event.id)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Event
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </CreatorLayout>

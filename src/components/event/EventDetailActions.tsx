@@ -283,15 +283,16 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
               </div>
             ) : (
               <>
-                {/* Paid Event */}
+                {/* Paid Event with Tickets */}
                 <div className="space-y-4">
-                  <div className="text-center">
-                    {event.price && (
+                  {/* Show event price if no tickets configured */}
+                  {tickets.length === 0 && event.price && (
+                    <div className="text-center">
                       <div className="text-2xl font-bold text-primary mb-4">
                         {formatPrice(event.price)}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Ticket Selection for Paid Events */}
                   {tickets.length > 0 ? (
@@ -376,7 +377,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                         );
                       })}
 
-                      {/* Add to Cart for Selected Tickets - Show for each ticket type */}
+                      {/* Add to Cart for Selected Tickets */}
                       {tickets.map((ticket) => {
                         const quantity = selectedTickets[ticket.id] || 0;
                         if (quantity === 0) return null;
@@ -419,11 +420,31 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                       )}
                     </div>
                   ) : (
-                    // No tickets configured - fallback
+                    // No tickets configured - fallback with add to cart for event price
                     <div className="space-y-4">
-                      <div className="text-center text-gray-600">
-                        <p>Ticket information will be available soon.</p>
-                      </div>
+                      {event.price && event.price > 0 ? (
+                        <div className="space-y-4">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-primary mb-4">
+                              {formatPrice(event.price)}
+                            </div>
+                          </div>
+                          
+                          <AddToCartButton
+                            itemType="event_ticket"
+                            itemId={event.id}
+                            itemName={event.title}
+                            price={event.price}
+                            eventId={event.id}
+                            eventTitle={event.title}
+                            className="w-full"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-600">
+                          <p>Ticket information will be available soon.</p>
+                        </div>
+                      )}
                       {!user && (
                         <p className="text-sm text-gray-600 text-center">
                           Please sign in to register for this event

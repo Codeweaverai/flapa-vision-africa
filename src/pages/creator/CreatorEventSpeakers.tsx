@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,20 +7,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Plus, Edit, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { 
-  KeynoteSpeaker, 
-  CreateSpeakerInput,
-  fetchEventSpeakers, 
-  createSpeaker, 
-  updateSpeaker, 
-  deleteSpeaker 
-} from '@/services/eventManagementService';
+import { supabase } from '@/lib/supabaseClient';
+
+interface KeynoteSpeaker {
+  id: string;
+  event_id: string;
+  name: string;
+  title?: string;
+  bio?: string;
+  image_url?: string;
+  speaking_topic?: string;
+  linkedin_url?: string;
+  twitter_url?: string;
+  website_url?: string;
+  order_index: number;
+}
 
 const CreatorEventSpeakers = () => {
-  const { id: eventId } = useParams<{ id: string }>();
+  const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,10 +38,10 @@ const CreatorEventSpeakers = () => {
     title: '',
     bio: '',
     image_url: '',
+    speaking_topic: '',
     linkedin_url: '',
     twitter_url: '',
-    website_url: '',
-    speaking_topic: ''
+    website_url: ''
   });
 
   useEffect(() => {
@@ -47,8 +55,17 @@ const CreatorEventSpeakers = () => {
     
     setLoading(true);
     try {
-      const speakersData = await fetchEventSpeakers(eventId);
-      setSpeakers(speakersData);
+      const { data, error } = await supabase
+        .from('keynote_speakers')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('order_index', { ascending: true });
+
+      if (error) throw error;
+      setSpeakers(data || []);
+    } catch (error) {
+      console.error('Error loading speakers:', error);
+      toast.error('Failed to load speakers');
     } finally {
       setLoading(false);
     }
@@ -61,10 +78,10 @@ const CreatorEventSpeakers = () => {
       title: '',
       bio: '',
       image_url: '',
+      speaking_topic: '',
       linkedin_url: '',
       twitter_url: '',
-      website_url: '',
-      speaking_topic: ''
+      website_url: ''
     });
     setDialogOpen(true);
   };
@@ -76,10 +93,10 @@ const CreatorEventSpeakers = () => {
       title: speaker.title || '',
       bio: speaker.bio || '',
       image_url: speaker.image_url || '',
+      speaking_topic: speaker.speaking_topic || '',
       linkedin_url: speaker.linkedin_url || '',
       twitter_url: speaker.twitter_url || '',
-      website_url: speaker.website_url || '',
-      speaking_topic: speaker.speaking_topic || ''
+      website_url: speaker.website_url || ''
     });
     setDialogOpen(true);
   };
@@ -88,30 +105,54 @@ const CreatorEventSpeakers = () => {
     e.preventDefault();
     if (!eventId) return;
 
-    let result;
-    if (editingSpeaker) {
-      result = await updateSpeaker(editingSpeaker.id, formData);
-    } else {
-      const speakerData: CreateSpeakerInput = {
-        ...formData,
-        event_id: eventId,
-        order_index: speakers.length
-      };
-      result = await createSpeaker(speakerData);
-    }
+    try {
+      if (editingSpeaker) {
+        const { error } = await supabase
+          .from('keynote_speakers')
+          .update(formData)
+          .eq('id', editingSpeaker.id);
 
-    if (result) {
+        if (error) throw error;
+        toast.success('Speaker updated successfully');
+      } else {
+        const nextOrderIndex = speakers.length > 0 ? Math.max(...speakers.map(s => s.order_index)) + 1 : 0;
+        
+        const { error } = await supabase
+          .from('keynote_speakers')
+          .insert({
+            ...formData,
+            event_id: eventId,
+            order_index: nextOrderIndex
+          });
+
+        if (error) throw error;
+        toast.success('Speaker created successfully');
+      }
+
       await loadSpeakers();
       setDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving speaker:', error);
+      toast.error('Failed to save speaker');
     }
   };
 
   const handleDeleteSpeaker = async (speakerId: string) => {
     if (!confirm('Are you sure you want to delete this speaker?')) return;
     
-    const success = await deleteSpeaker(speakerId);
-    if (success) {
+    try {
+      const { error } = await supabase
+        .from('keynote_speakers')
+        .delete()
+        .eq('id', speakerId);
+
+      if (error) throw error;
+      
       await loadSpeakers();
+      toast.success('Speaker deleted successfully');
+    } catch (error) {
+      console.error('Error deleting speaker:', error);
+      toast.error('Failed to delete speaker');
     }
   };
 
@@ -140,7 +181,7 @@ const CreatorEventSpeakers = () => {
       </div>
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Keynote Speakers</h2>
+        <h2 className="text-2xl font-bold">Event Speakers</h2>
         <Button onClick={handleAddSpeaker}>
           <Plus className="h-4 w-4 mr-2" />
           Add Speaker
@@ -151,11 +192,11 @@ const CreatorEventSpeakers = () => {
         <Card className="border-dashed">
           <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
             <div className="mb-4 rounded-full bg-primary/10 p-6">
-              <UserPlus className="h-8 w-8 text-primary" />
+              <User className="h-8 w-8 text-primary" />
             </div>
             <CardTitle className="mb-2">No speakers yet</CardTitle>
             <p className="text-muted-foreground mb-6">
-              Add keynote speakers to showcase your event's expertise
+              Add keynote speakers for your event
             </p>
             <Button onClick={handleAddSpeaker}>
               <Plus className="h-4 w-4 mr-2" />
@@ -169,18 +210,24 @@ const CreatorEventSpeakers = () => {
             <Card key={speaker.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    {speaker.image_url && (
+                  <div className="flex items-center gap-3">
+                    {speaker.image_url ? (
                       <img
                         src={speaker.image_url}
                         alt={speaker.name}
-                        className="w-16 h-16 rounded-full object-cover mb-4"
+                        className="w-12 h-12 rounded-full object-cover"
                       />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
+                        {speaker.name.charAt(0)}
+                      </div>
                     )}
-                    <CardTitle className="text-lg">{speaker.name}</CardTitle>
-                    {speaker.title && (
-                      <p className="text-sm text-muted-foreground">{speaker.title}</p>
-                    )}
+                    <div>
+                      <CardTitle className="text-lg">{speaker.name}</CardTitle>
+                      {speaker.title && (
+                        <p className="text-sm text-muted-foreground">{speaker.title}</p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditSpeaker(speaker)}>
@@ -204,6 +251,29 @@ const CreatorEventSpeakers = () => {
                 {speaker.bio && (
                   <p className="text-sm text-muted-foreground line-clamp-3">{speaker.bio}</p>
                 )}
+                <div className="flex gap-2 mt-3">
+                  {speaker.linkedin_url && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={speaker.linkedin_url} target="_blank" rel="noopener noreferrer">
+                        LinkedIn
+                      </a>
+                    </Button>
+                  )}
+                  {speaker.twitter_url && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={speaker.twitter_url} target="_blank" rel="noopener noreferrer">
+                        Twitter
+                      </a>
+                    </Button>
+                  )}
+                  {speaker.website_url && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={speaker.website_url} target="_blank" rel="noopener noreferrer">
+                        Website
+                      </a>
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -220,23 +290,24 @@ const CreatorEventSpeakers = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="name">Name *</Label>
+                <Label htmlFor="name">Speaker Name *</Label>
                 <Input
                   id="name"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
                   required
+                  placeholder="e.g. John Doe"
                 />
               </div>
               <div>
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="title">Title/Position</Label>
                 <Input
                   id="title"
                   name="title"
                   value={formData.title}
                   onChange={handleChange}
-                  placeholder="e.g. CEO, CTO, etc."
+                  placeholder="e.g. CEO, Tech Company"
                 />
               </div>
             </div>
@@ -253,13 +324,13 @@ const CreatorEventSpeakers = () => {
             </div>
 
             <div>
-              <Label htmlFor="bio">Biography</Label>
+              <Label htmlFor="bio">Bio</Label>
               <Textarea
                 id="bio"
                 name="bio"
                 value={formData.bio}
                 onChange={handleChange}
-                placeholder="Brief biography of the speaker"
+                placeholder="Brief biography..."
                 rows={3}
               />
             </div>
@@ -271,11 +342,11 @@ const CreatorEventSpeakers = () => {
                 name="image_url"
                 value={formData.image_url}
                 onChange={handleChange}
-                placeholder="https://..."
+                placeholder="https://example.com/photo.jpg"
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="linkedin_url">LinkedIn URL</Label>
                 <Input
@@ -303,7 +374,7 @@ const CreatorEventSpeakers = () => {
                   name="website_url"
                   value={formData.website_url}
                   onChange={handleChange}
-                  placeholder="https://..."
+                  placeholder="https://example.com"
                 />
               </div>
             </div>
@@ -313,7 +384,7 @@ const CreatorEventSpeakers = () => {
                 Cancel
               </Button>
               <Button type="submit">
-                {editingSpeaker ? 'Update' : 'Add'} Speaker
+                {editingSpeaker ? 'Update' : 'Create'} Speaker
               </Button>
             </div>
           </form>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,29 +8,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Plus, Edit, Trash2, Clock } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { 
-  EventAgenda, 
-  KeynoteSpeaker, 
-  CreateAgendaInput,
-  fetchEventAgenda, 
-  fetchEventSpeakers,
-  createAgendaItem, 
-  updateAgendaItem, 
-  deleteAgendaItem 
-} from '@/services/eventManagementService';
+import { supabase } from '@/lib/supabaseClient';
+import { format, parseISO } from 'date-fns';
+
+interface AgendaItem {
+  id: string;
+  event_id: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  speaker_id?: string;
+  location?: string;
+  session_type: string;
+}
+
+interface Speaker {
+  id: string;
+  name: string;
+  title?: string;
+}
 
 const CreatorEventAgenda = () => {
-  const { id: eventId } = useParams<{ id: string }>();
+  const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const [agenda, setAgenda] = useState<EventAgenda[]>([]);
-  const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
+  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<EventAgenda | null>(null);
+  const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -42,23 +52,46 @@ const CreatorEventAgenda = () => {
 
   useEffect(() => {
     if (eventId) {
-      loadData();
+      loadAgenda();
+      loadSpeakers();
     }
   }, [eventId]);
 
-  const loadData = async () => {
+  const loadAgenda = async () => {
     if (!eventId) return;
     
     setLoading(true);
     try {
-      const [agendaData, speakersData] = await Promise.all([
-        fetchEventAgenda(eventId),
-        fetchEventSpeakers(eventId)
-      ]);
-      setAgenda(agendaData);
-      setSpeakers(speakersData);
+      const { data, error } = await supabase
+        .from('event_agenda')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+      setAgenda(data || []);
+    } catch (error) {
+      console.error('Error loading agenda:', error);
+      toast.error('Failed to load agenda');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSpeakers = async () => {
+    if (!eventId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('keynote_speakers')
+        .select('id, name, title')
+        .eq('event_id', eventId)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setSpeakers(data || []);
+    } catch (error) {
+      console.error('Error loading speakers:', error);
     }
   };
 
@@ -76,7 +109,7 @@ const CreatorEventAgenda = () => {
     setDialogOpen(true);
   };
 
-  const handleEditItem = (item: EventAgenda) => {
+  const handleEditItem = (item: AgendaItem) => {
     setEditingItem(item);
     setFormData({
       title: item.title,
@@ -94,34 +127,56 @@ const CreatorEventAgenda = () => {
     e.preventDefault();
     if (!eventId) return;
 
-    let result;
-    if (editingItem) {
-      result = await updateAgendaItem(editingItem.id, {
+    try {
+      const submitData = {
         ...formData,
         speaker_id: formData.speaker_id || null
-      });
-    } else {
-      const agendaData: CreateAgendaInput = {
-        ...formData,
-        event_id: eventId,
-        order_index: agenda.length,
-        speaker_id: formData.speaker_id || undefined
       };
-      result = await createAgendaItem(agendaData);
-    }
 
-    if (result) {
-      await loadData();
+      if (editingItem) {
+        const { error } = await supabase
+          .from('event_agenda')
+          .update(submitData)
+          .eq('id', editingItem.id);
+
+        if (error) throw error;
+        toast.success('Agenda item updated successfully');
+      } else {
+        const { error } = await supabase
+          .from('event_agenda')
+          .insert({
+            ...submitData,
+            event_id: eventId
+          });
+
+        if (error) throw error;
+        toast.success('Agenda item created successfully');
+      }
+
+      await loadAgenda();
       setDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving agenda item:', error);
+      toast.error('Failed to save agenda item');
     }
   };
 
   const handleDeleteItem = async (itemId: string) => {
     if (!confirm('Are you sure you want to delete this agenda item?')) return;
     
-    const success = await deleteAgendaItem(itemId);
-    if (success) {
-      await loadData();
+    try {
+      const { error } = await supabase
+        .from('event_agenda')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+      
+      await loadAgenda();
+      toast.success('Agenda item deleted successfully');
+    } catch (error) {
+      console.error('Error deleting agenda item:', error);
+      toast.error('Failed to delete agenda item');
     }
   };
 
@@ -130,8 +185,10 @@ const CreatorEventAgenda = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const getSpeakerName = (speakerId?: string) => {
+    if (!speakerId) return null;
+    const speaker = speakers.find(s => s.id === speakerId);
+    return speaker ? `${speaker.name}${speaker.title ? ` (${speaker.title})` : ''}` : null;
   };
 
   if (loading) {
@@ -165,11 +222,11 @@ const CreatorEventAgenda = () => {
         <Card className="border-dashed">
           <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
             <div className="mb-4 rounded-full bg-primary/10 p-6">
-              <Clock className="h-8 w-8 text-primary" />
+              <Calendar className="h-8 w-8 text-primary" />
             </div>
             <CardTitle className="mb-2">No agenda items yet</CardTitle>
             <p className="text-muted-foreground mb-6">
-              Create a detailed agenda for your event
+              Create your event schedule
             </p>
             <Button onClick={handleAddItem}>
               <Plus className="h-4 w-4 mr-2" />
@@ -184,20 +241,15 @@ const CreatorEventAgenda = () => {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                      <span>
-                        {format(parseISO(item.start_time), 'MMM d, h:mm a')} - 
-                        {format(parseISO(item.end_time), 'h:mm a')}
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle className="text-lg">{item.title}</CardTitle>
+                      <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded">
+                        {item.session_type}
                       </span>
-                      {item.location && <span>📍 {item.location}</span>}
-                      <span className="capitalize">{item.session_type}</span>
                     </div>
-                    {item.keynote_speakers && (
-                      <p className="text-sm text-primary mt-1">
-                        Speaker: {item.keynote_speakers.name}
-                      </p>
-                    )}
+                    <div className="text-sm text-muted-foreground">
+                      {format(parseISO(item.start_time), 'PPP p')} - {format(parseISO(item.end_time), 'p')}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditItem(item)}>
@@ -214,11 +266,19 @@ const CreatorEventAgenda = () => {
                   </div>
                 </div>
               </CardHeader>
-              {item.description && (
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                </CardContent>
-              )}
+              <CardContent>
+                {item.description && (
+                  <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
+                )}
+                <div className="flex flex-wrap gap-4 text-sm">
+                  {getSpeakerName(item.speaker_id) && (
+                    <span><strong>Speaker:</strong> {getSpeakerName(item.speaker_id)}</span>
+                  )}
+                  {item.location && (
+                    <span><strong>Location:</strong> {item.location}</span>
+                  )}
+                </div>
+              </CardContent>
             </Card>
           ))}
         </div>
@@ -240,6 +300,7 @@ const CreatorEventAgenda = () => {
                 value={formData.title}
                 onChange={handleChange}
                 required
+                placeholder="e.g. Opening Keynote"
               />
             </div>
 
@@ -250,7 +311,7 @@ const CreatorEventAgenda = () => {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Brief description of this agenda item"
+                placeholder="Brief description of this session..."
                 rows={3}
               />
             </div>
@@ -283,9 +344,9 @@ const CreatorEventAgenda = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="session_type">Session Type</Label>
-                <Select 
-                  value={formData.session_type} 
-                  onValueChange={(value) => handleSelectChange('session_type', value)}
+                <Select
+                  value={formData.session_type}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, session_type: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -294,43 +355,43 @@ const CreatorEventAgenda = () => {
                     <SelectItem value="presentation">Presentation</SelectItem>
                     <SelectItem value="workshop">Workshop</SelectItem>
                     <SelectItem value="panel">Panel Discussion</SelectItem>
+                    <SelectItem value="keynote">Keynote</SelectItem>
                     <SelectItem value="networking">Networking</SelectItem>
                     <SelectItem value="break">Break</SelectItem>
-                    <SelectItem value="lunch">Lunch</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleChange}
-                  placeholder="Room, online link, etc."
-                />
+                <Label htmlFor="speaker_id">Speaker (Optional)</Label>
+                <Select
+                  value={formData.speaker_id}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, speaker_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a speaker..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No speaker</SelectItem>
+                    {speakers.map((speaker) => (
+                      <SelectItem key={speaker.id} value={speaker.id}>
+                        {speaker.name}{speaker.title && ` (${speaker.title})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="speaker_id">Speaker (Optional)</Label>
-              <Select 
-                value={formData.speaker_id} 
-                onValueChange={(value) => handleSelectChange('speaker_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a speaker" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No speaker assigned</SelectItem>
-                  {speakers.map((speaker) => (
-                    <SelectItem key={speaker.id} value={speaker.id}>
-                      {speaker.name} {speaker.title && `- ${speaker.title}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                placeholder="e.g. Main Hall, Room A, Online"
+              />
             </div>
 
             <div className="flex justify-end gap-4">
@@ -338,7 +399,7 @@ const CreatorEventAgenda = () => {
                 Cancel
               </Button>
               <Button type="submit">
-                {editingItem ? 'Update' : 'Add'} Item
+                {editingItem ? 'Update' : 'Create'} Item
               </Button>
             </div>
           </form>
