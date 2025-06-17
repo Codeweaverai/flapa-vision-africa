@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { VALID_EVENT_TYPES } from '@/services/eventService';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,17 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
-const VALID_EVENT_TYPES = [
-  'workshop',
-  'webinar',
-  'conference',
-  'seminar',
-  'meetup',
-  'training',
-  'networking',
-  'other'
-];
-
 const CreatorEventCreate = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -34,7 +23,7 @@ const CreatorEventCreate = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    event_type: 'workshop',
+    event_type: 'webinar',
     start_time: '',
     end_time: '',
     location: '',
