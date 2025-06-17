@@ -23,6 +23,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   Mail, 
   Plus, 
@@ -32,7 +43,10 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Eye
+  Eye,
+  Edit,
+  Trash2,
+  Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -53,17 +67,21 @@ const AdminNewsletters = () => {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedNewsletter, setSelectedNewsletter] = useState<Newsletter | null>(null);
+  const [recipientCount, setRecipientCount] = useState(0);
   
   // Form state
   const [subject, setSubject] = useState('');
   const [bodyHtml, setBodyHtml] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     fetchNewsletters();
+    fetchRecipientCount();
   }, []);
 
   const fetchNewsletters = async () => {
@@ -75,13 +93,24 @@ const AdminNewsletters = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      // Type assertion to ensure proper typing
       setNewsletters((data || []) as Newsletter[]);
     } catch (error) {
       console.error('Error fetching newsletters:', error);
       toast.error('Failed to load newsletters');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRecipientCount = async () => {
+    try {
+      const { data: authUsers, error } = await supabase.auth.admin.listUsers();
+      if (error) throw error;
+      
+      const verifiedUsers = authUsers?.users?.filter(user => user.email_confirmed_at) || [];
+      setRecipientCount(verifiedUsers.length);
+    } catch (error) {
+      console.error('Error fetching recipient count:', error);
     }
   };
 
@@ -107,14 +136,27 @@ const AdminNewsletters = () => {
         created_by: (await supabase.auth.getUser()).data.user?.id
       };
 
-      const { error } = await supabase
-        .from('newsletters')
-        .insert([newsletterData]);
+      if (selectedNewsletter) {
+        // Update existing newsletter
+        const { error } = await supabase
+          .from('newsletters')
+          .update(newsletterData)
+          .eq('id', selectedNewsletter.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success('Newsletter updated successfully');
+        setEditDialogOpen(false);
+      } else {
+        // Create new newsletter
+        const { error } = await supabase
+          .from('newsletters')
+          .insert([newsletterData]);
 
-      toast.success(status === 'draft' ? 'Newsletter saved as draft' : 'Newsletter scheduled successfully');
-      setCreateDialogOpen(false);
+        if (error) throw error;
+        toast.success(status === 'draft' ? 'Newsletter saved as draft' : 'Newsletter scheduled successfully');
+        setCreateDialogOpen(false);
+      }
+
       resetForm();
       fetchNewsletters();
     } catch (error) {
@@ -125,10 +167,56 @@ const AdminNewsletters = () => {
     }
   };
 
+  const handleSendNow = async (newsletterId: string) => {
+    try {
+      setSending(true);
+      
+      const { data, error } = await supabase.functions.invoke('send-newsletter-now', {
+        body: { newsletterId }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Newsletter sent! ${data.successful_sends} successful, ${data.failed_sends} failed`);
+      fetchNewsletters();
+    } catch (error) {
+      console.error('Error sending newsletter:', error);
+      toast.error('Failed to send newsletter');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleDelete = async (newsletterId: string) => {
+    try {
+      const { error } = await supabase
+        .from('newsletters')
+        .delete()
+        .eq('id', newsletterId);
+
+      if (error) throw error;
+      
+      toast.success('Newsletter deleted successfully');
+      fetchNewsletters();
+    } catch (error) {
+      console.error('Error deleting newsletter:', error);
+      toast.error('Failed to delete newsletter');
+    }
+  };
+
+  const openEditDialog = (newsletter: Newsletter) => {
+    setSelectedNewsletter(newsletter);
+    setSubject(newsletter.subject);
+    setBodyHtml(newsletter.body_html);
+    setScheduledAt(newsletter.scheduled_at ? newsletter.scheduled_at.slice(0, 16) : '');
+    setEditDialogOpen(true);
+  };
+
   const resetForm = () => {
     setSubject('');
     setBodyHtml('');
     setScheduledAt('');
+    setSelectedNewsletter(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -165,6 +253,134 @@ const AdminNewsletters = () => {
     }
   };
 
+  const PlaceholderInfo = () => (
+    <div className="bg-blue-50 p-4 rounded-lg mb-4">
+      <h4 className="font-semibold mb-2 flex items-center gap-2">
+        <Info className="h-4 w-4" />
+        Available Placeholders
+      </h4>
+      <div className="text-sm space-y-1">
+        <p><code>{`{{full_name}}`}</code> - User's full name or display name</p>
+        <p><code>{`{{display_name}}`}</code> - User's display name</p>
+        <p><code>{`{{course_names}}`}</code> - List of published courses</p>
+        <p><code>{`{{event_titles}}`}</code> - List of upcoming events</p>
+      </div>
+    </div>
+  );
+
+  const NewsletterForm = ({ isEdit = false }) => (
+    <div className="space-y-6">
+      <PlaceholderInfo />
+      
+      <div className="bg-green-50 p-3 rounded-lg">
+        <div className="flex items-center gap-2 text-green-700">
+          <Users className="h-4 w-4" />
+          <span className="font-medium">Recipients: {recipientCount} verified users</span>
+        </div>
+        <p className="text-sm text-green-600 mt-1">
+          Includes all verified users (both regular users and creators)
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="subject">Subject</Label>
+        <Input
+          id="subject"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Enter newsletter subject... (use {{full_name}} for personalization)"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="schedule">Schedule Date & Time (optional)</Label>
+        <Input
+          id="schedule"
+          type="datetime-local"
+          value={scheduledAt}
+          onChange={(e) => setScheduledAt(e.target.value)}
+          min={new Date().toISOString().slice(0, 16)}
+        />
+        <p className="text-sm text-gray-500">
+          Leave empty to save as draft. Set a future date to schedule.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="content">HTML Content</Label>
+        <Textarea
+          id="content"
+          value={bodyHtml}
+          onChange={(e) => setBodyHtml(e.target.value)}
+          placeholder="Enter HTML content... Use placeholders like {{full_name}}, {{course_names}}, {{event_titles}}"
+          rows={15}
+          className="font-mono text-sm"
+        />
+        <p className="text-sm text-gray-500">
+          Use HTML to format your newsletter content. Unsubscribe links will be added automatically.
+        </p>
+      </div>
+
+      <div className="flex gap-3 pt-4">
+        <Button
+          variant="outline"
+          onClick={() => handleSave('draft')}
+          disabled={saving}
+        >
+          Save as Draft
+        </Button>
+        {scheduledAt && (
+          <Button
+            onClick={() => handleSave('scheduled')}
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {saving ? 'Scheduling...' : 'Schedule Newsletter'}
+          </Button>
+        )}
+        {!isEdit && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                disabled={!subject.trim() || !bodyHtml.trim() || sending}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+              >
+                {sending ? 'Sending...' : 'Send Now'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Send Newsletter Now?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will immediately send the newsletter to {recipientCount} verified users. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    // First save as draft, then send
+                    await handleSave('draft');
+                    if (selectedNewsletter || newsletters.length > 0) {
+                      // Get the newsletter ID after saving
+                      const latestNewsletter = newsletters[0];
+                      if (latestNewsletter) {
+                        await handleSendNow(latestNewsletter.id);
+                      }
+                    }
+                  }}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                >
+                  Send Now
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <AdminLayout title="Newsletter Management">
@@ -187,7 +403,10 @@ const AdminNewsletters = () => {
           
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
+              <Button 
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                onClick={resetForm}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Newsletter
               </Button>
@@ -196,64 +415,7 @@ const AdminNewsletters = () => {
               <DialogHeader>
                 <DialogTitle>Create Newsletter</DialogTitle>
               </DialogHeader>
-              
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Subject</Label>
-                  <Input
-                    id="subject"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Enter newsletter subject..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="schedule">Schedule Date & Time (optional)</Label>
-                  <Input
-                    id="schedule"
-                    type="datetime-local"
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                    min={new Date().toISOString().slice(0, 16)}
-                  />
-                  <p className="text-sm text-gray-500">
-                    Leave empty to save as draft. Set a future date to schedule.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="content">HTML Content</Label>
-                  <Textarea
-                    id="content"
-                    value={bodyHtml}
-                    onChange={(e) => setBodyHtml(e.target.value)}
-                    placeholder="Enter HTML content for your newsletter..."
-                    rows={15}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-sm text-gray-500">
-                    Use HTML to format your newsletter content. Unsubscribe links will be added automatically.
-                  </p>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleSave('draft')}
-                    disabled={saving}
-                  >
-                    Save as Draft
-                  </Button>
-                  <Button
-                    onClick={() => handleSave('scheduled')}
-                    disabled={saving || !scheduledAt}
-                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
-                  >
-                    {saving ? 'Saving...' : 'Schedule Newsletter'}
-                  </Button>
-                </div>
-              </div>
+              <NewsletterForm />
             </DialogContent>
           </Dialog>
         </div>
@@ -314,7 +476,7 @@ const AdminNewsletters = () => {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4 text-gray-400" />
-                            {newsletter.total_recipients || 0}
+                            {newsletter.total_recipients || recipientCount}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -337,17 +499,88 @@ const AdminNewsletters = () => {
                           {format(new Date(newsletter.created_at), 'MMM d, yyyy')}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedNewsletter(newsletter);
-                              setPreviewDialogOpen(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Preview
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedNewsletter(newsletter);
+                                setPreviewDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            
+                            {newsletter.status === 'draft' && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEditDialog(newsletter)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={sending}
+                                    >
+                                      <Send className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Send Newsletter Now?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will send "{newsletter.subject}" to {recipientCount} verified users immediately.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleSendNow(newsletter.id)}
+                                        className="bg-gradient-to-r from-orange-500 to-purple-600"
+                                      >
+                                        Send Now
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Newsletter?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete "{newsletter.subject}". This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(newsletter.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -357,6 +590,16 @@ const AdminNewsletters = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Newsletter</DialogTitle>
+            </DialogHeader>
+            <NewsletterForm isEdit={true} />
+          </DialogContent>
+        </Dialog>
 
         {/* Preview Dialog */}
         <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>

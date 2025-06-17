@@ -27,7 +27,21 @@ interface Newsletter {
 interface User {
   id: string;
   email: string;
-  full_name?: string;
+  raw_user_meta_data: {
+    full_name?: string;
+    display_name?: string;
+    username?: string;
+  };
+}
+
+interface Course {
+  id: string;
+  title: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -71,21 +85,16 @@ const handler = async (req: Request): Promise<Response> => {
         .eq('id', newsletter.id);
 
       try {
-        // Fetch all verified and subscribed users
-        const { data: users, error: usersError } = await supabase
-          .from('profiles')
-          .select('id, email, full_name')
-          .eq('email_verified', true)
-          .eq('newsletter_subscribed', true)
-          .not('email', 'is', null);
+        // Fetch all users from auth.users (includes both regular users and creators)
+        const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers();
 
         if (usersError) {
           console.error('Error fetching users:', usersError);
           throw usersError;
         }
 
-        if (!users || users.length === 0) {
-          console.log('No verified users found');
+        if (!authUsers?.users || authUsers.users.length === 0) {
+          console.log('No users found');
           await supabase
             .from('newsletters')
             .update({ status: 'sent', sent_at: new Date().toISOString() })
@@ -93,10 +102,23 @@ const handler = async (req: Request): Promise<Response> => {
           continue;
         }
 
-        console.log(`Sending to ${users.length} users`);
+        // Filter for verified users only
+        const verifiedUsers = authUsers.users.filter(user => user.email_confirmed_at);
+        console.log(`Sending to ${verifiedUsers.length} verified users`);
+
+        // Fetch courses and events for dynamic placeholders
+        const { data: courses } = await supabase
+          .from('courses')
+          .select('id, title')
+          .eq('is_published', true);
+
+        const { data: events } = await supabase
+          .from('events')
+          .select('id, title')
+          .gte('start_time', new Date().toISOString());
 
         // Create newsletter logs for all recipients
-        const logs = users.map((user: User) => ({
+        const logs = verifiedUsers.map((user: any) => ({
           newsletter_id: newsletter.id,
           user_id: user.id,
           email: user.email,
@@ -112,16 +134,35 @@ const handler = async (req: Request): Promise<Response> => {
         let successCount = 0;
         let failureCount = 0;
 
-        for (let i = 0; i < users.length; i += batchSize) {
-          const batch = users.slice(i, i + batchSize);
+        for (let i = 0; i < verifiedUsers.length; i += batchSize) {
+          const batch = verifiedUsers.slice(i, i + batchSize);
           
-          await Promise.all(batch.map(async (user: User) => {
+          await Promise.all(batch.map(async (user: any) => {
             try {
+              // Replace dynamic placeholders
+              const fullName = user.raw_user_meta_data?.full_name || 
+                             user.raw_user_meta_data?.display_name || 
+                             user.raw_user_meta_data?.username || 
+                             'Valued User';
+              
+              const coursesList = courses?.map((c: Course) => c.title).join(', ') || 'Check out our latest courses';
+              const eventsList = events?.map((e: Event) => e.title).join(', ') || 'Explore upcoming events';
+              
+              let personalizedContent = newsletter.body_html
+                .replace(/\{\{full_name\}\}/g, fullName)
+                .replace(/\{\{display_name\}\}/g, fullName)
+                .replace(/\{\{course_names\}\}/g, coursesList)
+                .replace(/\{\{event_titles\}\}/g, eventsList);
+
+              let personalizedSubject = newsletter.subject
+                .replace(/\{\{full_name\}\}/g, fullName)
+                .replace(/\{\{display_name\}\}/g, fullName);
+
               // Create unsubscribe link
               const unsubscribeUrl = `${Deno.env.get('SITE_URL') || 'https://your-domain.com'}/unsubscribe?token=${btoa(user.id)}`;
               
               // Add unsubscribe link to HTML body
-              const emailBody = newsletter.body_html + `
+              const emailBody = personalizedContent + `
                 <br><br>
                 <div style="text-align: center; font-size: 12px; color: #666; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
                   <p>You're receiving this because you're subscribed to our newsletter.</p>
@@ -132,7 +173,7 @@ const handler = async (req: Request): Promise<Response> => {
               const emailResponse = await resend.emails.send({
                 from: 'Newsletter <no-reply@yourdomain.com>',
                 to: [user.email],
-                subject: newsletter.subject,
+                subject: personalizedSubject,
                 html: emailBody,
                 headers: {
                   'X-Newsletter-ID': newsletter.id,
@@ -172,7 +213,7 @@ const handler = async (req: Request): Promise<Response> => {
           }));
 
           // Small delay between batches
-          if (i + batchSize < users.length) {
+          if (i + batchSize < verifiedUsers.length) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
@@ -183,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
           .update({ 
             status: 'sent',
             sent_at: new Date().toISOString(),
-            total_recipients: users.length,
+            total_recipients: verifiedUsers.length,
             successful_sends: successCount,
             failed_sends: failureCount
           })

@@ -39,6 +39,9 @@ port = 54322
 [functions.newsletter-cron]
 verify_jwt = false
 
+[functions.send-newsletter-now]
+verify_jwt = false
+
 [functions.unsubscribe-newsletter]
 verify_jwt = false
 
