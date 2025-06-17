@@ -13,15 +13,26 @@ const supabase = createClient(
 );
 
 const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== 'GET') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+  // Accept both GET and POST requests
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    console.log(`Method ${req.method} not allowed`);
+    return new Response(JSON.stringify({ 
+      error: 'Method not allowed',
+      allowed_methods: ['GET', 'POST']
+    }), { 
+      status: 405, 
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
   }
 
   try {
+    console.log('Starting to fetch newsletter recipients...');
+    
     // Fetch all users from auth.users using admin listUsers
     const { data: authUsersResponse, error: authError } = await supabase.auth.admin.listUsers();
 
