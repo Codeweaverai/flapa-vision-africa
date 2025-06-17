@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Star, BookOpen, Users, Search, Filter } from 'lucide-react';
+import { Star, BookOpen, Users, Search, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import Layout from '@/components/layout/Layout';
 
@@ -17,6 +17,7 @@ interface Creator {
   avatar_url?: string;
   bio?: string;
   total_courses: number;
+  total_events: number;
   total_students: number;
   average_rating: number;
   total_reviews: number;
@@ -41,7 +42,7 @@ const CreatorsPage = () => {
     try {
       setLoading(true);
       
-      // Get all creators with published courses
+      // Get all creators
       const { data: creatorsData, error } = await supabase
         .from('profiles')
         .select(`
@@ -69,12 +70,20 @@ const CreatorsPage = () => {
             .eq('creator_id', creator.id)
             .eq('is_published', true);
 
-          const totalCourses = coursesData?.length || 0;
+          // Get events count
+          const { data: eventsData } = await supabase
+            .from('events')
+            .select('id')
+            .eq('creator_id', creator.id);
 
-          if (totalCourses === 0) {
+          const totalCourses = coursesData?.length || 0;
+          const totalEvents = eventsData?.length || 0;
+
+          if (totalCourses === 0 && totalEvents === 0) {
             return {
               ...creator,
               total_courses: 0,
+              total_events: 0,
               total_students: 0,
               average_rating: 0,
               total_reviews: 0
@@ -82,29 +91,52 @@ const CreatorsPage = () => {
           }
 
           const courseIds = coursesData?.map(c => c.id) || [];
+          const eventIds = eventsData?.map(e => e.id) || [];
 
-          // Get total students (enrollments)
-          const { data: enrollmentsData } = await supabase
-            .from('course_enrollments')
-            .select('id')
-            .in('course_id', courseIds)
-            .eq('payment_status', 'completed');
+          // Get total students (enrollments + event bookings)
+          let totalStudents = 0;
 
-          // Get reviews and calculate average rating
-          const { data: reviewsData } = await supabase
-            .from('course_reviews')
-            .select('rating')
-            .in('course_id', courseIds);
+          if (courseIds.length > 0) {
+            const { data: enrollmentsData } = await supabase
+              .from('course_enrollments')
+              .select('id')
+              .in('course_id', courseIds)
+              .eq('payment_status', 'completed');
+            
+            totalStudents += enrollmentsData?.length || 0;
+          }
 
-          const totalStudents = enrollmentsData?.length || 0;
-          const totalReviews = reviewsData?.length || 0;
-          const averageRating = totalReviews > 0 
-            ? reviewsData.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
-            : 0;
+          if (eventIds.length > 0) {
+            const { data: bookingsData } = await supabase
+              .from('event_bookings')
+              .select('ticket_quantity')
+              .in('event_id', eventIds)
+              .eq('payment_status', 'completed');
+            
+            const eventStudents = bookingsData?.reduce((sum, booking) => sum + (booking.ticket_quantity || 0), 0) || 0;
+            totalStudents += eventStudents;
+          }
+
+          // Get reviews and calculate average rating (only from courses)
+          let averageRating = 0;
+          let totalReviews = 0;
+
+          if (courseIds.length > 0) {
+            const { data: reviewsData } = await supabase
+              .from('course_reviews')
+              .select('rating')
+              .in('course_id', courseIds);
+
+            totalReviews = reviewsData?.length || 0;
+            if (totalReviews > 0) {
+              averageRating = reviewsData.reduce((sum, review) => sum + review.rating, 0) / totalReviews;
+            }
+          }
 
           return {
             ...creator,
             total_courses: totalCourses,
+            total_events: totalEvents,
             total_students: totalStudents,
             average_rating: Math.round(averageRating * 10) / 10,
             total_reviews: totalReviews
@@ -112,8 +144,8 @@ const CreatorsPage = () => {
         })
       );
 
-      // Filter out creators with no courses
-      const activeCreators = creatorsWithStats.filter(creator => creator.total_courses > 0);
+      // Filter out creators with no courses or events
+      const activeCreators = creatorsWithStats.filter(creator => creator.total_courses > 0 || creator.total_events > 0);
       setCreators(activeCreators);
     } catch (error) {
       console.error('Error fetching creators:', error);
@@ -135,6 +167,8 @@ const CreatorsPage = () => {
           return b.total_students - a.total_students;
         case 'courses':
           return b.total_courses - a.total_courses;
+        case 'events':
+          return b.total_events - a.total_events;
         case 'rating':
           return b.average_rating - a.average_rating;
         case 'name':
@@ -201,6 +235,7 @@ const CreatorsPage = () => {
               <SelectContent>
                 <SelectItem value="students">Most Students</SelectItem>
                 <SelectItem value="courses">Most Courses</SelectItem>
+                <SelectItem value="events">Most Events</SelectItem>
                 <SelectItem value="rating">Highest Rated</SelectItem>
                 <SelectItem value="name">Name (A-Z)</SelectItem>
               </SelectContent>
@@ -240,7 +275,15 @@ const CreatorsPage = () => {
                           <div className="text-xs text-orange-500 text-center mt-1">Courses</div>
                         </div>
                         
-                        <div className="bg-purple-50 p-3 rounded-lg">
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="flex items-center justify-center gap-1 text-blue-600">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-sm font-medium">{creator.total_events}</span>
+                          </div>
+                          <div className="text-xs text-blue-500 text-center mt-1">Events</div>
+                        </div>
+                        
+                        <div className="bg-purple-50 p-3 rounded-lg col-span-2">
                           <div className="flex items-center justify-center gap-1 text-purple-600">
                             <Users className="w-4 h-4" />
                             <span className="text-sm font-medium">{creator.total_students}</span>
@@ -290,7 +333,7 @@ const CreatorsPage = () => {
           {/* Stats Summary */}
           {filteredCreators.length > 0 && (
             <div className="mt-16 text-center">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
                 <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl border border-purple-200">
                   <div className="text-3xl font-bold text-orange-600 mb-2">
                     {filteredCreators.length}
@@ -302,6 +345,12 @@ const CreatorsPage = () => {
                     {filteredCreators.reduce((sum, creator) => sum + creator.total_courses, 0)}
                   </div>
                   <div className="text-gray-600">Total Courses</div>
+                </div>
+                <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl border border-purple-200">
+                  <div className="text-3xl font-bold text-blue-600 mb-2">
+                    {filteredCreators.reduce((sum, creator) => sum + creator.total_events, 0)}
+                  </div>
+                  <div className="text-gray-600">Total Events</div>
                 </div>
                 <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl border border-purple-200">
                   <div className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent mb-2">
