@@ -85,7 +85,7 @@ const handler = async (req: Request): Promise<Response> => {
         .eq('id', newsletter.id);
 
       try {
-        // Fetch all users from auth.users (includes both regular users and creators)
+        // Fetch all users from auth.users (includes all users - verified and unverified)
         const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers();
 
         if (usersError) {
@@ -102,9 +102,9 @@ const handler = async (req: Request): Promise<Response> => {
           continue;
         }
 
-        // Filter for verified users only
-        const verifiedUsers = authUsers.users.filter(user => user.email_confirmed_at);
-        console.log(`Sending to ${verifiedUsers.length} verified users`);
+        // Send to ALL users (both verified and unverified)
+        const allUsers = authUsers.users;
+        console.log(`Sending to ${allUsers.length} total users`);
 
         // Fetch courses and events for dynamic placeholders
         const { data: courses } = await supabase
@@ -118,7 +118,7 @@ const handler = async (req: Request): Promise<Response> => {
           .gte('start_time', new Date().toISOString());
 
         // Create newsletter logs for all recipients
-        const logs = verifiedUsers.map((user: any) => ({
+        const logs = allUsers.map((user: any) => ({
           newsletter_id: newsletter.id,
           user_id: user.id,
           email: user.email,
@@ -134,8 +134,8 @@ const handler = async (req: Request): Promise<Response> => {
         let successCount = 0;
         let failureCount = 0;
 
-        for (let i = 0; i < verifiedUsers.length; i += batchSize) {
-          const batch = verifiedUsers.slice(i, i + batchSize);
+        for (let i = 0; i < allUsers.length; i += batchSize) {
+          const batch = allUsers.slice(i, i + batchSize);
           
           await Promise.all(batch.map(async (user: any) => {
             try {
@@ -158,8 +158,8 @@ const handler = async (req: Request): Promise<Response> => {
                 .replace(/\{\{full_name\}\}/g, fullName)
                 .replace(/\{\{display_name\}\}/g, fullName);
 
-              // Create unsubscribe link
-              const unsubscribeUrl = `${Deno.env.get('SITE_URL') || 'https://your-domain.com'}/unsubscribe?token=${btoa(user.id)}`;
+              // Create unsubscribe link with skillpulse.cloud domain
+              const unsubscribeUrl = `https://skillpulse.cloud/unsubscribe?token=${btoa(user.id)}`;
               
               // Add unsubscribe link to HTML body
               const emailBody = personalizedContent + `
@@ -171,7 +171,7 @@ const handler = async (req: Request): Promise<Response> => {
               `;
 
               const emailResponse = await resend.emails.send({
-                from: 'Newsletter <no-reply@yourdomain.com>',
+                from: 'Newsletter <no-reply@skillpulse.cloud>',
                 to: [user.email],
                 subject: personalizedSubject,
                 html: emailBody,
@@ -213,7 +213,7 @@ const handler = async (req: Request): Promise<Response> => {
           }));
 
           // Small delay between batches
-          if (i + batchSize < verifiedUsers.length) {
+          if (i + batchSize < allUsers.length) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
@@ -224,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
           .update({ 
             status: 'sent',
             sent_at: new Date().toISOString(),
-            total_recipients: verifiedUsers.length,
+            total_recipients: allUsers.length,
             successful_sends: successCount,
             failed_sends: failureCount
           })

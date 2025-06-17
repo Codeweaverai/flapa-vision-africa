@@ -54,14 +54,14 @@ const handler = async (req: Request): Promise<Response> => {
       .update({ status: 'sending' })
       .eq('id', newsletterId);
 
-    // Fetch all verified users
+    // Fetch all users (both verified and unverified)
     const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers();
 
     if (usersError) {
       throw usersError;
     }
 
-    const verifiedUsers = authUsers?.users?.filter(user => user.email_confirmed_at) || [];
+    const allUsers = authUsers?.users || [];
 
     // Fetch dynamic content
     const { data: courses } = await supabase
@@ -75,7 +75,7 @@ const handler = async (req: Request): Promise<Response> => {
       .gte('start_time', new Date().toISOString());
 
     // Create logs
-    const logs = verifiedUsers.map((user: any) => ({
+    const logs = allUsers.map((user: any) => ({
       newsletter_id: newsletterId,
       user_id: user.id,
       email: user.email,
@@ -88,7 +88,7 @@ const handler = async (req: Request): Promise<Response> => {
     let successCount = 0;
     let failureCount = 0;
 
-    for (const user of verifiedUsers) {
+    for (const user of allUsers) {
       try {
         const fullName = user.raw_user_meta_data?.full_name || 
                         user.raw_user_meta_data?.display_name || 
@@ -108,7 +108,7 @@ const handler = async (req: Request): Promise<Response> => {
           .replace(/\{\{full_name\}\}/g, fullName)
           .replace(/\{\{display_name\}\}/g, fullName);
 
-        const unsubscribeUrl = `${Deno.env.get('SITE_URL') || 'https://your-domain.com'}/unsubscribe?token=${btoa(user.id)}`;
+        const unsubscribeUrl = `https://skillpulse.cloud/unsubscribe?token=${btoa(user.id)}`;
         
         const emailBody = personalizedContent + `
           <br><br>
@@ -119,7 +119,7 @@ const handler = async (req: Request): Promise<Response> => {
         `;
 
         await resend.emails.send({
-          from: 'Newsletter <no-reply@yourdomain.com>',
+          from: 'Newsletter <no-reply@skillpulse.cloud>',
           to: [user.email],
           subject: personalizedSubject,
           html: emailBody,
@@ -149,7 +149,7 @@ const handler = async (req: Request): Promise<Response> => {
       .update({
         status: 'sent',
         sent_at: new Date().toISOString(),
-        total_recipients: verifiedUsers.length,
+        total_recipients: allUsers.length,
         successful_sends: successCount,
         failed_sends: failureCount
       })
@@ -157,7 +157,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({
       success: true,
-      total_recipients: verifiedUsers.length,
+      total_recipients: allUsers.length,
       successful_sends: successCount,
       failed_sends: failureCount
     }), {

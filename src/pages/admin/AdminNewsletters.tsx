@@ -118,8 +118,8 @@ const AdminNewsletters = () => {
       if (error) throw error;
       
       const authUsers = authUsersResponse?.users as AuthUser[] || [];
-      const verifiedUsers = authUsers.filter(user => user.email_confirmed_at);
-      setRecipientCount(verifiedUsers.length);
+      // Include all users, not just verified ones
+      setRecipientCount(authUsers.length);
     } catch (error) {
       console.error('Error fetching recipient count:', error);
     }
@@ -286,10 +286,10 @@ const AdminNewsletters = () => {
       <div className="bg-green-50 p-3 rounded-lg">
         <div className="flex items-center gap-2 text-green-700">
           <Users className="h-4 w-4" />
-          <span className="font-medium">Recipients: {recipientCount} verified users</span>
+          <span className="font-medium">Recipients: {recipientCount} total users</span>
         </div>
         <p className="text-sm text-green-600 mt-1">
-          Includes all verified users (both regular users and creators)
+          Includes all users (both verified and unverified users, regular users and creators)
         </p>
       </div>
 
@@ -363,7 +363,7 @@ const AdminNewsletters = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Send Newsletter Now?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will immediately send the newsletter to {recipientCount} verified users. This action cannot be undone.
+                  This will immediately send the newsletter to {recipientCount} users (both verified and unverified). This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -546,7 +546,7 @@ const AdminNewsletters = () => {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Send Newsletter Now?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This will send "{newsletter.subject}" to {recipientCount} verified users immediately.
+                                        This will send "{newsletter.subject}" to {recipientCount} users immediately.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
