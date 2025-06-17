@@ -2174,6 +2174,92 @@ export type Database = {
         }
         Relationships: []
       }
+      newsletter_logs: {
+        Row: {
+          created_at: string
+          email: string
+          error_message: string | null
+          id: string
+          newsletter_id: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          error_message?: string | null
+          id?: string
+          newsletter_id: string
+          sent_at?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          error_message?: string | null
+          id?: string
+          newsletter_id?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_logs_newsletter_id_fkey"
+            columns: ["newsletter_id"]
+            isOneToOne: false
+            referencedRelation: "newsletters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      newsletters: {
+        Row: {
+          body_html: string
+          created_at: string
+          created_by: string
+          failed_sends: number | null
+          id: string
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          successful_sends: number | null
+          total_recipients: number | null
+          updated_at: string
+        }
+        Insert: {
+          body_html: string
+          created_at?: string
+          created_by: string
+          failed_sends?: number | null
+          id?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          successful_sends?: number | null
+          total_recipients?: number | null
+          updated_at?: string
+        }
+        Update: {
+          body_html?: string
+          created_at?: string
+          created_by?: string
+          failed_sends?: number | null
+          id?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          successful_sends?: number | null
+          total_recipients?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           content: string
@@ -2477,11 +2563,13 @@ export type Database = {
           bio: string | null
           created_at: string | null
           creator_enabled_at: string | null
+          email_verified: boolean | null
           full_name: string | null
           id: string
           is_creator: boolean | null
           mobile_money_details: Json | null
           mobile_money_number: string | null
+          newsletter_subscribed: boolean | null
           payout_method: string | null
           role: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_id: string | null
@@ -2495,11 +2583,13 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
+          email_verified?: boolean | null
           full_name?: string | null
           id: string
           is_creator?: boolean | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
+          newsletter_subscribed?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_id?: string | null
@@ -2513,11 +2603,13 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
+          email_verified?: boolean | null
           full_name?: string | null
           id?: string
           is_creator?: boolean | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
+          newsletter_subscribed?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_id?: string | null
@@ -3054,6 +3146,10 @@ export type Database = {
           p_session_id?: string
         }
         Returns: boolean
+      }
+      update_newsletter_stats: {
+        Args: { newsletter_id: string }
+        Returns: undefined
       }
     }
     Enums: {

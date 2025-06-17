@@ -14,6 +14,7 @@ import {
   Briefcase,
   Package,
   MessageSquareMore,
+  Mail,
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -28,6 +29,7 @@ const AdminSidebar = () => {
     { name: 'Users', path: '/admin/users', icon: <Users className="mr-2 h-4 w-4" /> },
     { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="mr-2 h-4 w-4" /> },
     { name: 'Media', path: '/admin/media', icon: <FileText className="mr-2 h-4 w-4" /> },
+    { name: 'Newsletters', path: '/admin/newsletters', icon: <Mail className="mr-2 h-4 w-4" /> },
     { name: 'Support Inbox', path: '/admin/support-inbox', icon: <MessageSquareMore className="mr-2 h-4 w-4" /> },
     { name: 'Contact Request', path: '/admin/contact-submissions', icon: <PhoneCall className="mr-2 h-4 w-4" /> },
     { name: 'Speaking', path: '/admin/speaking', icon: <Mic className="mr-2 h-4 w-4" /> },

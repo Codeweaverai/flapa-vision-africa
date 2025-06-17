@@ -91,6 +91,7 @@ import AdminEventEdit from "./pages/admin/AdminEventEdit";
 import AdminEventRegistrations from "./pages/admin/AdminEventRegistrations";
 import AdminMedia from "./pages/admin/AdminMedia";
 import AdminMediaForm from "./pages/admin/AdminMediaForm";
+import AdminNewsletters from "./pages/admin/AdminNewsletters";
 import AdminSupportInbox from "./pages/admin/AdminSupportInbox";
 import AdminConsultations from "./pages/admin/AdminConsultations";
 import AdminSpeaking from "./pages/admin/AdminSpeaking";
@@ -235,6 +236,7 @@ const App = () => (
                 <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
                 <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
                 <Route path="/admin/media/edit/:id" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+                <Route path="/admin/newsletters" element={<AdminRoute><AdminNewsletters /></AdminRoute>} />
                 <Route path="/admin/support-inbox" element={<AdminRoute><AdminSupportInbox /></AdminRoute>} />
                 <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
                 <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
