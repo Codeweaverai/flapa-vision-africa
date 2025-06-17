@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -63,6 +62,17 @@ interface Newsletter {
   failed_sends: number;
 }
 
+interface AuthUser {
+  id: string;
+  email: string;
+  email_confirmed_at: string | null;
+  raw_user_meta_data?: {
+    full_name?: string;
+    display_name?: string;
+    username?: string;
+  };
+}
+
 const AdminNewsletters = () => {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,10 +114,11 @@ const AdminNewsletters = () => {
 
   const fetchRecipientCount = async () => {
     try {
-      const { data: authUsers, error } = await supabase.auth.admin.listUsers();
+      const { data: authUsersResponse, error } = await supabase.auth.admin.listUsers();
       if (error) throw error;
       
-      const verifiedUsers = authUsers?.users?.filter(user => user.email_confirmed_at) || [];
+      const authUsers = authUsersResponse?.users as AuthUser[] || [];
+      const verifiedUsers = authUsers.filter(user => user.email_confirmed_at);
       setRecipientCount(verifiedUsers.length);
     } catch (error) {
       console.error('Error fetching recipient count:', error);
