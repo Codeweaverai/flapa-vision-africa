@@ -29,7 +29,7 @@ const AdminSidebar = () => {
     { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="mr-2 h-4 w-4" /> },
     { name: 'Media', path: '/admin/media', icon: <FileText className="mr-2 h-4 w-4" /> },
     { name: 'Support Inbox', path: '/admin/support-inbox', icon: <MessageSquareMore className="mr-2 h-4 w-4" /> },
-    { name: 'Consultations', path: '/admin/consultations', icon: <PhoneCall className="mr-2 h-4 w-4" /> },
+    { name: 'Contact Request', path: '/admin/contact-submissions', icon: <PhoneCall className="mr-2 h-4 w-4" /> },
     { name: 'Speaking', path: '/admin/speaking', icon: <Mic className="mr-2 h-4 w-4" /> },
     { name: 'Careers', path: '/admin/careers', icon: <Briefcase className="mr-2 h-4 w-4" /> },
     { name: 'Registrations', path: '/admin/registrations', icon: <ClipboardCheck className="mr-2 h-4 w-4" /> },
