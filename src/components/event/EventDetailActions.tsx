@@ -75,9 +75,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
     try {
       for (const ticket of tickets) {
         try {
-          console.log(`Converting price for ticket ${ticket.id}: ${ticket.price} USD`);
           const convertedPrice = await convertPrice(ticket.price, 'USD');
-          console.log(`Converted price: ${convertedPrice}`);
           priceMap[ticket.id] = convertedPrice;
         } catch (error) {
           console.error('Error converting price for ticket:', ticket.id, error);
@@ -87,7 +85,6 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
       setConvertedPrices(priceMap);
     } catch (error) {
       console.error('Error in convertTicketPrices:', error);
-      // Fallback to original prices
       tickets.forEach(ticket => {
         priceMap[ticket.id] = ticket.price;
       });
@@ -111,7 +108,6 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
         throw error;
       }
       
-      console.log('Fetched tickets:', data);
       setTickets(data || []);
     } catch (error) {
       console.error('Error fetching tickets:', error);
@@ -172,18 +168,6 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
   const isEarlyBird = (ticket: EventTicket) => {
     if (!ticket.early_bird_end_date) return false;
     return new Date() < new Date(ticket.early_bird_end_date);
-  };
-
-  const getTotalPrice = () => {
-    return tickets.reduce((total, ticket) => {
-      const quantity = selectedTickets[ticket.id] || 0;
-      const convertedPrice = convertedPrices[ticket.id] || ticket.price;
-      return total + (convertedPrice * quantity);
-    }, 0);
-  };
-
-  const getTotalTickets = () => {
-    return Object.values(selectedTickets).reduce((sum, qty) => sum + qty, 0);
   };
 
   const addToGoogleCalendar = () => {
@@ -285,22 +269,10 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
               <>
                 {/* Paid Event with Tickets */}
                 <div className="space-y-4">
-                  {/* Show event price if no tickets configured */}
-                  {tickets.length === 0 && event.price && (
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary mb-4">
-                        {formatPrice(event.price)}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Ticket Selection for Paid Events */}
                   {tickets.length > 0 ? (
                     <div className="space-y-4">
                       <h4 className="font-medium">Select Tickets</h4>
-                      {convertingPrices && (
-                        <div className="text-sm text-gray-500">Converting prices...</div>
-                      )}
                       {tickets.map((ticket) => {
                         const availableQty = getAvailableQuantity(ticket);
                         const selectedQty = selectedTickets[ticket.id] || 0;
@@ -326,16 +298,11 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                                 </div>
                                 <div className="text-right">
                                   <p className="font-bold">{formatPrice(convertedPrice)}</p>
-                                  {convertedPrice !== ticket.price && (
-                                    <p className="text-xs text-gray-500">
-                                      (${ticket.price} USD)
-                                    </p>
-                                  )}
                                 </div>
                               </div>
 
                               {availableQty > 0 ? (
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between mb-3">
                                   <Label htmlFor={`qty-${ticket.id}`} className="text-sm">Quantity:</Label>
                                   <div className="flex items-center gap-2">
                                     <Button
@@ -368,56 +335,28 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                                   </div>
                                 </div>
                               ) : (
-                                <Badge variant="destructive" className="w-full justify-center">
+                                <Badge variant="destructive" className="w-full justify-center mb-3">
                                   Sold Out
                                 </Badge>
+                              )}
+
+                              {/* Add to Cart Button for each ticket type */}
+                              {selectedQty > 0 && (
+                                <AddToCartButton
+                                  itemType="event_ticket"
+                                  itemId={ticket.id}
+                                  itemName={`${event.title} - ${ticket.name}`}
+                                  price={convertedPrice}
+                                  ticketType={ticket.ticket_type}
+                                  eventId={event.id}
+                                  eventTitle={event.title}
+                                  className="w-full"
+                                />
                               )}
                             </CardContent>
                           </Card>
                         );
                       })}
-
-                      {/* Add to Cart for Selected Tickets */}
-                      {tickets.map((ticket) => {
-                        const quantity = selectedTickets[ticket.id] || 0;
-                        if (quantity === 0) return null;
-                        
-                        const convertedPrice = convertedPrices[ticket.id] || ticket.price;
-                        
-                        return (
-                          <div key={`cart-${ticket.id}`} className="space-y-2 pt-4 border-t">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">
-                                {ticket.name} ({quantity} {quantity === 1 ? 'ticket' : 'tickets'}):
-                              </span>
-                              <span className="text-lg font-bold">
-                                {formatPrice(convertedPrice * quantity)}
-                              </span>
-                            </div>
-                            
-                            <AddToCartButton
-                              itemType="event_ticket"
-                              itemId={ticket.id}
-                              itemName={`${event.title} - ${ticket.name}`}
-                              price={convertedPrice}
-                              ticketType={ticket.ticket_type}
-                              eventId={event.id}
-                              eventTitle={event.title}
-                              className="w-full"
-                            />
-                          </div>
-                        );
-                      })}
-
-                      {/* Total Summary */}
-                      {getTotalTickets() > 0 && (
-                        <div className="pt-4 border-t">
-                          <div className="flex justify-between items-center text-lg font-bold">
-                            <span>Total ({getTotalTickets()} tickets):</span>
-                            <span>{formatPrice(getTotalPrice())}</span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ) : (
                     // No tickets configured - fallback with add to cart for event price

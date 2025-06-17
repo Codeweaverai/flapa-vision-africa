@@ -147,10 +147,8 @@ const EventDetailPage = () => {
         .eq('status', 'confirmed')
         .maybeSingle();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('Error checking registration status:', error);
-        setIsRegistered(false);
-        return;
       }
 
       setIsRegistered(!!data);
@@ -432,35 +430,70 @@ const EventDetailPage = () => {
                   <TabsContent value="speakers" className="p-6">
                     <h3 className="text-lg font-semibold mb-4">Keynote Speakers</h3>
                     {keynoteSpeakers.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {keynoteSpeakers.map((speaker) => (
-                          <div key={speaker.id} className="p-4 border rounded-lg">
-                            <div className="flex items-start gap-4">
-                              {speaker.image_url ? (
-                                <img
-                                  src={speaker.image_url}
-                                  alt={speaker.name}
-                                  className="w-16 h-16 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-                                  {speaker.name.charAt(0)}
+                          <Card key={speaker.id} className="overflow-hidden bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100 border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
+                            <div className="bg-gradient-to-r from-orange-400 to-purple-600 p-1">
+                              <div className="bg-white rounded-lg p-6">
+                                <div className="flex items-start gap-4">
+                                  {speaker.image_url ? (
+                                    <img
+                                      src={speaker.image_url}
+                                      alt={speaker.name}
+                                      className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                                    />
+                                  ) : (
+                                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg border-4 border-white">
+                                      {speaker.name.charAt(0)}
+                                    </div>
+                                  )}
+                                  <div className="flex-1">
+                                    <h4 className="font-bold text-lg text-gray-800 mb-1">{speaker.name}</h4>
+                                    {speaker.title && (
+                                      <p className="text-purple-600 font-medium mb-3">{speaker.title}</p>
+                                    )}
+                                    {speaker.speaking_topic && (
+                                      <div className="mb-3">
+                                        <span className="inline-block bg-gradient-to-r from-orange-500 to-purple-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                                          {speaker.speaking_topic}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {speaker.bio && (
+                                      <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">{speaker.bio}</p>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                              <div className="flex-1">
-                                <h4 className="font-semibold">{speaker.name}</h4>
-                                {speaker.title && (
-                                  <p className="text-sm text-purple-600 mb-2">{speaker.title}</p>
-                                )}
-                                {speaker.speaking_topic && (
-                                  <p className="text-sm font-medium mb-2">Topic: {speaker.speaking_topic}</p>
-                                )}
-                                {speaker.bio && (
-                                  <p className="text-sm text-gray-600 line-clamp-3">{speaker.bio}</p>
+                                
+                                {/* Social Links */}
+                                {(speaker.linkedin_url || speaker.twitter_url || speaker.website_url) && (
+                                  <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                                    {speaker.linkedin_url && (
+                                      <Button variant="outline" size="sm" asChild className="bg-blue-50 hover:bg-blue-100 border-blue-200">
+                                        <a href={speaker.linkedin_url} target="_blank" rel="noopener noreferrer">
+                                          LinkedIn
+                                        </a>
+                                      </Button>
+                                    )}
+                                    {speaker.twitter_url && (
+                                      <Button variant="outline" size="sm" asChild className="bg-cyan-50 hover:bg-cyan-100 border-cyan-200">
+                                        <a href={speaker.twitter_url} target="_blank" rel="noopener noreferrer">
+                                          Twitter
+                                        </a>
+                                      </Button>
+                                    )}
+                                    {speaker.website_url && (
+                                      <Button variant="outline" size="sm" asChild className="bg-green-50 hover:bg-green-100 border-green-200">
+                                        <a href={speaker.website_url} target="_blank" rel="noopener noreferrer">
+                                          Website
+                                        </a>
+                                      </Button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          </div>
+                          </Card>
                         ))}
                       </div>
                     ) : (

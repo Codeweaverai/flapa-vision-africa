@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -212,10 +212,133 @@ const CreatorEventAgenda = () => {
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Event Agenda</h2>
-        <Button onClick={handleAddItem}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Agenda Item
-        </Button>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={handleAddItem}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Agenda Item
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {editingItem ? 'Edit Agenda Item' : 'Add Agenda Item'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  required
+                  placeholder="e.g. Opening Keynote"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Brief description of this session..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="start_time">Start Time *</Label>
+                  <Input
+                    id="start_time"
+                    name="start_time"
+                    type="datetime-local"
+                    value={formData.start_time}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="end_time">End Time *</Label>
+                  <Input
+                    id="end_time"
+                    name="end_time"
+                    type="datetime-local"
+                    value={formData.end_time}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="session_type">Session Type</Label>
+                  <Select
+                    value={formData.session_type}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, session_type: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="presentation">Presentation</SelectItem>
+                      <SelectItem value="workshop">Workshop</SelectItem>
+                      <SelectItem value="panel">Panel Discussion</SelectItem>
+                      <SelectItem value="keynote">Keynote</SelectItem>
+                      <SelectItem value="networking">Networking</SelectItem>
+                      <SelectItem value="break">Break</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="speaker_id">Speaker (Optional)</Label>
+                  <Select
+                    value={formData.speaker_id}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, speaker_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a speaker..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No speaker</SelectItem>
+                      {speakers.map((speaker) => (
+                        <SelectItem key={speaker.id} value={speaker.id}>
+                          {speaker.name}{speaker.title && ` (${speaker.title})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  placeholder="e.g. Main Hall, Room A, Online"
+                />
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {editingItem ? 'Update' : 'Create'} Item
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {agenda.length === 0 ? (
@@ -228,10 +351,14 @@ const CreatorEventAgenda = () => {
             <p className="text-muted-foreground mb-6">
               Create your event schedule
             </p>
-            <Button onClick={handleAddItem}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Item
-            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleAddItem}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Item
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </CardContent>
         </Card>
       ) : (
@@ -283,128 +410,6 @@ const CreatorEventAgenda = () => {
           ))}
         </div>
       )}
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingItem ? 'Edit Agenda Item' : 'Add Agenda Item'}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-                placeholder="e.g. Opening Keynote"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Brief description of this session..."
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="start_time">Start Time *</Label>
-                <Input
-                  id="start_time"
-                  name="start_time"
-                  type="datetime-local"
-                  value={formData.start_time}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="end_time">End Time *</Label>
-                <Input
-                  id="end_time"
-                  name="end_time"
-                  type="datetime-local"
-                  value={formData.end_time}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="session_type">Session Type</Label>
-                <Select
-                  value={formData.session_type}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, session_type: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="presentation">Presentation</SelectItem>
-                    <SelectItem value="workshop">Workshop</SelectItem>
-                    <SelectItem value="panel">Panel Discussion</SelectItem>
-                    <SelectItem value="keynote">Keynote</SelectItem>
-                    <SelectItem value="networking">Networking</SelectItem>
-                    <SelectItem value="break">Break</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="speaker_id">Speaker (Optional)</Label>
-                <Select
-                  value={formData.speaker_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, speaker_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a speaker..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No speaker</SelectItem>
-                    {speakers.map((speaker) => (
-                      <SelectItem key={speaker.id} value={speaker.id}>
-                        {speaker.name}{speaker.title && ` (${speaker.title})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                placeholder="e.g. Main Hall, Room A, Online"
-              />
-            </div>
-
-            <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {editingItem ? 'Update' : 'Create'} Item
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </CreatorLayout>
   );
 };

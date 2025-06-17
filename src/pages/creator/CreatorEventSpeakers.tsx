@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +11,7 @@ import { ArrowLeft, Plus, Edit, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
+import ImageUpload from '@/components/ui/image-upload';
 
 interface KeynoteSpeaker {
   id: string;
@@ -161,6 +162,10 @@ const CreatorEventSpeakers = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleImageUpload = (imageUrl: string) => {
+    setFormData(prev => ({ ...prev, image_url: imageUrl }));
+  };
+
   if (loading) {
     return (
       <CreatorLayout title="Event Speakers">
@@ -182,10 +187,116 @@ const CreatorEventSpeakers = () => {
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Event Speakers</h2>
-        <Button onClick={handleAddSpeaker}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Speaker
-        </Button>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={handleAddSpeaker}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Speaker
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {editingSpeaker ? 'Edit Speaker' : 'Add Speaker'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <ImageUpload
+                onImageUpload={handleImageUpload}
+                currentImage={formData.image_url}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Speaker Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    placeholder="e.g. John Doe"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="title">Title/Position</Label>
+                  <Input
+                    id="title"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleChange}
+                    placeholder="e.g. CEO, Tech Company"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="speaking_topic">Speaking Topic</Label>
+                <Input
+                  id="speaking_topic"
+                  name="speaking_topic"
+                  value={formData.speaking_topic}
+                  onChange={handleChange}
+                  placeholder="What will they be speaking about?"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  name="bio"
+                  value={formData.bio}
+                  onChange={handleChange}
+                  placeholder="Brief biography..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="linkedin_url">LinkedIn URL</Label>
+                  <Input
+                    id="linkedin_url"
+                    name="linkedin_url"
+                    value={formData.linkedin_url}
+                    onChange={handleChange}
+                    placeholder="https://linkedin.com/in/..."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="twitter_url">Twitter URL</Label>
+                  <Input
+                    id="twitter_url"
+                    name="twitter_url"
+                    value={formData.twitter_url}
+                    onChange={handleChange}
+                    placeholder="https://twitter.com/..."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="website_url">Website URL</Label>
+                  <Input
+                    id="website_url"
+                    name="website_url"
+                    value={formData.website_url}
+                    onChange={handleChange}
+                    placeholder="https://example.com"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {editingSpeaker ? 'Update' : 'Create'} Speaker
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {speakers.length === 0 ? (
@@ -198,10 +309,14 @@ const CreatorEventSpeakers = () => {
             <p className="text-muted-foreground mb-6">
               Add keynote speakers for your event
             </p>
-            <Button onClick={handleAddSpeaker}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Speaker
-            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleAddSpeaker}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Speaker
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </CardContent>
         </Card>
       ) : (
@@ -279,117 +394,6 @@ const CreatorEventSpeakers = () => {
           ))}
         </div>
       )}
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingSpeaker ? 'Edit Speaker' : 'Add Speaker'}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Speaker Name *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  placeholder="e.g. John Doe"
-                />
-              </div>
-              <div>
-                <Label htmlFor="title">Title/Position</Label>
-                <Input
-                  id="title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  placeholder="e.g. CEO, Tech Company"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="speaking_topic">Speaking Topic</Label>
-              <Input
-                id="speaking_topic"
-                name="speaking_topic"
-                value={formData.speaking_topic}
-                onChange={handleChange}
-                placeholder="What will they be speaking about?"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleChange}
-                placeholder="Brief biography..."
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="image_url">Profile Image URL</Label>
-              <Input
-                id="image_url"
-                name="image_url"
-                value={formData.image_url}
-                onChange={handleChange}
-                placeholder="https://example.com/photo.jpg"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-                <Input
-                  id="linkedin_url"
-                  name="linkedin_url"
-                  value={formData.linkedin_url}
-                  onChange={handleChange}
-                  placeholder="https://linkedin.com/in/..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="twitter_url">Twitter URL</Label>
-                <Input
-                  id="twitter_url"
-                  name="twitter_url"
-                  value={formData.twitter_url}
-                  onChange={handleChange}
-                  placeholder="https://twitter.com/..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="website_url">Website URL</Label>
-                <Input
-                  id="website_url"
-                  name="website_url"
-                  value={formData.website_url}
-                  onChange={handleChange}
-                  placeholder="https://example.com"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {editingSpeaker ? 'Update' : 'Create'} Speaker
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </CreatorLayout>
   );
 };
