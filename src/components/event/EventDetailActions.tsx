@@ -56,27 +56,45 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [convertedPrices, setConvertedPrices] = useState<Record<string, number>>({});
+  const [convertingPrices, setConvertingPrices] = useState(false);
 
   useEffect(() => {
     fetchTickets();
   }, [event.id]);
 
   useEffect(() => {
-    convertTicketPrices();
+    if (tickets.length > 0) {
+      convertTicketPrices();
+    }
   }, [tickets]);
 
   const convertTicketPrices = async () => {
+    setConvertingPrices(true);
     const priceMap: Record<string, number> = {};
-    for (const ticket of tickets) {
-      try {
-        const convertedPrice = await convertPrice(ticket.price, 'USD');
-        priceMap[ticket.id] = convertedPrice;
-      } catch (error) {
-        console.error('Error converting price for ticket:', ticket.id, error);
-        priceMap[ticket.id] = ticket.price;
+    
+    try {
+      for (const ticket of tickets) {
+        try {
+          console.log(`Converting price for ticket ${ticket.id}: ${ticket.price} USD`);
+          const convertedPrice = await convertPrice(ticket.price, 'USD');
+          console.log(`Converted price: ${convertedPrice}`);
+          priceMap[ticket.id] = convertedPrice;
+        } catch (error) {
+          console.error('Error converting price for ticket:', ticket.id, error);
+          priceMap[ticket.id] = ticket.price;
+        }
       }
+      setConvertedPrices(priceMap);
+    } catch (error) {
+      console.error('Error in convertTicketPrices:', error);
+      // Fallback to original prices
+      tickets.forEach(ticket => {
+        priceMap[ticket.id] = ticket.price;
+      });
+      setConvertedPrices(priceMap);
+    } finally {
+      setConvertingPrices(false);
     }
-    setConvertedPrices(priceMap);
   };
 
   const fetchTickets = async () => {
@@ -88,7 +106,12 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
         .eq('is_active', true)
         .order('price', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching tickets:', error);
+        throw error;
+      }
+      
+      console.log('Fetched tickets:', data);
       setTickets(data || []);
     } catch (error) {
       console.error('Error fetching tickets:', error);
@@ -274,6 +297,9 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                   {tickets.length > 0 ? (
                     <div className="space-y-4">
                       <h4 className="font-medium">Select Tickets</h4>
+                      {convertingPrices && (
+                        <div className="text-sm text-gray-500">Converting prices...</div>
+                      )}
                       {tickets.map((ticket) => {
                         const availableQty = getAvailableQuantity(ticket);
                         const selectedQty = selectedTickets[ticket.id] || 0;
@@ -299,6 +325,11 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                                 </div>
                                 <div className="text-right">
                                   <p className="font-bold">{formatPrice(convertedPrice)}</p>
+                                  {convertedPrice !== ticket.price && (
+                                    <p className="text-xs text-gray-500">
+                                      (${ticket.price} USD)
+                                    </p>
+                                  )}
                                 </div>
                               </div>
 
@@ -345,33 +376,44 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                         );
                       })}
 
-                      {/* Add to Cart for Selected Tickets */}
-                      {getTotalTickets() > 0 && (
-                        <div className="space-y-4 pt-4 border-t">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Total ({getTotalTickets()} tickets):</span>
-                            <span className="text-xl font-bold">{formatPrice(getTotalPrice())}</span>
+                      {/* Add to Cart for Selected Tickets - Show for each ticket type */}
+                      {tickets.map((ticket) => {
+                        const quantity = selectedTickets[ticket.id] || 0;
+                        if (quantity === 0) return null;
+                        
+                        const convertedPrice = convertedPrices[ticket.id] || ticket.price;
+                        
+                        return (
+                          <div key={`cart-${ticket.id}`} className="space-y-2 pt-4 border-t">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">
+                                {ticket.name} ({quantity} {quantity === 1 ? 'ticket' : 'tickets'}):
+                              </span>
+                              <span className="text-lg font-bold">
+                                {formatPrice(convertedPrice * quantity)}
+                              </span>
+                            </div>
+                            
+                            <AddToCartButton
+                              itemType="event_ticket"
+                              itemId={ticket.id}
+                              itemName={`${event.title} - ${ticket.name}`}
+                              price={convertedPrice}
+                              ticketType={ticket.ticket_type}
+                              eventId={event.id}
+                              eventTitle={event.title}
+                              className="w-full"
+                            />
                           </div>
-                          
-                          <div className="space-y-2">
-                            {tickets.map((ticket) => {
-                              const quantity = selectedTickets[ticket.id] || 0;
-                              if (quantity === 0) return null;
-                              
-                              return (
-                                <AddToCartButton
-                                  key={ticket.id}
-                                  itemType="event_ticket"
-                                  itemId={ticket.id}
-                                  itemName={`${event.title} - ${ticket.name}`}
-                                  price={convertedPrices[ticket.id] || ticket.price}
-                                  ticketType={ticket.ticket_type}
-                                  eventId={event.id}
-                                  eventTitle={event.title}
-                                  className="w-full"
-                                />
-                              );
-                            })}
+                        );
+                      })}
+
+                      {/* Total Summary */}
+                      {getTotalTickets() > 0 && (
+                        <div className="pt-4 border-t">
+                          <div className="flex justify-between items-center text-lg font-bold">
+                            <span>Total ({getTotalTickets()} tickets):</span>
+                            <span>{formatPrice(getTotalPrice())}</span>
                           </div>
                         </div>
                       )}

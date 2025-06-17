@@ -28,6 +28,7 @@ class CurrencyService {
 
   async fetchExchangeRates(baseCurrency: CurrencyCode = 'USD'): Promise<Record<string, number>> {
     try {
+      console.log(`Fetching exchange rates with base currency: ${baseCurrency}`);
       const response = await fetch(`${EXCHANGE_API_BASE}/${EXCHANGE_API_KEY}/latest/${baseCurrency}`);
       
       if (!response.ok) {
@@ -40,13 +41,28 @@ class CurrencyService {
         throw new Error('Failed to fetch exchange rates');
       }
 
+      console.log('Fetched exchange rates:', data.conversion_rates);
       this.exchangeRates = data.conversion_rates;
       this.lastUpdate = Date.now();
       
       return this.exchangeRates;
     } catch (error) {
       console.error('Error fetching exchange rates:', error);
-      // Return cached rates if available, otherwise return default rates
+      // Return fallback rates with some common currencies if API fails
+      if (Object.keys(this.exchangeRates).length === 0) {
+        this.exchangeRates = {
+          'USD': 1,
+          'EUR': 0.85,
+          'GBP': 0.73,
+          'ZMW': 27.5, // Zambian Kwacha - approximate rate
+          'CAD': 1.35,
+          'AUD': 1.55,
+          'JPY': 150,
+          'CHF': 0.88,
+          'CNY': 7.25
+        };
+        console.log('Using fallback exchange rates:', this.exchangeRates);
+      }
       return this.exchangeRates;
     }
   }
@@ -54,6 +70,7 @@ class CurrencyService {
   async getExchangeRates(): Promise<Record<string, number>> {
     // Check if cache is still valid
     if (Date.now() - this.lastUpdate < this.CACHE_DURATION && Object.keys(this.exchangeRates).length > 0) {
+      console.log('Using cached exchange rates:', this.exchangeRates);
       return this.exchangeRates;
     }
 
@@ -61,11 +78,14 @@ class CurrencyService {
   }
 
   async convertPrice(amount: number, fromCurrency: CurrencyCode, toCurrency: CurrencyCode): Promise<number> {
+    console.log(`Converting ${amount} from ${fromCurrency} to ${toCurrency}`);
+    
     if (fromCurrency === toCurrency) {
       return amount;
     }
 
     const rates = await this.getExchangeRates();
+    console.log('Available rates:', rates);
     
     // Convert to USD first if fromCurrency is not USD
     let usdAmount = amount;
@@ -76,6 +96,7 @@ class CurrencyService {
         return amount;
       }
       usdAmount = amount / fromRate;
+      console.log(`Converted to USD: ${usdAmount}`);
     }
 
     // Convert from USD to target currency
@@ -89,7 +110,9 @@ class CurrencyService {
       return usdAmount;
     }
 
-    return usdAmount * toRate;
+    const convertedAmount = usdAmount * toRate;
+    console.log(`Final converted amount: ${convertedAmount} ${toCurrency}`);
+    return convertedAmount;
   }
 
   async detectUserCurrency(): Promise<CurrencyCode> {
@@ -100,6 +123,8 @@ class CurrencyService {
       
       const countryCode = data.countryCode;
       const currency = COUNTRY_TO_CURRENCY[countryCode];
+      
+      console.log(`Detected country: ${countryCode}, currency: ${currency}`);
       
       if (currency && SUPPORTED_CURRENCIES[currency]) {
         return currency;

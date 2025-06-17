@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -115,6 +114,11 @@ import CreatorStudents from "./pages/creator/CreatorStudents";
 import CreatorAnalytics from "./pages/creator/CreatorAnalytics";
 import CreatorPayments from "./pages/creator/CreatorPayments";
 import CreatorSettings from "./pages/creator/CreatorSettings";
+
+// Add these imports at the top with the other creator imports
+import CreatorEventSpeakers from '@/pages/creator/CreatorEventSpeakers';
+import CreatorEventAgenda from '@/pages/creator/CreatorEventAgenda';
+import CreatorEventTickets from '@/pages/creator/CreatorEventTickets';
 
 const queryClient = new QueryClient();
 
