@@ -75,7 +75,8 @@ const AdminNewsletters = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setNewsletters(data || []);
+      // Type assertion to ensure proper typing
+      setNewsletters((data || []) as Newsletter[]);
     } catch (error) {
       console.error('Error fetching newsletters:', error);
       toast.error('Failed to load newsletters');
