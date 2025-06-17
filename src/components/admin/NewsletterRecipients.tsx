@@ -113,9 +113,13 @@ const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ onRecipient
                       {recipient.full_name}
                     </span>
                     {recipient.email_confirmed_at ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" title="Email verified" />
+                      <div title="Email verified">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      </div>
                     ) : (
-                      <Clock className="h-4 w-4 text-yellow-500" title="Email not verified" />
+                      <div title="Email not verified">
+                        <Clock className="h-4 w-4 text-yellow-500" />
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-1 text-sm text-gray-600">
