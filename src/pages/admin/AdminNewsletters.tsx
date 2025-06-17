@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import AdminLayout from '@/components/admin/AdminLayout';
+import NewsletterRecipients from '@/components/admin/NewsletterRecipients';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -91,7 +92,6 @@ const AdminNewsletters = () => {
 
   useEffect(() => {
     fetchNewsletters();
-    fetchRecipientCount();
   }, []);
 
   const fetchNewsletters = async () => {
@@ -112,17 +112,8 @@ const AdminNewsletters = () => {
     }
   };
 
-  const fetchRecipientCount = async () => {
-    try {
-      const { data: authUsersResponse, error } = await supabase.auth.admin.listUsers();
-      if (error) throw error;
-      
-      const authUsers = authUsersResponse?.users as AuthUser[] || [];
-      // Include all users, not just verified ones
-      setRecipientCount(authUsers.length);
-    } catch (error) {
-      console.error('Error fetching recipient count:', error);
-    }
+  const handleRecipientCountChange = (count: number) => {
+    setRecipientCount(count);
   };
 
   const handleSave = async (status: 'draft' | 'scheduled') => {
@@ -430,6 +421,9 @@ const AdminNewsletters = () => {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Recipients Section */}
+        <NewsletterRecipients onRecipientCountChange={handleRecipientCountChange} />
 
         {/* Newsletters Table */}
         <Card className="border-0 shadow-lg">

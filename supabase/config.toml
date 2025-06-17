@@ -45,6 +45,9 @@ verify_jwt = false
 [functions.unsubscribe-newsletter]
 verify_jwt = false
 
+[functions.get-newsletter-recipients]
+verify_jwt = false
+
 [db]
 port = 54322
 shadow_port = 54320
