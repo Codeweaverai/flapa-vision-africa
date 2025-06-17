@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, MapPin, Users, Clock, Plus, Minus } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Plus, Minus, CalendarPlus } from 'lucide-react';
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useNavigate } from 'react-router-dom';
 
 interface EventTicket {
@@ -48,15 +49,35 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
   registrationCount
 }) => {
   const { user } = useAuth();
+  const { formatPrice, convertPrice } = useCurrency();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<EventTicket[]>([]);
   const [selectedTickets, setSelectedTickets] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [convertedPrices, setConvertedPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchTickets();
   }, [event.id]);
+
+  useEffect(() => {
+    convertTicketPrices();
+  }, [tickets]);
+
+  const convertTicketPrices = async () => {
+    const priceMap: Record<string, number> = {};
+    for (const ticket of tickets) {
+      try {
+        const convertedPrice = await convertPrice(ticket.price, 'USD');
+        priceMap[ticket.id] = convertedPrice;
+      } catch (error) {
+        console.error('Error converting price for ticket:', ticket.id, error);
+        priceMap[ticket.id] = ticket.price;
+      }
+    }
+    setConvertedPrices(priceMap);
+  };
 
   const fetchTickets = async () => {
     try {
@@ -133,12 +154,31 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
   const getTotalPrice = () => {
     return tickets.reduce((total, ticket) => {
       const quantity = selectedTickets[ticket.id] || 0;
-      return total + (ticket.price * quantity);
+      const convertedPrice = convertedPrices[ticket.id] || ticket.price;
+      return total + (convertedPrice * quantity);
     }, 0);
   };
 
   const getTotalTickets = () => {
     return Object.values(selectedTickets).reduce((sum, qty) => sum + qty, 0);
+  };
+
+  const addToGoogleCalendar = () => {
+    const startDate = new Date(event.start_time);
+    const endDate = new Date(event.end_time);
+    
+    const formatDateForGoogle = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const googleCalendarUrl = new URL('https://calendar.google.com/calendar/render');
+    googleCalendarUrl.searchParams.set('action', 'TEMPLATE');
+    googleCalendarUrl.searchParams.set('text', event.title);
+    googleCalendarUrl.searchParams.set('dates', `${formatDateForGoogle(startDate)}/${formatDateForGoogle(endDate)}`);
+    googleCalendarUrl.searchParams.set('details', `Event: ${event.title}\n\nLocation: ${event.location || 'TBD'}`);
+    googleCalendarUrl.searchParams.set('location', event.location || '');
+
+    window.open(googleCalendarUrl.toString(), '_blank');
   };
 
   if (loading) {
@@ -186,6 +226,16 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
           </div>
         </div>
 
+        {/* Add to Google Calendar Button */}
+        <Button 
+          onClick={addToGoogleCalendar}
+          variant="outline"
+          className="w-full flex items-center gap-2"
+        >
+          <CalendarPlus className="h-4 w-4" />
+          Add to Google Calendar
+        </Button>
+
         {/* Registration Section */}
         {isRegistered ? (
           <div className="text-center">
@@ -210,12 +260,12 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
               </div>
             ) : (
               <>
-                {/* Paid Event - Show price and add to cart */}
+                {/* Paid Event */}
                 <div className="space-y-4">
                   <div className="text-center">
                     {event.price && (
                       <div className="text-2xl font-bold text-primary mb-4">
-                        {event.currency || 'USD'} {event.price.toFixed(2)}
+                        {formatPrice(event.price)}
                       </div>
                     )}
                   </div>
@@ -227,6 +277,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                       {tickets.map((ticket) => {
                         const availableQty = getAvailableQuantity(ticket);
                         const selectedQty = selectedTickets[ticket.id] || 0;
+                        const convertedPrice = convertedPrices[ticket.id] || ticket.price;
                         
                         return (
                           <Card key={ticket.id} className="border-2">
@@ -247,7 +298,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-bold">${ticket.price}</p>
+                                  <p className="font-bold">{formatPrice(convertedPrice)}</p>
                                 </div>
                               </div>
 
@@ -299,7 +350,7 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                         <div className="space-y-4 pt-4 border-t">
                           <div className="flex justify-between items-center">
                             <span className="font-medium">Total ({getTotalTickets()} tickets):</span>
-                            <span className="text-xl font-bold">${getTotalPrice().toFixed(2)}</span>
+                            <span className="text-xl font-bold">{formatPrice(getTotalPrice())}</span>
                           </div>
                           
                           <div className="space-y-2">
@@ -312,13 +363,12 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                                   key={ticket.id}
                                   itemType="event_ticket"
                                   itemId={ticket.id}
-                                  itemName={event.title}
-                                  price={ticket.price}
+                                  itemName={`${event.title} - ${ticket.name}`}
+                                  price={convertedPrices[ticket.id] || ticket.price}
                                   ticketType={ticket.ticket_type}
                                   eventId={event.id}
                                   eventTitle={event.title}
                                   className="w-full"
-                                  onClick={!user ? handleSignInPrompt : undefined}
                                 />
                               );
                             })}
@@ -327,18 +377,11 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
                       )}
                     </div>
                   ) : (
-                    // No tickets configured - show basic add to cart for event price
+                    // No tickets configured - fallback
                     <div className="space-y-4">
-                      {event.price && (
-                        <AddToCartButton
-                          itemType="event"
-                          itemId={event.id}
-                          itemName={event.title}
-                          price={event.price}
-                          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                          onClick={!user ? handleSignInPrompt : undefined}
-                        />
-                      )}
+                      <div className="text-center text-gray-600">
+                        <p>Ticket information will be available soon.</p>
+                      </div>
                       {!user && (
                         <p className="text-sm text-gray-600 text-center">
                           Please sign in to register for this event
