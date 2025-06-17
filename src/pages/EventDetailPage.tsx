@@ -75,6 +75,8 @@ const EventDetailPage = () => {
   const [registrationCount, setRegistrationCount] = useState(0);
   const [keynoteSpeakers, setKeynoteSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
 
   useEffect(() => {
     if (eventId) {
@@ -83,6 +85,7 @@ const EventDetailPage = () => {
       fetchRegistrationCount();
       fetchKeynoteSpeakers();
       fetchAgenda();
+      fetchReviewsStats();
     }
   }, [eventId, user]);
 
@@ -209,6 +212,35 @@ const EventDetailPage = () => {
       setAgenda(formattedAgenda);
     } catch (error) {
       console.error('Error fetching agenda:', error);
+    }
+  };
+
+  const fetchReviewsStats = async () => {
+    if (!eventId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('event_reviews')
+        .select('rating')
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const total = data.length;
+        const sum = data.reduce((acc, review) => acc + review.rating, 0);
+        const average = sum / total;
+        
+        setTotalReviews(total);
+        setAverageRating(average);
+      } else {
+        setTotalReviews(0);
+        setAverageRating(0);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews stats:', error);
+      setTotalReviews(0);
+      setAverageRating(0);
     }
   };
 
@@ -352,7 +384,7 @@ const EventDetailPage = () => {
               {/* Tabs for additional content */}
               <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl">
                 <Tabs defaultValue="overview" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="speakers">
                       <User className="h-4 w-4 mr-2" />
@@ -365,6 +397,10 @@ const EventDetailPage = () => {
                     <TabsTrigger value="reviews">
                       <Star className="h-4 w-4 mr-2" />
                       Reviews
+                    </TabsTrigger>
+                    <TabsTrigger value="faq">
+                      <HelpCircle className="h-4 w-4 mr-2" />
+                      FAQ
                     </TabsTrigger>
                   </TabsList>
 
@@ -460,7 +496,41 @@ const EventDetailPage = () => {
                   </TabsContent>
 
                   <TabsContent value="reviews" className="p-6">
-                    <EventReviewsTab eventId={event.id} />
+                    <EventReviewsTab 
+                      eventId={event.id} 
+                      averageRating={averageRating}
+                      totalReviews={totalReviews}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="faq" className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Frequently Asked Questions</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium mb-2">What should I bring to the event?</h4>
+                        <p className="text-gray-600">
+                          Please bring a valid ID and your ticket confirmation. If this is a workshop, we recommend bringing a notebook and pen.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Is there parking available?</h4>
+                        <p className="text-gray-600">
+                          Yes, complimentary parking is available on-site for all attendees.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">What is the cancellation policy?</h4>
+                        <p className="text-gray-600">
+                          Tickets can be cancelled up to 48 hours before the event for a full refund.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Will food be provided?</h4>
+                        <p className="text-gray-600">
+                          Light refreshments and networking lunch will be provided for all attendees.
+                        </p>
+                      </div>
+                    </div>
                   </TabsContent>
                 </Tabs>
               </Card>
