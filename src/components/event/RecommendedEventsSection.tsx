@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,8 +58,7 @@ const RecommendedEventsSection: React.FC<RecommendedEventsSectionProps> = ({
           is_free,
           currency,
           capacity,
-          creator_id,
-          profiles(full_name)
+          creator_id
         `)
         .neq('id', currentEventId)
         .gte('start_time', new Date().toISOString())
@@ -94,8 +92,7 @@ const RecommendedEventsSection: React.FC<RecommendedEventsSectionProps> = ({
               is_free,
               currency,
               capacity,
-              creator_id,
-              profiles(full_name)
+              creator_id
             `)
             .neq('id', currentEventId)
             .gte('start_time', new Date().toISOString())
@@ -103,28 +100,53 @@ const RecommendedEventsSection: React.FC<RecommendedEventsSectionProps> = ({
             .limit(6);
 
           if (!fallbackError && fallbackData) {
-            const formattedEvents = fallbackData.map(event => ({
-              ...event,
-              creator_name: event.profiles?.full_name || 'Unknown Creator'
-            }));
-            setRecommendedEvents(formattedEvents);
+            const eventsWithCreators = await fetchCreatorNames(fallbackData);
+            setRecommendedEvents(eventsWithCreators);
           }
         }
         return;
       }
 
       if (data) {
-        const formattedEvents = data.map(event => ({
-          ...event,
-          creator_name: event.profiles?.full_name || 'Unknown Creator'
-        }));
-        setRecommendedEvents(formattedEvents);
+        const eventsWithCreators = await fetchCreatorNames(data);
+        setRecommendedEvents(eventsWithCreators);
       }
     } catch (error) {
       console.error('Error fetching recommended events:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchCreatorNames = async (events: any[]) => {
+    const eventsWithCreators = await Promise.all(
+      events.map(async (event) => {
+        let creatorName = 'Unknown Creator';
+        
+        if (event.creator_id) {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', event.creator_id)
+              .single();
+            
+            if (profile?.full_name) {
+              creatorName = profile.full_name;
+            }
+          } catch (error) {
+            console.error('Error fetching creator profile:', error);
+          }
+        }
+
+        return {
+          ...event,
+          creator_name: creatorName
+        };
+      })
+    );
+
+    return eventsWithCreators;
   };
 
   const getCurrencyCode = (currency?: string): CurrencyCode => {

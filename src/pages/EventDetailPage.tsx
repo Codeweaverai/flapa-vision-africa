@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -59,23 +58,34 @@ const EventDetailPage = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('events')
-        .select(`
-          *,
-          profiles(
-            full_name,
-            avatar_url,
-            bio
-          )
-        `)
+        .select('*')
         .eq('id', eventId)
         .single();
 
       if (error) throw error;
 
       if (data) {
+        // Fetch creator profile separately
+        let creator = {};
+        if (data.creator_id) {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url, bio')
+              .eq('id', data.creator_id)
+              .single();
+            
+            if (profile) {
+              creator = profile;
+            }
+          } catch (error) {
+            console.error('Error fetching creator profile:', error);
+          }
+        }
+
         setEvent({
           ...data,
-          creator: data.profiles || {}
+          creator
         });
       }
     } catch (error) {
