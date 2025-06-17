@@ -98,7 +98,6 @@ import AdminCareers from "./pages/admin/AdminCareers";
 import AdminRegistrations from "./pages/admin/AdminRegistrations";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminOrders from "./pages/admin/AdminOrders";
-import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
 
 // Creator Pages
 import CreatorDashboard from "./pages/creator/CreatorDashboard";
@@ -117,6 +116,9 @@ import CreatorStudents from "./pages/creator/CreatorStudents";
 import CreatorAnalytics from "./pages/creator/CreatorAnalytics";
 import CreatorPayments from "./pages/creator/CreatorPayments";
 import CreatorSettings from "./pages/creator/CreatorSettings";
+
+// Lazy load the AdminContactSubmissions component to avoid import issues
+const AdminContactSubmissions = React.lazy(() => import("./pages/admin/AdminContactSubmissions"));
 
 const queryClient = new QueryClient();
 
@@ -239,7 +241,13 @@ const App = () => (
                 <Route path="/admin/careers" element={<AdminRoute><AdminCareers /></AdminRoute>} />
                 <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
                 <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
-                <Route path="/admin/contact-submissions" element={<AdminRoute><AdminContactSubmissions /></AdminRoute>} />
+                <Route path="/admin/contact-submissions" element={
+                  <AdminRoute>
+                    <React.Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>}>
+                      <AdminContactSubmissions />
+                    </React.Suspense>
+                  </AdminRoute>
+                } />
 
                 {/* 404 Route */}
                 <Route path="*" element={<NotFoundPage />} />
