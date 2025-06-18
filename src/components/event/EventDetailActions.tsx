@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -143,13 +142,12 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
     
     try {
       await addToCart({
-        item_type: 'event_ticket',
-        item_id: ticket.id,
-        title: `${event.title} - ${ticket.name}`,
+        itemType: 'event_ticket',
+        itemId: ticket.id,
+        itemName: `${event.title} - ${ticket.name}`,
         quantity,
         price: ticket.price,
-        event_id: event.id,
-        ticket_holder_names: []
+        ticketHolderNames: []
       });
       
       toast.success(`Added ${quantity} ticket(s) to cart`);
@@ -179,13 +177,12 @@ const EventDetailActions: React.FC<EventDetailActionsProps> = ({
     
     try {
       await addToCart({
-        item_type: 'event_ticket',
-        item_id: event.id,
-        title: event.title,
+        itemType: 'event_ticket',
+        itemId: event.id,
+        itemName: event.title,
         quantity: 1,
         price: event.price,
-        event_id: event.id,
-        ticket_holder_names: []
+        ticketHolderNames: []
       });
       
       toast.success('Added event to cart');

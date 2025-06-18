@@ -45,7 +45,16 @@ const TicketTypeSelector: React.FC<TicketTypeSelectorProps> = ({ eventId, curren
         .order('price', { ascending: true });
 
       if (error) throw error;
-      setTickets(data || []);
+      
+      // Filter and type-cast the ticket types to ensure they match our union type
+      const validTickets = (data || []).filter(ticket => 
+        ['ordinary', 'standard', 'vip'].includes(ticket.ticket_type)
+      ).map(ticket => ({
+        ...ticket,
+        ticket_type: ticket.ticket_type as 'ordinary' | 'standard' | 'vip'
+      }));
+      
+      setTickets(validTickets);
     } catch (error) {
       console.error('Error fetching ticket types:', error);
       toast.error('Failed to load ticket types');

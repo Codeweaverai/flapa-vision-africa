@@ -108,13 +108,13 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const checkUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        setCurrentUser(user);
+        setUser(user);
       } catch (error) {
         console.error('Error checking user:', error);
       }
@@ -280,12 +280,12 @@ const CourseDetailPage = () => {
       }
 
       // Check if user is enrolled
-      if (currentUser) {
+      if (user) {
         const { data: enrollment } = await supabase
           .from('course_enrollments')
           .select('id')
           .eq('course_id', id)
-          .eq('user_id', currentUser.id)
+          .eq('user_id', user.id)
           .eq('payment_status', 'completed')
           .single();
 
@@ -343,25 +343,31 @@ const CourseDetailPage = () => {
   };
 
   const handleAddToCart = async () => {
-    if (!course) return;
+    if (!user) {
+      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      return;
+    }
 
+    setLoading(true);
     try {
       await addToCart({
-        item_type: 'course',
-        item_id: course.id,
-        title: course.title,
+        itemType: 'course',
+        itemId: course.id,
+        itemName: course.title,
+        quantity: 1,
         price: course.price,
-        quantity: 1
+        ticketHolderNames: []
       });
-      toast.success('Course added to cart!');
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Failed to add course to cart');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEnrollNow = () => {
-    if (!currentUser) {
+    if (!user) {
       toast.error('Please sign in to enroll in courses');
       navigate('/auth');
       return;
@@ -376,17 +382,17 @@ const CourseDetailPage = () => {
   };
 
   const handleFreeEnrollment = async () => {
-    if (!course || !currentUser) return;
+    if (!course || !user) return;
 
     try {
       setEnrollmentLoading(true);
-      console.log('Starting free enrollment for user:', currentUser.id, 'course:', course.id);
+      console.log('Starting free enrollment for user:', user.id, 'course:', course.id);
       
       // Check for existing enrollment with detailed logging
       const { data: existingEnrollment, error: checkError } = await supabase
         .from('course_enrollments')
         .select('id, user_id, course_id, payment_status')
-        .eq('user_id', currentUser.id)
+        .eq('user_id', user.id)
         .eq('course_id', course.id);
 
       console.log('Existing enrollment check result:', { existingEnrollment, checkError });
@@ -410,7 +416,7 @@ const CourseDetailPage = () => {
 
       // Proceed with enrollment
       const enrollmentData = {
-        user_id: currentUser.id,
+        user_id: user.id,
         course_id: course.id,
         payment_status: 'completed',
         enrollment_date: new Date().toISOString()
