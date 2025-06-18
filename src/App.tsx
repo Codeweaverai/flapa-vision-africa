@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -122,10 +123,10 @@ const queryClient = new QueryClient({
 const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <CartProvider>
-          <CurrencyProvider>
-            <Router>
+      <Router>
+        <AuthProvider>
+          <CartProvider>
+            <CurrencyProvider>
               <Toaster />
               
               <Routes>
@@ -245,12 +246,13 @@ const App: React.FC = () => {
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
 
-            </Router>
-          </CurrencyProvider>
-        </CartProvider>
-      </AuthProvider>
+            </CurrencyProvider>
+          </CartProvider>
+        </AuthProvider>
+      </Router>
     </QueryClientProvider>
   );
 };
 
 export default App;
+
