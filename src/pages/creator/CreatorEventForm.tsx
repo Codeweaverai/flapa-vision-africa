@@ -507,6 +507,19 @@ const CreatorEventForm = () => {
                               <SelectItem value="GBP">GBP - British Pound</SelectItem>
                               <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
                               <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                              <SelectItem value="ZMW">ZMW - Zambian Kwacha</SelectItem>
+                              <SelectItem value="XOF">XOF - West African CFA Franc (Benin, Burkina Faso, Ivory Coast, Senegal)</SelectItem>
+                              <SelectItem value="XAF">XAF - Central African CFA Franc (Cameroon, Congo-Brazzaville, DRC, Gabon)</SelectItem>
+                              <SelectItem value="GHS">GHS - Ghanaian Cedi</SelectItem>
+                              <SelectItem value="KES">KES - Kenyan Shilling</SelectItem>
+                              <SelectItem value="LSL">LSL - Lesotho Loti</SelectItem>
+                              <SelectItem value="MWK">MWK - Malawian Kwacha</SelectItem>
+                              <SelectItem value="MZN">MZN - Mozambican Metical</SelectItem>
+                              <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
+                              <SelectItem value="RWF">RWF - Rwandan Franc</SelectItem>
+                              <SelectItem value="SLL">SLL - Sierra Leonean Leone</SelectItem>
+                              <SelectItem value="TZS">TZS - Tanzanian Shilling</SelectItem>
+                              <SelectItem value="UGX">UGX - Ugandan Shilling</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
