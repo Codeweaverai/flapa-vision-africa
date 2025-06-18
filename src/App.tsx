@@ -99,6 +99,7 @@ import AdminCareers from "./pages/admin/AdminCareers";
 import AdminRegistrations from "./pages/admin/AdminRegistrations";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminOrders from "./pages/admin/AdminOrders";
+import AdminReviews from "./pages/admin/AdminReviews";
 
 // Creator Pages
 import CreatorDashboard from "./pages/creator/CreatorDashboard";
@@ -243,6 +244,7 @@ function App() {
                   <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
                   <Route path="/admin/careers" element={<AdminRoute><AdminCareers /></AdminRoute>} />
                   <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
+                  <Route path="/admin/reviews" element={<AdminRoute><AdminReviews /></AdminRoute>} />
                   <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
                   <Route path="/admin/contact-submissions" element={
                     <AdminRoute>
