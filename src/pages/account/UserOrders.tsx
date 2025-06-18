@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, PlayCircle } from 'lucide-react';
+import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, PlayCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -17,7 +17,9 @@ interface OrderItem {
   item_type: string;
   quantity: number;
   total_price: number;
+  unit_price: number;
   item_id: string;
+  metadata?: any;
 }
 
 interface Order {
@@ -27,7 +29,11 @@ interface Order {
   payment_status: string;
   payment_method: string;
   created_at: string;
+  updated_at: string;
   receipt_url: string;
+  stripe_session_id?: string;
+  stripe_payment_intent_id?: string;
+  payment_provider_id?: string;
   order_items: OrderItem[];
   generated_tickets?: Array<{
     id: string;
@@ -35,6 +41,7 @@ interface Order {
     ticket_holder_name: string;
     pdf_url: string;
     ticket_status: string;
+    event_id?: string;
     events?: {
       title: string;
       start_time: string;
@@ -47,10 +54,17 @@ const UserOrders = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadOrders();
+      // Set up polling for pending orders
+      const interval = setInterval(() => {
+        checkPendingOrders();
+      }, 30000); // Check every 30 seconds
+      
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -72,23 +86,38 @@ const UserOrders = () => {
 
       if (error) throw error;
 
-      // Enhance order items with proper event titles
+      // Enhance order items with proper event and course titles
       const enhancedOrders = await Promise.all(
         (ordersData || []).map(async (order) => {
           const enhancedItems = await Promise.all(
             order.order_items.map(async (item: OrderItem) => {
               if (item.item_type === 'event_ticket') {
                 try {
+                  // First try to get from event_tickets table
                   const { data: ticket } = await supabase
                     .from('event_tickets')
-                    .select('event_id, events!event_tickets_event_id_fkey(title)')
+                    .select('event_id, name, events!event_tickets_event_id_fkey(title)')
                     .eq('id', item.item_id)
                     .maybeSingle();
 
                   if (ticket && ticket.events) {
                     return {
                       ...item,
-                      item_name: ticket.events.title
+                      item_name: `${ticket.events.title} - ${ticket.name}`
+                    };
+                  }
+
+                  // Fallback: check if item_id is actually an event_id
+                  const { data: event } = await supabase
+                    .from('events')
+                    .select('title')
+                    .eq('id', item.item_id)
+                    .maybeSingle();
+
+                  if (event) {
+                    return {
+                      ...item,
+                      item_name: event.title
                     };
                   }
                 } catch (err) {
@@ -130,6 +159,57 @@ const UserOrders = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkPendingOrders = async () => {
+    if (!user) return;
+
+    try {
+      const { data: pendingOrders } = await supabase
+        .from('orders')
+        .select('id, payment_status, stripe_session_id, payment_provider_id')
+        .eq('user_id', user.id)
+        .eq('payment_status', 'pending');
+
+      if (pendingOrders && pendingOrders.length > 0) {
+        console.log('Checking pending orders:', pendingOrders.length);
+        
+        // Check if any payments have been completed
+        for (const order of pendingOrders) {
+          await verifyPaymentStatus(order.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking pending orders:', error);
+    }
+  };
+
+  const verifyPaymentStatus = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { orderId }
+      });
+
+      if (error) {
+        console.error('Error verifying payment:', error);
+        return;
+      }
+
+      if (data?.paymentCompleted) {
+        toast.success('Payment confirmed! Your order has been updated.');
+        loadOrders(); // Refresh orders
+      }
+    } catch (error) {
+      console.error('Error verifying payment status:', error);
+    }
+  };
+
+  const handleRefreshOrders = async () => {
+    setRefreshing(true);
+    await loadOrders();
+    await checkPendingOrders();
+    setRefreshing(false);
+    toast.success('Orders refreshed');
   };
 
   const handleDownloadReceipt = (receiptUrl: string) => {
@@ -206,6 +286,19 @@ const UserOrders = () => {
     }
   };
 
+  const getPaymentMethodDisplay = (method: string) => {
+    switch (method?.toLowerCase()) {
+      case 'card':
+      case 'stripe':
+        return 'Credit/Debit Card';
+      case 'mobile_money':
+      case 'pawapay':
+        return 'Mobile Money';
+      default:
+        return method || 'Unknown';
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -221,11 +314,22 @@ const UserOrders = () => {
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <div className="flex items-center gap-3 mb-8">
-              <Package className="h-8 w-8 text-orange-600" />
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                My Orders
-              </h1>
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <Package className="h-8 w-8 text-orange-600" />
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                  My Orders
+                </h1>
+              </div>
+              <Button 
+                onClick={handleRefreshOrders} 
+                disabled={refreshing}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
 
             {orders.length === 0 ? (
@@ -261,6 +365,11 @@ const UserOrders = () => {
                               <Badge className={getStatusBadgeColor(order.payment_status)}>
                                 {order.payment_status.toUpperCase()}
                               </Badge>
+                              {order.payment_status === 'pending' && (
+                                <Badge variant="outline" className="text-blue-600 border-blue-300">
+                                  Processing
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <div className="text-lg lg:text-right">
@@ -268,8 +377,13 @@ const UserOrders = () => {
                               {order.total_amount.toFixed(2)} {order.currency}
                             </div>
                             <div className="text-sm text-gray-600 capitalize">
-                              via {order.payment_method}
+                              via {getPaymentMethodDisplay(order.payment_method)}
                             </div>
+                            {order.updated_at !== order.created_at && (
+                              <div className="text-xs text-gray-500">
+                                Updated: {format(new Date(order.updated_at), 'PPp')}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </CardHeader>
@@ -285,7 +399,8 @@ const UserOrders = () => {
                                   <div className="font-medium">{item.item_name}</div>
                                   <div className="text-sm text-gray-600">
                                     {item.item_type === 'event_ticket' ? 'Event Ticket' : 'Course'} • 
-                                    Quantity: {item.quantity}
+                                    Quantity: {item.quantity} • 
+                                    Unit Price: {item.unit_price?.toFixed(2) || (item.total_price / item.quantity).toFixed(2)} {order.currency}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -332,6 +447,11 @@ const UserOrders = () => {
                                       <div className="font-medium text-sm">{ticket.events?.title || 'Event'}</div>
                                       <div className="text-xs text-gray-600">{ticket.ticket_holder_name}</div>
                                       <div className="text-xs text-gray-500">Code: {ticket.ticket_code}</div>
+                                      {ticket.events?.start_time && (
+                                        <div className="text-xs text-blue-600">
+                                          {format(new Date(ticket.events.start_time), 'PPp')}
+                                        </div>
+                                      )}
                                     </div>
                                     <Button
                                       size="sm"
@@ -352,7 +472,10 @@ const UserOrders = () => {
                               </div>
                             ) : (
                               <div className="text-sm text-gray-600">
-                                {order.payment_status === 'completed' ? 'Tickets are being generated...' : 'Tickets will be generated after payment completion'}
+                                {order.payment_status === 'completed' ? 
+                                  'Tickets are being generated...' : 
+                                  'Tickets will be generated after payment completion'
+                                }
                               </div>
                             )}
                           </div>
@@ -380,6 +503,18 @@ const UserOrders = () => {
                             >
                               <Ticket className="h-4 w-4 mr-2" />
                               Regenerate Tickets
+                            </Button>
+                          )}
+
+                          {/* Refresh Payment Status for Pending Orders */}
+                          {order.payment_status === 'pending' && (
+                            <Button
+                              variant="outline"
+                              onClick={() => verifyPaymentStatus(order.id)}
+                              className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Check Payment
                             </Button>
                           )}
                         </div>

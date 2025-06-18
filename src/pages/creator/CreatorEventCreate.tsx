@@ -11,8 +11,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Upload } from 'lucide-react';
+import { Calendar, Upload, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface TicketType {
+  id: string;
+  ticket_type: string;
+  name: string;
+  description: string;
+  price: number;
+  quantity_available: number;
+  early_bird_end_date: string;
+  is_active: boolean;
+}
 
 const CreatorEventCreate = () => {
   const navigate = useNavigate();
@@ -35,8 +46,34 @@ const CreatorEventCreate = () => {
     image_url: ''
   });
 
+  const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const addTicketType = () => {
+    const newTicket: TicketType = {
+      id: `temp_${Date.now()}`,
+      ticket_type: 'standard',
+      name: '',
+      description: '',
+      price: 0,
+      quantity_available: 100,
+      early_bird_end_date: '',
+      is_active: true
+    };
+    setTicketTypes(prev => [...prev, newTicket]);
+  };
+
+  const updateTicketType = (index: number, field: string, value: any) => {
+    setTicketTypes(prev => prev.map((ticket, i) => 
+      i === index ? { ...ticket, [field]: value } : ticket
+    ));
+  };
+
+  const removeTicketType = (index: number) => {
+    setTicketTypes(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,6 +134,20 @@ const CreatorEventCreate = () => {
       return;
     }
 
+    // Validate ticket types for paid events
+    if (!formData.is_free && ticketTypes.length === 0) {
+      toast.error('Please add at least one ticket type for paid events');
+      return;
+    }
+
+    // Validate ticket types data
+    for (const ticket of ticketTypes) {
+      if (!ticket.name || ticket.price < 0 || ticket.quantity_available <= 0) {
+        toast.error('Please fill in all ticket type details correctly');
+        return;
+      }
+    }
+
     setLoading(true);
     
     try {
@@ -116,13 +167,37 @@ const CreatorEventCreate = () => {
         creator_id: user.id
       };
 
-      const { data, error } = await supabase
+      const { data: event, error: eventError } = await supabase
         .from('events')
         .insert([eventData])
         .select()
         .single();
 
-      if (error) throw error;
+      if (eventError) throw eventError;
+
+      // Create ticket types if this is not a free event
+      if (!formData.is_free && ticketTypes.length > 0) {
+        const ticketData = ticketTypes.map(ticket => ({
+          event_id: event.id,
+          ticket_type: ticket.ticket_type,
+          name: ticket.name,
+          description: ticket.description,
+          price: ticket.price,
+          quantity_available: ticket.quantity_available,
+          quantity_sold: 0,
+          early_bird_end_date: ticket.early_bird_end_date || null,
+          is_active: ticket.is_active
+        }));
+
+        const { error: ticketsError } = await supabase
+          .from('event_tickets')
+          .insert(ticketData);
+
+        if (ticketsError) {
+          console.error('Error creating tickets:', ticketsError);
+          toast.error('Event created but failed to create tickets');
+        }
+      }
 
       toast.success('Event created successfully');
       navigate('/creator/events');
@@ -274,7 +349,12 @@ const CreatorEventCreate = () => {
                     type="checkbox"
                     id="is_free"
                     checked={formData.is_free}
-                    onChange={(e) => handleInputChange('is_free', e.target.checked)}
+                    onChange={(e) => {
+                      handleInputChange('is_free', e.target.checked);
+                      if (e.target.checked) {
+                        setTicketTypes([]);
+                      }
+                    }}
                     className="rounded"
                   />
                   <Label htmlFor="is_free">Free Event</Label>
@@ -284,7 +364,7 @@ const CreatorEventCreate = () => {
               {!formData.is_free && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="price">Price</Label>
+                    <Label htmlFor="price">Base Price (for fallback)</Label>
                     <Input
                       id="price"
                       type="number"
@@ -314,6 +394,105 @@ const CreatorEventCreate = () => {
                 </>
               )}
             </div>
+
+            {/* Ticket Types Section */}
+            {!formData.is_free && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Ticket Types</Label>
+                  <Button type="button" onClick={addTicketType} variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Ticket Type
+                  </Button>
+                </div>
+
+                {ticketTypes.map((ticket, index) => (
+                  <Card key={ticket.id} className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Ticket Name *</Label>
+                        <Input
+                          value={ticket.name}
+                          onChange={(e) => updateTicketType(index, 'name', e.target.value)}
+                          placeholder="e.g., Early Bird, VIP, Standard"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Ticket Type</Label>
+                        <Select 
+                          value={ticket.ticket_type} 
+                          onValueChange={(value) => updateTicketType(index, 'ticket_type', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ordinary">Ordinary</SelectItem>
+                            <SelectItem value="standard">Standard</SelectItem>
+                            <SelectItem value="vip">VIP</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Price *</Label>
+                        <Input
+                          type="number"
+                          value={ticket.price}
+                          onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value) || 0)}
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Quantity Available *</Label>
+                        <Input
+                          type="number"
+                          value={ticket.quantity_available}
+                          onChange={(e) => updateTicketType(index, 'quantity_available', parseInt(e.target.value) || 0)}
+                          min="1"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Early Bird End Date (Optional)</Label>
+                        <Input
+                          type="datetime-local"
+                          value={ticket.early_bird_end_date}
+                          onChange={(e) => updateTicketType(index, 'early_bird_end_date', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeTicketType(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <Label>Description</Label>
+                      <Textarea
+                        value={ticket.description}
+                        onChange={(e) => updateTicketType(index, 'description', e.target.value)}
+                        placeholder="What's included with this ticket?"
+                        rows={2}
+                      />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
 
             <div className="flex gap-4">
               <Button
