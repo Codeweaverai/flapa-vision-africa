@@ -1,144 +1,74 @@
+
 import React from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  BookOpen, 
-  Calendar, 
-  ShoppingCart, 
-  Video, 
-  Mail, 
-  MessageSquare, 
-  Mic, 
-  HelpCircle, 
-  Briefcase, 
-  Inbox, 
-  BarChart3, 
+import { useLocation, Link } from 'react-router-dom';
+import {
+  BarChart3,
+  CalendarDays,
+  Users,
+  BookOpen,
+  FileText,
+  PhoneCall,
   Settings,
-  Star
+  Mic,
+  ClipboardCheck,
+  Briefcase,
+  Package,
+  MessageSquareMore,
+  Mail,
 } from 'lucide-react';
 
 const AdminSidebar = () => {
-  const navigate = useNavigate();
   const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
 
-  const menuItems = [
-    { 
-      label: 'Dashboard', 
-      icon: LayoutDashboard, 
-      path: '/admin/dashboard',
-      description: 'Overview and analytics'
-    },
-    { 
-      label: 'Users', 
-      icon: Users, 
-      path: '/admin/users',
-      description: 'User management'
-    },
-    { 
-      label: 'Courses', 
-      icon: BookOpen, 
-      path: '/admin/courses',
-      description: 'Course management'
-    },
-    { 
-      label: 'Events', 
-      icon: Calendar, 
-      path: '/admin/events',
-      description: 'Event management'
-    },
-    { 
-      label: 'Orders', 
-      icon: ShoppingCart, 
-      path: '/admin/orders',
-      description: 'Order management'
-    },
-    { 
-      label: 'Reviews', 
-      icon: Star, 
-      path: '/admin/reviews',
-      description: 'Review management'
-    },
-    { 
-      label: 'Media', 
-      icon: Video, 
-      path: '/admin/media',
-      description: 'Media content'
-    },
-    { 
-      label: 'Newsletters', 
-      icon: Mail, 
-      path: '/admin/newsletters',
-      description: 'Newsletter campaigns'
-    },
-    { 
-      label: 'Consultations', 
-      icon: MessageSquare, 
-      path: '/admin/consultations',
-      description: 'Consultation bookings'
-    },
-    { 
-      label: 'Speaking', 
-      icon: Mic, 
-      path: '/admin/speaking',
-      description: 'Speaking requests'
-    },
-    { 
-      label: 'Contact', 
-      icon: HelpCircle, 
-      path: '/admin/contact-submissions',
-      description: 'Contact submissions'
-    },
-    { 
-      label: 'Careers', 
-      icon: Briefcase, 
-      path: '/admin/careers',
-      description: 'Job applications'
-    },
-    { 
-      label: 'Support Inbox', 
-      icon: Inbox, 
-      path: '/admin/support-inbox',
-      description: 'Support messages'
-    },
-    { 
-      label: 'Analytics', 
-      icon: BarChart3, 
-      path: '/admin/analytics',
-      description: 'Platform analytics'
-    },
-    { 
-      label: 'Settings', 
-      icon: Settings, 
-      path: '/admin/settings',
-      description: 'System settings'
-    },
+  const navItems = [
+    { name: 'Dashboard', path: '/admin', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+    { name: 'Analytics', path: '/admin/analytics', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+    { name: 'Orders', path: '/admin/orders', icon: <Package className="mr-2 h-4 w-4" /> },
+    { name: 'Events', path: '/admin/events', icon: <CalendarDays className="mr-2 h-4 w-4" /> },
+    { name: 'Users', path: '/admin/users', icon: <Users className="mr-2 h-4 w-4" /> },
+    { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="mr-2 h-4 w-4" /> },
+    { name: 'Media', path: '/admin/media', icon: <FileText className="mr-2 h-4 w-4" /> },
+    { name: 'Newsletters', path: '/admin/newsletters', icon: <Mail className="mr-2 h-4 w-4" /> },
+    { name: 'Support Inbox', path: '/admin/support-inbox', icon: <MessageSquareMore className="mr-2 h-4 w-4" /> },
+    { name: 'Contact Request', path: '/admin/contact-submissions', icon: <PhoneCall className="mr-2 h-4 w-4" /> },
+    { name: 'Speaking', path: '/admin/speaking', icon: <Mic className="mr-2 h-4 w-4" /> },
+    { name: 'Careers', path: '/admin/careers', icon: <Briefcase className="mr-2 h-4 w-4" /> },
+    { name: 'Registrations', path: '/admin/registrations', icon: <ClipboardCheck className="mr-2 h-4 w-4" /> },
+    { name: 'Settings', path: '/admin/settings', icon: <Settings className="mr-2 h-4 w-4" /> },
   ];
 
   return (
-    <div className="w-64 flex-shrink-0 border-r bg-secondary">
-      <div className="h-full p-4 space-y-2">
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-800">Admin Panel</h2>
-          <p className="text-sm text-gray-500">Manage platform content</p>
+    <div className="h-screen w-64 bg-gradient-to-b from-orange-500 via-purple-500 to-purple-600 shadow-xl">
+      <div className="flex flex-col h-full">
+        <div className="p-6 border-b border-white/20">
+          <h1 className="text-xl font-bold text-white">Admin Panel</h1>
+          <p className="text-orange-100 text-sm mt-1">Management Dashboard</p>
         </div>
-        {menuItems.map((item) => (
-          <Link
-            key={item.label}
-            to={item.path}
-            className={`flex items-center p-2 rounded-md hover:bg-accent ${location.pathname === item.path ? 'bg-accent font-medium' : ''}`}
-          >
-            <item.icon className="w-5 h-5 mr-2" />
-            <span>{item.label}</span>
-          </Link>
-        ))}
-        <div className="mt-auto pt-4 border-t">
-          <button
-            onClick={() => navigate('/')}
-            className="w-full py-2 px-4 rounded-md bg-gray-100 hover:bg-gray-200 text-sm text-gray-700"
-          >
-            Back to Site
-          </button>
+        
+        <div className="p-4 space-y-2 flex-1 overflow-y-auto">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center px-4 py-3 rounded-lg transition-all duration-200 ${
+                isActive(item.path)
+                  ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
+                  : 'text-orange-100 hover:bg-white/10 hover:text-white hover:shadow-md'
+              }`}
+            >
+              <span className={isActive(item.path) ? 'text-white' : 'text-orange-200'}>
+                {item.icon}
+              </span>
+              <span className="font-medium">{item.name}</span>
+            </Link>
+          ))}
+        </div>
+
+        <div className="p-4 border-t border-white/20">
+          <div className="text-orange-100 text-xs text-center">
+            © 2024 Learning Platform
+          </div>
         </div>
       </div>
     </div>
