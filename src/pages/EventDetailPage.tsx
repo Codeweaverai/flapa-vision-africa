@@ -258,7 +258,7 @@ const EventDetailPage = () => {
 
   const handleViewCreatorProfile = () => {
     if (event?.creator_id) {
-      navigate(`/creator/profile/${event_id}`);
+      navigate(`/creator/profile/${eventid}`);
     }
   };
 
