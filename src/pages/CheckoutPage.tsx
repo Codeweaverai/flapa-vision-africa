@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -170,34 +171,6 @@ const CheckoutPage = () => {
     }
   };
 
-  const renderTicketHolderSummary = (item: any) => {
-    if (item.item_type !== 'event_ticket' || !item.ticket_holder_names?.length) {
-      return null;
-    }
-
-    const filledHolders = item.ticket_holder_names.filter((holder: any) => holder.name?.trim());
-    
-    return (
-      <div className="mt-2 p-2 bg-blue-50 rounded border">
-        <div className="flex items-center gap-2 mb-1">
-          <Users className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-800">Ticket Holders:</span>
-        </div>
-        {filledHolders.length > 0 ? (
-          <div className="text-sm text-blue-700">
-            {filledHolders.map((holder: any, index: number) => (
-              <div key={index}>• {holder.name}</div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-orange-600">
-            ⚠️ Please add ticket holder names before checkout
-          </div>
-        )}
-      </div>
-    );
-  };
-
   if (items.length === 0) {
     return null;
   }
@@ -218,13 +191,13 @@ const CheckoutPage = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {items.map((item) => (
-                      <div key={item.id} className="flex flex-col p-4 border rounded-lg">
+                      <div key={item.itemId} className="flex flex-col p-4 border rounded-lg">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <h4 className="font-medium">{item.title}</h4>
+                            <h4 className="font-medium">{item.itemName}</h4>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge variant="secondary">
-                                {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
+                                {item.itemType === 'course' ? 'Course' : 'Event Ticket'}
                               </Badge>
                             </div>
                             <div className="mt-2 space-y-1">
@@ -243,12 +216,12 @@ const CheckoutPage = () => {
                           </div>
                           
                           <div className="flex items-center gap-4">
-                            {item.item_type === 'event_ticket' && (
+                            {item.itemType === 'event_ticket' && (
                               <div className="flex items-center gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                  onClick={() => updateQuantity(item.itemId, item.quantity - 1)}
                                   className="h-8 w-8 p-0"
                                 >
                                   <Minus className="h-4 w-4" />
@@ -257,7 +230,7 @@ const CheckoutPage = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                  onClick={() => updateQuantity(item.itemId, item.quantity + 1)}
                                   className="h-8 w-8 p-0"
                                 >
                                   <Plus className="h-4 w-4" />
@@ -268,15 +241,13 @@ const CheckoutPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => removeFromCart(item.id)}
+                              onClick={() => removeFromCart(item.itemId)}
                               className="text-red-600 hover:text-red-700"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                        
-                        {renderTicketHolderSummary(item)}
                       </div>
                     ))}
                   </CardContent>

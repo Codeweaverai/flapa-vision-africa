@@ -3,8 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingCart, X, Plus, Minus, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useCart } from '@/contexts/CartContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
@@ -20,7 +18,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 
 const CartIcon = () => {
-  const { items, getItemCount, updateQuantity, removeFromCart, updateTicketHolders } = useCart();
+  const { items, getItemCount, updateQuantity, removeFromCart } = useCart();
   const { convertPrice, formatPrice, currentCurrency } = useCurrency();
   const [isOpen, setIsOpen] = useState(false);
   const [convertedTotal, setConvertedTotal] = useState(0);
@@ -49,27 +47,8 @@ const CartIcon = () => {
   }, [items, convertPrice, currentCurrency]);
 
   const handleCheckout = () => {
-    // Validate that all event tickets have names
-    const eventItems = items.filter(item => item.item_type === 'event_ticket');
-    for (const item of eventItems) {
-      const holders = item.ticket_holder_names || [];
-      if (holders.some(holder => !holder.name.trim())) {
-        alert(`Please provide names for all tickets for ${item.title}`);
-        return;
-      }
-    }
-
     setIsOpen(false);
     navigate('/checkout');
-  };
-
-  const updateTicketHolderName = (itemId: string, holderIndex: number, name: string) => {
-    const item = items.find(i => i.id === itemId);
-    if (!item) return;
-
-    const updatedHolders = [...(item.ticket_holder_names || [])];
-    updatedHolders[holderIndex] = { ...updatedHolders[holderIndex], name };
-    updateTicketHolders(itemId, updatedHolders);
   };
 
   return (
@@ -105,13 +84,13 @@ const CartIcon = () => {
             <>
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {items.map((item) => (
-                  <Card key={item.id}>
+                  <Card key={item.itemId}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{item.title}</h4>
+                          <h4 className="font-medium text-sm truncate">{item.itemName}</h4>
                           <p className="text-xs text-gray-500">
-                            {item.item_type === 'course' ? 'Course' : 'Event Ticket'}
+                            {item.itemType === 'course' ? 'Course' : 'Event Ticket'}
                           </p>
                           <div className="mt-1">
                             <PriceDisplay 
@@ -129,14 +108,14 @@ const CartIcon = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => removeFromCart(item.itemId)}
                           className="h-8 w-8 p-0"
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
                       
-                      {item.item_type === 'event_ticket' && (
+                      {item.itemType === 'event_ticket' && (
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-500">Quantity:</span>
@@ -144,7 +123,7 @@ const CartIcon = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                onClick={() => updateQuantity(item.itemId, item.quantity - 1)}
                                 className="h-6 w-6 p-0"
                               >
                                 <Minus className="h-3 w-3" />
@@ -153,29 +132,12 @@ const CartIcon = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                onClick={() => updateQuantity(item.itemId, item.quantity + 1)}
                                 className="h-6 w-6 p-0"
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>
-                          </div>
-                          
-                          {/* Ticket Holder Names */}
-                          <div className="space-y-2">
-                            <Label className="text-xs font-medium text-gray-700">Ticket Holder Names:</Label>
-                            {Array.from({ length: item.quantity }).map((_, index) => (
-                              <div key={index} className="flex items-center gap-2">
-                                <User className="h-3 w-3 text-gray-400" />
-                                <Input
-                                  placeholder={`Ticket ${index + 1} holder name`}
-                                  value={item.ticket_holder_names?.[index]?.name || ''}
-                                  onChange={(e) => updateTicketHolderName(item.id, index, e.target.value)}
-                                  className="text-xs h-7"
-                                  required
-                                />
-                              </div>
-                            ))}
                           </div>
                         </div>
                       )}
