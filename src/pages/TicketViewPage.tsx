@@ -148,25 +148,27 @@ const TicketViewPage = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto">
             {/* Print Styles */}
-            <style jsx>{`
-              @media print {
-                body * {
-                  visibility: hidden;
+            <style>
+              {`
+                @media print {
+                  body * {
+                    visibility: hidden;
+                  }
+                  #ticket-content, #ticket-content * {
+                    visibility: visible;
+                  }
+                  #ticket-content {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    width: 100% !important;
+                  }
+                  .no-print {
+                    display: none !important;
+                  }
                 }
-                #ticket-content, #ticket-content * {
-                  visibility: visible;
-                }
-                #ticket-content {
-                  position: absolute;
-                  left: 0;
-                  top: 0;
-                  width: 100% !important;
-                }
-                .no-print {
-                  display: none !important;
-                }
-              }
-            `}</style>
+              `}
+            </style>
 
             {/* Action Buttons */}
             <div className="flex gap-4 justify-center mb-6 no-print">

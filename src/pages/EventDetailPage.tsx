@@ -5,7 +5,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Clock, MapPin, Users, Globe, Star, User, MessageSquare, Calendar as CalendarIcon, HelpCircle, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import EventReviewsTab from '@/components/event/EventReviewsTab';

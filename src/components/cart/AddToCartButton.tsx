@@ -43,13 +43,12 @@ const AddToCartButton: React.FC<AddToCartButtonProps> = ({
     setLoading(true);
     try {
       await addToCart({
-        item_type: itemType,
-        item_id: itemId,
-        title: itemName,
+        itemId,
+        itemType,
+        itemName,
         quantity: 1,
         price,
-        event_id: eventId,
-        ticket_holder_names: []
+        ticketHolderNames: []
       });
     } catch (error) {
       console.error('Error adding to cart:', error);
