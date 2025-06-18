@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -33,7 +34,7 @@ import MediaPage from '@/pages/MediaPage';
 import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
 import BlogPage from '@/pages/BlogPage';
 import BlogPostPage from '@/pages/BlogPostPage';
-import careers from '@/pages/careers';
+import CareersPage from '@/pages/careers';
 import JobDetailPage from '@/pages/JobDetailPage';
 import AboutPage from '@/pages/AboutPage';
 import LearnOurCulturePage from '@/pages/LearnOurCulturePage';
@@ -158,7 +159,7 @@ const App: React.FC = () => {
                 <Route path="/media/:postId" element={<MediaPostDetailPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:postId" element={<BlogPostPage />} />
-                <Route path="/careers" element={<careers />} />
+                <Route path="/careers" element={<CareersPage />} />
                 <Route path="/job/:jobId" element={<JobDetailPage />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
