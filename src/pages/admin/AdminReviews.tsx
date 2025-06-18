@@ -43,11 +43,11 @@ interface CourseReview {
   courses: {
     title: string;
     category: string;
-  };
+  } | null;
   profiles: {
     full_name: string;
     avatar_url: string;
-  };
+  } | null;
 }
 
 interface EventReview {
@@ -61,11 +61,11 @@ interface EventReview {
   events: {
     title: string;
     event_type: string;
-  };
+  } | null;
   profiles: {
     full_name: string;
     avatar_url: string;
-  };
+  } | null;
 }
 
 const AdminReviews = () => {
@@ -88,14 +88,17 @@ const AdminReviews = () => {
         .from('course_reviews')
         .select(`
           *,
-          courses!course_reviews_course_id_fkey(title, category),
-          profiles!course_reviews_user_id_fkey(full_name, avatar_url)
+          courses(title, category),
+          profiles(full_name, avatar_url)
         `)
         .order('created_at', { ascending: false });
 
       if (courseError) {
         console.error('Course reviews error:', courseError);
-        throw courseError;
+        // Set empty array if error occurs
+        setCourseReviews([]);
+      } else {
+        setCourseReviews(courseReviewsData || []);
       }
 
       // Fetch event reviews with proper joins
@@ -103,21 +106,24 @@ const AdminReviews = () => {
         .from('event_reviews')
         .select(`
           *,
-          events!event_reviews_event_id_fkey(title, event_type),
-          profiles!event_reviews_user_id_fkey(full_name, avatar_url)
+          events(title, event_type),
+          profiles(full_name, avatar_url)
         `)
         .order('created_at', { ascending: false });
 
       if (eventError) {
         console.error('Event reviews error:', eventError);
-        throw eventError;
+        // Set empty array if error occurs
+        setEventReviews([]);
+      } else {
+        setEventReviews(eventReviewsData || []);
       }
 
-      setCourseReviews(courseReviewsData || []);
-      setEventReviews(eventReviewsData || []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
       toast.error('Failed to fetch reviews');
+      setCourseReviews([]);
+      setEventReviews([]);
     } finally {
       setLoading(false);
     }
