@@ -40,11 +40,11 @@ interface CourseReview {
   updated_at: string;
   course_id: string;
   user_id: string;
-  courses: {
+  course?: {
     title: string;
     category: string;
   } | null;
-  profiles: {
+  user?: {
     full_name: string;
     avatar_url: string;
   } | null;
@@ -58,11 +58,11 @@ interface EventReview {
   updated_at: string;
   event_id: string;
   user_id: string;
-  events: {
+  event?: {
     title: string;
     event_type: string;
   } | null;
-  profiles: {
+  user?: {
     full_name: string;
     avatar_url: string;
   } | null;
@@ -83,40 +83,78 @@ const AdminReviews = () => {
     try {
       setLoading(true);
 
-      // Fetch course reviews with proper joins
+      // Fetch course reviews
       const { data: courseReviewsData, error: courseError } = await supabase
         .from('course_reviews')
-        .select(`
-          *,
-          courses(title, category),
-          profiles(full_name, avatar_url)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (courseError) {
         console.error('Course reviews error:', courseError);
-        // Set empty array if error occurs
         setCourseReviews([]);
       } else {
-        setCourseReviews(courseReviewsData || []);
+        // Fetch related course and user data for each review
+        const enrichedCourseReviews = await Promise.all(
+          (courseReviewsData || []).map(async (review) => {
+            // Fetch course data
+            const { data: courseData } = await supabase
+              .from('courses')
+              .select('title, category')
+              .eq('id', review.course_id)
+              .single();
+
+            // Fetch user profile data
+            const { data: userData } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', review.user_id)
+              .single();
+
+            return {
+              ...review,
+              course: courseData,
+              user: userData
+            };
+          })
+        );
+        setCourseReviews(enrichedCourseReviews);
       }
 
-      // Fetch event reviews with proper joins
+      // Fetch event reviews
       const { data: eventReviewsData, error: eventError } = await supabase
         .from('event_reviews')
-        .select(`
-          *,
-          events(title, event_type),
-          profiles(full_name, avatar_url)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (eventError) {
         console.error('Event reviews error:', eventError);
-        // Set empty array if error occurs
         setEventReviews([]);
       } else {
-        setEventReviews(eventReviewsData || []);
+        // Fetch related event and user data for each review
+        const enrichedEventReviews = await Promise.all(
+          (eventReviewsData || []).map(async (review) => {
+            // Fetch event data
+            const { data: eventData } = await supabase
+              .from('events')
+              .select('title, event_type')
+              .eq('id', review.event_id)
+              .single();
+
+            // Fetch user profile data
+            const { data: userData } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', review.user_id)
+              .single();
+
+            return {
+              ...review,
+              event: eventData,
+              user: userData
+            };
+          })
+        );
+        setEventReviews(enrichedEventReviews);
       }
 
     } catch (error) {
@@ -184,13 +222,13 @@ const AdminReviews = () => {
   };
 
   const filteredCourseReviews = courseReviews.filter(review =>
-    review.courses?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    review.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    review.course?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    review.user?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredEventReviews = eventReviews.filter(review =>
-    review.events?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    review.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    review.event?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    review.user?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalReviews = courseReviews.length + eventReviews.length;
@@ -295,10 +333,10 @@ const AdminReviews = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-                          {review.profiles?.avatar_url ? (
+                          {review.user?.avatar_url ? (
                             <img 
-                              src={review.profiles.avatar_url} 
-                              alt={review.profiles.full_name || 'User'} 
+                              src={review.user.avatar_url} 
+                              alt={review.user.full_name || 'User'} 
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
@@ -306,12 +344,12 @@ const AdminReviews = () => {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-gray-800">{review.profiles?.full_name || 'Anonymous User'}</h4>
+                          <h4 className="font-semibold text-gray-800">{review.user?.full_name || 'Anonymous User'}</h4>
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <BookOpen className="h-4 w-4" />
-                            <span>{review.courses?.title || 'Unknown Course'}</span>
-                            {review.courses?.category && (
-                              <Badge variant="secondary">{review.courses.category}</Badge>
+                            <span>{review.course?.title || 'Unknown Course'}</span>
+                            {review.course?.category && (
+                              <Badge variant="secondary">{review.course.category}</Badge>
                             )}
                           </div>
                         </div>
@@ -375,10 +413,10 @@ const AdminReviews = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-                          {review.profiles?.avatar_url ? (
+                          {review.user?.avatar_url ? (
                             <img 
-                              src={review.profiles.avatar_url} 
-                              alt={review.profiles.full_name || 'User'} 
+                              src={review.user.avatar_url} 
+                              alt={review.user.full_name || 'User'} 
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
@@ -386,12 +424,12 @@ const AdminReviews = () => {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-gray-800">{review.profiles?.full_name || 'Anonymous User'}</h4>
+                          <h4 className="font-semibold text-gray-800">{review.user?.full_name || 'Anonymous User'}</h4>
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <CalendarDays className="h-4 w-4" />
-                            <span>{review.events?.title || 'Unknown Event'}</span>
-                            {review.events?.event_type && (
-                              <Badge variant="secondary">{review.events.event_type}</Badge>
+                            <span>{review.event?.title || 'Unknown Event'}</span>
+                            {review.event?.event_type && (
+                              <Badge variant="secondary">{review.event.event_type}</Badge>
                             )}
                           </div>
                         </div>
@@ -458,10 +496,10 @@ const AdminReviews = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-                          {review.profiles?.avatar_url ? (
+                          {review.user?.avatar_url ? (
                             <img 
-                              src={review.profiles.avatar_url} 
-                              alt={review.profiles.full_name || 'User'} 
+                              src={review.user.avatar_url} 
+                              alt={review.user.full_name || 'User'} 
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
@@ -469,12 +507,12 @@ const AdminReviews = () => {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-gray-800">{review.profiles?.full_name || 'Anonymous User'}</h4>
+                          <h4 className="font-semibold text-gray-800">{review.user?.full_name || 'Anonymous User'}</h4>
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <BookOpen className="h-4 w-4" />
-                            <span>{review.courses?.title || 'Unknown Course'}</span>
-                            {review.courses?.category && (
-                              <Badge variant="secondary">{review.courses.category}</Badge>
+                            <span>{review.course?.title || 'Unknown Course'}</span>
+                            {review.course?.category && (
+                              <Badge variant="secondary">{review.course.category}</Badge>
                             )}
                           </div>
                         </div>
@@ -536,10 +574,10 @@ const AdminReviews = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-                          {review.profiles?.avatar_url ? (
+                          {review.user?.avatar_url ? (
                             <img 
-                              src={review.profiles.avatar_url} 
-                              alt={review.profiles.full_name || 'User'} 
+                              src={review.user.avatar_url} 
+                              alt={review.user.full_name || 'User'} 
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
@@ -547,12 +585,12 @@ const AdminReviews = () => {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-gray-800">{review.profiles?.full_name || 'Anonymous User'}</h4>
+                          <h4 className="font-semibold text-gray-800">{review.user?.full_name || 'Anonymous User'}</h4>
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <CalendarDays className="h-4 w-4" />
-                            <span>{review.events?.title || 'Unknown Event'}</span>
-                            {review.events?.event_type && (
-                              <Badge variant="secondary">{review.events.event_type}</Badge>
+                            <span>{review.event?.title || 'Unknown Event'}</span>
+                            {review.event?.event_type && (
+                              <Badge variant="secondary">{review.event.event_type}</Badge>
                             )}
                           </div>
                         </div>
