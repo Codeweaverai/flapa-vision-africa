@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,7 +86,7 @@ interface Course {
     id: string;
     full_name: string;
     avatar_url: string;
-    profile_description: string;
+    bio?: string;
   };
 }
 
@@ -147,45 +146,63 @@ const CourseDetailPage: React.FC = () => {
   const loadCourseDetails = async () => {
     try {
       setLoading(true);
+      
+      // Fetch basic course data
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
-        .select(`
-          *,
-          sections (
-            id,
-            title,
-            order,
-            lessons (
-              id,
-              title,
-              description,
-              video_url,
-              duration_minutes,
-              order
-            )
-          ),
-          author:profiles (
-            id,
-            full_name,
-            avatar_url,
-            profile_description
-          )
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
       if (courseError) throw courseError;
 
-      // Ensure the course data has the required image_url property
+      // Fetch course modules with lessons
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('course_modules')
+        .select(`
+          id,
+          title,
+          order_index,
+          lessons (
+            id,
+            title,
+            description,
+            video_url,
+            order_index
+          )
+        `)
+        .eq('course_id', id)
+        .order('order_index', { ascending: true });
+
+      // Fetch creator profile
+      const { data: creatorData, error: creatorError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, bio')
+        .eq('id', courseData.creator_id)
+        .single();
+
+      // Build the enriched course object
       const enrichedCourse: Course = {
         ...courseData,
-        image_url: courseData.image_url || courseData.thumbnail_url || undefined,
-        sections: courseData.sections || [],
-        author: courseData.author || {
+        image_url: courseData.thumbnail_url || undefined,
+        sections: (modulesData || []).map(module => ({
+          id: module.id,
+          title: module.title,
+          order: module.order_index,
+          lessons: (module.lessons || []).map(lesson => ({
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description || '',
+            video_url: lesson.video_url || '',
+            duration_minutes: 0, // Default duration
+            order: lesson.order_index
+          }))
+        })),
+        author: creatorData || {
           id: courseData.creator_id || '',
           full_name: 'Unknown Author',
           avatar_url: '',
-          profile_description: ''
+          bio: ''
         }
       };
 
@@ -234,33 +251,41 @@ const CourseDetailPage: React.FC = () => {
 
   const loadReviews = async () => {
     try {
+      // Fetch reviews
       const { data: reviewData, error: reviewError } = await supabase
         .from('course_reviews')
-        .select(`
-          *,
-          user:profiles (
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('course_id', id)
         .order('created_at', { ascending: false });
 
       if (reviewError) throw reviewError;
 
-      // Transform the data to match our Review interface
-      const transformedReviews: Review[] = (reviewData || []).map(review => ({
-        id: review.id,
-        rating: review.rating,
-        comment: review.review_text || '', // Map review_text to comment
-        created_at: review.created_at,
-        user: review.user || {
-          id: '',
-          full_name: 'Anonymous',
-          avatar_url: ''
-        }
-      }));
+      // If we have reviews, fetch the user profiles
+      const transformedReviews: Review[] = [];
+      
+      if (reviewData && reviewData.length > 0) {
+        const userIds = reviewData.map(review => review.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
+
+        // Transform the data to match our Review interface
+        reviewData.forEach(review => {
+          const profile = profilesData?.find(p => p.id === review.user_id);
+          transformedReviews.push({
+            id: review.id,
+            rating: review.rating,
+            comment: review.review_text || '',
+            created_at: review.created_at,
+            user: profile || {
+              id: review.user_id,
+              full_name: 'Anonymous',
+              avatar_url: ''
+            }
+          });
+        });
+      }
 
       setReviews(transformedReviews);
 
@@ -300,7 +325,7 @@ const CourseDetailPage: React.FC = () => {
           course_id: id,
           user_id: user.id,
           rating: reviewRating,
-          review_text: reviewText, // Use review_text instead of comment
+          review_text: reviewText,
         });
 
       if (error) throw error;
