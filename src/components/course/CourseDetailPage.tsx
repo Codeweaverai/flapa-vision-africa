@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -65,12 +67,13 @@ import {
 import { Link } from 'react-router-dom';
 import CourseDetailActions from '@/components/course/CourseDetailActions';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { useCart } from '@/contexts/CartContext';
 
 interface Course {
   id: string;
   title: string;
   description: string;
-  image_url: string;
+  image_url?: string;
   price: number;
   is_free: boolean;
   duration_minutes: number;
@@ -119,6 +122,7 @@ interface Review {
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { addToCart } = useCart();
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean>(false);
@@ -172,7 +176,20 @@ const CourseDetailPage: React.FC = () => {
 
       if (courseError) throw courseError;
 
-      setCourse(courseData as Course);
+      // Ensure the course data has the required image_url property
+      const enrichedCourse: Course = {
+        ...courseData,
+        image_url: courseData.image_url || courseData.thumbnail_url || undefined,
+        sections: courseData.sections || [],
+        author: courseData.author || {
+          id: courseData.creator_id || '',
+          full_name: 'Unknown Author',
+          avatar_url: '',
+          profile_description: ''
+        }
+      };
+
+      setCourse(enrichedCourse);
     } catch (error) {
       console.error('Error loading course details:', error);
       toast.error('Failed to load course details');
@@ -232,14 +249,27 @@ const CourseDetailPage: React.FC = () => {
 
       if (reviewError) throw reviewError;
 
-      setReviews(reviewData as Review[]);
+      // Transform the data to match our Review interface
+      const transformedReviews: Review[] = (reviewData || []).map(review => ({
+        id: review.id,
+        rating: review.rating,
+        comment: review.review_text || '', // Map review_text to comment
+        created_at: review.created_at,
+        user: review.user || {
+          id: '',
+          full_name: 'Anonymous',
+          avatar_url: ''
+        }
+      }));
+
+      setReviews(transformedReviews);
 
       // Calculate average rating
-      if (reviewData && reviewData.length > 0) {
-        const totalRating = reviewData.reduce((sum, review) => sum + review.rating, 0);
-        const avgRating = totalRating / reviewData.length;
+      if (transformedReviews && transformedReviews.length > 0) {
+        const totalRating = transformedReviews.reduce((sum, review) => sum + review.rating, 0);
+        const avgRating = totalRating / transformedReviews.length;
         setRating(avgRating);
-        setReviewCount(reviewData.length);
+        setReviewCount(transformedReviews.length);
       } else {
         setRating(0);
         setReviewCount(0);
@@ -270,7 +300,7 @@ const CourseDetailPage: React.FC = () => {
           course_id: id,
           user_id: user.id,
           rating: reviewRating,
-          comment: reviewText,
+          review_text: reviewText, // Use review_text instead of comment
         });
 
       if (error) throw error;
@@ -293,6 +323,8 @@ const CourseDetailPage: React.FC = () => {
       navigate('/auth', { state: { redirectTo: window.location.pathname } });
       return;
     }
+
+    if (!course) return;
 
     setLoading(true);
     try {
@@ -363,11 +395,13 @@ const CourseDetailPage: React.FC = () => {
         {/* Course Content */}
         <div className="lg:col-span-2">
           <Card className="overflow-hidden">
-            <img
-              src={course.image_url}
-              alt={course.title}
-              className="w-full h-64 object-cover rounded-t-md"
-            />
+            {course.image_url && (
+              <img
+                src={course.image_url}
+                alt={course.title}
+                className="w-full h-64 object-cover rounded-t-md"
+              />
+            )}
             <CardHeader>
               <CardTitle className="text-2xl font-bold">{course.title}</CardTitle>
               <CardDescription>
