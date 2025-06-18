@@ -1,37 +1,76 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/contexts/AuthContext';
-import { useCurrency } from '@/contexts/CurrencyContext';
+
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { toast } from 'sonner';
 
-interface TicketHolder {
-  name: string;
-  email?: string;
-}
-
-interface CartItem {
-  id: string;
-  item_id: string;
-  item_type: 'course' | 'event_ticket';
+export interface CartItem {
+  itemId: string;
+  itemType: 'course' | 'event_ticket';
+  itemName: string;
   price: number;
   quantity: number;
-  title: string;
-  thumbnail_url?: string;
-  event_id?: string;
-  ticket_holder_names?: TicketHolder[];
+  ticketHolderNames?: string[];
 }
+
+interface CartState {
+  items: CartItem[];
+}
+
+type CartAction =
+  | { type: 'ADD_ITEM'; payload: CartItem }
+  | { type: 'REMOVE_ITEM'; payload: string }
+  | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
+  | { type: 'CLEAR_CART' }
+  | { type: 'LOAD_CART'; payload: CartItem[] };
+
+const cartReducer = (state: CartState, action: CartAction): CartState => {
+  switch (action.type) {
+    case 'ADD_ITEM': {
+      const existingItemIndex = state.items.findIndex(
+        item => item.itemId === action.payload.itemId && item.itemType === action.payload.itemType
+      );
+
+      if (existingItemIndex >= 0) {
+        const updatedItems = [...state.items];
+        updatedItems[existingItemIndex] = {
+          ...updatedItems[existingItemIndex],
+          quantity: updatedItems[existingItemIndex].quantity + action.payload.quantity
+        };
+        return { ...state, items: updatedItems };
+      }
+
+      return { ...state, items: [...state.items, action.payload] };
+    }
+    case 'REMOVE_ITEM':
+      return {
+        ...state,
+        items: state.items.filter(item => item.itemId !== action.payload)
+      };
+    case 'UPDATE_QUANTITY':
+      return {
+        ...state,
+        items: state.items.map(item =>
+          item.itemId === action.payload.itemId
+            ? { ...item, quantity: action.payload.quantity }
+            : item
+        ).filter(item => item.quantity > 0)
+      };
+    case 'CLEAR_CART':
+      return { ...state, items: [] };
+    case 'LOAD_CART':
+      return { ...state, items: action.payload };
+    default:
+      return state;
+  }
+};
 
 interface CartContextType {
   items: CartItem[];
-  loading: boolean;
-  addToCart: (item: Omit<CartItem, 'id'>) => Promise<void>;
-  removeFromCart: (itemId: string) => Promise<void>;
-  updateQuantity: (itemId: string, quantity: number) => Promise<void>;
-  updateTicketHolders: (itemId: string, holders: TicketHolder[]) => Promise<void>;
-  clearCart: () => Promise<void>;
+  addToCart: (item: CartItem) => void;
+  removeFromCart: (itemId: string) => void;
+  updateQuantity: (itemId: string, quantity: number) => void;
+  clearCart: () => void;
   getTotalPrice: () => number;
-  getItemCount: () => number;
-  getConvertedTotalPrice: () => Promise<number>;
+  getTotalItems: () => number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -44,343 +83,64 @@ export const useCart = () => {
   return context;
 };
 
-// Helper function to safely convert Json to TicketHolder[]
-const convertToTicketHolders = (jsonData: any): TicketHolder[] => {
-  if (!jsonData) return [];
-  
-  try {
-    if (Array.isArray(jsonData)) {
-      return jsonData.filter((item): item is TicketHolder => 
-        typeof item === 'object' && 
-        item !== null && 
-        typeof item.name === 'string'
-      );
-    }
-    return [];
-  } catch (error) {
-    console.error('Error converting ticket holders:', error);
-    return [];
-  }
-};
-
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const { convertPrice } = useCurrency();
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [state, dispatch] = useReducer(cartReducer, { items: [] });
 
   useEffect(() => {
-    if (user) {
-      loadCart();
-    } else {
-      setItems([]);
-    }
-  }, [user]);
-
-  const loadCart = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('carts')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      const cartItems: CartItem[] = await Promise.all(
-        data.map(async (item) => {
-          let title = '';
-          let thumbnail_url = '';
-          let event_id = '';
-
-          if (item.item_type === 'course') {
-            try {
-              const { data: course, error: courseError } = await supabase
-                .from('courses')
-                .select('title, thumbnail_url')
-                .eq('id', item.item_id)
-                .maybeSingle();
-              
-              if (!courseError && course) {
-                title = course.title || '';
-                thumbnail_url = course.thumbnail_url || '';
-              }
-            } catch (err) {
-              console.error('Error fetching course:', err);
-            }
-          } else if (item.item_type === 'event_ticket') {
-            try {
-              // First get the ticket details
-              const { data: ticket, error: ticketError } = await supabase
-                .from('event_tickets')
-                .select('event_id')
-                .eq('id', item.item_id)
-                .maybeSingle();
-              
-              if (!ticketError && ticket) {
-                // Then get the event details using the event_id
-                const { data: event, error: eventError } = await supabase
-                  .from('events')
-                  .select('id, title, image_url')
-                  .eq('id', ticket.event_id)
-                  .maybeSingle();
-                
-                if (!eventError && event) {
-                  title = event.title;
-                  thumbnail_url = event.image_url || '';
-                  event_id = event.id;
-                } else {
-                  console.warn('Failed to fetch event details:', eventError);
-                  // Don't set any fallback title - let it remain empty if we can't fetch the event
-                }
-              } else {
-                console.warn('Failed to fetch event ticket details:', ticketError);
-                // Don't set any fallback title
-              }
-            } catch (err) {
-              console.error('Error fetching event ticket:', err);
-              // Don't set any fallback title
-            }
-          }
-
-          // Only return the cart item if we successfully got a title
-          return {
-            id: item.id,
-            item_id: item.item_id,
-            item_type: item.item_type as 'course' | 'event_ticket',
-            price: parseFloat(item.price.toString()),
-            quantity: item.quantity,
-            title,
-            thumbnail_url,
-            event_id,
-            ticket_holder_names: convertToTicketHolders(item.ticket_holder_names)
-          };
-        })
-      );
-
-      // Filter out items without titles (failed fetches)
-      const validItems = cartItems.filter(item => item.title && item.title.trim() !== '');
-      setItems(validItems);
-    } catch (error) {
-      console.error('Error loading cart:', error);
-      toast.error('Failed to load cart');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addToCart = async (item: Omit<CartItem, 'id'>) => {
-    if (!user) {
-      toast.error('Please sign in to add items to cart');
-      return;
-    }
-
-    try {
-      // Check if item already exists in cart
-      const existingItem = items.find(
-        (cartItem) => cartItem.item_id === item.item_id && cartItem.item_type === item.item_type
-      );
-
-      if (existingItem) {
-        // Update quantity instead of creating duplicate
-        await updateQuantity(existingItem.id, existingItem.quantity + item.quantity);
-        toast.success('Item quantity updated in cart');
-        return;
+    const savedCart = localStorage.getItem('cart');
+    if (savedCart) {
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        dispatch({ type: 'LOAD_CART', payload: parsedCart });
+      } catch (error) {
+        console.error('Error loading cart from localStorage:', error);
       }
-
-      // For event tickets, initialize with empty ticket holder names based on quantity
-      const initialTicketHolders = item.item_type === 'event_ticket' 
-        ? Array.from({ length: item.quantity }, () => ({ name: '', email: '' }))
-        : [];
-
-      const { data, error } = await supabase
-        .from('carts')
-        .insert({
-          user_id: user.id,
-          item_id: item.item_id,
-          item_type: item.item_type,
-          price: item.price,
-          quantity: item.quantity,
-          ticket_holder_names: initialTicketHolders as any
-        })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === '23505') {
-          // Handle duplicate key error by updating existing item
-          const { data: existing } = await supabase
-            .from('carts')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('item_id', item.item_id)
-            .eq('item_type', item.item_type)
-            .single();
-
-          if (existing) {
-            await updateQuantity(existing.id, existing.quantity + item.quantity);
-            toast.success('Item quantity updated in cart');
-            return;
-          }
-        }
-        throw error;
-      }
-
-      const newCartItem: CartItem = {
-        id: data.id,
-        item_id: item.item_id,
-        item_type: item.item_type,
-        price: item.price,
-        quantity: item.quantity,
-        title: item.title,
-        thumbnail_url: item.thumbnail_url,
-        event_id: item.event_id,
-        ticket_holder_names: initialTicketHolders
-      };
-
-      setItems([...items, newCartItem]);
-      toast.success('Item added to cart');
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      toast.error('Failed to add item to cart');
     }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(state.items));
+  }, [state.items]);
+
+  const addToCart = (item: CartItem) => {
+    dispatch({ type: 'ADD_ITEM', payload: item });
+    toast.success(`${item.itemName} added to cart`);
   };
 
-  const removeFromCart = async (itemId: string) => {
-    try {
-      const { error } = await supabase
-        .from('carts')
-        .delete()
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      setItems(items.filter(item => item.id !== itemId));
-      toast.success('Item removed from cart');
-    } catch (error) {
-      console.error('Error removing from cart:', error);
-      toast.error('Failed to remove item');
-    }
+  const removeFromCart = (itemId: string) => {
+    dispatch({ type: 'REMOVE_ITEM', payload: itemId });
+    toast.success('Item removed from cart');
   };
 
-  const updateQuantity = async (itemId: string, quantity: number) => {
-    if (quantity <= 0) {
-      await removeFromCart(itemId);
-      return;
-    }
-
-    try {
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-
-      // For event tickets, adjust ticket holder names array to match quantity
-      let updatedTicketHolders = item.ticket_holder_names || [];
-      if (item.item_type === 'event_ticket') {
-        if (quantity > updatedTicketHolders.length) {
-          // Add new empty holders
-          const newHolders = Array.from({ length: quantity - updatedTicketHolders.length }, () => ({ name: '', email: '' }));
-          updatedTicketHolders = [...updatedTicketHolders, ...newHolders];
-        } else if (quantity < updatedTicketHolders.length) {
-          // Remove excess holders
-          updatedTicketHolders = updatedTicketHolders.slice(0, quantity);
-        }
-      }
-
-      const { error } = await supabase
-        .from('carts')
-        .update({ 
-          quantity,
-          ticket_holder_names: updatedTicketHolders as any
-        })
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      setItems(items.map(item => 
-        item.id === itemId ? { ...item, quantity, ticket_holder_names: updatedTicketHolders } : item
-      ));
-    } catch (error) {
-      console.error('Error updating quantity:', error);
-      toast.error('Failed to update quantity');
-    }
+  const updateQuantity = (itemId: string, quantity: number) => {
+    dispatch({ type: 'UPDATE_QUANTITY', payload: { itemId, quantity } });
   };
 
-  const updateTicketHolders = async (itemId: string, holders: TicketHolder[]) => {
-    try {
-      console.log('Updating ticket holders for item:', itemId, 'with holders:', holders);
-      
-      const { error } = await supabase
-        .from('carts')
-        .update({ ticket_holder_names: holders as any })
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      setItems(prevItems => prevItems.map(item => 
-        item.id === itemId ? { ...item, ticket_holder_names: holders } : item
-      ));
-      
-      console.log('Successfully updated ticket holders in database');
-    } catch (error) {
-      console.error('Error updating ticket holders:', error);
-      toast.error('Failed to update ticket holders');
-    }
-  };
-
-  const clearCart = async () => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from('carts')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      setItems([]);
-    } catch (error) {
-      console.error('Error clearing cart:', error);
-      toast.error('Failed to clear cart');
-    }
+  const clearCart = () => {
+    dispatch({ type: 'CLEAR_CART' });
   };
 
   const getTotalPrice = () => {
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
-  const getItemCount = () => {
-    return items.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const getConvertedTotalPrice = async () => {
-    try {
-      const totalUSD = getTotalPrice();
-      return await convertPrice(totalUSD, 'USD');
-    } catch (error) {
-      console.error('Error converting total price:', error);
-      return getTotalPrice();
-    }
+  const getTotalItems = () => {
+    return state.items.reduce((total, item) => total + item.quantity, 0);
   };
 
   return (
-    <CartContext.Provider value={{
-      items,
-      loading,
-      addToCart,
-      removeFromCart,
-      updateQuantity,
-      updateTicketHolders,
-      clearCart,
-      getTotalPrice,
-      getItemCount,
-      getConvertedTotalPrice
-    }}>
+    <CartContext.Provider
+      value={{
+        items: state.items,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        getTotalPrice,
+        getTotalItems,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );
 };
-
-export default CartProvider;

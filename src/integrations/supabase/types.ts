@@ -881,6 +881,7 @@ export type Database = {
       }
       event_bookings: {
         Row: {
+          booking_code: string | null
           booking_date: string | null
           created_at: string | null
           event_id: string
@@ -899,6 +900,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          booking_code?: string | null
           booking_date?: string | null
           created_at?: string | null
           event_id: string
@@ -917,6 +919,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          booking_code?: string | null
           booking_date?: string | null
           created_at?: string | null
           event_id?: string
@@ -1404,6 +1407,7 @@ export type Database = {
       }
       generated_tickets: {
         Row: {
+          booking_code: string | null
           booking_id: string | null
           created_at: string | null
           event_id: string | null
@@ -1422,6 +1426,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          booking_code?: string | null
           booking_id?: string | null
           created_at?: string | null
           event_id?: string | null
@@ -1440,6 +1445,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          booking_code?: string | null
           booking_id?: string | null
           created_at?: string | null
           event_id?: string | null
@@ -3130,6 +3136,10 @@ export type Database = {
           event_id: string
           count: string
         }[]
+      }
+      generate_booking_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       generate_ticket_code: {
         Args: Record<PropertyKey, never>

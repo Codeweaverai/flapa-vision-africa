@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +8,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/admin/AdminRoute";
+import TicketViewPage from '@/pages/TicketViewPage';
 
 // Import all pages
 import Index from "./pages/Index";
@@ -123,14 +123,13 @@ const AdminContactSubmissions = React.lazy(() => import("./pages/admin/AdminCont
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <CurrencyProvider>
-        <BrowserRouter>
+function App() {
+  return (
+    <BrowserRouter>
+      <QueryClient>
+        <CurrencyProvider>
           <AuthProvider>
             <CartProvider>
-              <Toaster />
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Index />} />
@@ -169,6 +168,7 @@ const App = () => (
                 <Route path="/payment/cancel" element={<PaymentCancelPage />} />
                 <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
                 <Route path="/ticket/:id" element={<TicketDetailPage />} />
+                <Route path="/tickets/:bookingId" element={<TicketViewPage />} />
                 <Route path="/help" element={<HelpCenterPage />} />
                 <Route path="/careers" element={<CareersPage />} />
                 <Route path="/jobs/:id" element={<JobDetailPage />} />
@@ -254,12 +254,13 @@ const App = () => (
                 {/* 404 Route */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
+              <Toaster />
             </CartProvider>
           </AuthProvider>
-        </BrowserRouter>
-      </CurrencyProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+        </CurrencyProvider>
+      </QueryClient>
+    </BrowserRouter>
+  );
+}
 
 export default App;
