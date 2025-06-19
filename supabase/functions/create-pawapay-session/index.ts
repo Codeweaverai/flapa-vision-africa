@@ -113,19 +113,28 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Order created successfully:', order.id);
 
-    // Create order items using service role
-    const orderItems = items.map((item: any) => ({
-      order_id: order.id,
-      item_id: item.item_id,
-      item_type: item.item_type,
-      item_name: item.item_name || item.title || 'Item',
-      quantity: item.quantity,
-      unit_price: item.price,
-      total_price: item.price * item.quantity,
-      metadata: {
-        ticket_holder_names: item.ticket_holder_names || null
-      }
-    }));
+    // Create order items using service role - ensure we have proper item_type and item_id
+    const orderItems = items.map((item: any) => {
+      // Extract item details from the item object
+      const itemType = item.item_type || item.itemType || 'event_ticket'; // Default to event_ticket if not specified
+      const itemId = item.item_id || item.itemId || item.id;
+      const itemName = item.item_name || item.itemName || item.title || item.name || 'Item';
+      
+      return {
+        order_id: order.id,
+        item_id: itemId,
+        item_type: itemType,
+        item_name: itemName,
+        quantity: item.quantity || 1,
+        unit_price: item.price || 0,
+        total_price: (item.price || 0) * (item.quantity || 1),
+        metadata: {
+          ticket_holder_names: item.ticket_holder_names || []
+        }
+      };
+    });
+
+    console.log('Creating order items:', orderItems);
 
     const { error: itemsError } = await serviceRoleClient
       .from('order_items')
@@ -146,8 +155,13 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Determine reason based on items
-    const hasEvents = items.some((item: any) => item.item_type === 'event_ticket');
-    const hasCourses = items.some((item: any) => item.item_type === 'course');
+    const hasEvents = items.some((item: any) => 
+      (item.item_type || item.itemType) === 'event_ticket' || 
+      (item.item_type || item.itemType) === 'event'
+    );
+    const hasCourses = items.some((item: any) => 
+      (item.item_type || item.itemType) === 'course'
+    );
     const reason = hasEvents && hasCourses ? 'Course & Event' : hasEvents ? 'Event' : 'Course';
 
     // Prepare metadata as per PawaPay documentation (simplified)

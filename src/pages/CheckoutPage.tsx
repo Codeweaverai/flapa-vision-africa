@@ -145,11 +145,20 @@ const CheckoutPage = () => {
     setLoading(true);
     try {
       if (paymentMethod === 'stripe') {
+        // For cart-based checkout, pass the items from cart
         const { data, error } = await supabase.functions.invoke('create-checkout-session', {
           body: {
             payment_method: 'stripe',
             success_url: `${window.location.origin}/checkout/success`,
             cancel_url: `${window.location.origin}/checkout`,
+            // Pass cart items for processing
+            items: items.map(item => ({
+              item_id: item.itemId,
+              item_type: item.itemType,
+              item_name: item.itemName,
+              quantity: item.quantity,
+              price: item.price
+            }))
           }
         });
 
@@ -355,7 +364,14 @@ const CheckoutPage = () => {
         onClose={() => setShowMobileMoneyDialog(false)}
         amount={convertedAmounts.final}
         currency={currentCurrency}
-        items={items}
+        items={items.map(item => ({
+          item_id: item.itemId,
+          item_type: item.itemType,
+          item_name: item.itemName,
+          quantity: item.quantity,
+          price: item.price,
+          ticket_holder_names: []
+        }))}
         discount={convertedAmounts.discount}
         taxAmount={convertedAmounts.tax}
         promoCode={promoCode}

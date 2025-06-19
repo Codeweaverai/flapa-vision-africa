@@ -27,8 +27,8 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { courseId, eventId, returnUrl, payment_method = 'stripe' } = await req.json();
-    logStep("Request data", { courseId, eventId, payment_method });
+    const { courseId, eventId, eventTicketId, returnUrl, payment_method = 'stripe' } = await req.json();
+    logStep("Request data", { courseId, eventId, eventTicketId, payment_method });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -66,11 +66,12 @@ serve(async (req) => {
     
     logStep("Setting up URLs", { successUrl, cancelUrl });
 
-    if (courseId || eventId) {
-      // Individual item purchase
+    // Check if this is a direct item purchase (course or event ticket)
+    if (courseId || eventId || eventTicketId) {
       let itemData;
       let itemName;
       let itemPrice;
+      let itemType;
 
       if (courseId) {
         const { data: course, error: courseError } = await supabaseClient
@@ -84,7 +85,28 @@ serve(async (req) => {
         itemData = course;
         itemName = course.title;
         itemPrice = course.price || 0;
+        itemType = 'course';
         logStep("Course data retrieved", { courseId, title: itemName, price: itemPrice });
+      } else if (eventTicketId) {
+        const { data: ticket, error: ticketError } = await supabaseClient
+          .from('event_tickets')
+          .select(`
+            name,
+            price,
+            event:events (
+              title
+            )
+          `)
+          .eq('id', eventTicketId)
+          .single();
+
+        if (ticketError) throw new Error(`Event ticket not found: ${ticketError.message}`);
+        
+        itemData = ticket;
+        itemName = `${ticket.event.title} - ${ticket.name}`;
+        itemPrice = ticket.price || 0;
+        itemType = 'event_ticket';
+        logStep("Event ticket data retrieved", { eventTicketId, title: itemName, price: itemPrice });
       } else if (eventId) {
         const { data: event, error: eventError } = await supabaseClient
           .from('events')
@@ -97,8 +119,42 @@ serve(async (req) => {
         itemData = event;
         itemName = event.title;
         itemPrice = event.price || 0;
+        itemType = 'event';
         logStep("Event data retrieved", { eventId, title: itemName, price: itemPrice });
       }
+
+      // Create order for direct purchase
+      const { data: order, error: orderError } = await supabaseClient
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          email: user.email,
+          total_amount: itemPrice,
+          currency: 'USD',
+          payment_status: 'processing',
+          payment_method: 'stripe'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw new Error(`Failed to create order: ${orderError.message}`);
+      logStep("Order created", { orderId: order.id, totalAmount: itemPrice });
+
+      // Create order item
+      const { error: itemError } = await supabaseClient
+        .from('order_items')
+        .insert({
+          order_id: order.id,
+          item_id: courseId || eventTicketId || eventId,
+          item_type: itemType,
+          item_name: itemName,
+          quantity: 1,
+          unit_price: itemPrice,
+          total_price: itemPrice
+        });
+
+      if (itemError) throw new Error(`Failed to create order item: ${itemError.message}`);
+      logStep("Order item created");
 
       sessionData = {
         customer: customerId,
@@ -114,8 +170,10 @@ serve(async (req) => {
         mode: "payment",
         metadata: {
           user_id: user.id,
-          type: courseId ? 'course' : 'event',
-          item_id: courseId || eventId
+          order_id: order.id,
+          type: 'direct',
+          item_type: itemType,
+          item_id: courseId || eventTicketId || eventId
         },
         success_url: successUrl,
         cancel_url: cancelUrl,
@@ -128,7 +186,7 @@ serve(async (req) => {
         .eq('user_id', user.id);
 
       if (cartError || !cartItems || cartItems.length === 0) {
-        throw new Error('No items in cart');
+        throw new Error('No items in cart and no direct item specified');
       }
 
       logStep("Cart items retrieved", { itemCount: cartItems.length });
@@ -197,6 +255,12 @@ serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create(sessionData);
     logStep("Stripe session created", { sessionId: session.id, url: session.url });
+
+    // Update order with stripe session ID
+    await supabaseClient
+      .from('orders')
+      .update({ stripe_session_id: session.id })
+      .eq('id', sessionData.metadata.order_id);
 
     return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
