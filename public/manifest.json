@@ -1,0 +1,62 @@
+
+{
+  "name": "SkillPulse - Skills and Event Booking Platform",
+  "short_name": "SkillPulse",
+  "description": "Connect with professionals, book events, and enhance your skills",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e40af",
+  "orientation": "portrait-primary",
+  "categories": ["education", "business", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse Courses",
+      "short_name": "Courses",
+      "description": "Explore available courses",
+      "url": "/courses",
+      "icons": [
+        {
+          "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Browse Events",
+      "short_name": "Events",
+      "description": "Find upcoming events",
+      "url": "/events",
+      "icons": [
+        {
+          "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
