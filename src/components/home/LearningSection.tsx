@@ -129,8 +129,8 @@ const LearningSection = () => {
               </Button>
             </Link>
             <Link to="/become-creator">
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-white hover:bg-white hover:text-orange-600 transform hover:scale-105 transition-all duration-200">
-                Become an Instructor
+                <Button size="lg" className="text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200">
+                Become a Creator
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
