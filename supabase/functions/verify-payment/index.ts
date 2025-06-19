@@ -49,7 +49,7 @@ serve(async (req) => {
     let paymentCompleted = false
 
     // Check Stripe payment if stripe session exists
-    if (order.stripe_session_id && order.payment_method === 'card') {
+    if (order.stripe_session_id && order.payment_method === 'stripe') {
       const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
         apiVersion: '2023-10-16',
       })

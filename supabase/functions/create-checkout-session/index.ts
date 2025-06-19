@@ -27,8 +27,8 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { courseId, eventId, eventTicketId, returnUrl, payment_method = 'stripe' } = await req.json();
-    logStep("Request data", { courseId, eventId, eventTicketId, payment_method });
+    const { courseId, eventId, eventTicketId, returnUrl, payment_method = 'stripe', items } = await req.json();
+    logStep("Request data", { courseId, eventId, eventTicketId, payment_method, itemsCount: items?.length });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -178,18 +178,85 @@ serve(async (req) => {
         success_url: successUrl,
         cancel_url: cancelUrl,
       };
+    } else if (items && items.length > 0) {
+      // Cart-based purchase using items from request
+      logStep("Processing cart items from request", { itemCount: items.length });
+
+      // Calculate total amount from items
+      const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+      
+      const { data: order, error: orderError } = await supabaseClient
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          email: user.email,
+          total_amount: totalAmount,
+          currency: 'USD',
+          payment_status: 'processing',
+          payment_method: 'stripe'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw new Error(`Failed to create order: ${orderError.message}`);
+      logStep("Order created", { orderId: order.id, totalAmount });
+
+      // Create order items
+      const orderItems = items.map((item: any) => ({
+        order_id: order.id,
+        item_id: item.itemId || item.item_id,
+        item_type: item.itemType || item.item_type,
+        item_name: item.itemName || item.item_name || 'Item',
+        quantity: item.quantity || 1,
+        unit_price: item.price,
+        total_price: item.price * (item.quantity || 1),
+        metadata: {
+          ticket_holder_names: item.ticket_holder_names || []
+        }
+      }));
+
+      const { error: itemsError } = await supabaseClient
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw new Error(`Failed to create order items: ${itemsError.message}`);
+      logStep("Order items created", { itemCount: orderItems.length });
+
+      // Create Stripe line items
+      const lineItems = items.map((item: any) => ({
+        price_data: {
+          currency: "usd",
+          product_data: { name: item.itemName || item.item_name || 'Item' },
+          unit_amount: Math.round(item.price * 100),
+        },
+        quantity: item.quantity || 1,
+      }));
+
+      sessionData = {
+        customer: customerId,
+        customer_email: customerId ? undefined : user.email,
+        line_items: lineItems,
+        mode: "payment",
+        metadata: {
+          user_id: user.id,
+          order_id: order.id,
+          type: 'cart'
+        },
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      };
     } else {
-      // Cart-based purchase
+      // Fallback: try to get cart items from database
       const { data: cartItems, error: cartError } = await supabaseClient
         .from('carts')
         .select('*')
         .eq('user_id', user.id);
 
       if (cartError || !cartItems || cartItems.length === 0) {
-        throw new Error('No items in cart and no direct item specified');
+        throw new Error('No items provided and no items in cart');
       }
 
-      logStep("Cart items retrieved", { itemCount: cartItems.length });
+      logStep("Cart items retrieved from database", { itemCount: cartItems.length });
 
       // Create order first for cart-based purchase
       const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -259,7 +326,10 @@ serve(async (req) => {
     // Update order with stripe session ID
     await supabaseClient
       .from('orders')
-      .update({ stripe_session_id: session.id })
+      .update({ 
+        stripe_session_id: session.id,
+        payment_status: 'pending'
+      })
       .eq('id', sessionData.metadata.order_id);
 
     return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {
