@@ -124,7 +124,7 @@ const BecomeCreatorPage = () => {
                   variant="outline" 
                   size="lg" 
                   onClick={() => setShowDemoVideo(true)}
-                  className="w-[500px] h-[500px] rounded-lg border-2 border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 font-semibold px-8 py-4 rounded-xl text-lg"
+                  className="border-2 border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 font-semibold px-8 py-4 rounded-xl text-lg"
                 >
                   <Play className="h-5 w-5 mr-2" />
                   Watch Demo
