@@ -27,7 +27,7 @@ const BecomeCreatorPage = () => {
     {
       icon: <DollarSign className="h-8 w-8" />,
       title: "Earn Revenue",
-      description: "Set your own prices and earn up to 85% revenue share from course sales and events."
+      description: "Set your own prices and earn up to 92% revenue share from course sales and events."
     },
     {
       icon: <Users className="h-8 w-8" />,
@@ -37,7 +37,7 @@ const BecomeCreatorPage = () => {
     {
       icon: <BookOpen className="h-8 w-8" />,
       title: "Course Creation Tools",
-      description: "Use our intuitive course builder with video hosting, quizzes, and assessments."
+      description: "Use our intuitive course builder with video hosting, quizzes,exercises and assessments."
     },
     {
       icon: <TrendingUp className="h-8 w-8" />,
@@ -124,7 +124,7 @@ const BecomeCreatorPage = () => {
                   variant="outline" 
                   size="lg" 
                   onClick={() => setShowDemoVideo(true)}
-                  className="border-2 border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 font-semibold px-8 py-4 rounded-xl text-lg"
+                  className="w-[500px] h-[500px] rounded-lg border-2 border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 font-semibold px-8 py-4 rounded-xl text-lg"
                 >
                   <Play className="h-5 w-5 mr-2" />
                   Watch Demo
