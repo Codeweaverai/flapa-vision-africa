@@ -25,7 +25,7 @@ serve(async (req) => {
       throw new Error('Order ID is required')
     }
 
-    console.log('Verifying payment for order:', orderId)
+    console.log('[VERIFY-PAYMENT] Payment verification started -', { orderId })
 
     // Get order details
     const { data: order, error: orderError } = await supabaseClient
@@ -38,7 +38,7 @@ serve(async (req) => {
       throw new Error('Order not found')
     }
 
-    console.log('Order found:', { 
+    console.log('[VERIFY-PAYMENT] Order found:', { 
       id: order.id, 
       status: order.payment_status, 
       method: order.payment_method,
@@ -56,7 +56,7 @@ serve(async (req) => {
 
       try {
         const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id)
-        console.log('Stripe session status:', session.payment_status)
+        console.log('[VERIFY-PAYMENT] Stripe session status:', session.payment_status)
 
         if (session.payment_status === 'paid') {
           paymentCompleted = true
@@ -73,11 +73,13 @@ serve(async (req) => {
             .eq('id', orderId)
 
           if (updateError) {
-            console.error('Error updating order:', updateError)
+            console.error('[VERIFY-PAYMENT] Error updating order:', updateError)
           } else {
-            console.log('Order updated to completed')
+            console.log('[VERIFY-PAYMENT] Order updated to completed')
             
             // Process payment success (create enrollments, bookings, etc.)
+            console.log('[VERIFY-PAYMENT] Starting order fulfillment -', { orderId })
+            
             const { error: processError } = await supabaseClient.rpc('process_payment_success', {
               p_order_id: orderId,
               p_payment_intent_id: session.payment_intent,
@@ -85,14 +87,37 @@ serve(async (req) => {
             })
 
             if (processError) {
-              console.error('Error processing payment success:', processError)
+              console.error('[VERIFY-PAYMENT] Error processing payment success:', processError)
             } else {
-              console.log('Payment success processed')
+              console.log('[VERIFY-PAYMENT] Payment success processed')
+              
+              // Send ticket confirmation email
+              try {
+                // Get user profile for email
+                const { data: profile } = await supabaseClient
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('id', order.user_id)
+                  .single()
+
+                await supabaseClient.functions.invoke('send-ticket-confirmation', {
+                  body: {
+                    orderId: order.id,
+                    userEmail: order.email,
+                    userName: profile?.full_name || 'Valued Customer'
+                  }
+                })
+                
+                console.log('[VERIFY-PAYMENT] Ticket confirmation email sent')
+              } catch (emailError) {
+                console.error('[VERIFY-PAYMENT] Error sending confirmation email:', emailError)
+                // Don't fail the payment verification if email fails
+              }
             }
           }
         }
       } catch (stripeError) {
-        console.error('Error checking Stripe session:', stripeError)
+        console.error('[VERIFY-PAYMENT] Error checking Stripe session:', stripeError)
       }
     }
 
@@ -115,7 +140,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error verifying payment:', error)
+    console.error('[VERIFY-PAYMENT] ERROR in payment verification -', { message: error.message })
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

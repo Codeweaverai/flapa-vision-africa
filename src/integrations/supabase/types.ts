@@ -1418,9 +1418,11 @@ export type Database = {
           pdf_storage_path: string | null
           pdf_url: string | null
           qr_code_data: string
+          qr_code_url: string | null
           ticket_code: string
           ticket_holder_email: string | null
           ticket_holder_name: string
+          ticket_number: string | null
           ticket_status: string | null
           updated_at: string | null
           user_id: string | null
@@ -1437,9 +1439,11 @@ export type Database = {
           pdf_storage_path?: string | null
           pdf_url?: string | null
           qr_code_data: string
-          ticket_code: string
+          qr_code_url?: string | null
+          ticket_code?: string
           ticket_holder_email?: string | null
           ticket_holder_name: string
+          ticket_number?: string | null
           ticket_status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -1456,9 +1460,11 @@ export type Database = {
           pdf_storage_path?: string | null
           pdf_url?: string | null
           qr_code_data?: string
+          qr_code_url?: string | null
           ticket_code?: string
           ticket_holder_email?: string | null
           ticket_holder_name?: string
+          ticket_number?: string | null
           ticket_status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -3144,6 +3150,14 @@ export type Database = {
       generate_ticket_code: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      generate_ticket_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_available_tickets: {
+        Args: { ticket_id: string }
+        Returns: number
       }
       is_admin: {
         Args: Record<PropertyKey, never>

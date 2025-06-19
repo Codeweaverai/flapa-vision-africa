@@ -192,6 +192,7 @@ function App() {
                   <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
                   <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
                   <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
+                  <Route path="/my-orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
                   <Route path="/course/:id/play" element={<ProtectedRoute><CoursePlayerPage /></ProtectedRoute>} />
                   <Route path="/course/:id/learn" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
                   <Route path="/course/:id/results" element={<ProtectedRoute><CourseResultsPage /></ProtectedRoute>} />
