@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabaseClient';
 
 export interface CreatorEarningsData {
@@ -14,7 +15,7 @@ export interface CreatorTransaction {
   order_id: string;
   customer_email: string;
   customer_name?: string;
-  item_type: 'course' | 'event';
+  item_type: 'course' | 'event_ticket';
   item_name: string;
   item_id: string;
   quantity: number;
@@ -209,7 +210,7 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
     for (const item of orderItems) {
       let isCreatorItem = false;
       let itemName = 'Unknown Item';
-      let itemType: 'course' | 'event' = 'course';
+      let itemType: 'course' | 'event_ticket' = 'course';
       
       if (item.item_type === 'course') {
         const { data: course } = await supabase
@@ -241,7 +242,7 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
           if (event && event.creator_id === creatorId) {
             isCreatorItem = true;
             itemName = event.title;
-            itemType = 'event';
+            itemType = 'event_ticket';
           }
         }
       }

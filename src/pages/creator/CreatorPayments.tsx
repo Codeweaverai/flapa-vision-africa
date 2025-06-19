@@ -137,7 +137,7 @@ const CreatorPayments: React.FC = () => {
     switch (type) {
       case 'course':
         return 'Course Purchase';
-      case 'event':
+      case 'event_ticket':
         return 'Event Registration';
       case 'consultation':
         return 'Consultation Booking';
@@ -383,20 +383,20 @@ const CreatorPayments: React.FC = () => {
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline">
-                                  {getPaymentTypeLabel(transaction.reference_type)}
+                                  {getPaymentTypeLabel(transaction.item_type)}
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <PriceDisplay amount={transaction.amount} originalCurrency="USD" />
+                                <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
                               </TableCell>
                               <TableCell className="font-medium text-green-600">
                                 <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" />
                               </TableCell>
                               <TableCell className="text-muted-foreground">
-                                <PriceDisplay amount={transaction.platform_fee_amount} originalCurrency="USD" />
+                                <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" />
                               </TableCell>
                               <TableCell>
-                                {getStatusBadge(transaction.status)}
+                                {getStatusBadge(transaction.payment_status)}
                               </TableCell>
                               <TableCell>
                                 {transaction.payout_eligible_date ? 
