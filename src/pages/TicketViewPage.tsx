@@ -52,7 +52,7 @@ const TicketViewPage = () => {
       setLoading(true);
       
       // First verify the booking belongs to the user
-      const { data: booking, error: bookingError } = await supabaseClient
+      const { data: booking, error: bookingError } = await supabase
         .from('event_bookings')
         .select('user_id')
         .eq('id', bookingId)

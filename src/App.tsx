@@ -9,6 +9,7 @@ import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/admin/AdminRoute";
 import TicketViewPage from '@/pages/TicketViewPage';
+import MyOrdersPage from '@/pages/MyOrdersPage';
 
 // Import all pages
 import Index from "./pages/Index";
