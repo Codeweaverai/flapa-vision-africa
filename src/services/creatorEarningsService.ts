@@ -188,8 +188,7 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
           updated_at
         )
       `)
-      .eq('orders.payment_status', 'completed')
-      .order('orders.created_at', { ascending: false });
+      .eq('orders.payment_status', 'completed');
 
     if (error) throw error;
 
@@ -197,9 +196,6 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
       return [];
     }
 
-    // Filter and process items that belong to this creator
-    const creatorTransactions: CreatorTransaction[] = [];
-    
     // Get user profiles for customer names
     const userIds = [...new Set(orderItems.map(item => item.orders.user_id))];
     const { data: profiles } = await supabase
@@ -207,17 +203,40 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
       .select('id, username, full_name')
       .in('id', userIds);
 
+    // Get all course IDs and event ticket IDs for batch fetching
+    const courseIds = [...new Set(orderItems.filter(item => item.item_type === 'course').map(item => item.item_id))];
+    const ticketIds = [...new Set(orderItems.filter(item => item.item_type === 'event_ticket').map(item => item.item_id))];
+
+    // Batch fetch courses
+    const { data: courses } = courseIds.length > 0 ? await supabase
+      .from('courses')
+      .select('id, creator_id, title')
+      .in('id', courseIds) : { data: [] };
+
+    // Batch fetch event tickets and their events
+    const { data: eventTickets } = ticketIds.length > 0 ? await supabase
+      .from('event_tickets')
+      .select(`
+        id,
+        event_id,
+        events!inner(
+          id,
+          creator_id,
+          title
+        )
+      `)
+      .in('id', ticketIds) : { data: [] };
+
+    // Filter and process items that belong to this creator
+    const creatorTransactions: CreatorTransaction[] = [];
+    
     for (const item of orderItems) {
       let isCreatorItem = false;
       let itemName = 'Unknown Item';
       let itemType: 'course' | 'event_ticket' = 'course';
       
       if (item.item_type === 'course') {
-        const { data: course } = await supabase
-          .from('courses')
-          .select('creator_id, title')
-          .eq('id', item.item_id)
-          .single();
+        const course = courses?.find(c => c.id === item.item_id);
         
         if (course && course.creator_id === creatorId) {
           isCreatorItem = true;
@@ -225,25 +244,12 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
           itemType = 'course';
         }
       } else if (item.item_type === 'event_ticket') {
-        // Get event from ticket
-        const { data: ticket } = await supabase
-          .from('event_tickets')
-          .select('event_id')
-          .eq('id', item.item_id)
-          .single();
+        const ticket = eventTickets?.find(t => t.id === item.item_id);
         
-        if (ticket) {
-          const { data: event } = await supabase
-            .from('events')
-            .select('creator_id, title')
-            .eq('id', ticket.event_id)
-            .single();
-          
-          if (event && event.creator_id === creatorId) {
-            isCreatorItem = true;
-            itemName = event.title;
-            itemType = 'event_ticket';
-          }
+        if (ticket && ticket.events.creator_id === creatorId) {
+          isCreatorItem = true;
+          itemName = ticket.events.title;
+          itemType = 'event_ticket';
         }
       }
       
@@ -279,6 +285,9 @@ export async function fetchCreatorTransactions(creatorId: string): Promise<Creat
         });
       }
     }
+
+    // Sort by creation date descending
+    creatorTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return creatorTransactions;
   } catch (error) {
