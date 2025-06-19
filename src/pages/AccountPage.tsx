@@ -24,8 +24,6 @@ interface ProfileData {
   avatar_storage_path: string | null;
   is_creator: boolean;
   role: string;
-  total_courses: number;
-  total_events: number;
 }
 
 const AccountPage = () => {
@@ -344,11 +342,11 @@ const AccountPage = () => {
                       
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-background/50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold">{creator.total_courses}</div>
+                          <div className="text-2xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Courses</div>
                         </div>
                         <div className="bg-background/50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold">{creator.total_events}</div>
+                          <div className="text-2xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Events</div>
                         </div>
                       </div>
