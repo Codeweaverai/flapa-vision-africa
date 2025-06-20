@@ -28,7 +28,7 @@ interface PromoCode {
   valid_until: string | null;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
+  updated_at?: string; // Make optional to handle missing field
 }
 
 interface Course {
@@ -76,7 +76,7 @@ const PromoCodeManager = () => {
     try {
       const { data, error } = await supabase
         .from('promo_codes')
-        .select('*')
+        .select('*, updated_at')
         .eq('creator_id', user?.id)
         .order('created_at', { ascending: false });
 

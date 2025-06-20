@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,11 +48,11 @@ const CreatorDashboard = () => {
     try {
       setLoading(true);
       
-      // Load revenue data from orders/order_items
+      // Load enhanced revenue data from orders
       const revenueData = await fetchCreatorRevenue(user.id);
       setRevenue(revenueData);
       
-      // Load earnings data
+      // Load earnings data for withdraw dialog
       const earningsData = await fetchCreatorEarnings(user.id);
       setEarnings(earningsData);
       
@@ -87,68 +86,19 @@ const CreatorDashboard = () => {
       
       if (eventsError) throw eventsError;
 
-      // Fetch total students (enrollments + event bookings)
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('course_enrollments')
-        .select(`
-          id,
-          courses!inner(creator_id)
-        `)
-        .eq('courses.creator_id', user.id)
-        .eq('payment_status', 'completed');
-
-      if (enrollmentsError) throw enrollmentsError;
-
-      const { data: bookings, error: bookingsError } = await supabase
-        .from('event_bookings')
-        .select(`
-          id,
-          events!inner(creator_id)
-        `)
-        .eq('events.creator_id', user.id)
-        .eq('payment_status', 'completed');
-
-      if (bookingsError) throw bookingsError;
-
-      // Fetch reviews
-      const { data: courseReviews, error: courseReviewsError } = await supabase
-        .from('course_reviews')
-        .select(`
-          rating,
-          courses!inner(creator_id)
-        `)
-        .eq('courses.creator_id', user.id);
-
-      if (courseReviewsError) throw courseReviewsError;
-
-      const { data: eventReviews, error: eventReviewsError } = await supabase
-        .from('event_reviews')
-        .select(`
-          rating,
-          events!inner(creator_id)
-        `)
-        .eq('events.creator_id', user.id);
-
-      if (eventReviewsError) throw eventReviewsError;
-
-      const allReviews = [...(courseReviews || []), ...(eventReviews || [])];
-      const averageRating = allReviews.length > 0 
-        ? allReviews.reduce((sum, review) => sum + review.rating, 0) / allReviews.length 
-        : 0;
-
       setStats({
         totalCourses: courses?.length || 0,
         totalEvents: events?.length || 0,
-        totalStudents: (enrollments?.length || 0) + (bookings?.length || 0),
-        totalReviews: allReviews.length,
-        averageRating: Math.round(averageRating * 10) / 10
+        totalStudents: revenue?.totalStudents || 0,
+        totalReviews: revenue?.totalReviews || 0,
+        averageRating: revenue?.averageRating || 0
       });
     } catch (error) {
       console.error('Error loading basic stats:', error);
     }
   };
 
-  // Chart data
+  // Chart data using real revenue data
   const revenueBySource = revenue ? [
     { name: 'Courses', value: revenue.courseRevenue, color: '#8b5cf6' },
     { name: 'Events', value: revenue.eventRevenue, color: '#ff7b42' }
@@ -175,7 +125,7 @@ const CreatorDashboard = () => {
           </div>
           <Button
             onClick={() => setIsWithdrawDialogOpen(true)}
-            disabled={!earnings?.available_balance || earnings.available_balance < 5}
+            disabled={!revenue?.availableBalance || revenue.availableBalance < 5}
             className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
           >
             <DollarSign className="h-4 w-4 mr-2" />
@@ -219,9 +169,9 @@ const CreatorDashboard = () => {
               <Star className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.averageRating.toFixed(1)}</div>
+              <div className="text-2xl font-bold">{revenue?.averageRating?.toFixed(1) || '0.0'}</div>
               <p className="text-xs text-muted-foreground">
-                From {stats.totalReviews} reviews
+                From {revenue?.totalReviews || 0} reviews
               </p>
             </CardContent>
           </Card>
@@ -233,7 +183,7 @@ const CreatorDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
+                <PriceDisplay amount={revenue?.availableBalance || 0} originalCurrency="USD" />
               </div>
               <p className="text-xs text-muted-foreground">
                 Ready for withdrawal
@@ -365,13 +315,13 @@ const CreatorDashboard = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Available Balance:</span>
                   <span className="font-bold text-green-600">
-                    <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
+                    <PriceDisplay amount={revenue?.availableBalance || 0} originalCurrency="USD" />
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Pending (7-day hold):</span>
                   <span className="font-bold text-amber-600">
-                    <PriceDisplay amount={earnings?.pending_balance || 0} originalCurrency="USD" />
+                    <PriceDisplay amount={revenue?.pendingBalance || 0} originalCurrency="USD" />
                   </span>
                 </div>
               </div>
@@ -383,7 +333,7 @@ const CreatorDashboard = () => {
         <EnhancedWithdrawDialog
           open={isWithdrawDialogOpen}
           onOpenChange={setIsWithdrawDialogOpen}
-          availableBalance={earnings?.available_balance || 0}
+          availableBalance={revenue?.availableBalance || 0}
           currency={currentCurrency}
           onSuccess={loadDashboardData}
         />
