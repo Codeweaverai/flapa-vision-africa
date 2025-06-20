@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -199,7 +198,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     step="0.01"
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                    <PriceDisplay amount={withdrawAmount} originalCurrency="USD" showCurrency={false} />
+                    <PriceDisplay amount={withdrawAmount} originalCurrency="USD" />
                   </div>
                 </div>
               </div>

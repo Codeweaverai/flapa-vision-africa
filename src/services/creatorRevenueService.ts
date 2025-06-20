@@ -68,11 +68,11 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
       .map(([month, revenue]) => ({ month, revenue }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Fetch total students
+    // Fetch total students - use enrollment_date instead of created_at
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from('course_enrollments')
       .select(`
-        created_at,
+        enrollment_date,
         courses!inner(creator_id)
       `)
       .eq('courses.creator_id', creatorId)
@@ -80,10 +80,11 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
 
     if (enrollmentsError) throw enrollmentsError;
 
+    // Use booking_date for event bookings
     const { data: eventBookings, error: bookingsError } = await supabase
       .from('event_bookings')
       .select(`
-        created_at,
+        booking_date,
         events!inner(creator_id)
       `)
       .eq('events.creator_id', creatorId)
@@ -94,7 +95,10 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
     const totalStudents = (enrollments?.length || 0) + (eventBookings?.length || 0);
 
     // Calculate monthly students
-    const allStudents = [...(enrollments || []), ...(eventBookings || [])];
+    const allStudents = [
+      ...(enrollments || []).map(e => ({ created_at: e.enrollment_date })),
+      ...(eventBookings || []).map(b => ({ created_at: b.booking_date }))
+    ];
     const monthlyStudentsMap = new Map<string, number>();
     
     allStudents.forEach(student => {
