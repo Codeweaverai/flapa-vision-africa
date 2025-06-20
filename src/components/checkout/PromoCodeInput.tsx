@@ -77,7 +77,7 @@ const PromoCodeInput: React.FC<PromoCodeInputProps> = ({
       }
 
       // Check if promo code applies to current item (if specified)
-      if (itemType && itemId) {
+      if (itemType && itemId && data.item_type && data.item_id) {
         if (data.item_type !== itemType || data.item_id !== itemId) {
           toast.error('This promo code does not apply to this item');
           return;

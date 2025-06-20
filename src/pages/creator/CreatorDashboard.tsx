@@ -1,601 +1,394 @@
 
 import React, { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line
-} from 'recharts';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/lib/supabaseClient';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Users, BookOpen, Calendar, DollarSign } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { DollarSign, Users, BookOpen, Calendar, TrendingUp, Eye, Download, MessageSquare, Star } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { fetchCreatorRevenue } from '@/services/creatorRevenueService';
+import { fetchCreatorEarnings } from '@/services/creatorPaymentService';
 import CreatorLayout from '@/components/creator/CreatorLayout';
+import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { supabase } from '@/lib/supabaseClient';
 
-// Fix the specific function causing the error
-const calculateMonthlyRevenue = (enrollments: EnrollmentType[]) => {
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  // Initialize the monthly revenue with zeros for all months
-  const monthlyRevenue = monthNames.map(name => ({ name, revenue: 0 }));
-  
-  if (!enrollments || enrollments.length === 0) {
-    return monthlyRevenue;
-  }
-  
-  enrollments.forEach(enrollment => {
-    if (enrollment?.payment_status === 'completed' && enrollment?.course) {
-      const enrollmentDate = new Date(enrollment.enrollment_date);
-      const monthIndex = enrollmentDate.getMonth();
-      const price = enrollment?.course?.price ? Number(enrollment.course.price) : 0;
-      
-      if (monthIndex >= 0 && monthIndex < 12) {
-        monthlyRevenue[monthIndex] = {
-          name: monthlyRevenue[monthIndex].name,
-          revenue: Number(monthlyRevenue[monthIndex].revenue) + price
-        };
-      }
-    }
-  });
-  
-  return monthlyRevenue;
-};
-
-// Define interfaces for our state types
-interface RevenueMetrics {
-  totalRevenue: number;
-  courseRevenue: number;
-  eventRevenue: number;
-  monthlyRevenue: Array<{name: string, revenue: number}>;
-  revenueBySource: Array<{name: string, value: number}>;
-}
-
-interface EngagementMetrics {
+interface DashboardStats {
+  totalCourses: number;
+  totalEvents: number;
   totalStudents: number;
-  activeCourses: number;
-  completionRate: number;
-  studentEngagement: Array<{month: string, engagement: number}>;
+  totalReviews: number;
+  averageRating: number;
 }
 
-// Define simpler interfaces for API response types to avoid deep type recursion
-interface CourseType {
-  id: string;
-  title: string;
-  price: number;
-  [key: string]: any;
-}
-
-interface EnrollmentType {
-  id: string;
-  user_id: string;
-  course_id: string;
-  payment_status: string;
-  enrollment_date: string;
-  course?: CourseType;
-  status?: string;
-  [key: string]: any;
-}
-
-interface EventType {
-  id: string;
-  title: string;
-  price: number;
-  [key: string]: any;
-}
-
-interface RegistrationType {
-  id: string;
-  user_id: string;
-  event_id: string;
-  payment_status: string;
-  event?: EventType;
-  [key: string]: any;
-}
-
-// Define simple types for Supabase responses to avoid nested type recursion
-type SupabaseResponse<T> = {
-  data: T | null;
-  error: Error | null;
-};
-
-const CreatorDashboard: React.FC = () => {
-  const [courses, setCourses] = useState<CourseType[]>([]);
-  const [enrollments, setEnrollments] = useState<EnrollmentType[]>([]);
-  const [events, setEvents] = useState<EventType[]>([]);
-  const [registrations, setRegistrations] = useState<RegistrationType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedTimeRange, setSelectedTimeRange] = useState('month');
-  const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false);
-  const [showRevenueBySource, setShowRevenueBySource] = useState(false);
-  const [revenueMetrics, setRevenueMetrics] = useState<RevenueMetrics>({
-    totalRevenue: 0,
-    courseRevenue: 0,
-    eventRevenue: 0,
-    monthlyRevenue: [],
-    revenueBySource: []
-  });
-  const [engagementMetrics, setEngagementMetrics] = useState<EngagementMetrics>({
+const CreatorDashboard = () => {
+  const { user } = useAuth();
+  const { convertPrice, currentCurrency } = useCurrency();
+  const [revenue, setRevenue] = useState<any>(null);
+  const [earnings, setEarnings] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalCourses: 0,
+    totalEvents: 0,
     totalStudents: 0,
-    activeCourses: 0,
-    completionRate: 0,
-    studentEngagement: []
+    totalReviews: 0,
+    averageRating: 0
   });
+  const [loading, setLoading] = useState(true);
+  const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
 
   useEffect(() => {
-    const fetchCreatorData = async () => {
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  const loadDashboardData = async () => {
+    if (!user) return;
+    
+    try {
       setLoading(true);
-      setError(null);
-      try {
-        const authResponse: SupabaseResponse<{user?: {id: string}|null}> = await supabase.auth.getUser();
-        
-        if (authResponse.error) throw authResponse.error;
-        
-        const creatorId = authResponse.data?.user?.id;
-        if (!creatorId) {
-          throw new Error('User not authenticated');
-        }
-        
-        // Fetch courses created by this creator
-        const coursesResponse: SupabaseResponse<CourseType[]> = await supabase
-          .from('courses')
-          .select('*')
-          .eq('creator_id', creatorId);
-        
-        if (coursesResponse.error) throw coursesResponse.error;
-        
-        // Fetch course enrollments with payment transactions
-        const courseIds = coursesResponse.data?.map(course => course.id) || [];
-        
-        let enrollmentsData: EnrollmentType[] = [];
-        if (courseIds.length > 0) {
-          const enrollmentsResponse: SupabaseResponse<EnrollmentType[]> = await supabase
-            .from('course_enrollments')
-            .select(`
-              *,
-              course:courses(*)
-            `)
-            .in('course_id', courseIds);
-          
-          if (enrollmentsResponse.error) throw enrollmentsResponse.error;
-          enrollmentsData = enrollmentsResponse.data || [];
-        }
-        
-        // Fetch events created by this creator
-        const eventsResponse: SupabaseResponse<EventType[]> = await supabase
-          .from('events')
-          .select('*')
-          .eq('creator_id', creatorId);
-        
-        if (eventsResponse.error) throw eventsResponse.error;
-        
-        // Fetch event bookings
-        const eventIds = eventsResponse.data?.map(event => event.id) || [];
-        
-        let registrationsData: RegistrationType[] = [];
-        if (eventIds.length > 0) {
-          const registrationsResponse: SupabaseResponse<RegistrationType[]> = await supabase
-            .from('event_bookings')
-            .select(`
-              *,
-              event:events(*)
-            `)
-            .in('event_id', eventIds);
-          
-          if (registrationsResponse.error) throw registrationsResponse.error;
-          registrationsData = registrationsResponse.data || [];
-        }
-
-        // Fetch payment transactions for earnings calculation
-        const { data: paymentData, error: paymentError } = await supabase
-          .from('payment_transactions')
-          .select('*')
-          .eq('creator_id', creatorId)
-          .eq('status', 'completed');
-
-        if (paymentError) throw paymentError;
-
-        setCourses(coursesResponse.data || []);
-        setEnrollments(enrollmentsData);
-        setEvents(eventsResponse.data || []);
-        setRegistrations(registrationsData);
-        
-        // Calculate revenue metrics with actual payment data
-        calculateRevenueMetrics(enrollmentsData, registrationsData, paymentData || []);
-        
-        // Calculate engagement metrics
-        calculateEngagementMetrics(enrollmentsData, coursesResponse.data || []);
-        
-      } catch (err: any) {
-        console.error('Error fetching creator data:', err.message);
-        setError('Failed to load dashboard data. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchCreatorData();
-  }, []);
-
-  const calculateRevenueMetrics = (
-    enrollments: EnrollmentType[], 
-    registrations: RegistrationType[], 
-    paymentTransactions: any[]
-  ) => {
-    // Calculate revenue from actual payment transactions
-    const courseRevenue = paymentTransactions
-      .filter(pt => pt.reference_type === 'course')
-      .reduce((total, pt) => total + (Number(pt.creator_earning) || 0), 0);
-    
-    const eventRevenue = paymentTransactions
-      .filter(pt => pt.reference_type === 'event')
-      .reduce((total, pt) => total + (Number(pt.creator_earning) || 0), 0);
-    
-    const totalRevenue = courseRevenue + eventRevenue;
-    
-    // Calculate monthly revenue from payment transactions
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthlyRevenue = monthNames.map(name => ({ name, revenue: 0 }));
-    
-    paymentTransactions.forEach(transaction => {
-      const transactionDate = new Date(transaction.created_at);
-      const monthIndex = transactionDate.getMonth();
-      const earning = Number(transaction.creator_earning) || 0;
       
-      if (monthIndex >= 0 && monthIndex < 12) {
-        monthlyRevenue[monthIndex] = {
-          name: monthlyRevenue[monthIndex].name,
-          revenue: Number(monthlyRevenue[monthIndex].revenue) + earning
-        };
-      }
-    });
-    
-    const revenueBySource = [
-      { name: 'Courses', value: courseRevenue },
-      { name: 'Events', value: eventRevenue }
-    ];
-    
-    setRevenueMetrics({
-      totalRevenue,
-      courseRevenue,
-      eventRevenue,
-      monthlyRevenue,
-      revenueBySource
-    });
+      // Load revenue data
+      const revenueData = await fetchCreatorRevenue(user.id);
+      setRevenue(revenueData);
+      
+      // Load earnings data
+      const earningsData = await fetchCreatorEarnings(user.id);
+      setEarnings(earningsData);
+      
+      // Load basic stats
+      await loadBasicStats();
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const calculateEngagementMetrics = (enrollments: EnrollmentType[], courses: CourseType[]) => {
-    // Calculate total students (unique users enrolled)
-    const uniqueStudentIds = new Set(enrollments.map(enrollment => enrollment.user_id));
-    const totalStudents = uniqueStudentIds.size;
+  const loadBasicStats = async () => {
+    if (!user) return;
     
-    // Calculate active courses (courses with at least one enrollment)
-    const activeCourseIds = new Set(enrollments.map(enrollment => enrollment.course_id));
-    const activeCourses = activeCourseIds.size;
-    
-    // Calculate completion rate
-    const completedEnrollments = enrollments.filter(enrollment => enrollment.status === 'completed').length;
-    const completionRate = enrollments.length > 0 
-      ? (completedEnrollments / enrollments.length) * 100 
-      : 0;
-    
-    // Sample student engagement data over time
-    // In a real application, this would be calculated from actual user activity data
-    const studentEngagement = [
-      { month: 'Jan', engagement: 65 },
-      { month: 'Feb', engagement: 59 },
-      { month: 'Mar', engagement: 80 },
-      { month: 'Apr', engagement: 81 },
-      { month: 'May', engagement: 56 },
-      { month: 'Jun', engagement: 55 },
-      { month: 'Jul', engagement: 40 }
-    ];
-    
-    setEngagementMetrics({
-      totalStudents,
-      activeCourses,
-      completionRate,
-      studentEngagement
-    });
+    try {
+      // Fetch courses count
+      const { data: courses, error: coursesError } = await supabase
+        .from('courses')
+        .select('id')
+        .eq('creator_id', user.id)
+        .eq('is_published', true);
+      
+      if (coursesError) throw coursesError;
+
+      // Fetch events count
+      const { data: events, error: eventsError } = await supabase
+        .from('events')
+        .select('id')
+        .eq('creator_id', user.id);
+      
+      if (eventsError) throw eventsError;
+
+      // Fetch total students (enrollments + event bookings)
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select(`
+          id,
+          courses!inner(creator_id)
+        `)
+        .eq('courses.creator_id', user.id)
+        .eq('payment_status', 'completed');
+
+      if (enrollmentsError) throw enrollmentsError;
+
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('event_bookings')
+        .select(`
+          id,
+          events!inner(creator_id)
+        `)
+        .eq('events.creator_id', user.id)
+        .eq('payment_status', 'completed');
+
+      if (bookingsError) throw bookingsError;
+
+      // Fetch reviews
+      const { data: courseReviews, error: courseReviewsError } = await supabase
+        .from('course_reviews')
+        .select(`
+          rating,
+          courses!inner(creator_id)
+        `)
+        .eq('courses.creator_id', user.id);
+
+      if (courseReviewsError) throw courseReviewsError;
+
+      const { data: eventReviews, error: eventReviewsError } = await supabase
+        .from('event_reviews')
+        .select(`
+          rating,
+          events!inner(creator_id)
+        `)
+        .eq('events.creator_id', user.id);
+
+      if (eventReviewsError) throw eventReviewsError;
+
+      const allReviews = [...(courseReviews || []), ...(eventReviews || [])];
+      const averageRating = allReviews.length > 0 
+        ? allReviews.reduce((sum, review) => sum + review.rating, 0) / allReviews.length 
+        : 0;
+
+      setStats({
+        totalCourses: courses?.length || 0,
+        totalEvents: events?.length || 0,
+        totalStudents: (enrollments?.length || 0) + (bookings?.length || 0),
+        totalReviews: allReviews.length,
+        averageRating: Math.round(averageRating * 10) / 10
+      });
+    } catch (error) {
+      console.error('Error loading basic stats:', error);
+    }
   };
+
+  // Chart data
+  const revenueBySource = revenue ? [
+    { name: 'Courses', value: revenue.courseRevenue, color: '#8b5cf6' },
+    { name: 'Events', value: revenue.eventRevenue, color: '#ff7b42' }
+  ] : [];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
-        <CreatorLayout title="Dashboard">
-          <div className="flex justify-center items-center h-64">
-            <p className="text-white">Loading dashboard data...</p>
-          </div>
-        </CreatorLayout>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
-        <CreatorLayout title="Dashboard">
-          <div className="flex justify-center items-center h-64">
-            <p className="text-red-300">{error}</p>
-          </div>
-        </CreatorLayout>
-      </div>
+      <CreatorLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </CreatorLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-600 to-purple-800">
-      <CreatorLayout title="Dashboard">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-              <div className="flex items-center space-x-2">
-                <DollarSign className="h-10 w-10 text-orange-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Total Revenue</p>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                    <PriceDisplay amount={revenueMetrics.totalRevenue} originalCurrency="USD" />
-                  </h3>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-              <div className="flex items-center space-x-2">
-                <Users className="h-10 w-10 text-purple-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Total Students</p>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{engagementMetrics.totalStudents}</h3>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-              <div className="flex items-center space-x-2">
-                <BookOpen className="h-10 w-10 text-orange-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Active Courses</p>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{engagementMetrics.activeCourses}</h3>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-10 w-10 text-purple-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Active Events</p>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{events.length}</h3>
-                </div>
-              </div>
-            </Card>
+    <CreatorLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Creator Dashboard</h1>
+            <p className="text-muted-foreground">Welcome back! Here's your performance overview.</p>
           </div>
-          
-          <Tabs defaultValue="revenue" className="w-full">
-            <TabsList className="mb-4 bg-white/80 backdrop-blur-sm">
-              <TabsTrigger value="revenue" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">Revenue</TabsTrigger>
-              <TabsTrigger value="engagement" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">Engagement</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="revenue" className="space-y-4">
-              <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Revenue Overview</h3>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={revenueMetrics.monthlyRevenue}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value) => [`$${value}`, 'Revenue']}
-                      />
-                      <Bar dataKey="revenue" fill="url(#orangePurpleGradient)" />
-                      <defs>
-                        <linearGradient id="orangePurpleGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f97316" />
-                          <stop offset="100%" stopColor="#9333ea" />
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Course Revenue</h3>
-                  <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      <PriceDisplay amount={revenueMetrics.courseRevenue} originalCurrency="USD" />
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {
-                        revenueMetrics.totalRevenue > 0 
-                          ? `${((revenueMetrics.courseRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
-                          : '0% of total'
-                      }
-                    </p>
-                  </div>
-                </Card>
-                
-                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Event Revenue</h3>
-                  <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      <PriceDisplay amount={revenueMetrics.eventRevenue} originalCurrency="USD" />
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {
-                        revenueMetrics.totalRevenue > 0
-                          ? `${((revenueMetrics.eventRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)}% of total`
-                          : '0% of total'
-                      }
-                    </p>
-                  </div>
-                </Card>
-              </div>
-              
-              <Collapsible 
-                open={showRevenueBySource}
-                onOpenChange={setShowRevenueBySource}
-                className="w-full"
-              >
-                <CollapsibleTrigger asChild>
-                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-white/20 rounded backdrop-blur-sm">
-                    <ChevronDown className={`h-4 w-4 transition-transform text-white ${showRevenueBySource ? 'transform rotate-180' : ''}`} />
-                    <span className="font-medium text-white">Revenue by Source</span>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                    <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Revenue by Source</h3>
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={revenueMetrics.revenueBySource}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip 
-                            formatter={(value) => [`$${value}`, 'Revenue']}
-                          />
-                          <Bar dataKey="value" fill="url(#orangePurpleGradient)" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
-            </TabsContent>
-            
-            <TabsContent value="engagement" className="space-y-4">
-              <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Student Engagement</h3>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={engagementMetrics.studentEngagement}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="engagement" stroke="url(#orangePurpleGradient)" strokeWidth={3} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Course Completion Rate</h3>
-                  <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{engagementMetrics.completionRate.toFixed(1)}%</p>
-                    <p className="text-sm text-gray-600">Average completion rate</p>
-                  </div>
-                </Card>
-                
-                <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                  <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Course Popularity</h3>
-                  <div className="flex flex-col items-center justify-center h-[200px]">
-                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">{courses.length > 0 ? (enrollments.length / courses.length).toFixed(1) : '0'}</p>
-                    <p className="text-sm text-gray-600">Avg. enrollments per course</p>
-                  </div>
-                </Card>
-              </div>
-              
-              <Collapsible 
-                open={showDetailedAnalytics}
-                onOpenChange={setShowDetailedAnalytics}
-                className="w-full"
-              >
-                <CollapsibleTrigger asChild>
-                  <div className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-white/20 rounded backdrop-blur-sm">
-                    <ChevronDown className={`h-4 w-4 transition-transform text-white ${showDetailedAnalytics ? 'transform rotate-180' : ''}`} />
-                    <span className="font-medium text-white">Detailed Analytics</span>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <Card className="p-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                    <h3 className="text-lg font-medium mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Analytics Controls</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-sm font-medium mb-2">Time Range</h4>
-                        <div className="flex space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id="time-week"
-                              checked={selectedTimeRange === 'week'}
-                              onCheckedChange={() => setSelectedTimeRange('week')}
-                            />
-                            <label htmlFor="time-week">Week</label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id="time-month"
-                              checked={selectedTimeRange === 'month'}
-                              onCheckedChange={() => setSelectedTimeRange('month')}
-                            />
-                            <label htmlFor="time-month">Month</label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id="time-year"
-                              checked={selectedTimeRange === 'year'}
-                              onCheckedChange={() => setSelectedTimeRange('year')}
-                            />
-                            <label htmlFor="time-year">Year</label>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <Separator />
-                      
-                      <div>
-                        <h4 className="text-sm font-medium mb-2">Data Filters</h4>
-                        <div className="flex flex-wrap gap-4">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="filter-courses" />
-                            <label htmlFor="filter-courses">Courses Only</label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="filter-events" />
-                            <label htmlFor="filter-events">Events Only</label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="filter-paid" />
-                            <label htmlFor="filter-paid">Paid Content Only</label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="filter-free" />
-                            <label htmlFor="filter-free">Free Content Only</label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
-            </TabsContent>
-          </Tabs>
+          <Button
+            onClick={() => setIsWithdrawDialogOpen(true)}
+            disabled={!earnings?.available_balance || earnings.available_balance < 5}
+            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+          >
+            <DollarSign className="h-4 w-4 mr-2" />
+            Withdraw Funds
+          </Button>
         </div>
-      </CreatorLayout>
-    </div>
+
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                <PriceDisplay amount={revenue?.totalRevenue || 0} originalCurrency="USD" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                +{((revenue?.monthlyRevenue || []).slice(-2).reduce((sum: number, month: any) => sum + month.revenue, 0) || 0).toFixed(1)}% from last month
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalStudents}</div>
+              <p className="text-xs text-muted-foreground">
+                {stats.totalCourses} courses, {stats.totalEvents} events
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+              <Star className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.averageRating.toFixed(1)}</div>
+              <p className="text-xs text-muted-foreground">
+                From {stats.totalReviews} reviews
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ready for withdrawal
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Revenue Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Overview</CardTitle>
+              <CardDescription>Monthly revenue from all sources</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={revenue?.monthlyRevenue || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Revenue']}
+                    labelFormatter={(label) => `Month: ${label}`}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2}
+                    dot={{ fill: '#8b5cf6' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Engagement Graph */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Student Engagement</CardTitle>
+              <CardDescription>New students per month</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={revenue?.monthlyStudents || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value: any) => [value, 'Students']}
+                    labelFormatter={(label) => `Month: ${label}`}
+                  />
+                  <Bar dataKey="students" fill="#ff7b42" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Revenue Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Course vs Event Revenue */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue by Source</CardTitle>
+              <CardDescription>Compare course and event revenue</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={revenueBySource}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    dataKey="value"
+                  >
+                    {revenueBySource.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => `$${Number(value).toFixed(2)}`} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex justify-center gap-4 mt-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                  <span className="text-sm">Courses</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span className="text-sm">Events</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Revenue Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Details</CardTitle>
+              <CardDescription>Breakdown of your earnings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Course Revenue:</span>
+                  <span className="font-bold">
+                    <PriceDisplay amount={revenue?.courseRevenue || 0} originalCurrency="USD" />
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Event Revenue:</span>
+                  <span className="font-bold">
+                    <PriceDisplay amount={revenue?.eventRevenue || 0} originalCurrency="USD" />
+                  </span>
+                </div>
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Total Revenue:</span>
+                    <span className="font-bold text-lg">
+                      <PriceDisplay amount={revenue?.totalRevenue || 0} originalCurrency="USD" />
+                    </span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Available Balance:</span>
+                  <span className="font-bold text-green-600">
+                    <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Pending (7-day hold):</span>
+                  <span className="font-bold text-amber-600">
+                    <PriceDisplay amount={earnings?.pending_balance || 0} originalCurrency="USD" />
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Enhanced Withdraw Dialog */}
+        <EnhancedWithdrawDialog
+          open={isWithdrawDialogOpen}
+          onOpenChange={setIsWithdrawDialogOpen}
+          availableBalance={earnings?.available_balance || 0}
+          currency={currentCurrency}
+          onSuccess={loadDashboardData}
+        />
+      </div>
+    </CreatorLayout>
   );
 };
 

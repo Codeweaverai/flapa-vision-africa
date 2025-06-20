@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -118,12 +117,11 @@ const PromoCodeManager = () => {
 
   const generatePromoCode = async () => {
     try {
-      const { data, error } = await supabase.rpc('generate_promo_code');
-      if (error) throw error;
-      setFormData(prev => ({ ...prev, code: data }));
+      // Generate a random promo code
+      const randomCode = 'PROMO' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      setFormData(prev => ({ ...prev, code: randomCode }));
     } catch (error) {
       console.error('Error generating promo code:', error);
-      // Fallback to manual generation
       const randomCode = 'PROMO' + Math.random().toString(36).substr(2, 6).toUpperCase();
       setFormData(prev => ({ ...prev, code: randomCode }));
     }
