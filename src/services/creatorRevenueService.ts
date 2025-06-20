@@ -12,7 +12,7 @@ export interface CreatorRevenue {
 
 export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRevenue> {
   try {
-    // Fetch course revenue from orders
+    // Fetch course revenue from orders and order_items
     const { data: courseOrders, error: courseError } = await supabase
       .from('orders')
       .select(`
@@ -30,7 +30,7 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
 
     if (courseError) throw courseError;
 
-    // Fetch event revenue from orders
+    // Fetch event revenue from orders and order_items
     const { data: eventOrders, error: eventError } = await supabase
       .from('orders')
       .select(`
@@ -40,6 +40,7 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
           item_type,
           item_id,
           event_tickets!inner(
+            event_id,
             events!inner(creator_id)
           )
         )
@@ -68,7 +69,7 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
       .map(([month, revenue]) => ({ month, revenue }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Fetch total students - use enrollment_date instead of created_at
+    // Fetch total students from course enrollments
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from('course_enrollments')
       .select(`
@@ -80,7 +81,7 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
 
     if (enrollmentsError) throw enrollmentsError;
 
-    // Use booking_date for event bookings
+    // Fetch students from event bookings
     const { data: eventBookings, error: bookingsError } = await supabase
       .from('event_bookings')
       .select(`

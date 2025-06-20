@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -18,8 +17,8 @@ interface PromoCode {
   id: string;
   code: string;
   creator_id: string;
-  item_type: 'course' | 'event';
-  item_id: string;
+  item_type: string | null;
+  item_id: string | null;
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
   max_uses: number | null;
@@ -55,7 +54,7 @@ const PromoCodeManager = () => {
 
   const [formData, setFormData] = useState({
     code: '',
-    item_type: 'course' as 'course' | 'event',
+    item_type: 'course' as 'course' | 'event' | '',
     item_id: '',
     discount_type: 'percentage' as 'percentage' | 'fixed',
     discount_value: 0,
@@ -137,6 +136,8 @@ const PromoCodeManager = () => {
       const promoCodeData = {
         ...formData,
         creator_id: user.id,
+        item_type: formData.item_type || null,
+        item_id: formData.item_id || null,
         valid_from: new Date(formData.valid_from).toISOString(),
         valid_until: formData.valid_until ? new Date(formData.valid_until).toISOString() : null,
         current_uses: 0
@@ -187,8 +188,8 @@ const PromoCodeManager = () => {
     setEditingPromoCode(promoCode);
     setFormData({
       code: promoCode.code,
-      item_type: promoCode.item_type,
-      item_id: promoCode.item_id,
+      item_type: (promoCode.item_type as 'course' | 'event') || 'course',
+      item_id: promoCode.item_id || '',
       discount_type: promoCode.discount_type,
       discount_value: promoCode.discount_value,
       max_uses: promoCode.max_uses,
@@ -239,7 +240,9 @@ const PromoCodeManager = () => {
     toast.success('Promo code copied to clipboard');
   };
 
-  const getItemTitle = (itemType: string, itemId: string) => {
+  const getItemTitle = (itemType: string | null, itemId: string | null) => {
+    if (!itemType || !itemId) return 'All Items';
+    
     if (itemType === 'course') {
       const course = courses.find(c => c.id === itemId);
       return course?.title || 'Unknown Course';
@@ -314,13 +317,14 @@ const PromoCodeManager = () => {
                 </div>
                 <div>
                   <Label htmlFor="item_type">Apply To</Label>
-                  <Select value={formData.item_type} onValueChange={(value: 'course' | 'event') => {
+                  <Select value={formData.item_type} onValueChange={(value: 'course' | 'event' | '') => {
                     setFormData(prev => ({ ...prev, item_type: value, item_id: '' }));
                   }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">All Items</SelectItem>
                       <SelectItem value="course">Course</SelectItem>
                       <SelectItem value="event">Event</SelectItem>
                     </SelectContent>
@@ -328,33 +332,35 @@ const PromoCodeManager = () => {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="item_id">
-                  {formData.item_type === 'course' ? 'Course' : 'Event'}
-                </Label>
-                <Select value={formData.item_id} onValueChange={(value) => {
-                  setFormData(prev => ({ ...prev, item_id: value }));
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={`Select ${formData.item_type}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.item_type === 'course' ? (
-                      courses.map(course => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.title} - ${course.price}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      events.map(event => (
-                        <SelectItem key={event.id} value={event.id}>
-                          {event.title} - ${event.price}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              {formData.item_type && (
+                <div>
+                  <Label htmlFor="item_id">
+                    {formData.item_type === 'course' ? 'Course' : 'Event'}
+                  </Label>
+                  <Select value={formData.item_id} onValueChange={(value) => {
+                    setFormData(prev => ({ ...prev, item_id: value }));
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Select ${formData.item_type}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.item_type === 'course' ? (
+                        courses.map(course => (
+                          <SelectItem key={course.id} value={course.id}>
+                            {course.title} - ${course.price}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        events.map(event => (
+                          <SelectItem key={event.id} value={event.id}>
+                            {event.title} - ${event.price}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -496,7 +502,7 @@ const PromoCodeManager = () => {
                         <div>
                           <p className="font-medium">{getItemTitle(promoCode.item_type, promoCode.item_id)}</p>
                           <Badge variant="outline" className="text-xs">
-                            {promoCode.item_type}
+                            {promoCode.item_type || 'all'}
                           </Badge>
                         </div>
                       </TableCell>

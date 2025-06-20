@@ -49,7 +49,7 @@ const CreatorDashboard = () => {
     try {
       setLoading(true);
       
-      // Load revenue data
+      // Load revenue data from orders/order_items
       const revenueData = await fetchCreatorRevenue(user.id);
       setRevenue(revenueData);
       
@@ -195,7 +195,7 @@ const CreatorDashboard = () => {
                 <PriceDisplay amount={revenue?.totalRevenue || 0} originalCurrency="USD" />
               </div>
               <p className="text-xs text-muted-foreground">
-                +{((revenue?.monthlyRevenue || []).slice(-2).reduce((sum: number, month: any) => sum + month.revenue, 0) || 0).toFixed(1)}% from last month
+                From orders and bookings
               </p>
             </CardContent>
           </Card>
@@ -206,7 +206,7 @@ const CreatorDashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalStudents}</div>
+              <div className="text-2xl font-bold">{revenue?.totalStudents || 0}</div>
               <p className="text-xs text-muted-foreground">
                 {stats.totalCourses} courses, {stats.totalEvents} events
               </p>
@@ -248,7 +248,7 @@ const CreatorDashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle>Revenue Overview</CardTitle>
-              <CardDescription>Monthly revenue from all sources</CardDescription>
+              <CardDescription>Monthly revenue from orders and bookings</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>

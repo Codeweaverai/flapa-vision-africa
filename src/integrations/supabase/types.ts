@@ -2634,11 +2634,14 @@ export type Database = {
         Row: {
           code: string
           created_at: string | null
+          creator_id: string | null
           current_uses: number | null
           discount_type: string
           discount_value: number
           id: string
           is_active: boolean | null
+          item_id: string | null
+          item_type: string | null
           max_uses: number | null
           min_order_amount: number | null
           valid_from: string | null
@@ -2647,11 +2650,14 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string | null
+          creator_id?: string | null
           current_uses?: number | null
           discount_type: string
           discount_value: number
           id?: string
           is_active?: boolean | null
+          item_id?: string | null
+          item_type?: string | null
           max_uses?: number | null
           min_order_amount?: number | null
           valid_from?: string | null
@@ -2660,11 +2666,14 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string | null
+          creator_id?: string | null
           current_uses?: number | null
           discount_type?: string
           discount_value?: number
           id?: string
           is_active?: boolean | null
+          item_id?: string | null
+          item_type?: string | null
           max_uses?: number | null
           min_order_amount?: number | null
           valid_from?: string | null
