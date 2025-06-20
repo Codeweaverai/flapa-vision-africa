@@ -167,7 +167,7 @@ const CreatorPayments: React.FC = () => {
             <span className="font-medium">Stripe Connect</span>
           </div>
           <div className="text-sm text-blue-600 mt-1">
-            Bank transfers (2-7 business days)
+            Bank transfers (2-3 business days)
           </div>
         </div>
       );
