@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -81,7 +82,14 @@ const PromoCodeManager = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPromoCodes(data || []);
+      
+      // Type cast the data to ensure compatibility with our interface
+      const typedData = data?.map(item => ({
+        ...item,
+        discount_type: item.discount_type as 'percentage' | 'fixed'
+      })) || [];
+      
+      setPromoCodes(typedData);
     } catch (error) {
       console.error('Error fetching promo codes:', error);
       toast.error('Failed to fetch promo codes');

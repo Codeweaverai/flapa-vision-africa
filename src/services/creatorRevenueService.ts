@@ -16,57 +16,77 @@ export interface CreatorRevenue {
 
 export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRevenue> {
   try {
-    // Fetch course revenue from orders and order_items for creator's courses
-    const { data: courseOrders, error: courseError } = await supabase
-      .from('orders')
+    console.log('Fetching creator revenue for:', creatorId);
+
+    // Fetch orders with order items for creator's courses
+    const { data: courseOrderItems, error: courseError } = await supabase
+      .from('order_items')
       .select(`
-        total_amount,
-        created_at,
-        order_items!inner(
-          item_type,
-          item_id,
-          courses!inner(creator_id)
+        total_price,
+        quantity,
+        orders!inner(
+          created_at,
+          payment_status,
+          user_id
         )
       `)
-      .eq('payment_status', 'completed')
-      .eq('order_items.item_type', 'course')
-      .eq('order_items.courses.creator_id', creatorId);
+      .eq('item_type', 'course')
+      .eq('orders.payment_status', 'completed')
+      .in('item_id', 
+        await supabase
+          .from('courses')
+          .select('id')
+          .eq('creator_id', creatorId)
+          .then(({ data }) => data?.map(c => c.id) || [])
+      );
 
-    if (courseError) throw courseError;
+    if (courseError) {
+      console.error('Course order items error:', courseError);
+      throw courseError;
+    }
 
-    // Fetch event revenue from orders and order_items for creator's events
-    const { data: eventOrders, error: eventError } = await supabase
-      .from('orders')
+    // Fetch orders with order items for creator's events
+    const { data: eventOrderItems, error: eventError } = await supabase
+      .from('order_items')
       .select(`
-        total_amount,
-        created_at,
-        order_items!inner(
-          item_type,
-          item_id,
-          event_tickets!inner(
-            event_id,
+        total_price,
+        quantity,
+        orders!inner(
+          created_at,
+          payment_status,
+          user_id
+        )
+      `)
+      .eq('item_type', 'event_ticket')
+      .eq('orders.payment_status', 'completed')
+      .in('item_id', 
+        await supabase
+          .from('event_tickets')
+          .select(`
+            id,
             events!inner(creator_id)
-          )
-        )
-      `)
-      .eq('payment_status', 'completed')
-      .eq('order_items.item_type', 'event_ticket')
-      .eq('order_items.event_tickets.events.creator_id', creatorId);
+          `)
+          .eq('events.creator_id', creatorId)
+          .then(({ data }) => data?.map(et => et.id) || [])
+      );
 
-    if (eventError) throw eventError;
+    if (eventError) {
+      console.error('Event order items error:', eventError);
+      throw eventError;
+    }
 
     // Calculate revenue totals
-    const courseRevenue = courseOrders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
-    const eventRevenue = eventOrders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+    const courseRevenue = courseOrderItems?.reduce((sum, item) => sum + Number(item.total_price), 0) || 0;
+    const eventRevenue = eventOrderItems?.reduce((sum, item) => sum + Number(item.total_price), 0) || 0;
     const totalRevenue = courseRevenue + eventRevenue;
 
     // Calculate monthly revenue
-    const allOrders = [...(courseOrders || []), ...(eventOrders || [])];
+    const allOrderItems = [...(courseOrderItems || []), ...(eventOrderItems || [])];
     const monthlyRevenueMap = new Map<string, number>();
     
-    allOrders.forEach(order => {
-      const month = new Date(order.created_at).toISOString().slice(0, 7);
-      monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + Number(order.total_amount));
+    allOrderItems.forEach(item => {
+      const month = new Date(item.orders.created_at).toISOString().slice(0, 7);
+      monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + Number(item.total_price));
     });
 
     const monthlyRevenue = Array.from(monthlyRevenueMap.entries())
@@ -78,10 +98,16 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
       .from('course_enrollments')
       .select(`
         enrollment_date,
-        courses!inner(creator_id)
+        user_id
       `)
-      .eq('courses.creator_id', creatorId)
-      .eq('payment_status', 'completed');
+      .eq('payment_status', 'completed')
+      .in('course_id', 
+        await supabase
+          .from('courses')
+          .select('id')
+          .eq('creator_id', creatorId)
+          .then(({ data }) => data?.map(c => c.id) || [])
+      );
 
     if (enrollmentsError) throw enrollmentsError;
 
@@ -90,10 +116,16 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
       .from('event_bookings')
       .select(`
         booking_date,
-        events!inner(creator_id)
+        user_id
       `)
-      .eq('events.creator_id', creatorId)
-      .eq('payment_status', 'completed');
+      .eq('payment_status', 'completed')
+      .in('event_id', 
+        await supabase
+          .from('events')
+          .select('id')
+          .eq('creator_id', creatorId)
+          .then(({ data }) => data?.map(e => e.id) || [])
+      );
 
     if (bookingsError) throw bookingsError;
 
@@ -101,21 +133,24 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
 
     // Calculate monthly students
     const allStudents = [
-      ...(enrollments || []).map(e => ({ created_at: e.enrollment_date })),
-      ...(eventBookings || []).map(b => ({ created_at: b.booking_date }))
+      ...(enrollments || []).map(e => ({ created_at: e.enrollment_date, user_id: e.user_id })),
+      ...(eventBookings || []).map(b => ({ created_at: b.booking_date, user_id: b.user_id }))
     ];
     
-    const monthlyStudentsMap = new Map<string, number>();
+    const monthlyStudentsMap = new Map<string, Set<string>>();
     allStudents.forEach(student => {
       const month = new Date(student.created_at).toISOString().slice(0, 7);
-      monthlyStudentsMap.set(month, (monthlyStudentsMap.get(month) || 0) + 1);
+      if (!monthlyStudentsMap.has(month)) {
+        monthlyStudentsMap.set(month, new Set());
+      }
+      monthlyStudentsMap.get(month)?.add(student.user_id);
     });
 
     const monthlyStudents = Array.from(monthlyStudentsMap.entries())
-      .map(([month, students]) => ({ month, students }))
+      .map(([month, userSet]) => ({ month, students: userSet.size }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Calculate available balance using payment_transactions with 7-day hold
+    // Calculate available and pending balances using payment_transactions with 7-day hold
     const { data: transactions, error: transactionsError } = await supabase
       .from('payment_transactions')
       .select('*')
@@ -142,7 +177,9 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
 
     transactions?.forEach(transaction => {
       const earningAmount = Number(transaction.creator_earning || 0);
-      const payoutEligibleDate = new Date(transaction.payout_eligible_date);
+      const payoutEligibleDate = transaction.payout_eligible_date ? 
+        new Date(transaction.payout_eligible_date) : 
+        new Date(new Date(transaction.created_at).getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from creation
       
       if (payoutEligibleDate <= now) {
         availableBalance += earningAmount;
@@ -157,10 +194,15 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
     const { data: courseReviews, error: courseReviewsError } = await supabase
       .from('course_reviews')
       .select(`
-        rating,
-        courses!inner(creator_id)
+        rating
       `)
-      .eq('courses.creator_id', creatorId);
+      .in('course_id', 
+        await supabase
+          .from('courses')
+          .select('id')
+          .eq('creator_id', creatorId)
+          .then(({ data }) => data?.map(c => c.id) || [])
+      );
 
     if (courseReviewsError) throw courseReviewsError;
 
@@ -168,10 +210,15 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
     const { data: eventReviews, error: eventReviewsError } = await supabase
       .from('event_reviews')
       .select(`
-        rating,
-        events!inner(creator_id)
+        rating
       `)
-      .eq('events.creator_id', creatorId);
+      .in('event_id', 
+        await supabase
+          .from('events')
+          .select('id')
+          .eq('creator_id', creatorId)
+          .then(({ data }) => data?.map(e => e.id) || [])
+      );
 
     if (eventReviewsError) throw eventReviewsError;
 
@@ -179,6 +226,16 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
     const averageRating = allReviews.length > 0 
       ? allReviews.reduce((sum, review) => sum + review.rating, 0) / allReviews.length 
       : 0;
+
+    console.log('Creator revenue calculated:', {
+      totalRevenue,
+      courseRevenue,
+      eventRevenue,
+      availableBalance,
+      pendingBalance,
+      totalStudents,
+      averageRating
+    });
 
     return {
       totalRevenue,
