@@ -119,6 +119,7 @@ import CreatorStudents from "./pages/creator/CreatorStudents";
 import CreatorAnalytics from "./pages/creator/CreatorAnalytics";
 import CreatorPayments from "./pages/creator/CreatorPayments";
 import CreatorSettings from "./pages/creator/CreatorSettings";
+import CreatorPromoCodes from "./pages/creator/CreatorPromoCodes";
 
 // Lazy load the AdminContactSubmissions component to avoid import issues
 const AdminContactSubmissions = React.lazy(() => import("./pages/admin/AdminContactSubmissions"));
@@ -222,6 +223,7 @@ function App() {
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
                   <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
+                  <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
 
                   {/* Admin Routes */}
                   <Route path="/admin-login" element={<AdminLogin />} />
