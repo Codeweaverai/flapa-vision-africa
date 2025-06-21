@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Calendar, MapPin, Users, Edit, Trash2, Eye, UserCheck, CalendarIcon, Ticket } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, Edit, Trash2, Eye, UserCheck, CalendarIcon, Ticket, Percent } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -241,6 +241,16 @@ const CreatorEvents = () => {
                     Tickets
                   </Button>
                 </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => navigate(`/creator/promo-codes?item_type=event&item_id=${event.id}`)}
+                >
+                  <Percent className="h-4 w-4 mr-1" />
+                  Promo Codes
+                </Button>
 
                 <Button
                   variant="destructive"

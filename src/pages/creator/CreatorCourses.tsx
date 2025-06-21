@@ -19,7 +19,8 @@ import {
   Users, 
   DollarSign,
   Settings,
-  PlayCircle
+  PlayCircle,
+  Percent
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -285,6 +286,13 @@ const CreatorCourses = () => {
                       {course.is_published ? 'Unpublish' : 'Publish'}
                     </Button>
                   </div>
+
+                  <Button variant="outline" size="sm" asChild className="w-full">
+                    <Link to={`/creator/promo-codes?item_type=course&item_id=${course.id}`}>
+                      <Percent className="h-4 w-4 mr-2" />
+                      Promo Codes
+                    </Link>
+                  </Button>
                   
                   <Button
                     variant="outline"

@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,6 +46,7 @@ interface Event {
 
 const PromoCodeManager = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -53,10 +54,14 @@ const PromoCodeManager = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingPromoCode, setEditingPromoCode] = useState<PromoCode | null>(null);
 
+  // Get URL parameters for pre-filling form
+  const urlItemType = searchParams.get('item_type') as 'course' | 'event' | null;
+  const urlItemId = searchParams.get('item_id');
+
   const [formData, setFormData] = useState({
     code: '',
-    item_type: 'course' as 'course' | 'event' | '',
-    item_id: '',
+    item_type: urlItemType || 'course' as 'course' | 'event' | '',
+    item_id: urlItemId || '',
     discount_type: 'percentage' as 'percentage' | 'fixed',
     discount_value: 0,
     max_uses: null as number | null,
@@ -72,6 +77,17 @@ const PromoCodeManager = () => {
       fetchCreatorContent();
     }
   }, [user]);
+
+  // Update form when URL parameters change
+  useEffect(() => {
+    if (urlItemType && urlItemId) {
+      setFormData(prev => ({
+        ...prev,
+        item_type: urlItemType,
+        item_id: urlItemId
+      }));
+    }
+  }, [urlItemType, urlItemId]);
 
   const fetchPromoCodes = async () => {
     try {
@@ -282,8 +298,8 @@ const PromoCodeManager = () => {
               setEditingPromoCode(null);
               setFormData({
                 code: '',
-                item_type: 'course',
-                item_id: '',
+                item_type: urlItemType || 'course',
+                item_id: urlItemId || '',
                 discount_type: 'percentage',
                 discount_value: 0,
                 max_uses: null,
