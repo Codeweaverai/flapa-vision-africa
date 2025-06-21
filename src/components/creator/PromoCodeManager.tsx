@@ -53,7 +53,6 @@ const PromoCodeManager = () => {
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingPromoCode, setEditingPromoCode] = useState<PromoCode | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   // Get URL parameters for pre-filling form
   const urlItemType = searchParams.get('item_type') as 'course' | 'event' | null;
@@ -157,29 +156,6 @@ const PromoCodeManager = () => {
     
     if (!user) return;
 
-    // Validation
-    if (!formData.code.trim()) {
-      toast.error('Promo code is required');
-      return;
-    }
-
-    if (formData.discount_value <= 0) {
-      toast.error('Discount value must be greater than 0');
-      return;
-    }
-
-    if (formData.discount_type === 'percentage' && formData.discount_value > 100) {
-      toast.error('Percentage discount cannot exceed 100%');
-      return;
-    }
-
-    if (formData.valid_until && formData.valid_until <= formData.valid_from) {
-      toast.error('End date must be after start date');
-      return;
-    }
-
-    setSubmitting(true);
-
     try {
       const promoCodeData = {
         ...formData,
@@ -201,21 +177,6 @@ const PromoCodeManager = () => {
         if (error) throw error;
         toast.success('Promo code updated successfully');
       } else {
-        // Check if code already exists
-        const { data: existingCode, error: checkError } = await supabase
-          .from('promo_codes')
-          .select('id')
-          .eq('code', formData.code.toUpperCase())
-          .eq('creator_id', user.id)
-          .maybeSingle();
-
-        if (checkError) throw checkError;
-
-        if (existingCode) {
-          toast.error('A promo code with this name already exists');
-          return;
-        }
-
         // Create new promo code
         const { error } = await supabase
           .from('promo_codes')
@@ -228,8 +189,8 @@ const PromoCodeManager = () => {
       // Reset form and close dialog
       setFormData({
         code: '',
-        item_type: urlItemType || 'course',
-        item_id: urlItemId || '',
+        item_type: 'course',
+        item_id: '',
         discount_type: 'percentage',
         discount_value: 0,
         max_uses: null,
@@ -244,8 +205,6 @@ const PromoCodeManager = () => {
     } catch (error) {
       console.error('Error saving promo code:', error);
       toast.error('Failed to save promo code');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -354,7 +313,7 @@ const PromoCodeManager = () => {
               Create Promo Code
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
                 {editingPromoCode ? 'Edit Promo Code' : 'Create New Promo Code'}
@@ -373,7 +332,6 @@ const PromoCodeManager = () => {
                       value={formData.code}
                       onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
                       placeholder="Enter promo code"
-                      maxLength={20}
                       required
                     />
                     <Button type="button" variant="outline" onClick={generatePromoCode}>
@@ -454,7 +412,6 @@ const PromoCodeManager = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, discount_value: Number(e.target.value) }))}
                     min="0"
                     max={formData.discount_type === 'percentage' ? 100 : undefined}
-                    step="0.01"
                     required
                   />
                 </div>
@@ -503,31 +460,16 @@ const PromoCodeManager = () => {
                     type="date"
                     value={formData.valid_until || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, valid_until: e.target.value || null }))}
-                    min={formData.valid_from}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setIsCreateDialogOpen(false)}
-                  disabled={submitting}
-                >
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      {editingPromoCode ? 'Updating...' : 'Creating...'}
-                    </>
-                  ) : (
-                    <>
-                      {editingPromoCode ? 'Update' : 'Create'} Promo Code
-                    </>
-                  )}
+                <Button type="submit">
+                  {editingPromoCode ? 'Update' : 'Create'} Promo Code
                 </Button>
               </div>
             </form>
