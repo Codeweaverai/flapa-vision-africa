@@ -163,14 +163,20 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
       .map(([month, userSet]) => ({ month, students: userSet.size }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Calculate available and pending balances with correct 7-day logic
-    const { data: transactions, error: transactionsError } = await supabase
-      .from('payment_transactions')
-      .select('*')
-      .eq('creator_id', creatorId)
-      .eq('status', 'completed');
+    // Calculate available and pending balances from orders and order_items
+    const { data: orderItemsWithOrders, error: orderItemsError } = await supabase
+      .from('order_items')
+      .select(`
+        total_price,
+        orders!inner(
+          created_at,
+          payment_status
+        )
+      `)
+      .eq('orders.payment_status', 'completed')
+      .or(`item_id.in.(${courseIds.join(',')}),item_id.in.(${eventTicketIds.join(',')})`, { foreignTable: 'orders' });
 
-    if (transactionsError) throw transactionsError;
+    if (orderItemsError) throw orderItemsError;
 
     // Fetch completed payouts
     const { data: payouts, error: payoutsError } = await supabase
@@ -189,32 +195,37 @@ export async function fetchCreatorRevenue(creatorId: string): Promise<CreatorRev
     let pendingBalance = 0;
 
     console.log('Current time for balance calculation:', now.toISOString());
-    console.log('Total transactions to process:', transactions?.length || 0);
+    console.log('Total order items to process:', orderItemsWithOrders?.length || 0);
 
-    transactions?.forEach(transaction => {
-      const earningAmount = Number(transaction.creator_earning || 0);
-      const transactionDate = new Date(transaction.created_at);
+    // Platform fee (10% as per general_settings)
+    const platformFeeRate = 0.10;
+
+    orderItemsWithOrders?.forEach(orderItem => {
+      const grossAmount = Number(orderItem.total_price);
+      const creatorEarning = grossAmount * (1 - platformFeeRate); // 90% goes to creator
+      const orderDate = new Date(orderItem.orders.created_at);
       
-      // Calculate 7 days from transaction creation
+      // Calculate 7 days from order creation
       // The 7th day at 00:00 is when funds become available
-      const eligibleDate = new Date(transactionDate);
-      eligibleDate.setDate(transactionDate.getDate() + 7);
+      const eligibleDate = new Date(orderDate);
+      eligibleDate.setDate(orderDate.getDate() + 7);
       eligibleDate.setHours(0, 0, 0, 0); // Set to 00:00 of the 7th day
       
-      console.log(`Transaction ${transaction.id}:`);
-      console.log(`  Created: ${transactionDate.toISOString()}`);
-      console.log(`  Eligible: ${eligibleDate.toISOString()}`);
+      console.log(`Order item:`);
+      console.log(`  Order Date: ${orderDate.toISOString()}`);
+      console.log(`  Eligible Date: ${eligibleDate.toISOString()}`);
       console.log(`  Now: ${now.toISOString()}`);
-      console.log(`  Amount: ${earningAmount}`);
-      console.log(`  Days since creation: ${(now.getTime() - transactionDate.getTime()) / (1000 * 60 * 60 * 24)}`);
+      console.log(`  Gross Amount: ${grossAmount}`);
+      console.log(`  Creator Earning: ${creatorEarning}`);
+      console.log(`  Days since order: ${(now.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24)}`);
       
       // Check if the current time is on or after 00:00 of the 7th day
       if (now >= eligibleDate) {
-        availableBalance += earningAmount;
-        console.log(`  -> Added to AVAILABLE balance: ${earningAmount}`);
+        availableBalance += creatorEarning;
+        console.log(`  -> Added to AVAILABLE balance: ${creatorEarning}`);
       } else {
-        pendingBalance += earningAmount;
-        console.log(`  -> Added to PENDING balance: ${earningAmount}`);
+        pendingBalance += creatorEarning;
+        console.log(`  -> Added to PENDING balance: ${creatorEarning}`);
       }
     });
 
