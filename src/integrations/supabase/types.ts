@@ -2644,6 +2644,7 @@ export type Database = {
           item_type: string | null
           max_uses: number | null
           min_order_amount: number | null
+          updated_at: string | null
           valid_from: string | null
           valid_until: string | null
         }
@@ -2660,6 +2661,7 @@ export type Database = {
           item_type?: string | null
           max_uses?: number | null
           min_order_amount?: number | null
+          updated_at?: string | null
           valid_from?: string | null
           valid_until?: string | null
         }
@@ -2676,6 +2678,7 @@ export type Database = {
           item_type?: string | null
           max_uses?: number | null
           min_order_amount?: number | null
+          updated_at?: string | null
           valid_from?: string | null
           valid_until?: string | null
         }
