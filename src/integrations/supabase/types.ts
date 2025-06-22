@@ -2586,7 +2586,9 @@ export type Database = {
           newsletter_subscribed: boolean | null
           payout_method: string | null
           role: Database["public"]["Enums"]["user_role"] | null
+          stripe_connect_account_id: string | null
           stripe_connect_id: string | null
+          stripe_onboarding_completed: boolean | null
           updated_at: string | null
           username: string | null
         }
@@ -2608,7 +2610,9 @@ export type Database = {
           newsletter_subscribed?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_connect_account_id?: string | null
           stripe_connect_id?: string | null
+          stripe_onboarding_completed?: boolean | null
           updated_at?: string | null
           username?: string | null
         }
@@ -2630,7 +2634,9 @@ export type Database = {
           newsletter_subscribed?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_connect_account_id?: string | null
           stripe_connect_id?: string | null
+          stripe_onboarding_completed?: boolean | null
           updated_at?: string | null
           username?: string | null
         }

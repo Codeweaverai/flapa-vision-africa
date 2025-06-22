@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,11 +14,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Smartphone, MapPin, Check } from 'lucide-react';
+import { AlertCircle, CreditCard, Smartphone, CheckCircle, ExternalLink } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { toast } from '@/components/ui/use-toast';
-import { PAWAPAY_COUNTRY_CODES, PawapayCountryCode } from '@/constants/pawapayCountries';
+import { toast } from 'sonner';
 
 interface PayoutMethodSetupDialogProps {
   open: boolean;
@@ -25,297 +26,334 @@ interface PayoutMethodSetupDialogProps {
   onSuccess: () => void;
 }
 
-const COUNTRY_OPTIONS = [
-  { code: 'USA', name: 'United States', flag: '🇺🇸', paymentMethod: 'stripe' },
-  { code: 'ZMB', name: 'Zambia', flag: '🇿🇲', paymentMethod: 'mobile_money' },
-  { code: 'NGA', name: 'Nigeria', flag: '🇳🇬', paymentMethod: 'mobile_money' },
-  { code: 'MWI', name: 'Malawi', flag: '🇲🇼', paymentMethod: 'mobile_money' },
-  { code: 'KEN', name: 'Kenya', flag: '🇰🇪', paymentMethod: 'mobile_money' },
-];
-
-const MOBILE_OPERATORS = {
-  ZMB: [
-    { name: 'MTN Zambia', code: 'MTN_MOMO_ZMB' },
-    { name: 'Airtel Zambia', code: 'AIRTEL_OAPI_ZMB' },
-    { name: 'Zamtel Zambia', code: 'ZAMTEL_ZMB' },
-  ],
-  NGA: [
-    { name: 'MTN Nigeria', code: 'MTN_MOMO_NGA' },
-    { name: 'Airtel Nigeria', code: 'AIRTEL_OAPI_NGA' },
-  ],
-  MWI: [
-    { name: 'TNM Malawi', code: 'TNM_MPAMBA_MWI' },
-    { name: 'Airtel Malawi', code: 'AIRTEL_OAPI_MWI' },
-  ],
-  KEN: [
-    { name: 'Safaricom M-Pesa', code: 'MPESA_KEN' },
-    { name: 'Airtel Kenya', code: 'AIRTEL_OAPI_KEN' },
-  ],
-};
+interface ProfileData {
+  stripe_connect_account_id?: string;
+  stripe_onboarding_completed?: boolean;
+  mobile_money_operator?: string;
+  mobile_money_number?: string;
+  default_payout_method?: string;
+}
 
 const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   open,
   onOpenChange,
   onSuccess
 }) => {
-  const [step, setStep] = useState(1);
-  const [selectedCountry, setSelectedCountry] = useState<string>('');
-  const [selectedOperator, setSelectedOperator] = useState<string>('');
-  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'mobile_money'>('stripe');
+  const [selectedCountry, setSelectedCountry] = useState('US');
+  const [mobileOperator, setMobileOperator] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  
   const { user } = useAuth();
 
-  const selectedCountryData = COUNTRY_OPTIONS.find(c => c.code === selectedCountry);
-  const countryDialCode = selectedCountryData ? PAWAPAY_COUNTRY_CODES[selectedCountryData.name as PawapayCountryCode]?.dialCode || '' : '';
-
-  const handleCountrySelect = (countryCode: string) => {
-    setSelectedCountry(countryCode);
-    setStep(2);
+  const mobileOperators = {
+    UG: [
+      { code: 'mtn_ug', name: 'MTN Uganda' },
+      { code: 'airtel_ug', name: 'Airtel Uganda' }
+    ],
+    KE: [
+      { code: 'mpesa_ke', name: 'M-Pesa Kenya' },
+      { code: 'airtel_ke', name: 'Airtel Kenya' }
+    ],
+    TZ: [
+      { code: 'vodacom_tz', name: 'Vodacom Tanzania' },
+      { code: 'tigo_tz', name: 'Tigo Tanzania' }
+    ]
   };
 
-  const handleStripeSetup = async () => {
+  useEffect(() => {
+    if (open && user) {
+      loadProfileData();
+    }
+  }, [open, user]);
+
+  const loadProfileData = async () => {
+    if (!user) return;
+    
+    setLoadingProfile(true);
     try {
-      setLoading(true);
-      
-      // First create a Stripe Connect account if user doesn't have one
-      const { data: profile } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('stripe_connect_id')
-        .eq('id', user?.id)
+        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method')
+        .eq('id', user.id)
         .single();
 
-      if (!profile?.stripe_connect_id) {
-        // Create Stripe Connect account first
-        const { data: accountData, error: accountError } = await supabase.functions.invoke('create-stripe-connect-account', {
-          body: { userId: user?.id }
-        });
-
-        if (accountError) throw accountError;
-
-        if (!accountData?.accountId) {
-          throw new Error('Failed to create Stripe Connect account');
-        }
-
-        // Update profile with Stripe Connect ID
-        await supabase
-          .from('profiles')
-          .update({ 
-            stripe_connect_id: accountData.accountId,
-            payout_method: 'stripe'
-          })
-          .eq('id', user?.id);
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading profile:', error);
+        return;
       }
 
-      // Now create account session
-      const { data, error } = await supabase.functions.invoke('create-stripe-account-session');
+      if (data) {
+        setProfileData(data);
+        if (data.default_payout_method) {
+          setSelectedMethod(data.default_payout_method as 'stripe' | 'mobile_money');
+        }
+        if (data.mobile_money_operator) {
+          setMobileOperator(data.mobile_money_operator);
+        }
+        if (data.mobile_money_number) {
+          setPhoneNumber(data.mobile_money_number);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading profile data:', error);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  const handleConnectStripe = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-connect-account', {
+        body: { userId: user.id }
+      });
 
       if (error) throw error;
 
-      if (data?.clientSecret) {
-        // For now, we'll show a success message since we don't have the full Stripe Connect UI integration
-        toast({
-          title: "Stripe Account Session Created",
-          description: "Your Stripe Connect session has been created successfully.",
+      if (data?.accountId) {
+        // Create account link for onboarding
+        const { data: linkData, error: linkError } = await supabase.functions.invoke('create-stripe-account-link', {
+          body: { 
+            accountId: data.accountId,
+            returnUrl: `${window.location.origin}/creator/payments?success=true`,
+            refreshUrl: `${window.location.origin}/creator/payments?refresh=true`
+          }
         });
-        
-        onSuccess();
-        onOpenChange(false);
-        resetDialog();
-      } else {
-        throw new Error('No client secret received from Stripe');
+
+        if (linkError) throw linkError;
+
+        if (linkData?.url) {
+          // Update default payout method
+          await supabase
+            .from('profiles')
+            .update({ 
+              default_payout_method: 'stripe',
+              stripe_connect_account_id: data.accountId
+            })
+            .eq('id', user.id);
+
+          window.open(linkData.url, '_blank');
+          toast.success('Redirecting to Stripe Connect setup...');
+        }
       }
     } catch (error) {
-      console.error('Error setting up Stripe:', error);
-      toast({
-        title: "Error",
-        description: "Failed to set up Stripe Connect account",
-        variant: "destructive"
-      });
+      console.error('Error connecting to Stripe:', error);
+      toast.error('Failed to connect to Stripe. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMobileMoneySetup = async () => {
-    if (!selectedOperator || !phoneNumber) {
-      toast({
-        title: "Missing Information",
-        description: "Please select an operator and enter your phone number",
-        variant: "destructive"
-      });
+  const handleSaveMobileMoney = async () => {
+    if (!user || !mobileOperator || !phoneNumber) {
+      toast.error('Please fill in all mobile money details');
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
       const { error } = await supabase
         .from('profiles')
         .update({
-          payout_method: 'mobile_money',
-          mobile_money_details: {
-            operator: selectedOperator,
-            phone_number: phoneNumber,
-            country: selectedCountry
-          }
+          default_payout_method: 'mobile_money',
+          mobile_money_operator: mobileOperator,
+          mobile_money_number: phoneNumber
         })
-        .eq('id', user?.id);
+        .eq('id', user.id);
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Mobile money payout method has been set up successfully!",
-      });
-
+      toast.success('Mobile money details saved successfully!');
       onSuccess();
       onOpenChange(false);
-      resetDialog();
     } catch (error) {
-      console.error('Error setting up mobile money:', error);
-      toast({
-        title: "Error",
-        description: "Failed to set up mobile money payout method",
-        variant: "destructive"
-      });
+      console.error('Error saving mobile money details:', error);
+      toast.error('Failed to save mobile money details');
     } finally {
       setLoading(false);
     }
   };
 
-  const resetDialog = () => {
-    setStep(1);
-    setSelectedCountry('');
-    setSelectedOperator('');
-    setPhoneNumber('');
-  };
-
-  const handleClose = () => {
-    onOpenChange(false);
-    resetDialog();
-  };
+  if (loadingProfile) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex items-center justify-center p-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading payout settings...</span>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Set Up Payout Method
-          </DialogTitle>
+          <DialogTitle>Payout Method Setup</DialogTitle>
           <DialogDescription>
-            Choose your country and preferred payout method to receive earnings
+            Choose your preferred method to receive payments
           </DialogDescription>
         </DialogHeader>
 
-        {step === 1 && (
-          <div className="space-y-4">
-            <div>
-              <Label className="text-base font-medium">Select Your Country</Label>
-              <p className="text-sm text-muted-foreground mb-4">
-                Choose your country to see available payout methods
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              {COUNTRY_OPTIONS.map((country) => (
-                <Card 
-                  key={country.code}
-                  className="cursor-pointer hover:bg-slate-50 transition-colors"
-                  onClick={() => handleCountrySelect(country.code)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{country.flag}</span>
-                        <div>
-                          <div className="font-medium">{country.name}</div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-2">
-                            {country.paymentMethod === 'stripe' ? (
-                              <>
-                                <CreditCard className="h-3 w-3" />
-                                Stripe Connect
-                              </>
-                            ) : (
-                              <>
-                                <Smartphone className="h-3 w-3" />
-                                Mobile Money
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant="outline">
-                        {country.paymentMethod === 'stripe' ? 'Bank Transfer' : 'Mobile Money'}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {step === 2 && selectedCountryData?.paymentMethod === 'stripe' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="text-4xl mb-2">🇺🇸</div>
-              <h3 className="text-lg font-semibold">United States - Stripe Connect</h3>
-              <p className="text-sm text-muted-foreground">
-                Connect your bank account through Stripe for secure payouts
-              </p>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Stripe Connect Setup
-                </CardTitle>
-                <CardDescription>
-                  You'll be connected to Stripe to complete your account setup
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-sm text-blue-700 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4" />
-                      Secure bank account connection
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4" />
-                      Fast transfers (2-7 business days)
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4" />
-                      Low processing fees
-                    </div>
-                  </div>
+        <div className="space-y-6">
+          {/* Current Status */}
+          {profileData && (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Current Setup</Label>
+              
+              {profileData.stripe_connect_account_id && (
+                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                  <CreditCard className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm">Stripe Connect</span>
+                  {profileData.stripe_onboarding_completed ? (
+                    <Badge variant="default" className="bg-green-100 text-green-800">Connected</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Setup Required</Badge>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              )}
 
-        {step === 2 && selectedCountryData?.paymentMethod === 'mobile_money' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="text-4xl mb-2">{selectedCountryData.flag}</div>
-              <h3 className="text-lg font-semibold">{selectedCountryData.name} - Mobile Money</h3>
-              <p className="text-sm text-muted-foreground">
-                Set up mobile money for instant payouts
-              </p>
+              {profileData.mobile_money_operator && profileData.mobile_money_number && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+                  <Smartphone className="h-4 w-4 text-green-600" />
+                  <span className="text-sm">Mobile Money</span>
+                  <Badge variant="default" className="bg-green-100 text-green-800">Configured</Badge>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {profileData.mobile_money_operator} - {profileData.mobile_money_number}
+                  </span>
+                </div>
+              )}
             </div>
+          )}
 
+          {/* Method Selection */}
+          <div className="space-y-4">
+            <Label className="text-sm font-medium">Select Payout Method</Label>
+            
+            <div className="space-y-3">
+              {/* Stripe Option */}
+              <Card 
+                className={`cursor-pointer transition-colors ${
+                  selectedMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                }`}
+                onClick={() => setSelectedMethod('stripe')}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      checked={selectedMethod === 'stripe'}
+                      onChange={() => setSelectedMethod('stripe')}
+                      className="text-blue-600"
+                    />
+                    <CreditCard className="h-5 w-5" />
+                    <div>
+                      <CardTitle className="text-base">Stripe Connect</CardTitle>
+                      <CardDescription>Bank transfers (2-7 business days) • Available in USA</CardDescription>
+                    </div>
+                    {profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed && (
+                      <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
+                    )}
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* Mobile Money Option */}
+              <Card 
+                className={`cursor-pointer transition-colors ${
+                  selectedMethod === 'mobile_money' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                }`}
+                onClick={() => setSelectedMethod('mobile_money')}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      checked={selectedMethod === 'mobile_money'}
+                      onChange={() => setSelectedMethod('mobile_money')}
+                      className="text-blue-600"
+                    />
+                    <Smartphone className="h-5 w-5" />
+                    <div>
+                      <CardTitle className="text-base">Mobile Money</CardTitle>
+                      <CardDescription>Direct mobile money transfers • Available in Africa</CardDescription>
+                    </div>
+                    {profileData?.mobile_money_operator && profileData?.mobile_money_number && (
+                      <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
+                    )}
+                  </div>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+
+          {/* Configuration Forms */}
+          {selectedMethod === 'stripe' && (
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="operator">Mobile Money Operator</Label>
-                <Select value={selectedOperator} onValueChange={setSelectedOperator}>
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select your mobile money operator" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOBILE_OPERATORS[selectedCountry as keyof typeof MOBILE_OPERATORS]?.map((operator) => (
+                    <SelectItem value="US">United States</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed ? (
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Your Stripe Connect account is already set up and ready to receive payments.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Button 
+                  onClick={handleConnectStripe} 
+                  disabled={loading}
+                  className="w-full"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  {loading ? "Connecting..." : "Connect with Stripe"}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {selectedMethod === 'mobile_money' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UG">Uganda</SelectItem>
+                    <SelectItem value="KE">Kenya</SelectItem>
+                    <SelectItem value="TZ">Tanzania</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="operator">Mobile Operator</Label>
+                <Select value={mobileOperator} onValueChange={setMobileOperator}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select operator" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mobileOperators[selectedCountry as keyof typeof mobileOperators]?.map((operator) => (
                       <SelectItem key={operator.code} value={operator.code}>
                         {operator.name}
                       </SelectItem>
@@ -324,65 +362,32 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                 </Select>
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <div className="flex">
-                  <div className="flex items-center px-3 bg-gray-50 border border-r-0 rounded-l-md">
-                    <span className="text-sm text-gray-600">{countryDialCode}</span>
-                  </div>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="Enter your mobile money number"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="rounded-l-none"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Enter the number registered with your mobile money account
-                </p>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+256 700 000 000"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                />
               </div>
 
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-sm text-green-700 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4" />
-                    Instant transfers (5-30 minutes)
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4" />
-                    No bank account required
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4" />
-                    Available 24/7
-                  </div>
-                </div>
-              </div>
+              <Button 
+                onClick={handleSaveMobileMoney}
+                disabled={loading || !mobileOperator || !phoneNumber}
+                className="w-full"
+              >
+                {loading ? "Saving..." : "Save Mobile Money Details"}
+              </Button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
           </Button>
-          {step === 1 && (
-            <Button disabled>
-              Select a Country
-            </Button>
-          )}
-          {step === 2 && selectedCountryData?.paymentMethod === 'stripe' && (
-            <Button onClick={handleStripeSetup} disabled={loading}>
-              {loading ? "Connecting..." : "Connect with Stripe"}
-            </Button>
-          )}
-          {step === 2 && selectedCountryData?.paymentMethod === 'mobile_money' && (
-            <Button onClick={handleMobileMoneySetup} disabled={loading || !selectedOperator || !phoneNumber}>
-              {loading ? "Setting up..." : "Set Up Mobile Money"}
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
