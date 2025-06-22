@@ -61,7 +61,7 @@ const PromoCodeManager = () => {
 
   const [formData, setFormData] = useState({
     code: '',
-    item_type: urlItemType || 'course' as 'course' | 'event' | '',
+    item_type: urlItemType || 'all',
     item_id: urlItemId || '',
     discount_type: 'percentage' as 'percentage' | 'fixed',
     discount_value: 0,
@@ -179,7 +179,7 @@ const PromoCodeManager = () => {
       const promoCodeData = {
         code: formData.code.toUpperCase(),
         creator_id: user.id,
-        item_type: formData.item_type || null,
+        item_type: formData.item_type === 'all' ? null : formData.item_type,
         item_id: formData.item_id || null,
         discount_type: formData.discount_type,
         discount_value: formData.discount_value,
@@ -239,7 +239,7 @@ const PromoCodeManager = () => {
   const resetForm = () => {
     setFormData({
       code: '',
-      item_type: urlItemType || 'course',
+      item_type: urlItemType || 'all',
       item_id: urlItemId || '',
       discount_type: 'percentage',
       discount_value: 0,
@@ -255,7 +255,7 @@ const PromoCodeManager = () => {
     setEditingPromoCode(promoCode);
     setFormData({
       code: promoCode.code,
-      item_type: (promoCode.item_type as 'course' | 'event') || 'course',
+      item_type: promoCode.item_type || 'all',
       item_id: promoCode.item_id || '',
       discount_type: promoCode.discount_type,
       discount_value: promoCode.discount_value,
@@ -375,14 +375,14 @@ const PromoCodeManager = () => {
                 </div>
                 <div>
                   <Label htmlFor="item_type">Apply To</Label>
-                  <Select value={formData.item_type} onValueChange={(value: 'course' | 'event' | '') => {
+                  <Select value={formData.item_type} onValueChange={(value) => {
                     setFormData(prev => ({ ...prev, item_type: value, item_id: '' }));
                   }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Items</SelectItem>
+                      <SelectItem value="all">All Items</SelectItem>
                       <SelectItem value="course">Specific Course</SelectItem>
                       <SelectItem value="event">Specific Event</SelectItem>
                     </SelectContent>
@@ -390,7 +390,7 @@ const PromoCodeManager = () => {
                 </div>
               </div>
 
-              {formData.item_type && (
+              {formData.item_type && formData.item_type !== 'all' && (
                 <div>
                   <Label htmlFor="item_id">
                     Select {formData.item_type === 'course' ? 'Course' : 'Event'} *

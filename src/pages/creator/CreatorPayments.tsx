@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +20,7 @@ import {
 import { 
   getCreatorPayoutMethod
 } from '@/services/creatorEarningsService';
-import CreatorWithdrawDialog from '@/components/creator/CreatorWithdrawDialog';
+import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog';
 import PayoutMethodSetupDialog from '@/components/creator/PayoutMethodSetupDialog';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -486,8 +485,8 @@ const CreatorPayments: React.FC = () => {
         </Tabs>
       </div>
 
-      {/* Withdraw Dialog */}
-      <CreatorWithdrawDialog
+      {/* Enhanced Withdraw Dialog */}
+      <EnhancedWithdrawDialog
         open={isWithdrawDialogOpen}
         onOpenChange={setIsWithdrawDialogOpen}
         availableBalance={earnings.available_balance}
