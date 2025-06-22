@@ -53,6 +53,7 @@ const PromoCodeManager = () => {
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingPromoCode, setEditingPromoCode] = useState<PromoCode | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Get URL parameters for pre-filling form
   const urlItemType = searchParams.get('item_type') as 'course' | 'event' | null;
@@ -156,14 +157,37 @@ const PromoCodeManager = () => {
     
     if (!user) return;
 
+    // Validation
+    if (!formData.code.trim()) {
+      toast.error('Promo code is required');
+      return;
+    }
+
+    if (formData.discount_value <= 0) {
+      toast.error('Discount value must be greater than 0');
+      return;
+    }
+
+    if (formData.discount_type === 'percentage' && formData.discount_value > 100) {
+      toast.error('Percentage discount cannot exceed 100%');
+      return;
+    }
+
+    setSubmitting(true);
+
     try {
       const promoCodeData = {
-        ...formData,
+        code: formData.code.toUpperCase(),
         creator_id: user.id,
         item_type: formData.item_type || null,
         item_id: formData.item_id || null,
+        discount_type: formData.discount_type,
+        discount_value: formData.discount_value,
+        max_uses: formData.max_uses,
+        min_order_amount: formData.min_order_amount,
         valid_from: new Date(formData.valid_from).toISOString(),
         valid_until: formData.valid_until ? new Date(formData.valid_until).toISOString() : null,
+        is_active: formData.is_active,
         current_uses: 0
       };
 
@@ -177,6 +201,19 @@ const PromoCodeManager = () => {
         if (error) throw error;
         toast.success('Promo code updated successfully');
       } else {
+        // Check if code already exists
+        const { data: existingCode } = await supabase
+          .from('promo_codes')
+          .select('id')
+          .eq('code', promoCodeData.code)
+          .eq('creator_id', user.id)
+          .single();
+
+        if (existingCode) {
+          toast.error('This promo code already exists');
+          return;
+        }
+
         // Create new promo code
         const { error } = await supabase
           .from('promo_codes')
@@ -187,25 +224,31 @@ const PromoCodeManager = () => {
       }
 
       // Reset form and close dialog
-      setFormData({
-        code: '',
-        item_type: 'course',
-        item_id: '',
-        discount_type: 'percentage',
-        discount_value: 0,
-        max_uses: null,
-        min_order_amount: 0,
-        valid_from: new Date().toISOString().split('T')[0],
-        valid_until: null,
-        is_active: true
-      });
+      resetForm();
       setIsCreateDialogOpen(false);
       setEditingPromoCode(null);
       fetchPromoCodes();
     } catch (error) {
       console.error('Error saving promo code:', error);
       toast.error('Failed to save promo code');
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      code: '',
+      item_type: urlItemType || 'course',
+      item_id: urlItemId || '',
+      discount_type: 'percentage',
+      discount_value: 0,
+      max_uses: null,
+      min_order_amount: 0,
+      valid_from: new Date().toISOString().split('T')[0],
+      valid_until: null,
+      is_active: true
+    });
   };
 
   const handleEdit = (promoCode: PromoCode) => {
@@ -296,24 +339,13 @@ const PromoCodeManager = () => {
           <DialogTrigger asChild>
             <Button onClick={() => {
               setEditingPromoCode(null);
-              setFormData({
-                code: '',
-                item_type: urlItemType || 'course',
-                item_id: urlItemId || '',
-                discount_type: 'percentage',
-                discount_value: 0,
-                max_uses: null,
-                min_order_amount: 0,
-                valid_from: new Date().toISOString().split('T')[0],
-                valid_until: null,
-                is_active: true
-              });
+              resetForm();
             }}>
               <Plus className="h-4 w-4 mr-2" />
               Create Promo Code
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingPromoCode ? 'Edit Promo Code' : 'Create New Promo Code'}
@@ -322,10 +354,11 @@ const PromoCodeManager = () => {
                 Set up a discount code for your courses or events
               </DialogDescription>
             </DialogHeader>
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="code">Promo Code</Label>
+                  <Label htmlFor="code">Promo Code *</Label>
                   <div className="flex gap-2">
                     <Input
                       id="code"
@@ -333,6 +366,7 @@ const PromoCodeManager = () => {
                       onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
                       placeholder="Enter promo code"
                       required
+                      maxLength={20}
                     />
                     <Button type="button" variant="outline" onClick={generatePromoCode}>
                       Generate
@@ -349,8 +383,8 @@ const PromoCodeManager = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">All Items</SelectItem>
-                      <SelectItem value="course">Course</SelectItem>
-                      <SelectItem value="event">Event</SelectItem>
+                      <SelectItem value="course">Specific Course</SelectItem>
+                      <SelectItem value="event">Specific Event</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -359,11 +393,11 @@ const PromoCodeManager = () => {
               {formData.item_type && (
                 <div>
                   <Label htmlFor="item_id">
-                    {formData.item_type === 'course' ? 'Course' : 'Event'}
+                    Select {formData.item_type === 'course' ? 'Course' : 'Event'} *
                   </Label>
                   <Select value={formData.item_id} onValueChange={(value) => {
                     setFormData(prev => ({ ...prev, item_id: value }));
-                  }}>
+                  }} required>
                     <SelectTrigger>
                       <SelectValue placeholder={`Select ${formData.item_type}`} />
                     </SelectTrigger>
@@ -388,7 +422,7 @@ const PromoCodeManager = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="discount_type">Discount Type</Label>
+                  <Label htmlFor="discount_type">Discount Type *</Label>
                   <Select value={formData.discount_type} onValueChange={(value: 'percentage' | 'fixed') => {
                     setFormData(prev => ({ ...prev, discount_type: value }));
                   }}>
@@ -396,14 +430,14 @@ const PromoCodeManager = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="percentage">Percentage</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount</SelectItem>
+                      <SelectItem value="percentage">Percentage (%)</SelectItem>
+                      <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label htmlFor="discount_value">
-                    Discount Value {formData.discount_type === 'percentage' ? '(%)' : '($)'}
+                    Discount Value * {formData.discount_type === 'percentage' ? '(%)' : '($)'}
                   </Label>
                   <Input
                     id="discount_value"
@@ -412,6 +446,7 @@ const PromoCodeManager = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, discount_value: Number(e.target.value) }))}
                     min="0"
                     max={formData.discount_type === 'percentage' ? 100 : undefined}
+                    step={formData.discount_type === 'percentage' ? 1 : 0.01}
                     required
                   />
                 </div>
@@ -419,7 +454,7 @@ const PromoCodeManager = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="max_uses">Max Uses (optional)</Label>
+                  <Label htmlFor="max_uses">Max Uses</Label>
                   <Input
                     id="max_uses"
                     type="number"
@@ -444,7 +479,7 @@ const PromoCodeManager = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="valid_from">Valid From</Label>
+                  <Label htmlFor="valid_from">Valid From *</Label>
                   <Input
                     id="valid_from"
                     type="date"
@@ -454,22 +489,39 @@ const PromoCodeManager = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="valid_until">Valid Until (optional)</Label>
+                  <Label htmlFor="valid_until">Valid Until</Label>
                   <Input
                     id="valid_until"
                     type="date"
                     value={formData.valid_until || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, valid_until: e.target.value || null }))}
+                    min={formData.valid_from}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label htmlFor="is_active">Active immediately</Label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsCreateDialogOpen(false)}
+                  disabled={submitting}
+                >
                   Cancel
                 </Button>
-                <Button type="submit">
-                  {editingPromoCode ? 'Update' : 'Create'} Promo Code
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? 'Saving...' : editingPromoCode ? 'Update' : 'Create'} Promo Code
                 </Button>
               </div>
             </form>

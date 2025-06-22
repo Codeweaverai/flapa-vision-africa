@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -11,10 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, DollarSign, CheckCircle, ExternalLink, CreditCard, Smartphone } from 'lucide-react';
+import { AlertCircle, DollarSign, CheckCircle, ExternalLink, Smartphone, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { requestCreatorPayout } from '@/services/creatorPaymentService';
-import { getCreatorPayoutMethod } from '@/services/creatorEarningsService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -38,68 +38,143 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 }) => {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const [payoutMethod, setPayoutMethod] = useState<any>(null);
-  const [checkingMethod, setCheckingMethod] = useState(true);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [checkingStripe, setCheckingStripe] = useState(true);
+  const [payoutMethod, setPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
+  const [mobileMoneyDetails, setMobileMoneyDetails] = useState<any>(null);
   const { user } = useAuth();
-  const { convertPrice, currentCurrency } = useCurrency();
+  const { convertPrice } = useCurrency();
 
   useEffect(() => {
     if (open && user) {
-      checkPayoutMethod();
+      checkPayoutMethods();
     }
   }, [open, user]);
 
-  const checkPayoutMethod = async () => {
+  const checkPayoutMethods = async () => {
     if (!user) return;
     
-    setCheckingMethod(true);
+    setCheckingStripe(true);
     try {
-      const method = await getCreatorPayoutMethod(user.id);
-      setPayoutMethod(method);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('stripe_connect_id, mobile_money_operator, mobile_money_number, default_payout_method')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      setStripeConnected(!!data?.stripe_connect_id);
+      setMobileMoneyDetails({
+        operator: data?.mobile_money_operator,
+        number: data?.mobile_money_number
+      });
+      
+      // Set default payout method
+      if (data?.default_payout_method) {
+        setPayoutMethod(data.default_payout_method as 'stripe' | 'mobile_money');
+      } else if (data?.stripe_connect_id) {
+        setPayoutMethod('stripe');
+      } else if (data?.mobile_money_operator && data?.mobile_money_number) {
+        setPayoutMethod('mobile_money');
+      }
     } catch (error) {
-      console.error('Error checking payout method:', error);
+      console.error('Error checking payout methods:', error);
     } finally {
-      setCheckingMethod(false);
+      setCheckingStripe(false);
+    }
+  };
+
+  const handleConnectStripe = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-connect-account', {
+        body: { userId: user.id }
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.open(data.url, '_blank');
+        toast.success('Redirecting to Stripe Connect setup...');
+      }
+    } catch (error) {
+      console.error('Error connecting to Stripe:', error);
+      toast.error('Failed to connect to Stripe. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleWithdraw = async () => {
-    if (!user || !payoutMethod?.has_payout_method) return;
+    if (!user) return;
 
     const withdrawAmount = parseFloat(amount);
     if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    if (withdrawAmount < 5) {
+      toast.error('Minimum withdrawal amount is $5.00');
+      return;
+    }
+
+    if (withdrawAmount > availableBalance) {
+      toast.error('Amount exceeds available balance');
       return;
     }
 
     setLoading(true);
     try {
-      let payoutRequest;
-      
-      if (payoutMethod.payout_method === 'stripe') {
-        payoutRequest = {
-          amount: withdrawAmount,
-          payout_method: 'stripe' as const
-        };
-      } else if (payoutMethod.payout_method === 'mobile_money') {
-        payoutRequest = {
-          amount: withdrawAmount,
-          payout_method: 'mobile_money' as const,
-          mobile_money_details: payoutMethod.mobile_money_details
-        };
-      } else {
-        toast.error('Invalid payout method');
-        return;
+      if (payoutMethod === 'stripe') {
+        if (!stripeConnected) {
+          toast.error('Please connect your Stripe account first');
+          return;
+        }
+
+        // Process Stripe payout
+        const { data, error } = await supabase.functions.invoke('stripe-payout', {
+          body: {
+            creatorId: user.id,
+            amount: withdrawAmount,
+            currency: 'usd'
+          }
+        });
+
+        if (error) throw error;
+
+        toast.success('Payout request submitted successfully! You will receive an email confirmation.');
+      } else if (payoutMethod === 'mobile_money') {
+        if (!mobileMoneyDetails?.operator || !mobileMoneyDetails?.number) {
+          toast.error('Mobile money details not configured');
+          return;
+        }
+
+        // Process PawaPay payout
+        const { data, error } = await supabase.functions.invoke('pawapay-payout', {
+          body: {
+            amount: withdrawAmount,
+            phone_number: mobileMoneyDetails.number,
+            operator: mobileMoneyDetails.operator,
+            country: 'UG', // Default to Uganda, can be made dynamic
+            creator_id: user.id
+          }
+        });
+
+        if (error) throw error;
+
+        toast.success('Payout request submitted successfully! You will receive an email confirmation.');
       }
 
-      const success = await requestCreatorPayout(user.id, payoutRequest);
-
-      if (success) {
-        onSuccess();
-        onOpenChange(false);
-        setAmount('');
-      }
+      onSuccess();
+      onOpenChange(false);
+      setAmount('');
     } catch (error) {
       console.error('Withdrawal error:', error);
+      toast.error('Failed to process withdrawal. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -107,14 +182,15 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
   const withdrawAmount = parseFloat(amount) || 0;
   const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= availableBalance;
+  const convertedBalance = convertPrice(availableBalance, 'USD');
 
-  if (checkingMethod) {
+  if (checkingStripe) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <div className="flex items-center justify-center p-6">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-2">Checking payout method...</span>
+            <span className="ml-2">Loading payout methods...</span>
           </div>
         </DialogContent>
       </Dialog>
@@ -130,7 +206,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             Withdraw Funds
           </DialogTitle>
           <DialogDescription>
-            Request a payout to your connected payout method
+            Request a payout from your available balance
           </DialogDescription>
         </DialogHeader>
 
@@ -147,44 +223,78 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             </div>
           </div>
 
-          {!payoutMethod?.has_payout_method ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                You need to set up a payout method before you can withdraw funds. Please go to Payout Settings to configure your preferred method.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-4">
-              {/* Payout Method Display */}
-              <div className="space-y-2">
-                <Label>Current Payout Method</Label>
-                {payoutMethod.payout_method === 'stripe' ? (
-                  <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <CreditCard className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <span className="text-blue-800 font-medium">Stripe Connect</span>
-                      <p className="text-sm text-blue-600">Bank transfers (2-7 business days)</p>
-                    </div>
+          {/* Payout Method Selection */}
+          <div className="space-y-3">
+            <Label>Payout Method</Label>
+            
+            {stripeConnected && (
+              <div 
+                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                  payoutMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                }`}
+                onClick={() => setPayoutMethod('stripe')}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    checked={payoutMethod === 'stripe'}
+                    onChange={() => setPayoutMethod('stripe')}
+                    className="text-blue-600"
+                  />
+                  <CreditCard className="h-5 w-5" />
+                  <div>
+                    <div className="font-medium">Stripe Connect</div>
+                    <div className="text-sm text-muted-foreground">Bank transfer (2-7 business days)</div>
                   </div>
-                ) : payoutMethod.payout_method === 'mobile_money' ? (
-                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <Smartphone className="h-5 w-5 text-green-600" />
-                    <div>
-                      <span className="text-green-800 font-medium">Mobile Money</span>
-                      <p className="text-sm text-green-600">
-                        {payoutMethod.mobile_money_details?.operator} • {payoutMethod.mobile_money_details?.phone_number}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
+                  <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
+                </div>
               </div>
+            )}
 
+            {mobileMoneyDetails?.operator && mobileMoneyDetails?.number && (
+              <div 
+                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                  payoutMethod === 'mobile_money' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                }`}
+                onClick={() => setPayoutMethod('mobile_money')}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    checked={payoutMethod === 'mobile_money'}
+                    onChange={() => setPayoutMethod('mobile_money')}
+                    className="text-blue-600"
+                  />
+                  <Smartphone className="h-5 w-5" />
+                  <div>
+                    <div className="font-medium">Mobile Money</div>
+                    <div className="text-sm text-muted-foreground">
+                      {mobileMoneyDetails.operator} - {mobileMoneyDetails.number}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Within 24 hours</div>
+                  </div>
+                  <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
+                </div>
+              </div>
+            )}
+
+            {!stripeConnected && (!mobileMoneyDetails?.operator || !mobileMoneyDetails?.number) && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No payout methods configured. Please set up Stripe Connect or Mobile Money in your settings.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {(stripeConnected || (mobileMoneyDetails?.operator && mobileMoneyDetails?.number)) && (
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="amount">Withdrawal Amount</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    {currentCurrency}
+                    $
                   </span>
                   <Input
                     id="amount"
@@ -192,15 +302,17 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="pl-16"
+                    className="pl-8"
                     min="5"
                     max={availableBalance}
                     step="0.01"
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                    <PriceDisplay amount={withdrawAmount} originalCurrency="USD" />
-                  </div>
                 </div>
+                {withdrawAmount > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    ≈ <PriceDisplay amount={withdrawAmount} originalCurrency="USD" />
+                  </div>
+                )}
               </div>
 
               {withdrawAmount > 0 && !isValidAmount && (
@@ -218,12 +330,23 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
               <div className="bg-blue-50 p-3 rounded-lg">
                 <div className="text-xs text-blue-700 space-y-1">
                   <div>• Minimum withdrawal: $5.00</div>
-                  <div>• Processing time: {payoutMethod.payout_method === 'stripe' ? '2-7 business days' : 'Within 24 hours'}</div>
-                  <div>• Platform fee: 8% (already deducted)</div>
-                  <div>• Email confirmation will be sent</div>
+                  <div>• Processing time: {payoutMethod === 'stripe' ? '2-7 business days' : 'Within 24 hours'}</div>
+                  <div>• Platform fee: 10% (already deducted)</div>
+                  <div>• You'll receive an email confirmation</div>
                 </div>
               </div>
             </div>
+          )}
+
+          {!stripeConnected && payoutMethod === 'stripe' && (
+            <Button 
+              onClick={handleConnectStripe} 
+              disabled={loading}
+              className="w-full"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              {loading ? "Connecting..." : "Connect Stripe Account"}
+            </Button>
           )}
         </div>
 
@@ -231,13 +354,13 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          {payoutMethod?.has_payout_method && (
+          {(stripeConnected || (mobileMoneyDetails?.operator && mobileMoneyDetails?.number)) && (
             <Button 
               onClick={handleWithdraw} 
               disabled={!isValidAmount || loading}
               className="min-w-[100px]"
             >
-              {loading ? "Processing..." : "Withdraw Funds"}
+              {loading ? "Processing..." : "Withdraw"}
             </Button>
           )}
         </DialogFooter>

@@ -7,12 +7,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface PayoutRequest {
+interface StripePayoutRequest {
+  creatorId: string;
   amount: number;
-  phone_number: string;
-  operator: string;
-  country: string;
-  creator_id: string;
+  currency: string;
 }
 
 serve(async (req) => {
@@ -21,11 +19,11 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, phone_number, operator, country, creator_id }: PayoutRequest = await req.json();
+    const { creatorId, amount, currency }: StripePayoutRequest = await req.json();
     
-    const pawaPayToken = Deno.env.get("PAWAPAY_TOKEN");
-    if (!pawaPayToken) {
-      throw new Error("PawaPay token not configured");
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeSecretKey) {
+      throw new Error("Stripe secret key not configured");
     }
 
     // Create Supabase client for database operations
@@ -35,33 +33,32 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Get creator profile for email
+    // Get creator's Stripe Connect account ID
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('email, full_name, username')
-      .eq('id', creator_id)
+      .select('stripe_connect_id, email, full_name, username')
+      .eq('id', creatorId)
       .single();
 
     if (profileError || !profile) {
       throw new Error('Creator profile not found');
     }
 
-    // Create payout record first
+    if (!profile.stripe_connect_id) {
+      throw new Error('Creator does not have a connected Stripe account');
+    }
+
+    // Create payout record
     const { data: payoutRecord, error: payoutError } = await supabaseClient
       .from('creator_payouts')
       .insert({
-        creator_id: creator_id,
+        creator_id: creatorId,
         amount: amount,
-        currency: 'usd',
-        method: 'mobile_money',
-        payout_method: 'mobile_money',
-        destination: `${operator} - ${phone_number}`,
-        status: 'pending',
-        mobile_money_details: {
-          phone_number,
-          operator,
-          country
-        }
+        currency: currency.toLowerCase(),
+        method: 'stripe',
+        payout_method: 'stripe',
+        destination: 'Stripe Connected Account',
+        status: 'processing'
       })
       .select()
       .single();
@@ -70,35 +67,24 @@ serve(async (req) => {
       throw new Error(`Failed to create payout record: ${payoutError.message}`);
     }
 
-    // Generate a unique deposit ID
-    const depositId = `payout_${payoutRecord.id}_${Date.now()}`;
-    
-    // PawaPay payout request
-    const pawaPayResponse = await fetch("https://api.pawapay.cloud/deposits", {
+    // Create Stripe payout
+    const stripeResponse = await fetch("https://api.stripe.com/v1/transfers", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${pawaPayToken}`,
-        "Content-Type": "application/json",
+        "Authorization": `Bearer ${stripeSecretKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify({
-        depositId: depositId,
+      body: new URLSearchParams({
         amount: (amount * 100).toString(), // Convert to cents
-        currency: "USD",
-        correspondent: operator,
-        payer: {
-          type: "MSISDN",
-          address: {
-            value: phone_number
-          }
-        },
-        customerTimestamp: new Date().toISOString(),
-        statementDescription: "Creator Payout"
+        currency: currency.toLowerCase(),
+        destination: profile.stripe_connect_id,
+        description: `Creator payout for ${profile.full_name || profile.username}`,
       }),
     });
 
-    if (!pawaPayResponse.ok) {
-      const errorData = await pawaPayResponse.text();
-      console.error("PawaPay error:", errorData);
+    if (!stripeResponse.ok) {
+      const errorData = await stripeResponse.text();
+      console.error("Stripe error:", errorData);
       
       // Update payout record with error
       await supabaseClient
@@ -106,18 +92,18 @@ serve(async (req) => {
         .update({ status: 'failed' })
         .eq('id', payoutRecord.id);
         
-      throw new Error(`PawaPay API error: ${pawaPayResponse.status}`);
+      throw new Error(`Stripe API error: ${stripeResponse.status}`);
     }
 
-    const pawaPayResult = await pawaPayResponse.json();
+    const stripeResult = await stripeResponse.json();
     
-    // Update the payout record with PawaPay details
+    // Update the payout record with Stripe details
     const { error: updateError } = await supabaseClient
       .from('creator_payouts')
       .update({
-        pawapay_deposit_id: depositId,
-        status: 'processing',
-        provider_payout_id: depositId
+        stripe_payout_id: stripeResult.id,
+        status: 'completed',
+        provider_payout_id: stripeResult.id
       })
       .eq('id', payoutRecord.id);
 
@@ -131,9 +117,9 @@ serve(async (req) => {
         body: {
           email: profile.email,
           amount: amount,
-          currency: 'USD',
-          method: 'Mobile Money',
-          destination: `${operator} - ${phone_number}`,
+          currency: currency.toUpperCase(),
+          method: 'Stripe Connect',
+          destination: 'Connected Bank Account',
           creatorName: profile.full_name || profile.username || 'Creator'
         }
       });
@@ -145,15 +131,15 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       payoutId: payoutRecord.id,
-      depositId: depositId,
-      status: 'processing'
+      stripeTransferId: stripeResult.id,
+      status: 'completed'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
 
   } catch (error) {
-    console.error("Payout error:", error);
+    console.error("Stripe payout error:", error);
     return new Response(JSON.stringify({
       error: error.message || "Failed to process payout"
     }), {
