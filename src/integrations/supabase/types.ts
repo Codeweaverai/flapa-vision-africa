@@ -2575,12 +2575,14 @@ export type Database = {
           bio: string | null
           created_at: string | null
           creator_enabled_at: string | null
+          default_payout_method: string | null
           email_verified: boolean | null
           full_name: string | null
           id: string
           is_creator: boolean | null
           mobile_money_details: Json | null
           mobile_money_number: string | null
+          mobile_money_operator: string | null
           newsletter_subscribed: boolean | null
           payout_method: string | null
           role: Database["public"]["Enums"]["user_role"] | null
@@ -2595,12 +2597,14 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
+          default_payout_method?: string | null
           email_verified?: boolean | null
           full_name?: string | null
           id: string
           is_creator?: boolean | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
+          mobile_money_operator?: string | null
           newsletter_subscribed?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
@@ -2615,12 +2619,14 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
+          default_payout_method?: string | null
           email_verified?: boolean | null
           full_name?: string | null
           id?: string
           is_creator?: boolean | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
+          mobile_money_operator?: string | null
           newsletter_subscribed?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null

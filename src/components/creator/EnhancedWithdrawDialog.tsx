@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, DollarSign, CheckCircle, ExternalLink, Smartphone, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { requestCreatorPayout } from '@/services/creatorPaymentService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -27,6 +26,13 @@ interface EnhancedWithdrawDialogProps {
   availableBalance: number;
   currency: string;
   onSuccess: () => void;
+}
+
+interface ProfileData {
+  stripe_connect_id?: string;
+  mobile_money_operator?: string;
+  mobile_money_number?: string;
+  default_payout_method?: string;
 }
 
 const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
@@ -62,20 +68,25 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      const profileData = data as ProfileData;
       
-      setStripeConnected(!!data?.stripe_connect_id);
+      setStripeConnected(!!profileData?.stripe_connect_id);
       setMobileMoneyDetails({
-        operator: data?.mobile_money_operator,
-        number: data?.mobile_money_number
+        operator: profileData?.mobile_money_operator,
+        number: profileData?.mobile_money_number
       });
       
       // Set default payout method
-      if (data?.default_payout_method) {
-        setPayoutMethod(data.default_payout_method as 'stripe' | 'mobile_money');
-      } else if (data?.stripe_connect_id) {
+      if (profileData?.default_payout_method) {
+        setPayoutMethod(profileData.default_payout_method as 'stripe' | 'mobile_money');
+      } else if (profileData?.stripe_connect_id) {
         setPayoutMethod('stripe');
-      } else if (data?.mobile_money_operator && data?.mobile_money_number) {
+      } else if (profileData?.mobile_money_operator && profileData?.mobile_money_number) {
         setPayoutMethod('mobile_money');
       }
     } catch (error) {
@@ -182,7 +193,6 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
   const withdrawAmount = parseFloat(amount) || 0;
   const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= availableBalance;
-  const convertedBalance = convertPrice(availableBalance, 'USD');
 
   if (checkingStripe) {
     return (
