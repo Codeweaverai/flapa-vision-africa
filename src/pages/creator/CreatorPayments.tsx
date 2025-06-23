@@ -167,6 +167,11 @@ const CreatorPayments: React.FC = () => {
             <div className="flex-1">
               <div className="font-medium text-blue-900">Stripe Connect - Connected</div>
               <div className="text-sm text-blue-700">Bank transfers (2-7 business days)</div>
+              {payoutMethod.stripe_account_id && (
+                <div className="text-xs text-blue-600 mt-1">
+                  Account ID: {payoutMethod.stripe_account_id.substring(0, 16)}...
+                </div>
+              )}
             </div>
             <Badge variant="default" className="bg-green-100 text-green-800">
               Active
@@ -185,9 +190,11 @@ const CreatorPayments: React.FC = () => {
             <div className="flex-1">
               <div className="font-medium text-green-900">Mobile Money - Connected</div>
               <div className="text-sm text-green-700">
-                {details.operator} • {details.phone_number}
+                {details.operator_name || details.operator} • {details.phone_number}
               </div>
-              <div className="text-xs text-green-600">Within 24 hours</div>
+              <div className="text-xs text-green-600 mt-1">
+                Country: {details.country} • Within 24 hours processing
+              </div>
             </div>
             <Badge variant="default" className="bg-green-100 text-green-800">
               Active
