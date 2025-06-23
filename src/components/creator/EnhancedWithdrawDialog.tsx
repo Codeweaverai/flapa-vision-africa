@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, DollarSign, CheckCircle, ExternalLink, Smartphone, CreditCard } from 'lucide-react';
+import { AlertCircle, DollarSign, CheckCircle, Smartphone, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -48,14 +48,26 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
+  const [convertedBalance, setConvertedBalance] = useState(0);
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
   useEffect(() => {
     if (open && user) {
       loadProfileData();
+      convertAvailableBalance();
     }
-  }, [open, user]);
+  }, [open, user, currentCurrency]);
+
+  const convertAvailableBalance = async () => {
+    try {
+      const converted = await convertPrice(availableBalance, 'USD');
+      setConvertedBalance(converted);
+    } catch (error) {
+      console.error('Error converting balance:', error);
+      setConvertedBalance(availableBalance);
+    }
+  };
 
   const loadProfileData = async () => {
     if (!user) return;
@@ -101,15 +113,20 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       return;
     }
 
-    if (withdrawAmount < 5) {
-      toast.error('Minimum withdrawal amount is $5.00');
+    // Convert minimum amount to current currency for validation
+    const minAmountConverted = await convertPrice(5, 'USD');
+    if (withdrawAmount < minAmountConverted) {
+      toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountConverted, currentCurrency)}`);
       return;
     }
 
-    if (withdrawAmount > availableBalance) {
+    if (withdrawAmount > convertedBalance) {
       toast.error('Amount exceeds available balance');
       return;
     }
+
+    // Convert back to USD for processing
+    const usdAmount = currentCurrency === 'USD' ? withdrawAmount : await convertPrice(withdrawAmount, currentCurrency);
 
     setLoading(true);
     try {
@@ -123,7 +140,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const { data, error } = await supabase.functions.invoke('stripe-payout', {
           body: {
             creatorId: user.id,
-            amount: withdrawAmount,
+            amount: usdAmount,
             currency: 'usd'
           }
         });
@@ -140,7 +157,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         // Process PawaPay payout
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
-            amount: withdrawAmount,
+            amount: usdAmount,
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
             country: 'UG', // Default to Uganda, can be made dynamic
@@ -165,7 +182,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   };
 
   const withdrawAmount = parseFloat(amount) || 0;
-  const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= availableBalance;
+  const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= convertedBalance;
 
   const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
   const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
@@ -175,6 +192,10 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Loading</DialogTitle>
+            <DialogDescription>Loading payout methods...</DialogDescription>
+          </DialogHeader>
           <div className="flex items-center justify-center p-6">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             <span className="ml-2">Loading payout methods...</span>
@@ -202,7 +223,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-muted-foreground">Available Balance</span>
               <Badge variant="outline" className="bg-green-50 text-green-700">
-                <PriceDisplay amount={availableBalance} originalCurrency="USD" />
+                {formatPrice(convertedBalance, currentCurrency)}
               </Badge>
             </div>
             <div className="text-xs text-muted-foreground">
@@ -283,7 +304,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                 <Label htmlFor="amount">Withdrawal Amount</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
+                    {currentCurrency === 'USD' ? '$' : currentCurrency}
                   </span>
                   <Input
                     id="amount"
@@ -291,15 +312,15 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="pl-8"
+                    className="pl-16"
                     min="5"
-                    max={availableBalance}
+                    max={convertedBalance}
                     step="0.01"
                   />
                 </div>
                 {withdrawAmount > 0 && (
                   <div className="text-sm text-muted-foreground">
-                    ≈ <PriceDisplay amount={withdrawAmount} originalCurrency="USD" />
+                    {formatPrice(withdrawAmount, currentCurrency)}
                   </div>
                 )}
               </div>
@@ -309,7 +330,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     {withdrawAmount < 5 
-                      ? "Minimum withdrawal amount is $5.00"
+                      ? `Minimum withdrawal amount is ${formatPrice(5, currentCurrency)}`
                       : "Amount exceeds available balance"
                     }
                   </AlertDescription>
@@ -318,7 +339,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
               <div className="bg-blue-50 p-3 rounded-lg">
                 <div className="text-xs text-blue-700 space-y-1">
-                  <div>• Minimum withdrawal: $5.00</div>
+                  <div>• Minimum withdrawal: {formatPrice(5, currentCurrency)}</div>
                   <div>• Processing time: {selectedPayoutMethod === 'stripe' ? '2-7 business days' : 'Within 24 hours'}</div>
                   <div>• Platform fee: 8% (already deducted)</div>
                   <div>• You'll receive an email confirmation</div>

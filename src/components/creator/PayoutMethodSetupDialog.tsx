@@ -202,17 +202,18 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-stripe-connect-account', {
+      // First create or get the Stripe Connect account
+      const { data: accountData, error: accountError } = await supabase.functions.invoke('create-stripe-connect-account', {
         body: { userId: user.id }
       });
 
-      if (error) throw error;
+      if (accountError) throw accountError;
 
-      if (data?.accountId) {
+      if (accountData?.accountId) {
         // Create account link for onboarding
         const { data: linkData, error: linkError } = await supabase.functions.invoke('create-stripe-account-link', {
           body: { 
-            accountId: data.accountId,
+            accountId: accountData.accountId,
             returnUrl: `${window.location.origin}/creator/payments?success=true`,
             refreshUrl: `${window.location.origin}/creator/payments?refresh=true`
           }
@@ -225,8 +226,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
           await supabase
             .from('profiles')
             .update({ 
-              default_payout_method: 'stripe',
-              stripe_connect_account_id: data.accountId
+              default_payout_method: 'stripe'
             })
             .eq('id', user.id);
 
@@ -278,6 +278,10 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Loading</DialogTitle>
+            <DialogDescription>Loading payout settings...</DialogDescription>
+          </DialogHeader>
           <div className="flex items-center justify-center p-6">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             <span className="ml-2">Loading payout settings...</span>

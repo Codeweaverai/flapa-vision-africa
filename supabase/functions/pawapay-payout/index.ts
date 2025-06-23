@@ -21,33 +21,60 @@ serve(async (req) => {
   }
 
   try {
+    // Create a Supabase client with the auth context of the request
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+    
+    // Get the session user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('Error getting authenticated user:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
     const { amount, phone_number, operator, country, creator_id }: PayoutRequest = await req.json();
+    
+    // Validate that the authenticated user matches the creator_id
+    if (user.id !== creator_id) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
     
     const pawaPayToken = Deno.env.get("PAWAPAY_TOKEN");
     if (!pawaPayToken) {
       throw new Error("PawaPay token not configured");
     }
 
-    // Create Supabase client for database operations
-    const supabaseClient = createClient(
+    // Create Supabase client for database operations with service role
+    const supabaseServiceClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
     // Get creator profile for email
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseServiceClient
       .from('profiles')
       .select('email, full_name, username')
       .eq('id', creator_id)
       .single();
 
     if (profileError || !profile) {
+      console.error('Profile error:', profileError);
       throw new Error('Creator profile not found');
     }
 
     // Create payout record first
-    const { data: payoutRecord, error: payoutError } = await supabaseClient
+    const { data: payoutRecord, error: payoutError } = await supabaseServiceClient
       .from('creator_payouts')
       .insert({
         creator_id: creator_id,
@@ -67,6 +94,7 @@ serve(async (req) => {
       .single();
 
     if (payoutError) {
+      console.error('Payout record error:', payoutError);
       throw new Error(`Failed to create payout record: ${payoutError.message}`);
     }
 
@@ -101,7 +129,7 @@ serve(async (req) => {
       console.error("PawaPay error:", errorData);
       
       // Update payout record with error
-      await supabaseClient
+      await supabaseServiceClient
         .from('creator_payouts')
         .update({ status: 'failed' })
         .eq('id', payoutRecord.id);
@@ -112,7 +140,7 @@ serve(async (req) => {
     const pawaPayResult = await pawaPayResponse.json();
     
     // Update the payout record with PawaPay details
-    const { error: updateError } = await supabaseClient
+    const { error: updateError } = await supabaseServiceClient
       .from('creator_payouts')
       .update({
         pawapay_deposit_id: depositId,
@@ -127,7 +155,7 @@ serve(async (req) => {
 
     // Send confirmation email
     try {
-      await supabaseClient.functions.invoke('payout-confirmation-email', {
+      await supabaseServiceClient.functions.invoke('payout-confirmation-email', {
         body: {
           email: profile.email,
           amount: amount,

@@ -39,40 +39,70 @@ serve(async (req) => {
     const body = await req.json();
     const { userId } = body;
     
-    if (!userId || userId !== user.id) {
+    // Validate that the authenticated user matches the userId
+    if (user.id !== userId) {
       return new Response(
-        JSON.stringify({ error: 'Invalid user ID' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        JSON.stringify({ error: 'Unauthorized' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
       );
     }
     
-    // Initialize Stripe with the latest version
+    // Initialize Stripe
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
       apiVersion: '2023-10-16',
     });
     
-    // Create a Stripe Connect account
+    // Get user profile data
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('email, full_name, stripe_connect_account_id')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'Profile not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+
+    // If user already has a Stripe account, return it
+    if (profile.stripe_connect_account_id) {
+      return new Response(
+        JSON.stringify({ accountId: profile.stripe_connect_account_id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+    
+    // Create Stripe Connect account
     const account = await stripe.accounts.create({
       type: 'express',
-      country: 'US', // Default to US, could be made dynamic
-      email: user.email,
+      country: 'US',
+      email: profile.email,
+      business_profile: {
+        name: profile.full_name || 'Creator',
+        product_description: 'Educational content creation',
+      },
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+      external_account: 'bank_account',
     });
     
-    // Update the user's profile with the Stripe Connect account ID
+    // Update profile with Stripe account ID
     const { error: updateError } = await supabaseClient
       .from('profiles')
       .update({ 
-        stripe_connect_id: account.id,
-        payout_method: 'stripe'
+        stripe_connect_account_id: account.id,
+        stripe_onboarding_completed: false
       })
       .eq('id', userId);
-    
+
     if (updateError) {
-      console.error('Error updating profile:', updateError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to update profile' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
+      console.error('Error updating profile with Stripe account ID:', updateError);
+      // Continue anyway, as the account was created successfully
     }
     
     return new Response(
