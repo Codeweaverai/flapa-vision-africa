@@ -1,12 +1,12 @@
 
-// The TypeScript errors related to Deno imports are expected and can be ignored
-// since these are Deno-specific imports that run in the Supabase Edge Function environment
-// and not in the browser. They will work correctly when deployed to Supabase.
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14.21.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
 
@@ -51,11 +51,18 @@ serve(async (req) => {
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
       apiVersion: '2023-10-16',
     });
+
+    // Create Supabase client for database operations with service role
+    const supabaseServiceClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
     
     // Get user profile data
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseServiceClient
       .from('profiles')
-      .select('email, full_name, stripe_connect_account_id')
+      .select('username, full_name, stripe_connect_account_id')
       .eq('id', userId)
       .single();
 
@@ -79,20 +86,19 @@ serve(async (req) => {
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'US',
-      email: profile.email,
+      email: user.email,
       business_profile: {
-        name: profile.full_name || 'Creator',
+        name: profile.full_name || profile.username || 'Creator',
         product_description: 'Educational content creation',
       },
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
-      external_account: 'bank_account',
     });
     
     // Update profile with Stripe account ID
-    const { error: updateError } = await supabaseClient
+    const { error: updateError } = await supabaseServiceClient
       .from('profiles')
       .update({ 
         stripe_connect_account_id: account.id,

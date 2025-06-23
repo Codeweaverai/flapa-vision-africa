@@ -207,7 +207,10 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
         body: { userId: user.id }
       });
 
-      if (accountError) throw accountError;
+      if (accountError) {
+        console.error('Account creation error:', accountError);
+        throw accountError;
+      }
 
       if (accountData?.accountId) {
         // Create account link for onboarding
@@ -219,7 +222,10 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
           }
         });
 
-        if (linkError) throw linkError;
+        if (linkError) {
+          console.error('Link creation error:', linkError);
+          throw linkError;
+        }
 
         if (linkData?.url) {
           // Update default payout method
@@ -230,10 +236,8 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
             })
             .eq('id', user.id);
 
-          window.open(linkData.url, '_blank');
-          toast.success('Redirecting to Stripe Connect setup...');
-          onSuccess();
-          onOpenChange(false);
+          // Open Stripe Connect setup in the same window
+          window.location.href = linkData.url;
         }
       }
     } catch (error) {

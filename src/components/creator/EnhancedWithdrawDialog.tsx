@@ -154,20 +154,31 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           return;
         }
 
+        // Extract country code from operator (e.g., mtn_zmb -> ZMB)
+        const operatorParts = profileData.mobile_money_operator.split('_');
+        const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
+
         // Process PawaPay payout
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
             amount: usdAmount,
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
-            country: 'UG', // Default to Uganda, can be made dynamic
+            country: countryCode,
             creator_id: user.id
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('PawaPay payout error:', error);
+          throw error;
+        }
 
-        toast.success('Payout request submitted successfully! You will receive an email confirmation.');
+        if (data?.success) {
+          toast.success('Payout request submitted successfully! You will receive an email confirmation.');
+        } else {
+          throw new Error(data?.message || 'Payout request failed');
+        }
       }
 
       onSuccess();
@@ -175,7 +186,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       setAmount('');
     } catch (error) {
       console.error('Withdrawal error:', error);
-      toast.error('Failed to process withdrawal. Please try again.');
+      toast.error(error.message || 'Failed to process withdrawal. Please try again.');
     } finally {
       setLoading(false);
     }

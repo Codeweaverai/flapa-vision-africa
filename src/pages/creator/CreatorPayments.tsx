@@ -159,7 +159,8 @@ const CreatorPayments: React.FC = () => {
       );
     }
 
-    if (payoutMethod.payout_method === 'stripe') {
+    // Show Stripe method if selected
+    if (payoutMethod.payout_method === 'stripe' && payoutMethod.stripe_account_id) {
       return (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center gap-3">
@@ -181,6 +182,7 @@ const CreatorPayments: React.FC = () => {
       );
     }
 
+    // Show Mobile Money method if selected
     if (payoutMethod.payout_method === 'mobile_money' && payoutMethod.mobile_money_details) {
       const details = payoutMethod.mobile_money_details;
       return (
