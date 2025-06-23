@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -217,7 +216,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
         const { data: linkData, error: linkError } = await supabase.functions.invoke('create-stripe-account-link', {
           body: { 
             accountId: accountData.accountId,
-            returnUrl: `${window.location.origin}/creator/payments?success=true`,
+            returnUrl: `${window.location.origin}/creator/payments`,
             refreshUrl: `${window.location.origin}/creator/payments?refresh=true`
           }
         });
@@ -228,14 +227,6 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
         }
 
         if (linkData?.url) {
-          // Update default payout method
-          await supabase
-            .from('profiles')
-            .update({ 
-              default_payout_method: 'stripe'
-            })
-            .eq('id', user.id);
-
           // Open Stripe Connect setup in the same window
           window.location.href = linkData.url;
         }

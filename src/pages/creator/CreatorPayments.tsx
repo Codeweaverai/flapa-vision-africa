@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +24,7 @@ import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog'
 import PayoutMethodSetupDialog from '@/components/creator/PayoutMethodSetupDialog';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { supabase } from '@/lib/supabase';
 
 const CreatorPayments: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -58,14 +58,12 @@ const CreatorPayments: React.FC = () => {
       // Check URL parameters for Stripe callback
       const success = searchParams.get('success');
       const refresh = searchParams.get('refresh');
+      const accountId = searchParams.get('account_id');
       
-      if (success === 'true') {
-        toast({
-          title: "Stripe Account Connected",
-          description: "Your Stripe Connect account has been set up successfully!",
-        });
+      if (success === 'true' && accountId) {
+        // Update the profile with the Stripe account ID and set as default payout method
+        handleStripeOnboardingSuccess(accountId);
         setSearchParams({});
-        loadPayoutMethod(); // Refresh payout method
       } else if (refresh === 'true') {
         toast({
           title: "Account Setup Incomplete",
@@ -76,6 +74,37 @@ const CreatorPayments: React.FC = () => {
     }
   }, [user, searchParams]);
   
+  const handleStripeOnboardingSuccess = async (accountId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          stripe_connect_account_id: accountId,
+          stripe_onboarding_completed: true,
+          default_payout_method: 'stripe'
+        })
+        .eq('id', user?.id);
+
+      if (error) {
+        console.error('Error updating Stripe account:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save Stripe account details",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Stripe Account Connected",
+          description: "Your Stripe Connect account has been set up successfully!",
+        });
+        // Reload payout method to reflect changes
+        loadPayoutMethod();
+      }
+    } catch (error) {
+      console.error('Error handling Stripe onboarding success:', error);
+    }
+  };
+
   const loadPaymentData = async () => {
     if (!user) return;
     
@@ -159,8 +188,8 @@ const CreatorPayments: React.FC = () => {
       );
     }
 
-    // Show Stripe method if selected
-    if (payoutMethod.payout_method === 'stripe' && payoutMethod.stripe_account_id) {
+    // Show Stripe method if it's the default payout method
+    if (payoutMethod.default_payout_method === 'stripe' && payoutMethod.stripe_account_id) {
       return (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center gap-3">
@@ -182,9 +211,8 @@ const CreatorPayments: React.FC = () => {
       );
     }
 
-    // Show Mobile Money method if selected
-    if (payoutMethod.payout_method === 'mobile_money' && payoutMethod.mobile_money_details) {
-      const details = payoutMethod.mobile_money_details;
+    // Show Mobile Money method if it's the default payout method
+    if (payoutMethod.default_payout_method === 'mobile_money' && payoutMethod.mobile_money_operator) {
       return (
         <div className="bg-green-50 p-4 rounded-lg border border-green-200">
           <div className="flex items-center gap-3">
@@ -192,10 +220,10 @@ const CreatorPayments: React.FC = () => {
             <div className="flex-1">
               <div className="font-medium text-green-900">Mobile Money - Connected</div>
               <div className="text-sm text-green-700">
-                {details.operator_name || details.operator} • {details.phone_number}
+                {payoutMethod.mobile_money_operator} • {payoutMethod.mobile_money_number}
               </div>
               <div className="text-xs text-green-600 mt-1">
-                Country: {details.country} • Within 24 hours processing
+                Within 24 hours processing
               </div>
             </div>
             <Badge variant="default" className="bg-green-100 text-green-800">

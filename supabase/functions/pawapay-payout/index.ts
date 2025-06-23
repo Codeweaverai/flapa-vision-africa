@@ -1,91 +1,20 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const PAWAPAY_TOKEN = Deno.env.get('PAWAPAY_TOKEN') || '';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-interface PayoutRequest {
-  amount: number;
-  phone_number: string;
-  operator: string;
-  country: string;
-  creator_id: string;
-}
-
-// Map operator codes to PawaPay provider codes
-const getProviderCode = (operator: string, country: string): string => {
-  const providerMap: { [key: string]: string } = {
-    // Zambia
-    'mtn_zmb': 'MTN_MOMO_ZMB',
-    'airtel_zmb': 'AIRTEL_OAPI_ZMB',
-    
-    // Kenya
-    'mpesa_ken': 'MPESA_KEN',
-    'airtel_ken': 'AIRTEL_OAPI_KEN',
-    'equitel_ken': 'EQUITEL_KEN',
-    
-    // Uganda
-    'mtn_uga': 'MTN_MOMO_UGA',
-    'airtel_uga': 'AIRTEL_OAPI_UGA',
-    
-    // Tanzania
-    'vodacom_tza': 'VODACOM_LIPA_TZA',
-    'tigo_tza': 'TIGO_TZA',
-    'airtel_tza': 'AIRTEL_OAPI_TZA',
-    
-    // Ghana
-    'mtn_gha': 'MTN_MOMO_GHA',
-    'vodafone_gha': 'VODAFONE_GHA',
-    'airteltigo_gha': 'AIRTELTIGO_GHA',
-    
-    // Nigeria
-    'mtn_nga': 'MTN_MOMO_NGA',
-    'airtel_nga': 'AIRTEL_OAPI_NGA',
-    'glo_nga': 'GLO_NGA',
-    '9mobile_nga': '9MOBILE_NGA',
-    
-    // Rwanda
-    'mtn_rwa': 'MTN_MOMO_RWA',
-    'airtel_rwa': 'AIRTEL_OAPI_RWA',
-    
-    // Add more mappings as needed
-  };
-  
-  return providerMap[operator] || operator.toUpperCase();
-};
-
-// Get currency for country
-const getCurrencyForCountry = (countryCode: string): string => {
-  const currencyMap: { [key: string]: string } = {
-    'ZMB': 'ZMW',
-    'KEN': 'KES',
-    'UGA': 'UGX',
-    'TZA': 'TZS',
-    'GHA': 'GHS',
-    'NGA': 'NGN',
-    'RWA': 'RWF',
-    'MWI': 'MWK',
-    'MOZ': 'MZN',
-    'SEN': 'XOF',
-    'BEN': 'XOF',
-    'BFA': 'XOF',
-    'CMR': 'XAF',
-    'COG': 'XAF',
-    'COD': 'CDF',
-    'GAB': 'XAF',
-    'CIV': 'XOF',
-    'LSO': 'LSL',
-    'SLE': 'SLL',
-  };
-  
-  return currencyMap[countryCode] || 'USD';
-};
+const supabaseServiceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    persistSession: false
+  }
+});
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -96,10 +25,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
-    
+
     // Get the session user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
+
     if (userError || !user) {
       console.error('Error getting authenticated user:', userError);
       return new Response(
@@ -108,68 +37,100 @@ serve(async (req) => {
       );
     }
 
-    const { amount, phone_number, operator, country, creator_id }: PayoutRequest = await req.json();
-    
-    // Validate that the authenticated user matches the creator_id
-    if (user.id !== creator_id) {
+    // Parse request body
+    const { 
+      amount, 
+      originalAmount,
+      originalCurrency, 
+      phone_number, 
+      operator, 
+      country, 
+      creator_id 
+    } = await req.json();
+
+    console.log('PawaPay payout request:', { 
+      amount, 
+      originalAmount,
+      originalCurrency,
+      phone_number, 
+      operator, 
+      country, 
+      creator_id 
+    });
+
+    // Validate required fields
+    if (!amount || !phone_number || !operator || !country || !creator_id) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+        JSON.stringify({ 
+          success: false, 
+          message: 'Missing required fields' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
-    
-    const pawaPayToken = Deno.env.get("PAWAPAY_TOKEN");
-    if (!pawaPayToken) {
-      throw new Error("PawaPay token not configured");
-    }
 
-    // Create Supabase client for database operations with service role
-    const supabaseServiceClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
-
-    // Get creator profile for email
+    // Get creator profile to verify mobile money setup
     const { data: profile, error: profileError } = await supabaseServiceClient
       .from('profiles')
-      .select('*')
+      .select('mobile_money_operator, mobile_money_number, full_name, username')
       .eq('id', creator_id)
       .single();
 
     if (profileError || !profile) {
-      console.error('Profile error:', profileError);
-      throw new Error('Creator profile not found');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Creator profile not found' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
     }
 
-    // Generate a unique payout ID
+    // Convert amount to appropriate currency for the operator's country
+    const currencyMap: Record<string, string> = {
+      'ZMB': 'ZMW',
+      'KEN': 'KES',
+      'UGA': 'UGX',
+      'TZA': 'TZS',
+      'GHA': 'GHS',
+      'NGA': 'NGN',
+      'RWA': 'RWF'
+    };
+
+    const targetCurrency = currencyMap[country] || 'USD';
+    
+    // Convert USD amount to target currency if needed
+    let finalAmount = amount;
+    if (targetCurrency !== 'USD') {
+      // Use the original amount if it's already in the target currency
+      if (originalCurrency === targetCurrency) {
+        finalAmount = originalAmount;
+      } else {
+        // Convert USD to target currency (you might want to use a conversion service here)
+        const conversionRates: Record<string, number> = {
+          'ZMW': 23.2,
+          'KES': 129.5,
+          'UGX': 3680,
+          'TZS': 2380,
+          'GHS': 12.1,
+          'NGN': 755,
+          'RWF': 1024
+        };
+        finalAmount = Math.round(amount * (conversionRates[targetCurrency] || 1));
+      }
+    }
+
+    // Generate unique payout ID
     const payoutId = crypto.randomUUID();
-    
-    // Get provider code and currency
-    const providerCode = getProviderCode(operator, country);
-    const currency = getCurrencyForCountry(country);
-    
-    // Convert USD amount to local currency (simplified - in production you'd use real exchange rates)
-    let localAmount = amount;
-    if (currency !== 'USD') {
-      // This is a simplified conversion - you should use real exchange rates
-      const exchangeRates: { [key: string]: number } = {
-        'ZMW': 23.5, 'KES': 129, 'UGX': 3700, 'TZS': 2300, 
-        'GHS': 12, 'NGN': 1500, 'RWF': 1200, 'MWK': 1200
-      };
-      localAmount = amount * (exchangeRates[currency] || 1);
-    }
-    
-    // Round to 2 decimal places for most currencies
-    const roundedAmount = Math.round(localAmount * 100) / 100;
 
-    // Create payout record first
+    // Create payout record in database
     const { data: payoutRecord, error: payoutError } = await supabaseServiceClient
       .from('creator_payouts')
       .insert({
-        creator_id: creator_id,
-        amount: amount,
-        currency: 'usd',
+        id: payoutId,
+        creator_id,
+        amount,
+        currency: 'USD',
         method: 'mobile_money',
         payout_method: 'mobile_money',
         destination: `${operator} - ${phone_number}`,
@@ -178,175 +139,127 @@ serve(async (req) => {
           phone_number,
           operator,
           country,
-          provider_code: providerCode,
-          local_currency: currency,
-          local_amount: roundedAmount
-        },
-        pawapay_deposit_id: payoutId
+          amount: finalAmount,
+          currency: targetCurrency
+        }
       })
       .select()
       .single();
 
     if (payoutError) {
-      console.error('Payout record error:', payoutError);
-      throw new Error(`Failed to create payout record: ${payoutError.message}`);
+      console.error('Error creating payout record:', payoutError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Failed to create payout record' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
     }
 
-    // PawaPay payout request using new API
-    const pawaPayPayload = {
-      payoutId: payoutId,
+    // Map operator to PawaPay provider format
+    const providerMap: Record<string, string> = {
+      'mtn_zmb': 'MTN_MOMO_ZMB',
+      'airtel_zmb': 'AIRTEL_OAPI_ZMB'
+      // Add more mappings as needed
+    };
+
+    const provider = providerMap[operator] || operator.toUpperCase();
+
+    // Prepare PawaPay request
+    const pawapayPayload = {
+      payoutId,
       recipient: {
         type: "MMO",
         accountDetails: {
           phoneNumber: phone_number,
-          provider: providerCode
+          provider: provider
         }
       },
       customerMessage: "Creator Payout",
-      amount: roundedAmount.toString(),
-      currency: currency,
+      amount: finalAmount.toString(),
+      currency: targetCurrency,
       metadata: [
         {
-          orderId: payoutRecord.id,
+          orderId: payoutId
         },
         {
-          customerId: profile.email || 'unknown@email.com',
+          customerId: creator_id,
           isPII: true
         }
       ]
     };
 
-    console.log('PawaPay payout payload:', JSON.stringify(pawaPayPayload, null, 2));
-    
-    const pawaPayResponse = await fetch("https://api.sandbox.pawapay.io/v2/payouts", {
-      method: "POST",
+    console.log('PawaPay payout payload:', JSON.stringify(pawapayPayload, null, 2));
+
+    // Make request to PawaPay
+    const pawapayResponse = await fetch('https://api.sandbox.pawapay.io/v2/payouts', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${pawaPayToken}`,
-        "Content-Type": "application/json",
+        'Authorization': `Bearer ${PAWAPAY_TOKEN}`,
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(pawaPayPayload),
+      body: JSON.stringify(pawapayPayload)
     });
 
-    const pawaPayResult = await pawaPayResponse.json();
-    console.log('PawaPay response:', JSON.stringify(pawaPayResult, null, 2));
+    const pawapayResult = await pawapayResponse.json();
+    console.log('PawaPay response:', JSON.stringify(pawapayResult, null, 2));
 
-    if (!pawaPayResponse.ok) {
-      console.error("PawaPay error:", pawaPayResult);
-      
-      // Handle different error types
-      let errorMessage = 'Payment failed';
-      if (pawaPayResult.failureReason) {
-        const { failureCode, failureMessage } = pawaPayResult.failureReason;
-        
-        switch (failureCode) {
-          case 'INVALID_PHONE_NUMBER':
-            errorMessage = 'Invalid phone number for the selected provider';
-            break;
-          case 'INVALID_CURRENCY':
-            errorMessage = `Currency ${currency} not supported by ${providerCode}`;
-            break;
-          case 'INVALID_AMOUNT':
-            errorMessage = 'Invalid amount format for this provider';
-            break;
-          case 'AMOUNT_OUT_OF_BOUNDS':
-            errorMessage = 'Amount is outside the allowed limits for this provider';
-            break;
-          case 'PROVIDER_TEMPORARILY_UNAVAILABLE':
-            errorMessage = 'Mobile money provider is temporarily unavailable';
-            break;
-          case 'AUTHENTICATION_ERROR':
-            errorMessage = 'Payment service authentication failed';
-            break;
-          default:
-            errorMessage = failureMessage || 'Payment processing failed';
-        }
-      }
-      
-      // Update payout record with error
-      await supabaseServiceClient
-        .from('creator_payouts')
-        .update({ 
-          status: 'failed',
-          mobile_money_details: {
-            ...payoutRecord.mobile_money_details,
-            error_code: pawaPayResult.failureReason?.failureCode,
-            error_message: pawaPayResult.failureReason?.failureMessage
-          }
-        })
-        .eq('id', payoutRecord.id);
-        
-      throw new Error(errorMessage);
-    }
-
-    // Update the payout record based on PawaPay response
+    // Update payout record based on PawaPay response
     let updateData: any = {
-      provider_payout_id: payoutId
+      pawapay_deposit_id: pawapayResult.payoutId,
+      updated_at: new Date().toISOString()
     };
 
-    if (pawaPayResult.status === 'ACCEPTED') {
+    if (pawapayResult.status === 'ACCEPTED') {
       updateData.status = 'processing';
-    } else if (pawaPayResult.status === 'DUPLICATE_IGNORED') {
-      updateData.status = 'completed';
-    } else if (pawaPayResult.status === 'REJECTED') {
-      updateData.status = 'failed';
-      updateData.mobile_money_details = {
-        ...payoutRecord.mobile_money_details,
-        error_code: pawaPayResult.failureReason?.failureCode,
-        error_message: pawaPayResult.failureReason?.failureMessage
-      };
-    }
-
-    const { error: updateError } = await supabaseServiceClient
-      .from('creator_payouts')
-      .update(updateData)
-      .eq('id', payoutRecord.id);
-
-    if (updateError) {
-      console.error("Database update error:", updateError);
-    }
-
-    // Send confirmation email only if payout was accepted
-    if (pawaPayResult.status === 'ACCEPTED') {
+      
+      // Send confirmation email
       try {
-        await supabaseServiceClient.functions.invoke('payout-confirmation-email', {
+        await supabase.functions.invoke('payout-confirmation-email', {
           body: {
-            email: profile.email,
-            amount: amount,
-            currency: 'USD',
-            method: 'Mobile Money',
-            destination: `${providerCode} - ${phone_number}`,
-            creatorName: profile.full_name || profile.username || 'Creator'
+            creatorId: creator_id,
+            amount: finalAmount,
+            currency: targetCurrency,
+            payoutId,
+            method: 'mobile_money',
+            destination: `${operator} - ${phone_number}`
           }
         });
       } catch (emailError) {
-        console.error("Failed to send confirmation email:", emailError);
-        // Don't fail the payout if email fails
+        console.error('Error sending confirmation email:', emailError);
       }
+    } else if (pawapayResult.status === 'REJECTED') {
+      updateData.status = 'failed';
+    } else if (pawapayResult.status === 'DUPLICATE_IGNORED') {
+      updateData.status = 'duplicate';
     }
 
-    return new Response(JSON.stringify({
-      success: pawaPayResult.status === 'ACCEPTED',
-      payoutId: payoutRecord.id,
-      status: pawaPayResult.status,
-      pawapayId: payoutId,
-      message: pawaPayResult.status === 'ACCEPTED' 
-        ? 'Payout request accepted and being processed'
-        : pawaPayResult.status === 'DUPLICATE_IGNORED'
-        ? 'Duplicate payout request ignored'
-        : 'Payout request rejected',
-      failureReason: pawaPayResult.failureReason
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    await supabaseServiceClient
+      .from('creator_payouts')
+      .update(updateData)
+      .eq('id', payoutId);
+
+    return new Response(
+      JSON.stringify({ 
+        success: pawapayResult.status === 'ACCEPTED',
+        payoutId: pawapayResult.payoutId,
+        status: pawapayResult.status,
+        message: pawapayResult.status === 'ACCEPTED' 
+          ? 'Payout request accepted successfully'
+          : pawapayResult.failureReason?.failureMessage || 'Payout request failed'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
 
   } catch (error) {
-    console.error("Payout error:", error);
-    return new Response(JSON.stringify({
-      error: error.message || "Failed to process payout"
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error('Error processing PawaPay payout:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        message: 'Internal server error' 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
   }
 });

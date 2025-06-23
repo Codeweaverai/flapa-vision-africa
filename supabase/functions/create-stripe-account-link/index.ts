@@ -1,8 +1,4 @@
 
-// The TypeScript errors related to Deno imports are expected and can be ignored
-// since these are Deno-specific imports that run in the Supabase Edge Function environment
-// and not in the browser. They will work correctly when deployed to Supabase.
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -51,11 +47,14 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     });
     
-    // Create account link for onboarding
+    // Create account link for onboarding with success URL that includes the account ID
+    const baseReturnUrl = returnUrl || `${new URL(req.url).origin}/creator/payments`;
+    const successUrl = `${baseReturnUrl}?success=true&account_id=${accountId}`;
+    
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: refreshUrl || `${new URL(req.url).origin}/creator/payments?refresh=true`,
-      return_url: returnUrl || `${new URL(req.url).origin}/creator/payments?success=true`,
+      return_url: successUrl,
       type: 'account_onboarding',
     });
     

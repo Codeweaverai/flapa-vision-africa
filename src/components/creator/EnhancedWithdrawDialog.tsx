@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -104,6 +103,20 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (profileData) {
+      if (profileData.default_payout_method === 'stripe' && hasStripeSetup) {
+        setSelectedPayoutMethod('stripe');
+      } else if (profileData.default_payout_method === 'mobile_money' && hasMobileMoneySetup) {
+        setSelectedPayoutMethod('mobile_money');
+      } else if (hasStripeSetup) {
+        setSelectedPayoutMethod('stripe');
+      } else if (hasMobileMoneySetup) {
+        setSelectedPayoutMethod('mobile_money');
+      }
+    }
+  }, [profileData, hasStripeSetup, hasMobileMoneySetup]);
+
   const handleWithdraw = async () => {
     if (!user || !profileData) return;
 
@@ -158,10 +171,12 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // Process PawaPay payout
+        // Process PawaPay payout with proper currency conversion
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
-            amount: usdAmount,
+            amount: usdAmount, // Always pass USD amount to the function
+            originalAmount: withdrawAmount, // Original amount in selected currency
+            originalCurrency: currentCurrency, // Selected currency
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
             country: countryCode,
