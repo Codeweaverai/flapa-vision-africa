@@ -34,13 +34,120 @@ interface ProfileData {
   default_payout_method?: string;
 }
 
+const PAWAPAY_COUNTRIES = {
+  'Zambia': { code: 'ZMB', flag: '🇿🇲', dialCode: '+260' },
+  'Kenya': { code: 'KEN', flag: '🇰🇪', dialCode: '+254' },
+  'Uganda': { code: 'UGA', flag: '🇺🇬', dialCode: '+256' },
+  'Tanzania': { code: 'TZA', flag: '🇹🇿', dialCode: '+255' },
+  'Ghana': { code: 'GHA', flag: '🇬🇭', dialCode: '+233' },
+  'Nigeria': { code: 'NGA', flag: '🇳🇬', dialCode: '+234' },
+  'Rwanda': { code: 'RWA', flag: '🇷🇼', dialCode: '+250' },
+  'Malawi': { code: 'MWI', flag: '🇲🇼', dialCode: '+265' },
+  'Mozambique': { code: 'MOZ', flag: '🇲🇿', dialCode: '+258' },
+  'Senegal': { code: 'SEN', flag: '🇸🇳', dialCode: '+221' },
+  'Benin': { code: 'BEN', flag: '🇧🇯', dialCode: '+229' },
+  'Burkina Faso': { code: 'BFA', flag: '🇧🇫', dialCode: '+226' },
+  'Cameroon': { code: 'CMR', flag: '🇨🇲', dialCode: '+237' },
+  'Congo-Brazzaville': { code: 'COG', flag: '🇨🇬', dialCode: '+242' },
+  'DRC': { code: 'COD', flag: '🇨🇩', dialCode: '+243' },
+  'Gabon': { code: 'GAB', flag: '🇬🇦', dialCode: '+241' },
+  'Ivory Coast': { code: 'CIV', flag: '🇨🇮', dialCode: '+225' },
+  'Lesotho': { code: 'LSO', flag: '🇱🇸', dialCode: '+266' },
+  'Sierra Leone': { code: 'SLE', flag: '🇸🇱', dialCode: '+232' },
+};
+
+const MOBILE_OPERATORS = {
+  ZMB: [
+    { code: 'mtn_zmb', name: 'MTN Zambia' },
+    { code: 'airtel_zmb', name: 'Airtel Zambia' }
+  ],
+  KEN: [
+    { code: 'mpesa_ken', name: 'M-Pesa Kenya' },
+    { code: 'airtel_ken', name: 'Airtel Kenya' },
+    { code: 'equitel_ken', name: 'Equitel Kenya' }
+  ],
+  UGA: [
+    { code: 'mtn_uga', name: 'MTN Uganda' },
+    { code: 'airtel_uga', name: 'Airtel Uganda' }
+  ],
+  TZA: [
+    { code: 'vodacom_tza', name: 'Vodacom Tanzania' },
+    { code: 'tigo_tza', name: 'Tigo Tanzania' },
+    { code: 'airtel_tza', name: 'Airtel Tanzania' }
+  ],
+  GHA: [
+    { code: 'mtn_gha', name: 'MTN Ghana' },
+    { code: 'vodafone_gha', name: 'Vodafone Ghana' },
+    { code: 'airteltigo_gha', name: 'AirtelTigo Ghana' }
+  ],
+  NGA: [
+    { code: 'mtn_nga', name: 'MTN Nigeria' },
+    { code: 'airtel_nga', name: 'Airtel Nigeria' },
+    { code: 'glo_nga', name: 'Glo Nigeria' },
+    { code: '9mobile_nga', name: '9mobile Nigeria' }
+  ],
+  RWA: [
+    { code: 'mtn_rwa', name: 'MTN Rwanda' },
+    { code: 'airtel_rwa', name: 'Airtel Rwanda' }
+  ],
+  MWI: [
+    { code: 'airtel_mwi', name: 'Airtel Malawi' },
+    { code: 'tnm_mwi', name: 'TNM Malawi' }
+  ],
+  MOZ: [
+    { code: 'vodacom_moz', name: 'Vodacom Mozambique' },
+    { code: 'mcel_moz', name: 'Mcel Mozambique' }
+  ],
+  SEN: [
+    { code: 'orange_sen', name: 'Orange Senegal' },
+    { code: 'free_sen', name: 'Free Senegal' }
+  ],
+  BEN: [
+    { code: 'mtn_ben', name: 'MTN Benin' },
+    { code: 'moov_ben', name: 'Moov Benin' }
+  ],
+  BFA: [
+    { code: 'orange_bfa', name: 'Orange Burkina Faso' },
+    { code: 'moov_bfa', name: 'Moov Burkina Faso' }
+  ],
+  CMR: [
+    { code: 'mtn_cmr', name: 'MTN Cameroon' },
+    { code: 'orange_cmr', name: 'Orange Cameroon' }
+  ],
+  COG: [
+    { code: 'airtel_cog', name: 'Airtel Congo' },
+    { code: 'mtn_cog', name: 'MTN Congo' }
+  ],
+  COD: [
+    { code: 'vodacom_cod', name: 'Vodacom DRC' },
+    { code: 'airtel_cod', name: 'Airtel DRC' }
+  ],
+  GAB: [
+    { code: 'airtel_gab', name: 'Airtel Gabon' },
+    { code: 'moov_gab', name: 'Moov Gabon' }
+  ],
+  CIV: [
+    { code: 'orange_civ', name: 'Orange Ivory Coast' },
+    { code: 'mtn_civ', name: 'MTN Ivory Coast' },
+    { code: 'moov_civ', name: 'Moov Ivory Coast' }
+  ],
+  LSO: [
+    { code: 'vodacom_lso', name: 'Vodacom Lesotho' },
+    { code: 'econet_lso', name: 'Econet Lesotho' }
+  ],
+  SLE: [
+    { code: 'orange_sle', name: 'Orange Sierra Leone' },
+    { code: 'airtel_sle', name: 'Airtel Sierra Leone' }
+  ]
+};
+
 const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   open,
   onOpenChange,
   onSuccess
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'mobile_money'>('stripe');
-  const [selectedCountry, setSelectedCountry] = useState('US');
+  const [selectedCountry, setSelectedCountry] = useState('USA');
   const [mobileOperator, setMobileOperator] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,21 +155,6 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   const [loadingProfile, setLoadingProfile] = useState(true);
   
   const { user } = useAuth();
-
-  const mobileOperators = {
-    UG: [
-      { code: 'mtn_ug', name: 'MTN Uganda' },
-      { code: 'airtel_ug', name: 'Airtel Uganda' }
-    ],
-    KE: [
-      { code: 'mpesa_ke', name: 'M-Pesa Kenya' },
-      { code: 'airtel_ke', name: 'Airtel Kenya' }
-    ],
-    TZ: [
-      { code: 'vodacom_tz', name: 'Vodacom Tanzania' },
-      { code: 'tigo_tz', name: 'Tigo Tanzania' }
-    ]
-  };
 
   useEffect(() => {
     if (open && user) {
@@ -140,6 +232,8 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
 
           window.open(linkData.url, '_blank');
           toast.success('Redirecting to Stripe Connect setup...');
+          onSuccess();
+          onOpenChange(false);
         }
       }
     } catch (error) {
@@ -305,7 +399,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="US">United States</SelectItem>
+                    <SelectItem value="USA">🇺🇸 United States</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -336,50 +430,61 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                 <Label htmlFor="country">Country</Label>
                 <Select value={selectedCountry} onValueChange={setSelectedCountry}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UG">Uganda</SelectItem>
-                    <SelectItem value="KE">Kenya</SelectItem>
-                    <SelectItem value="TZ">Tanzania</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="operator">Mobile Operator</Label>
-                <Select value={mobileOperator} onValueChange={setMobileOperator}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select operator" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mobileOperators[selectedCountry as keyof typeof mobileOperators]?.map((operator) => (
-                      <SelectItem key={operator.code} value={operator.code}>
-                        {operator.name}
+                    {Object.entries(PAWAPAY_COUNTRIES).map(([country, details]) => (
+                      <SelectItem key={details.code} value={details.code}>
+                        <span className="flex items-center gap-2">
+                          <span>{details.flag}</span>
+                          <span>{country}</span>
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+256 700 000 000"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                />
-              </div>
+              {selectedCountry && selectedCountry !== 'USA' && (
+                <div className="space-y-2">
+                  <Label htmlFor="operator">Mobile Operator</Label>
+                  <Select value={mobileOperator} onValueChange={setMobileOperator}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select operator" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MOBILE_OPERATORS[selectedCountry as keyof typeof MOBILE_OPERATORS]?.map((operator) => (
+                        <SelectItem key={operator.code} value={operator.code}>
+                          {operator.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-              <Button 
-                onClick={handleSaveMobileMoney}
-                disabled={loading || !mobileOperator || !phoneNumber}
-                className="w-full"
-              >
-                {loading ? "Saving..." : "Save Mobile Money Details"}
-              </Button>
+              {selectedCountry && selectedCountry !== 'USA' && (
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder={`${Object.values(PAWAPAY_COUNTRIES).find(c => c.code === selectedCountry)?.dialCode || '+XXX'} XXX XXX XXX`}
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {selectedCountry && selectedCountry !== 'USA' && (
+                <Button 
+                  onClick={handleSaveMobileMoney}
+                  disabled={loading || !mobileOperator || !phoneNumber}
+                  className="w-full"
+                >
+                  {loading ? "Saving..." : "Save Mobile Money Details"}
+                </Button>
+              )}
             </div>
           )}
         </div>

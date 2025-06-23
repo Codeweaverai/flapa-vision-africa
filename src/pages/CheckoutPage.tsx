@@ -42,7 +42,7 @@ const CheckoutPage = () => {
   });
   
   const totalAmountUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const TAX_RATE = 0.1; // 10% tax
+  const TAX_RATE = 0.04; // Changed to 4% tax
   const taxAmountUSD = totalAmountUSD * TAX_RATE;
   const finalAmountUSD = totalAmountUSD + taxAmountUSD - discount;
 
@@ -329,7 +329,7 @@ const CheckoutPage = () => {
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span>Tax (10%)</span>
+                      <span>Tax (4%)</span>
                       <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
                     </div>
                     <Separator />

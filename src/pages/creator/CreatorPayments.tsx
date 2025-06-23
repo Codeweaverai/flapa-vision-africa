@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -160,13 +161,16 @@ const CreatorPayments: React.FC = () => {
 
     if (payoutMethod.payout_method === 'stripe') {
       return (
-        <div className="bg-blue-50 p-3 rounded-lg">
-          <div className="flex items-center gap-2 text-blue-700">
-            <CreditCard className="h-4 w-4" />
-            <span className="font-medium">Stripe Connect</span>
-          </div>
-          <div className="text-sm text-blue-600 mt-1">
-            Bank transfers (2-3 business days)
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div className="flex items-center gap-3">
+            <CreditCard className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              <div className="font-medium text-blue-900">Stripe Connect - Connected</div>
+              <div className="text-sm text-blue-700">Bank transfers (2-7 business days)</div>
+            </div>
+            <Badge variant="default" className="bg-green-100 text-green-800">
+              Active
+            </Badge>
           </div>
         </div>
       );
@@ -175,13 +179,19 @@ const CreatorPayments: React.FC = () => {
     if (payoutMethod.payout_method === 'mobile_money' && payoutMethod.mobile_money_details) {
       const details = payoutMethod.mobile_money_details;
       return (
-        <div className="bg-green-50 p-3 rounded-lg">
-          <div className="flex items-center gap-2 text-green-700">
-            <CreditCard className="h-4 w-4" />
-            <span className="font-medium">Mobile Money</span>
-          </div>
-          <div className="text-sm text-green-600 mt-1">
-            {details.operator} • {details.phone_number}
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <div className="flex items-center gap-3">
+            <Smartphone className="h-5 w-5 text-green-600" />
+            <div className="flex-1">
+              <div className="font-medium text-green-900">Mobile Money - Connected</div>
+              <div className="text-sm text-green-700">
+                {details.operator} • {details.phone_number}
+              </div>
+              <div className="text-xs text-green-600">Within 24 hours</div>
+            </div>
+            <Badge variant="default" className="bg-green-100 text-green-800">
+              Active
+            </Badge>
           </div>
         </div>
       );

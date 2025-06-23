@@ -49,7 +49,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
   const { user } = useAuth();
-  const { convertPrice } = useCurrency();
+  const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
   useEffect(() => {
     if (open && user) {
