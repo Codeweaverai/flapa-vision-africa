@@ -255,247 +255,245 @@ const CreatorAnalytics: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-purple-700">
-      <CreatorLayout>
-        <div className="space-y-6">
-          <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
+    <CreatorLayout>
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
+        
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                <PriceDisplay amount={analyticsData.totalRevenue} originalCurrency="USD" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Your lifetime earnings (after platform fees)
+              </p>
+            </CardContent>
+          </Card>
           
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  <PriceDisplay amount={analyticsData.totalRevenue} originalCurrency="USD" />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Your lifetime earnings (after platform fees)
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalStudents}</div>
-                <p className="text-xs text-muted-foreground">
-                  Unique students enrolled
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Courses</CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalCourses}</div>
-                <p className="text-xs text-muted-foreground">
-                  Published courses
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Events</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalEvents}</div>
-                <p className="text-xs text-muted-foreground">
-                  Created events
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Revenue Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue Breakdown</CardTitle>
-                <CardDescription>Income distribution by content type</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {revenueBreakdown.some(item => item.value > 0) ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={revenueBreakdown.filter(item => item.value > 0)}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
-                      >
-                        {revenueBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                    No revenue data available
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Monthly Revenue Trend */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue Trend</CardTitle>
-                <CardDescription>Monthly earnings over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {analyticsData.monthlyRevenue.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={analyticsData.monthlyRevenue}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']} />
-                      <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                    No revenue trend data available
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Course Enrollments</CardTitle>
-                <CardDescription>Latest students enrolled in your courses</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {analyticsData.recentEnrollments.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">No recent enrollments</p>
-                  ) : (
-                    analyticsData.recentEnrollments.slice(0, 5).map((enrollment) => (
-                      <div key={enrollment.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{enrollment.profiles?.username || enrollment.profiles?.full_name || 'Unknown Student'}</p>
-                          <p className="text-sm text-muted-foreground">{enrollment.courses?.title}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant="outline">Enrolled</Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(enrollment.enrollment_date), 'MMM dd')}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Event Bookings</CardTitle>
-                <CardDescription>Latest bookings for your events</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {analyticsData.recentBookings.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">No recent bookings</p>
-                  ) : (
-                    analyticsData.recentBookings.slice(0, 5).map((booking) => (
-                      <div key={booking.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{booking.profiles?.username || booking.profiles?.full_name || 'Unknown Attendee'}</p>
-                          <p className="text-sm text-muted-foreground">{booking.events?.title}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant="outline">Booked</Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(booking.booking_date), 'MMM dd')}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Top Performing Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Courses</CardTitle>
-                <CardDescription>Your most popular courses by enrollment</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {analyticsData.topCourses.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">No courses available</p>
-                  ) : (
-                    analyticsData.topCourses.map((course, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{course.name}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{course.enrollments}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Events</CardTitle>
-                <CardDescription>Your most popular events by bookings</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {analyticsData.topEvents.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">No events available</p>
-                  ) : (
-                    analyticsData.topEvents.map((event, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{event.name}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{event.bookings}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analyticsData.totalStudents}</div>
+              <p className="text-xs text-muted-foreground">
+                Unique students enrolled
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Courses</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analyticsData.totalCourses}</div>
+              <p className="text-xs text-muted-foreground">
+                Published courses
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Events</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analyticsData.totalEvents}</div>
+              <p className="text-xs text-muted-foreground">
+                Created events
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      </CreatorLayout>
-    </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Revenue Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Breakdown</CardTitle>
+              <CardDescription>Income distribution by content type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {revenueBreakdown.some(item => item.value > 0) ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={revenueBreakdown.filter(item => item.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
+                    >
+                      {revenueBreakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  No revenue data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Monthly Revenue Trend */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Trend</CardTitle>
+              <CardDescription>Monthly earnings over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {analyticsData.monthlyRevenue.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analyticsData.monthlyRevenue}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']} />
+                    <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  No revenue trend data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Course Enrollments</CardTitle>
+              <CardDescription>Latest students enrolled in your courses</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {analyticsData.recentEnrollments.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">No recent enrollments</p>
+                ) : (
+                  analyticsData.recentEnrollments.slice(0, 5).map((enrollment) => (
+                    <div key={enrollment.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{enrollment.profiles?.username || enrollment.profiles?.full_name || 'Unknown Student'}</p>
+                        <p className="text-sm text-muted-foreground">{enrollment.courses?.title}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline">Enrolled</Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(enrollment.enrollment_date), 'MMM dd')}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Event Bookings</CardTitle>
+              <CardDescription>Latest bookings for your events</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {analyticsData.recentBookings.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">No recent bookings</p>
+                ) : (
+                  analyticsData.recentBookings.slice(0, 5).map((booking) => (
+                    <div key={booking.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{booking.profiles?.username || booking.profiles?.full_name || 'Unknown Attendee'}</p>
+                        <p className="text-sm text-muted-foreground">{booking.events?.title}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline">Booked</Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(booking.booking_date), 'MMM dd')}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Top Performing Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Courses</CardTitle>
+              <CardDescription>Your most popular courses by enrollment</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {analyticsData.topCourses.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">No courses available</p>
+                ) : (
+                  analyticsData.topCourses.map((course, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{course.name}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{course.enrollments}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Events</CardTitle>
+              <CardDescription>Your most popular events by bookings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {analyticsData.topEvents.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">No events available</p>
+                ) : (
+                  analyticsData.topEvents.map((event, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{event.name}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{event.bookings}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </CreatorLayout>
   );
 };
 

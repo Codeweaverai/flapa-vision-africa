@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -70,10 +69,10 @@ serve(async (req) => {
       );
     }
 
-    // Get creator profile to verify mobile money setup and get email
+    // Get creator profile to verify mobile money setup
     const { data: profile, error: profileError } = await supabaseServiceClient
       .from('profiles')
-      .select('mobile_money_operator, mobile_money_number, full_name, username, email')
+      .select('mobile_money_operator, mobile_money_number, full_name, username')
       .eq('id', creator_id)
       .single();
 
@@ -85,15 +84,6 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       );
-    }
-
-    // Get user email from auth.users if not in profile
-    let userEmail = profile.email;
-    if (!userEmail) {
-      const { data: authUser, error: authError } = await supabaseServiceClient.auth.admin.getUserById(creator_id);
-      if (authUser && authUser.user) {
-        userEmail = authUser.user.email;
-      }
     }
 
     // Convert amount to appropriate currency for the operator's country
@@ -140,7 +130,7 @@ serve(async (req) => {
         id: payoutId,
         creator_id,
         amount,
-        currency: targetCurrency,
+        currency: 'USD',
         method: 'mobile_money',
         payout_method: 'mobile_money',
         destination: `${operator} - ${phone_number}`,
@@ -150,9 +140,7 @@ serve(async (req) => {
           operator,
           country,
           amount: finalAmount,
-          currency: targetCurrency,
-          original_amount: originalAmount,
-          original_currency: originalCurrency
+          currency: targetCurrency
         }
       })
       .select()
@@ -226,23 +214,20 @@ serve(async (req) => {
     if (pawapayResult.status === 'ACCEPTED') {
       updateData.status = 'processing';
       
-      // Send confirmation email if we have user email
-      if (userEmail) {
-        try {
-          await supabaseServiceClient.functions.invoke('payout-confirmation-email', {
-            body: {
-              email: userEmail,
-              creatorId: creator_id,
-              amount: finalAmount,
-              currency: targetCurrency,
-              payoutId,
-              method: 'mobile_money',
-              destination: `${operator} - ${phone_number}`
-            }
-          });
-        } catch (emailError) {
-          console.error('Error sending confirmation email:', emailError);
-        }
+      // Send confirmation email
+      try {
+        await supabase.functions.invoke('payout-confirmation-email', {
+          body: {
+            creatorId: creator_id,
+            amount: finalAmount,
+            currency: targetCurrency,
+            payoutId,
+            method: 'mobile_money',
+            destination: `${operator} - ${phone_number}`
+          }
+        });
+      } catch (emailError) {
+        console.error('Error sending confirmation email:', emailError);
       }
     } else if (pawapayResult.status === 'REJECTED') {
       updateData.status = 'failed';
