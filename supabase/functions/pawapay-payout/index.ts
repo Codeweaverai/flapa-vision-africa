@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -69,7 +70,7 @@ serve(async (req) => {
       );
     }
 
-    // Get creator profile to verify mobile money setup
+    // Get creator profile and user email
     const { data: profile, error: profileError } = await supabaseServiceClient
       .from('profiles')
       .select('mobile_money_operator, mobile_money_number, full_name, username')
@@ -81,6 +82,20 @@ serve(async (req) => {
         JSON.stringify({ 
           success: false, 
           message: 'Creator profile not found' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+
+    // Get user email from auth
+    const { data: { user: creatorUser }, error: creatorUserError } = await supabaseServiceClient.auth.admin.getUserById(creator_id);
+    
+    if (creatorUserError || !creatorUser?.email) {
+      console.error('Error getting creator user email:', creatorUserError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Creator email not found' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       );
@@ -216,9 +231,10 @@ serve(async (req) => {
       
       // Send confirmation email
       try {
-        await supabase.functions.invoke('payout-confirmation-email', {
+        await supabaseServiceClient.functions.invoke('payout-confirmation-email', {
           body: {
-            creatorId: creator_id,
+            creatorEmail: creatorUser.email,
+            creatorName: profile.full_name || profile.username || 'Creator',
             amount: finalAmount,
             currency: targetCurrency,
             payoutId,

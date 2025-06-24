@@ -150,7 +150,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       .from('creator_payouts')
       .select('amount')
       .eq('creator_id', creatorId)
-      .eq('status', 'completed');
+      .in('status', ['completed', 'processing']); // Include both completed and processing payouts
 
     const totalPayouts = completedPayouts?.reduce((sum, payout) => sum + Number(payout.amount), 0) || 0;
     availableBalance = Math.max(0, availableBalance - totalPayouts);
