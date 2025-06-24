@@ -95,10 +95,8 @@ serve(async (req) => {
         currency: currency.toLowerCase(),
         description: `Creator payout for ${profile.full_name || profile.username}`,
         statement_descriptor: "Creator Payout",
-        metadata: JSON.stringify({
-          creator_id: creatorId,
-          payout_record_id: payoutRecord.id
-        })
+        "metadata[creator_id]": creatorId,
+        "metadata[payout_record_id]": payoutRecord.id
       }),
     });
 
