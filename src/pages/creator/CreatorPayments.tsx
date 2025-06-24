@@ -24,7 +24,7 @@ import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog'
 import PayoutMethodSetupDialog from '@/components/creator/PayoutMethodSetupDialog';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 
 const CreatorPayments: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -102,6 +103,11 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       setCheckingProfile(false);
     }
   };
+
+  // Define these variables before they're used
+  const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
+  const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
+  const hasAnyPayoutMethod = hasStripeSetup || hasMobileMoneySetup;
 
   useEffect(() => {
     if (profileData) {
@@ -209,10 +215,6 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
   const withdrawAmount = parseFloat(amount) || 0;
   const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= convertedBalance;
-
-  const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
-  const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
-  const hasAnyPayoutMethod = hasStripeSetup || hasMobileMoneySetup;
 
   if (checkingProfile) {
     return (
