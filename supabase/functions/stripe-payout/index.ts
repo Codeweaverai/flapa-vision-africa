@@ -33,10 +33,10 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Get creator's Stripe Connect account ID
+    // Get creator's Stripe Connect account ID and profile info
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('stripe_connect_id, email, full_name, username')
+      .select('stripe_connect_account_id, full_name, username')
       .eq('id', creatorId)
       .single();
 
@@ -44,11 +44,19 @@ serve(async (req) => {
       throw new Error('Creator profile not found');
     }
 
-    if (!profile.stripe_connect_id) {
+    if (!profile.stripe_connect_account_id) {
       throw new Error('Creator does not have a connected Stripe account');
     }
 
-    // Create payout record
+    // Get creator's email from auth
+    const { data: { user: creatorUser }, error: creatorUserError } = await supabaseClient.auth.admin.getUserById(creatorId);
+    
+    if (creatorUserError || !creatorUser?.email) {
+      console.error('Error getting creator user email:', creatorUserError);
+      throw new Error('Creator email not found');
+    }
+
+    // Create payout record in database first
     const { data: payoutRecord, error: payoutError } = await supabaseClient
       .from('creator_payouts')
       .insert({
@@ -64,46 +72,62 @@ serve(async (req) => {
       .single();
 
     if (payoutError) {
+      console.error('Error creating payout record:', payoutError);
       throw new Error(`Failed to create payout record: ${payoutError.message}`);
     }
 
-    // Create Stripe payout
-    const stripeResponse = await fetch("https://api.stripe.com/v1/transfers", {
+    console.log('Creating Stripe payout for:', {
+      amount: Math.round(amount * 100),
+      currency: currency.toLowerCase(),
+      connectedAccountId: profile.stripe_connect_account_id
+    });
+
+    // Create Stripe payout using the Payouts API
+    const stripeResponse = await fetch("https://api.stripe.com/v1/payouts", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${stripeSecretKey}`,
         "Content-Type": "application/x-www-form-urlencoded",
+        "Stripe-Account": profile.stripe_connect_account_id, // This specifies the connected account
       },
       body: new URLSearchParams({
-        amount: (amount * 100).toString(), // Convert to cents
+        amount: Math.round(amount * 100).toString(), // Convert to cents
         currency: currency.toLowerCase(),
-        destination: profile.stripe_connect_id,
         description: `Creator payout for ${profile.full_name || profile.username}`,
+        statement_descriptor: "Creator Payout",
+        metadata: JSON.stringify({
+          creator_id: creatorId,
+          payout_record_id: payoutRecord.id
+        })
       }),
     });
 
+    const stripeResult = await stripeResponse.json();
+    console.log('Stripe payout response:', stripeResult);
+
     if (!stripeResponse.ok) {
-      const errorData = await stripeResponse.text();
-      console.error("Stripe error:", errorData);
+      console.error("Stripe payout error:", stripeResult);
       
       // Update payout record with error
       await supabaseClient
         .from('creator_payouts')
-        .update({ status: 'failed' })
+        .update({ 
+          status: 'failed',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', payoutRecord.id);
         
-      throw new Error(`Stripe API error: ${stripeResponse.status}`);
+      throw new Error(`Stripe payout failed: ${stripeResult.error?.message || 'Unknown error'}`);
     }
 
-    const stripeResult = await stripeResponse.json();
-    
-    // Update the payout record with Stripe details
+    // Update the payout record with Stripe payout details
     const { error: updateError } = await supabaseClient
       .from('creator_payouts')
       .update({
         stripe_payout_id: stripeResult.id,
-        status: 'completed',
-        provider_payout_id: stripeResult.id
+        status: stripeResult.status === 'pending' ? 'processing' : 'completed',
+        provider_payout_id: stripeResult.id,
+        updated_at: new Date().toISOString()
       })
       .eq('id', payoutRecord.id);
 
@@ -115,12 +139,13 @@ serve(async (req) => {
     try {
       await supabaseClient.functions.invoke('payout-confirmation-email', {
         body: {
-          email: profile.email,
+          creatorEmail: creatorUser.email,
+          creatorName: profile.full_name || profile.username || 'Creator',
           amount: amount,
           currency: currency.toUpperCase(),
-          method: 'Stripe Connect',
-          destination: 'Connected Bank Account',
-          creatorName: profile.full_name || profile.username || 'Creator'
+          payoutId: payoutRecord.id,
+          method: 'stripe',
+          destination: 'Connected Bank Account'
         }
       });
     } catch (emailError) {
@@ -131,8 +156,10 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       payoutId: payoutRecord.id,
-      stripeTransferId: stripeResult.id,
-      status: 'completed'
+      stripePayoutId: stripeResult.id,
+      status: stripeResult.status,
+      arrivalDate: stripeResult.arrival_date,
+      message: 'Payout created successfully'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -141,6 +168,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Stripe payout error:", error);
     return new Response(JSON.stringify({
+      success: false,
       error: error.message || "Failed to process payout"
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

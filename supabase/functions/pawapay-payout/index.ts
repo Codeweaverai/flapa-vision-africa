@@ -114,14 +114,14 @@ serve(async (req) => {
 
     const targetCurrency = currencyMap[country] || 'USD';
     
-    // Convert USD amount to target currency if needed
+    // Use conversion rates to convert USD to target currency
     let finalAmount = amount;
     if (targetCurrency !== 'USD') {
       // Use the original amount if it's already in the target currency
       if (originalCurrency === targetCurrency) {
         finalAmount = originalAmount;
       } else {
-        // Convert USD to target currency (you might want to use a conversion service here)
+        // Convert USD to target currency
         const conversionRates: Record<string, number> = {
           'ZMW': 23.2,
           'KES': 129.5,
@@ -132,6 +132,7 @@ serve(async (req) => {
           'RWF': 1024
         };
         finalAmount = Math.round(amount * (conversionRates[targetCurrency] || 1));
+        console.log(`Converting ${amount} USD to ${finalAmount} ${targetCurrency} using rate ${conversionRates[targetCurrency]}`);
       }
     }
 
@@ -144,8 +145,8 @@ serve(async (req) => {
       .insert({
         id: payoutId,
         creator_id,
-        amount,
-        currency: 'USD',
+        amount: finalAmount, // Store the converted amount
+        currency: targetCurrency, // Store the target currency
         method: 'mobile_money',
         payout_method: 'mobile_money',
         destination: `${operator} - ${phone_number}`,
@@ -155,7 +156,8 @@ serve(async (req) => {
           operator,
           country,
           amount: finalAmount,
-          currency: targetCurrency
+          currency: targetCurrency,
+          original_usd_amount: amount
         }
       })
       .select()
@@ -175,8 +177,11 @@ serve(async (req) => {
     // Map operator to PawaPay provider format
     const providerMap: Record<string, string> = {
       'mtn_zmb': 'MTN_MOMO_ZMB',
-      'airtel_zmb': 'AIRTEL_OAPI_ZMB'
-      // Add more mappings as needed
+      'airtel_zmb': 'AIRTEL_OAPI_ZMB',
+      'mtn_ken': 'MTN_MOMO_KEN',
+      'airtel_ken': 'AIRTEL_OAPI_KEN',
+      'mtn_uga': 'MTN_MOMO_UGA',
+      'airtel_uga': 'AIRTEL_OAPI_UGA'
     };
 
     const provider = providerMap[operator] || operator.toUpperCase();
@@ -242,6 +247,7 @@ serve(async (req) => {
             destination: `${operator} - ${phone_number}`
           }
         });
+        console.log('Confirmation email sent successfully');
       } catch (emailError) {
         console.error('Error sending confirmation email:', emailError);
       }
@@ -261,6 +267,8 @@ serve(async (req) => {
         success: pawapayResult.status === 'ACCEPTED',
         payoutId: pawapayResult.payoutId,
         status: pawapayResult.status,
+        amount: finalAmount,
+        currency: targetCurrency,
         message: pawapayResult.status === 'ACCEPTED' 
           ? 'Payout request accepted successfully'
           : pawapayResult.failureReason?.failureMessage || 'Payout request failed'

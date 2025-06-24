@@ -233,7 +233,7 @@ const CreatorAnalytics: React.FC = () => {
   if (loading) {
     return (
       <CreatorLayout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-50">
+        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
           <div className="space-y-6 p-6">
             <h1 className="text-2xl font-bold">Analytics</h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -258,7 +258,7 @@ const CreatorAnalytics: React.FC = () => {
 
   return (
     <CreatorLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-50">
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
         <div className="space-y-6 p-6">
           <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
           

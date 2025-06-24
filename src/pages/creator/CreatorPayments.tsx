@@ -265,7 +265,7 @@ const CreatorPayments: React.FC = () => {
 
   return (
     <CreatorLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-50">
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
         <div className="space-y-6 p-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Payments & Payouts</h1>
@@ -530,7 +530,7 @@ const CreatorPayments: React.FC = () => {
                                   {format(new Date(payout.created_at), 'MMM dd, yyyy')}
                                 </TableCell>
                                 <TableCell className="font-medium">
-                                  {payout.currency?.toUpperCase()} {Number(payout.amount).toFixed(2)}
+                                  {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
                                 </TableCell>
                                 <TableCell>
                                   {payout.currency?.toUpperCase() || 'USD'}

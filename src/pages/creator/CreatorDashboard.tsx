@@ -107,7 +107,7 @@ const CreatorDashboard = () => {
   if (loading) {
     return (
       <CreatorLayout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-50">
+        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
@@ -118,7 +118,7 @@ const CreatorDashboard = () => {
 
   return (
     <CreatorLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-50">
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
         <div className="space-y-6 p-6">
           {/* Header */}
           <div className="flex justify-between items-start">
