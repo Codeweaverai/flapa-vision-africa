@@ -47,26 +47,38 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
-  const [convertedBalance, setConvertedBalance] = useState(0);
+  const [displayBalance, setDisplayBalance] = useState(0);
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
   useEffect(() => {
     if (open && user) {
       loadProfileData();
-      convertAvailableBalance();
     }
-  }, [open, user, currentCurrency]);
+  }, [open, user]);
 
-  const convertAvailableBalance = async () => {
-    try {
-      const converted = await convertPrice(availableBalance, 'USD');
-      setConvertedBalance(converted);
-    } catch (error) {
-      console.error('Error converting balance:', error);
-      setConvertedBalance(availableBalance);
+  // Convert balance based on selected payout method
+  useEffect(() => {
+    const convertBalanceForDisplay = async () => {
+      try {
+        if (selectedPayoutMethod === 'stripe') {
+          // For Stripe, convert to current currency for display
+          const converted = await convertPrice(availableBalance, 'USD');
+          setDisplayBalance(converted);
+        } else {
+          // For mobile money, keep balance in current currency (no conversion needed)
+          setDisplayBalance(availableBalance);
+        }
+      } catch (error) {
+        console.error('Error converting balance:', error);
+        setDisplayBalance(availableBalance);
+      }
+    };
+
+    if (availableBalance > 0) {
+      convertBalanceForDisplay();
     }
-  };
+  }, [availableBalance, selectedPayoutMethod, currentCurrency, convertPrice]);
 
   const loadProfileData = async () => {
     if (!user) return;
@@ -138,7 +150,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       return;
     }
 
-    if (withdrawAmount > convertedBalance) {
+    if (withdrawAmount > displayBalance) {
       toast.error('Amount exceeds available balance');
       return;
     }
@@ -176,7 +188,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // For mobile money, use the target currency amount directly
+        // For mobile money, use the amount directly in the current currency
+        // Only convert to USD for internal tracking
         const usdAmount = currentCurrency === 'USD' ? withdrawAmount : await convertPrice(withdrawAmount, currentCurrency);
 
         // Process PawaPay payout with proper currency handling
@@ -216,7 +229,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   };
 
   const withdrawAmount = parseFloat(amount) || 0;
-  const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= convertedBalance;
+  const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= displayBalance;
 
   if (checkingProfile) {
     return (
@@ -253,7 +266,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-muted-foreground">Available Balance</span>
               <Badge variant="outline" className="bg-green-50 text-green-700">
-                {formatPrice(convertedBalance, currentCurrency)}
+                {formatPrice(displayBalance, currentCurrency)}
               </Badge>
             </div>
             <div className="text-xs text-muted-foreground">
@@ -344,7 +357,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     onChange={(e) => setAmount(e.target.value)}
                     className="pl-16"
                     min="5"
-                    max={convertedBalance}
+                    max={displayBalance}
                     step="0.01"
                   />
                 </div>
