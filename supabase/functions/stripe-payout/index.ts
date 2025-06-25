@@ -8,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface StripePayoutRequest {
+interface StripeTransferRequest {
   creatorId: string;
   amount: number;
   currency: string;
@@ -30,7 +30,7 @@ serve(async (req) => {
   }
 
   try {
-    const { creatorId, amount, currency }: StripePayoutRequest = await req.json();
+    const { creatorId, amount, currency }: StripeTransferRequest = await req.json();
     
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecretKey) {
@@ -85,8 +85,8 @@ serve(async (req) => {
       });
     }
 
-    // Create payout record in database first
-    const { data: payoutRecord, error: payoutError } = await supabaseClient
+    // Create transfer record in database first
+    const { data: transferRecord, error: transferError } = await supabaseClient
       .from('creator_payouts')
       .insert({
         creator_id: creatorId,
@@ -100,107 +100,101 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (payoutError) {
-      console.error('Error creating payout record:', payoutError);
+    if (transferError) {
+      console.error('Error creating transfer record:', transferError);
       return new Response(JSON.stringify({
         success: false,
-        error: `Failed to create payout record: ${payoutError.message}`
+        error: `Failed to create transfer record: ${transferError.message}`
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
 
-    const requestedAmount = Math.round(amount * 100); // Convert to cents
+    const transferAmount = Math.round(amount * 100); // Convert to cents
 
-    console.log('Creating Stripe payout for:', {
-      amount: requestedAmount,
+    console.log('Creating Stripe transfer for:', {
+      amount: transferAmount,
       currency: currency.toLowerCase(),
       connectedAccountId: profile.stripe_connect_account_id
     });
 
-    // Create Stripe payout with timeout wrapper (5 seconds)
+    // Create Stripe transfer with timeout wrapper (5 seconds)
     let stripeResult;
     try {
       const stripeResponse = await withTimeout(
-        fetch("https://api.stripe.com/v1/payouts", {
+        fetch("https://api.stripe.com/v1/transfers", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${stripeSecretKey}`,
             "Content-Type": "application/x-www-form-urlencoded",
-            "Stripe-Account": profile.stripe_connect_account_id,
           },
           body: new URLSearchParams({
-            amount: requestedAmount.toString(),
+            amount: transferAmount.toString(),
             currency: currency.toLowerCase(),
-            description: `Creator payout for ${profile.full_name || profile.username}`,
-            statement_descriptor: "Creator Payout",
-            method: "instant", // Request instant payout if available
+            destination: profile.stripe_connect_account_id,
+            description: `Creator transfer for ${profile.full_name || profile.username}`,
             "metadata[creator_id]": creatorId,
-            "metadata[payout_record_id]": payoutRecord.id
+            "metadata[transfer_record_id]": transferRecord.id
           }),
         }),
         5000 // 5 second timeout
       );
 
       stripeResult = await stripeResponse.json();
-      console.log('Stripe payout response:', stripeResult);
+      console.log('Stripe transfer response:', stripeResult);
 
       if (!stripeResponse.ok) {
-        console.error("Stripe payout error:", stripeResult);
+        console.error("Stripe transfer error:", stripeResult);
         
-        // Update payout record with error
+        // Update transfer record with error
         await supabaseClient
           .from('creator_payouts')
           .update({ 
             status: 'failed',
             updated_at: new Date().toISOString()
           })
-          .eq('id', payoutRecord.id);
+          .eq('id', transferRecord.id);
           
         return new Response(JSON.stringify({
           success: false,
-          error: `Stripe payout failed: ${stripeResult.error?.message || 'Unknown error'}`
+          error: `Stripe transfer failed: ${stripeResult.error?.message || 'Unknown error'}`
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,
         });
       }
     } catch (error) {
-      console.error("Stripe payout timeout or error:", error);
+      console.error("Stripe transfer timeout or error:", error);
       
-      // Update payout record with error
+      // Update transfer record with error
       await supabaseClient
         .from('creator_payouts')
         .update({ 
           status: 'failed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', payoutRecord.id);
+        .eq('id', transferRecord.id);
         
       return new Response(JSON.stringify({
         success: false,
-        error: 'Stripe payout request timed out or failed'
+        error: 'Stripe transfer request timed out or failed'
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
 
-    // Update the payout record with Stripe payout details
-    const payoutStatus = stripeResult.status === 'paid' ? 'completed' : 
-                        stripeResult.status === 'pending' ? 'processing' : 
-                        stripeResult.status === 'in_transit' ? 'processing' : 'completed';
-
+    // Update the transfer record with Stripe transfer details
     const { error: updateError } = await supabaseClient
       .from('creator_payouts')
       .update({
-        stripe_payout_id: stripeResult.id,
-        status: payoutStatus,
+        stripe_payout_id: stripeResult.id, // Store transfer ID in payout_id field
+        status: 'completed',
         provider_payout_id: stripeResult.id,
         updated_at: new Date().toISOString()
       })
-      .eq('id', payoutRecord.id);
+      .eq('id', transferRecord.id);
 
     if (updateError) {
       console.error("Database update error:", updateError);
@@ -212,27 +206,26 @@ serve(async (req) => {
         resend.emails.send({
           from: "SkillPulse <onboarding@resend.dev>",
           to: creatorUser.email,
-          subject: "Payout Request Confirmed - SkillPulse",
+          subject: "Transfer Request Confirmed - SkillPulse",
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #333; border-bottom: 2px solid #f97316; padding-bottom: 10px;">Payout Confirmed</h1>
+              <h1 style="color: #333; border-bottom: 2px solid #f97316; padding-bottom: 10px;">Transfer Confirmed</h1>
               
               <p>Hello ${profile.full_name || profile.username || 'Creator'},</p>
               
-              <p>Your payout request has been confirmed and is being processed!</p>
+              <p>Your transfer request has been confirmed and processed successfully!</p>
               
               <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin: 0 0 15px 0; color: #333;">Payout Details:</h3>
+                <h3 style="margin: 0 0 15px 0; color: #333;">Transfer Details:</h3>
                 <p><strong>Amount:</strong> $${amount.toFixed(2)} USD</p>
-                <p><strong>Method:</strong> Stripe Connect</p>
-                <p><strong>Destination:</strong> Connected Bank Account</p>
-                <p><strong>Payout ID:</strong> ${payoutRecord.id}</p>
-                <p><strong>Stripe Payout ID:</strong> ${stripeResult.id}</p>
-                <p><strong>Status:</strong> ${payoutStatus === 'completed' ? 'Completed' : 'Processing'}</p>
-                ${stripeResult.arrival_date ? `<p><strong>Expected Arrival:</strong> ${new Date(stripeResult.arrival_date * 1000).toLocaleDateString()}</p>` : ''}
+                <p><strong>Method:</strong> Stripe Transfer</p>
+                <p><strong>Destination:</strong> Connected Stripe Account</p>
+                <p><strong>Transfer ID:</strong> ${transferRecord.id}</p>
+                <p><strong>Stripe Transfer ID:</strong> ${stripeResult.id}</p>
+                <p><strong>Status:</strong> Completed</p>
               </div>
               
-              <p>Your funds will be transferred to your connected bank account. Processing typically takes 2-7 business days.</p>
+              <p>Your funds have been transferred to your connected Stripe account and should be available immediately.</p>
               
               <p>Thank you for being a valued creator on SkillPulse!</p>
               
@@ -246,26 +239,25 @@ serve(async (req) => {
       console.log('Confirmation email sent successfully');
     } catch (emailError) {
       console.error("Failed to send confirmation email:", emailError);
-      // Don't fail the payout if email fails
+      // Don't fail the transfer if email fails
     }
 
     return new Response(JSON.stringify({
       success: true,
-      payoutId: payoutRecord.id,
-      stripePayoutId: stripeResult.id,
-      status: stripeResult.status,
-      arrivalDate: stripeResult.arrival_date,
-      message: 'Payout created successfully'
+      transferId: transferRecord.id,
+      stripeTransferId: stripeResult.id,
+      status: 'completed',
+      message: 'Transfer created successfully'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
 
   } catch (error) {
-    console.error("Stripe payout error:", error);
+    console.error("Stripe transfer error:", error);
     return new Response(JSON.stringify({
       success: false,
-      error: error.message || "Failed to process payout"
+      error: error.message || "Failed to process transfer"
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

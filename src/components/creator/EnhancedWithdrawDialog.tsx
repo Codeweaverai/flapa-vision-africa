@@ -195,7 +195,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         // For Stripe, always send USD amount (since availableBalance is in USD)
         const usdAmount = withdrawAmount * (availableBalance / convertedBalance);
 
-        // Process Stripe payout
+        // Process Stripe transfer
         const { data, error } = await supabase.functions.invoke('stripe-payout', {
           body: {
             creatorId: user.id,
@@ -206,7 +206,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
         if (error) throw error;
 
-        toast.success('Payout request submitted successfully! You will receive an email confirmation.');
+        toast.success('Transfer request processed successfully! You will receive an email confirmation.');
       } else if (selectedPayoutMethod === 'mobile_money') {
         if (!profileData.mobile_money_operator || !profileData.mobile_money_number) {
           toast.error('Mobile money details not configured');
@@ -287,7 +287,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             Withdraw Funds
           </DialogTitle>
           <DialogDescription>
-            Request a payout from your available balance
+            Request a transfer from your available balance
           </DialogDescription>
         </DialogHeader>
 
@@ -333,8 +333,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     />
                     <CreditCard className="h-5 w-5" />
                     <div>
-                      <div className="font-medium">Stripe Connect</div>
-                      <div className="text-sm text-muted-foreground">Bank transfer (2-7 business days)</div>
+                      <div className="font-medium">Stripe Transfer</div>
+                      <div className="text-sm text-muted-foreground">Instant transfer to connected account</div>
                     </div>
                     <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
                   </div>
@@ -427,7 +427,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
               <div className="bg-blue-50 p-3 rounded-lg">
                 <div className="text-xs text-blue-700 space-y-1">
                   <div>• Minimum withdrawal: {formatPrice(minAmount, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}</div>
-                  <div>• Processing time: {selectedPayoutMethod === 'stripe' ? '2-7 business days' : 'Within 24 hours'}</div>
+                  <div>• Processing time: {selectedPayoutMethod === 'stripe' ? 'Instant' : 'Within 24 hours'}</div>
                   <div>• Platform fee: 8% (already deducted)</div>
                   <div>• You'll receive an email confirmation</div>
                 </div>
@@ -446,7 +446,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
               disabled={!isValidAmount || loading}
               className="min-w-[100px]"
             >
-              {loading ? "Processing..." : "Withdraw"}
+              {loading ? "Processing..." : selectedPayoutMethod === 'stripe' ? "Transfer" : "Withdraw"}
             </Button>
           )}
         </DialogFooter>

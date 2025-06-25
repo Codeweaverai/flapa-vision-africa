@@ -75,9 +75,6 @@ import PaymentCancelPage from './pages/PaymentCancelPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import { Toaster } from 'sonner';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import CreatorLayout from './components/creator/CreatorLayout';
-import AdminLayout from './components/admin/AdminLayout';
-import AdminSidebar from './components/admin/AdminSidebar';
 
 const queryClient = new QueryClient();
 
@@ -102,8 +99,10 @@ function App() {
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/faq" element={<HelpCenterPage />} />
+                <Route path="/help" element={<HelpCenterPage />} />
                 <Route path="/terms" element={<TermsOfServicePage />} />
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/careers" element={<NotFoundPage />} />
 
                 {/* Auth Routes */}
                 <Route path="/login" element={<LoginPage />} />
@@ -111,6 +110,7 @@ function App() {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
                 <Route path="/email-verification" element={<VerifyPage />} />
+                <Route path="/verify" element={<VerifyPage />} />
                 <Route path="/logout" element={<LoginPage />} />
 
                 {/* User Routes */}
@@ -122,6 +122,7 @@ function App() {
                 <Route path="/user/orders" element={<AuthRoute><UserOrders /></AuthRoute>} />
                 <Route path="/user/reviews" element={<AuthRoute><ProfilePage /></AuthRoute>} />
                 <Route path="/user/settings" element={<AuthRoute><UserSettings /></AuthRoute>} />
+                <Route path="/user/consultations" element={<AuthRoute><UserConsultations /></AuthRoute>} />
 
                 {/* Creator Routes */}
                 <Route path="/creator" element={<CreatorRoute><CreatorDashboard /></CreatorRoute>} />
@@ -141,6 +142,7 @@ function App() {
                 {/* Cart and Checkout */}
                 <Route path="/cart" element={<CheckoutPage />} />
                 <Route path="/checkout" element={<AuthRoute><CheckoutPage /></AuthRoute>} />
+                <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
                 <Route path="/payment/success" element={<PaymentSuccessPage />} />
                 <Route path="/payment/cancel" element={<PaymentCancelPage />} />
 
@@ -170,6 +172,7 @@ function App() {
                 <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
                 <Route path="/admin/support-inbox" element={<AdminRoute><AdminSupportInbox /></AdminRoute>} />
                 <Route path="/admin/payouts" element={<AdminRoute><AdminPayouts /></AdminRoute>} />
+                <Route path="/admin/careers" element={<AdminRoute><AdminSettings /></AdminRoute>} />
 
                 {/* Catch-all route for 404 */}
                 <Route path="*" element={<NotFoundPage />} />
