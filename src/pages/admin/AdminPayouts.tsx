@@ -85,7 +85,7 @@ const AdminPayouts = () => {
             return {
               ...payout,
               creator_profile: {
-                ...payout.creator_profile,
+                ...(payout.creator_profile || {}),
                 email: userData.user?.email || 'N/A'
               }
             };
@@ -94,7 +94,7 @@ const AdminPayouts = () => {
             return {
               ...payout,
               creator_profile: {
-                ...payout.creator_profile,
+                ...(payout.creator_profile || {}),
                 email: 'N/A'
               }
             };
@@ -121,7 +121,7 @@ const AdminPayouts = () => {
           full_name,
           username
         `)
-        .eq('role', 'creator');
+        .eq('role', 'user'); // Changed from 'creator' to 'user' to match valid role types
 
       if (error) throw error;
 
@@ -421,7 +421,7 @@ const AdminPayouts = () => {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            <PriceDisplay amount={payout.amount} originalCurrency={payout.currency.toUpperCase()} />
+                            <PriceDisplay amount={payout.amount} originalCurrency={payout.currency.toUpperCase() as any} />
                           </div>
                         </TableCell>
                         <TableCell>
@@ -485,7 +485,7 @@ const AdminPayouts = () => {
                                     <div>
                                       <label className="text-sm font-medium">Amount</label>
                                       <p className="text-sm font-medium">
-                                        <PriceDisplay amount={selectedPayout.amount} originalCurrency={selectedPayout.currency.toUpperCase()} />
+                                        <PriceDisplay amount={selectedPayout.amount} originalCurrency={selectedPayout.currency.toUpperCase() as any} />
                                       </p>
                                     </div>
                                     <div>
