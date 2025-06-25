@@ -77,7 +77,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CreatorLayout from './components/creator/CreatorLayout';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminSidebar from './components/admin/AdminSidebar';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 const queryClient = new QueryClient();
 
@@ -173,7 +172,6 @@ function App() {
                 {/* Catch-all route for 404 */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
-              <ReactQueryDevtools initialIsOpen={false} />
             </CartProvider>
           </CurrencyProvider>
         </AuthProvider>

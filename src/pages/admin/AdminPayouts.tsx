@@ -85,7 +85,8 @@ const AdminPayouts = () => {
             return {
               ...payout,
               creator_profile: {
-                ...(payout.creator_profile || {}),
+                full_name: payout.creator_profile?.full_name || 'N/A',
+                username: payout.creator_profile?.username || 'N/A',
                 email: userData.user?.email || 'N/A'
               }
             };
@@ -94,7 +95,8 @@ const AdminPayouts = () => {
             return {
               ...payout,
               creator_profile: {
-                ...(payout.creator_profile || {}),
+                full_name: payout.creator_profile?.full_name || 'N/A',
+                username: payout.creator_profile?.username || 'N/A',
                 email: 'N/A'
               }
             };
@@ -421,7 +423,10 @@ const AdminPayouts = () => {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            <PriceDisplay amount={payout.amount} originalCurrency={payout.currency.toUpperCase() as any} />
+                            <PriceDisplay 
+                              amount={payout.amount} 
+                              originalCurrency={payout.currency.toUpperCase() as "USD" | "GBP" | "EUR" | "ZMW" | "NGN" | "GHS" | "KES" | "UGX" | "TZS" | "RWF" | "XOF" | "XAF" | "CDF" | "MZN" | "MWK" | "LSL" | "SLL"} 
+                            />
                           </div>
                         </TableCell>
                         <TableCell>
@@ -485,7 +490,10 @@ const AdminPayouts = () => {
                                     <div>
                                       <label className="text-sm font-medium">Amount</label>
                                       <p className="text-sm font-medium">
-                                        <PriceDisplay amount={selectedPayout.amount} originalCurrency={selectedPayout.currency.toUpperCase() as any} />
+                                        <PriceDisplay 
+                                          amount={selectedPayout.amount} 
+                                          originalCurrency={selectedPayout.currency.toUpperCase() as "USD" | "GBP" | "EUR" | "ZMW" | "NGN" | "GHS" | "KES" | "UGX" | "TZS" | "RWF" | "XOF" | "XAF" | "CDF" | "MZN" | "MWK" | "LSL" | "SLL"} 
+                                        />
                                       </p>
                                     </div>
                                     <div>
