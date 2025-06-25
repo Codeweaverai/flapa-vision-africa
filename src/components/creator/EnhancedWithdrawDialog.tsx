@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { CurrencyCode } from '@/constants/currencies';
 
 interface EnhancedWithdrawDialogProps {
   open: boolean;
@@ -49,7 +50,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
   const [convertedBalance, setConvertedBalance] = useState(0);
-  const [localCurrency, setLocalCurrency] = useState('USD');
+  const [localCurrency, setLocalCurrency] = useState<CurrencyCode>('USD');
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
@@ -74,7 +75,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
           
           // Map country codes to currencies
-          const currencyMap: Record<string, string> = {
+          const currencyMap: Record<string, CurrencyCode> = {
             'ZMB': 'ZMW', // Zambia
             'KEN': 'KES', // Kenya
             'UGA': 'UGX', // Uganda
@@ -85,11 +86,10 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           };
           
           const targetCurrency = currencyMap[countryCode] || 'USD';
-          const converted = await convertPrice(availableBalance, 'USD');
           
-          // Convert from current currency to target local currency
+          // Convert from USD to target local currency
           const localAmount = targetCurrency === 'USD' ? availableBalance : 
-            await convertPrice(availableBalance, 'USD', targetCurrency);
+            await convertPrice(availableBalance, 'USD');
           
           setConvertedBalance(localAmount);
           setLocalCurrency(targetCurrency);
@@ -172,7 +172,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     // Check minimum amount based on local currency
     const minAmountUSD = 5;
     const minAmountLocal = selectedPayoutMethod === 'mobile_money' ? 
-      await convertPrice(minAmountUSD, 'USD', localCurrency) : minAmountUSD;
+      await convertPrice(minAmountUSD, 'USD') : minAmountUSD;
     
     if (withdrawAmount < minAmountLocal) {
       toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountLocal, localCurrency)}`);
