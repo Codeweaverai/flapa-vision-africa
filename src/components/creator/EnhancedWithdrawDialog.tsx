@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -48,6 +49,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
   const [displayBalance, setDisplayBalance] = useState(0);
+  const [localCurrencyBalance, setLocalCurrencyBalance] = useState(0);
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
@@ -66,12 +68,15 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           const converted = await convertPrice(availableBalance, 'USD');
           setDisplayBalance(converted);
         } else {
-          // For mobile money, keep balance in current currency (no conversion needed)
-          setDisplayBalance(availableBalance);
+          // For mobile money, convert from USD to local currency
+          const converted = await convertPrice(availableBalance, 'USD');
+          setLocalCurrencyBalance(converted);
+          setDisplayBalance(availableBalance); // Keep USD for display to user
         }
       } catch (error) {
         console.error('Error converting balance:', error);
         setDisplayBalance(availableBalance);
+        setLocalCurrencyBalance(availableBalance);
       }
     };
 
@@ -143,14 +148,14 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       return;
     }
 
-    // For minimum amount validation, always use current currency
-    const minAmountConverted = await convertPrice(5, 'USD');
-    if (withdrawAmount < minAmountConverted) {
-      toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountConverted, currentCurrency)}`);
+    // For minimum amount validation, always use USD
+    if (withdrawAmount < 5) {
+      toast.error('Minimum withdrawal amount is $5.00 USD');
       return;
     }
 
-    if (withdrawAmount > displayBalance) {
+    // Check against USD balance for both methods
+    if (withdrawAmount > availableBalance) {
       toast.error('Amount exceeds available balance');
       return;
     }
@@ -163,14 +168,11 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           return;
         }
 
-        // For Stripe, convert back to USD since Stripe handles USD
-        const usdAmount = currentCurrency === 'USD' ? withdrawAmount : await convertPrice(withdrawAmount, currentCurrency);
-
-        // Process Stripe payout
+        // For Stripe, use USD amount directly
         const { data, error } = await supabase.functions.invoke('stripe-payout', {
           body: {
             creatorId: user.id,
-            amount: usdAmount,
+            amount: withdrawAmount,
             currency: 'usd'
           }
         });
@@ -188,16 +190,15 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // For mobile money, use the amount directly in the current currency
-        // Only convert to USD for internal tracking
-        const usdAmount = currentCurrency === 'USD' ? withdrawAmount : await convertPrice(withdrawAmount, currentCurrency);
+        // For mobile money, convert USD amount to local currency for the payout
+        const localCurrencyAmount = await convertPrice(withdrawAmount, 'USD');
 
-        // Process PawaPay payout with proper currency handling
+        // Process PawaPay payout with local currency
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
-            amount: usdAmount, // USD amount for calculation
-            targetAmount: withdrawAmount, // Amount in target currency to deduct
-            targetCurrency: currentCurrency, // Target currency
+            amount: withdrawAmount, // USD amount for deduction from balance
+            targetAmount: localCurrencyAmount, // Local currency amount for payout
+            targetCurrency: currentCurrency, // Local currency code
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
             country: countryCode,
@@ -229,7 +230,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   };
 
   const withdrawAmount = parseFloat(amount) || 0;
-  const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= displayBalance;
+  const isValidAmount = withdrawAmount >= 5 && withdrawAmount <= availableBalance;
 
   if (checkingProfile) {
     return (
@@ -264,11 +265,19 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         <div className="space-y-4">
           <div className="bg-slate-50 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-muted-foreground">Available Balance</span>
+              <span className="text-sm text-muted-foreground">Available Balance (USD)</span>
               <Badge variant="outline" className="bg-green-50 text-green-700">
-                {formatPrice(displayBalance, currentCurrency)}
+                ${availableBalance.toFixed(2)} USD
               </Badge>
             </div>
+            {selectedPayoutMethod === 'mobile_money' && localCurrencyBalance > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-muted-foreground">Local Currency Value</span>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  {formatPrice(localCurrencyBalance, currentCurrency)}
+                </Badge>
+              </div>
+            )}
             <div className="text-xs text-muted-foreground">
               Funds available for withdrawal (after 7-day hold period)
             </div>
@@ -297,6 +306,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     <div>
                       <div className="font-medium">Stripe Connect</div>
                       <div className="text-sm text-muted-foreground">Bank transfer (2-7 business days)</div>
+                      <div className="text-xs text-blue-600">Amount deducted in USD</div>
                     </div>
                     <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
                   </div>
@@ -324,6 +334,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                         {profileData?.mobile_money_operator} - {profileData?.mobile_money_number}
                       </div>
                       <div className="text-xs text-muted-foreground">Within 24 hours</div>
+                      <div className="text-xs text-blue-600">Paid in {currentCurrency}, deducted in USD</div>
                     </div>
                     <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
                   </div>
@@ -344,10 +355,10 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           {hasAnyPayoutMethod && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="amount">Withdrawal Amount</Label>
+                <Label htmlFor="amount">Withdrawal Amount (USD)</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    {currentCurrency === 'USD' ? '$' : currentCurrency}
+                    $
                   </span>
                   <Input
                     id="amount"
@@ -355,15 +366,20 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="pl-16"
+                    className="pl-8"
                     min="5"
-                    max={displayBalance}
+                    max={availableBalance}
                     step="0.01"
                   />
                 </div>
                 {withdrawAmount > 0 && (
                   <div className="text-sm text-muted-foreground">
-                    {formatPrice(withdrawAmount, currentCurrency)}
+                    ${withdrawAmount.toFixed(2)} USD
+                    {selectedPayoutMethod === 'mobile_money' && localCurrencyBalance > 0 && (
+                      <span className="text-blue-600 ml-2">
+                        (≈ {formatPrice(withdrawAmount * (localCurrencyBalance / availableBalance), currentCurrency)})
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -373,7 +389,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     {withdrawAmount < 5 
-                      ? `Minimum withdrawal amount is ${formatPrice(5, currentCurrency)}`
+                      ? "Minimum withdrawal amount is $5.00 USD"
                       : "Amount exceeds available balance"
                     }
                   </AlertDescription>
@@ -382,10 +398,13 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
               <div className="bg-blue-50 p-3 rounded-lg">
                 <div className="text-xs text-blue-700 space-y-1">
-                  <div>• Minimum withdrawal: {formatPrice(5, currentCurrency)}</div>
+                  <div>• Minimum withdrawal: $5.00 USD</div>
                   <div>• Processing time: {selectedPayoutMethod === 'stripe' ? '2-7 business days' : 'Within 24 hours'}</div>
                   <div>• Platform fee: 8% (already deducted)</div>
                   <div>• You'll receive an email confirmation</div>
+                  {selectedPayoutMethod === 'mobile_money' && (
+                    <div>• Mobile money payout in {currentCurrency}, balance deducted in USD</div>
+                  )}
                 </div>
               </div>
             </div>
