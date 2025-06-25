@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -132,7 +131,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       return;
     }
 
-    // Convert minimum amount to current currency for validation
+    // For minimum amount validation, always use current currency
     const minAmountConverted = await convertPrice(5, 'USD');
     if (withdrawAmount < minAmountConverted) {
       toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountConverted, currentCurrency)}`);
@@ -144,9 +143,6 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       return;
     }
 
-    // Convert back to USD for processing
-    const usdAmount = currentCurrency === 'USD' ? withdrawAmount : await convertPrice(withdrawAmount, currentCurrency);
-
     setLoading(true);
     try {
       if (selectedPayoutMethod === 'stripe') {
@@ -154,6 +150,9 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           toast.error('Please complete your Stripe Connect setup first');
           return;
         }
+
+        // For Stripe, convert back to USD since Stripe handles USD
+        const usdAmount = currentCurrency === 'USD' ? withdrawAmount : await convertPrice(withdrawAmount, currentCurrency);
 
         // Process Stripe payout
         const { data, error } = await supabase.functions.invoke('stripe-payout', {
@@ -177,12 +176,15 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // Process PawaPay payout with proper currency conversion
+        // For mobile money, use the target currency amount directly
+        const usdAmount = currentCurrency === 'USD' ? withdrawAmount : await convertPrice(withdrawAmount, currentCurrency);
+
+        // Process PawaPay payout with proper currency handling
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
-            amount: usdAmount, // Always pass USD amount to the function
-            originalAmount: withdrawAmount, // Original amount in selected currency
-            originalCurrency: currentCurrency, // Selected currency
+            amount: usdAmount, // USD amount for calculation
+            targetAmount: withdrawAmount, // Amount in target currency to deduct
+            targetCurrency: currentCurrency, // Target currency
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
             country: countryCode,

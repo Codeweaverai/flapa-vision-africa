@@ -2,16 +2,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "npm:resend@2.0.0";
 
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const PAWAPAY_TOKEN = Deno.env.get('PAWAPAY_TOKEN') || '';
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || '';
 
 const supabaseServiceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     persistSession: false
   }
 });
+
+const resend = new Resend(RESEND_API_KEY);
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -41,8 +45,8 @@ serve(async (req) => {
     // Parse request body
     const { 
       amount, 
-      originalAmount,
-      originalCurrency, 
+      targetAmount,
+      targetCurrency,
       phone_number, 
       operator, 
       country, 
@@ -51,8 +55,8 @@ serve(async (req) => {
 
     console.log('PawaPay payout request:', { 
       amount, 
-      originalAmount,
-      originalCurrency,
+      targetAmount,
+      targetCurrency,
       phone_number, 
       operator, 
       country, 
@@ -70,7 +74,7 @@ serve(async (req) => {
       );
     }
 
-    // Get creator profile and user email
+    // Get creator profile
     const { data: profile, error: profileError } = await supabaseServiceClient
       .from('profiles')
       .select('mobile_money_operator, mobile_money_number, full_name, username')
@@ -112,28 +116,26 @@ serve(async (req) => {
       'RWA': 'RWF'
     };
 
-    const targetCurrency = currencyMap[country] || 'USD';
+    const payoutCurrency = currencyMap[country] || 'USD';
     
-    // Use conversion rates to convert USD to target currency
-    let finalAmount = amount;
-    if (targetCurrency !== 'USD') {
-      // Use the original amount if it's already in the target currency
-      if (originalCurrency === targetCurrency) {
-        finalAmount = originalAmount;
-      } else {
-        // Convert USD to target currency
-        const conversionRates: Record<string, number> = {
-          'ZMW': 23.2,
-          'KES': 129.5,
-          'UGX': 3680,
-          'TZS': 2380,
-          'GHS': 12.1,
-          'NGN': 755,
-          'RWF': 1024
-        };
-        finalAmount = Math.round(amount * (conversionRates[targetCurrency] || 1));
-        console.log(`Converting ${amount} USD to ${finalAmount} ${targetCurrency} using rate ${conversionRates[targetCurrency]}`);
-      }
+    // Use target amount and currency if provided, otherwise convert USD
+    let finalAmount = targetAmount || amount;
+    let finalCurrency = targetCurrency || payoutCurrency;
+    
+    if (!targetAmount) {
+      // Convert USD to target currency if no target amount provided
+      const conversionRates: Record<string, number> = {
+        'ZMW': 23.2,
+        'KES': 129.5,
+        'UGX': 3680,
+        'TZS': 2380,
+        'GHS': 12.1,
+        'NGN': 755,
+        'RWF': 1024
+      };
+      finalAmount = Math.round(amount * (conversionRates[payoutCurrency] || 1));
+      finalCurrency = payoutCurrency;
+      console.log(`Converting ${amount} USD to ${finalAmount} ${payoutCurrency} using rate ${conversionRates[payoutCurrency]}`);
     }
 
     // Generate unique payout ID
@@ -145,8 +147,8 @@ serve(async (req) => {
       .insert({
         id: payoutId,
         creator_id,
-        amount: finalAmount, // Store the converted amount
-        currency: targetCurrency, // Store the target currency
+        amount: finalAmount,
+        currency: finalCurrency,
         method: 'mobile_money',
         payout_method: 'mobile_money',
         destination: `${operator} - ${phone_number}`,
@@ -156,7 +158,7 @@ serve(async (req) => {
           operator,
           country,
           amount: finalAmount,
-          currency: targetCurrency,
+          currency: finalCurrency,
           original_usd_amount: amount
         }
       })
@@ -198,7 +200,7 @@ serve(async (req) => {
       },
       customerMessage: "Creator Payout",
       amount: finalAmount.toString(),
-      currency: targetCurrency,
+      currency: finalCurrency,
       metadata: [
         {
           orderId: payoutId
@@ -232,22 +234,41 @@ serve(async (req) => {
     };
 
     if (pawapayResult.status === 'ACCEPTED') {
-      updateData.status = 'processing';
+      updateData.status = 'completed'; // Set to completed instead of processing
       
-      // Send confirmation email
+      // Send confirmation email using Resend
       try {
-        await supabaseServiceClient.functions.invoke('payout-confirmation-email', {
-          body: {
-            creatorEmail: creatorUser.email,
-            creatorName: profile.full_name || profile.username || 'Creator',
-            amount: finalAmount,
-            currency: targetCurrency,
-            payoutId,
-            method: 'mobile_money',
-            destination: `${operator} - ${phone_number}`
-          }
+        const emailResponse = await resend.emails.send({
+          from: "SkillPulse <onboarding@resend.dev>",
+          to: creatorUser.email,
+          subject: "Payout Request Confirmed - SkillPulse",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h1 style="color: #333; border-bottom: 2px solid #f97316; padding-bottom: 10px;">Payout Confirmed</h1>
+              
+              <p>Hello ${profile.full_name || profile.username || 'Creator'},</p>
+              
+              <p>Your payout request has been confirmed and processed successfully!</p>
+              
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin: 0 0 15px 0; color: #333;">Payout Details:</h3>
+                <p><strong>Amount:</strong> ${finalCurrency} ${finalAmount.toFixed(2)}</p>
+                <p><strong>Method:</strong> Mobile Money</p>
+                <p><strong>Destination:</strong> ${operator} - ${phone_number}</p>
+                <p><strong>Payout ID:</strong> ${payoutId}</p>
+                <p><strong>Status:</strong> Completed</p>
+              </div>
+              
+              <p>Your funds should arrive in your mobile money account within 24 hours.</p>
+              
+              <p>Thank you for being a valued creator on SkillPulse!</p>
+              
+              <p>Best regards,<br>The SkillPulse Team</p>
+            </div>
+          `,
         });
-        console.log('Confirmation email sent successfully');
+
+        console.log('Confirmation email sent successfully:', emailResponse);
       } catch (emailError) {
         console.error('Error sending confirmation email:', emailError);
       }
@@ -266,11 +287,11 @@ serve(async (req) => {
       JSON.stringify({ 
         success: pawapayResult.status === 'ACCEPTED',
         payoutId: pawapayResult.payoutId,
-        status: pawapayResult.status,
+        status: pawapayResult.status === 'ACCEPTED' ? 'completed' : pawapayResult.status,
         amount: finalAmount,
-        currency: targetCurrency,
+        currency: finalCurrency,
         message: pawapayResult.status === 'ACCEPTED' 
-          ? 'Payout request accepted successfully'
+          ? 'Payout request accepted and completed successfully'
           : pawapayResult.failureReason?.failureMessage || 'Payout request failed'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
