@@ -64,33 +64,28 @@ const AdminPayouts = () => {
 
   const loadPayouts = async () => {
     try {
-      // Get payouts without profile join to avoid relation issues
-      const { data: payoutsData, error } = await supabase
+      const { data, error } = await supabase
         .from('creator_payouts')
-        .select('*')
+        .select(`
+          *,
+          creator_profile:profiles!creator_payouts_creator_id_fkey (
+            full_name,
+            username
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get creator profiles separately
-      const creatorIds = [...new Set(payoutsData?.map(p => p.creator_id) || [])];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, username')
-        .in('id', creatorIds);
-
       // Get creator emails from auth
-      const payoutsWithProfiles = await Promise.all(
-        (payoutsData || []).map(async (payout) => {
-          const profile = profilesData?.find(p => p.id === payout.creator_id);
-          
+      const payoutsWithEmails = await Promise.all(
+        (data || []).map(async (payout) => {
           try {
             const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
             return {
               ...payout,
               creator_profile: {
-                full_name: profile?.full_name || 'N/A',
-                username: profile?.username || 'N/A',
+                ...(payout.creator_profile || {}),
                 email: userData.user?.email || 'N/A'
               }
             };
@@ -99,8 +94,7 @@ const AdminPayouts = () => {
             return {
               ...payout,
               creator_profile: {
-                full_name: profile?.full_name || 'N/A',
-                username: profile?.username || 'N/A',
+                ...(payout.creator_profile || {}),
                 email: 'N/A'
               }
             };
@@ -108,7 +102,7 @@ const AdminPayouts = () => {
         })
       );
 
-      setPayouts(payoutsWithProfiles);
+      setPayouts(payoutsWithEmails);
     } catch (error) {
       console.error('Error loading payouts:', error);
       toast.error('Failed to load payouts');
@@ -122,7 +116,12 @@ const AdminPayouts = () => {
       // Get all creators who have earnings
       const { data: creators, error } = await supabase
         .from('profiles')
-        .select('id, full_name, username');
+        .select(`
+          id,
+          full_name,
+          username
+        `)
+        .eq('role', 'user'); // Changed from 'creator' to 'user' to match valid role types
 
       if (error) throw error;
 
@@ -422,7 +421,7 @@ const AdminPayouts = () => {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            <PriceDisplay amount={payout.amount} originalCurrency={payout.currency.toUpperCase() as "USD"} />
+                            <PriceDisplay amount={payout.amount} originalCurrency={payout.currency.toUpperCase() as any} />
                           </div>
                         </TableCell>
                         <TableCell>
@@ -486,7 +485,7 @@ const AdminPayouts = () => {
                                     <div>
                                       <label className="text-sm font-medium">Amount</label>
                                       <p className="text-sm font-medium">
-                                        <PriceDisplay amount={selectedPayout.amount} originalCurrency={selectedPayout.currency.toUpperCase() as "USD"} />
+                                        <PriceDisplay amount={selectedPayout.amount} originalCurrency={selectedPayout.currency.toUpperCase() as any} />
                                       </p>
                                     </div>
                                     <div>
