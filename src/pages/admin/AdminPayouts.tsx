@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,43 +64,37 @@ const AdminPayouts = () => {
 
   const loadPayouts = async () => {
     try {
-      // First get payouts
-      const { data: payoutsData, error } = await supabase
+      const { data, error } = await supabase
         .from('creator_payouts')
-        .select('*')
+        .select(`
+          *,
+          creator_profile:profiles!creator_payouts_creator_id_fkey (
+            full_name,
+            username
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Then get creator profiles and user emails separately
-      const payoutsWithProfiles = await Promise.all(
-        (payoutsData || []).map(async (payout) => {
+      // Get creator emails from auth
+      const payoutsWithEmails = await Promise.all(
+        (data || []).map(async (payout) => {
           try {
-            // Get creator profile
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('full_name, username')
-              .eq('id', payout.creator_id)
-              .single();
-
-            // Get creator email from auth
             const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
-
             return {
               ...payout,
               creator_profile: {
-                full_name: profileData?.full_name || 'N/A',
-                username: profileData?.username || 'N/A',
+                ...(payout.creator_profile || {}),
                 email: userData.user?.email || 'N/A'
               }
             };
           } catch (error) {
-            console.error('Error fetching creator data:', error);
+            console.error('Error fetching user email:', error);
             return {
               ...payout,
               creator_profile: {
-                full_name: 'N/A',
-                username: 'N/A',
+                ...(payout.creator_profile || {}),
                 email: 'N/A'
               }
             };
@@ -107,7 +102,7 @@ const AdminPayouts = () => {
         })
       );
 
-      setPayouts(payoutsWithProfiles);
+      setPayouts(payoutsWithEmails);
     } catch (error) {
       console.error('Error loading payouts:', error);
       toast.error('Failed to load payouts');
@@ -126,7 +121,7 @@ const AdminPayouts = () => {
           full_name,
           username
         `)
-        .eq('role', 'user'); // Get all users as potential creators
+        .eq('role', 'user'); // Changed from 'creator' to 'user' to match valid role types
 
       if (error) throw error;
 
@@ -426,10 +421,7 @@ const AdminPayouts = () => {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            <PriceDisplay 
-                              amount={payout.amount} 
-                              originalCurrency={payout.currency.toUpperCase() as "USD" | "GBP" | "EUR" | "ZMW" | "NGN" | "GHS" | "KES" | "UGX" | "TZS" | "RWF" | "XOF" | "XAF" | "CDF" | "MZN" | "MWK" | "LSL" | "SLL"} 
-                            />
+                            <PriceDisplay amount={payout.amount} originalCurrency={payout.currency.toUpperCase() as any} />
                           </div>
                         </TableCell>
                         <TableCell>
@@ -493,10 +485,7 @@ const AdminPayouts = () => {
                                     <div>
                                       <label className="text-sm font-medium">Amount</label>
                                       <p className="text-sm font-medium">
-                                        <PriceDisplay 
-                                          amount={selectedPayout.amount} 
-                                          originalCurrency={selectedPayout.currency.toUpperCase() as "USD" | "GBP" | "EUR" | "ZMW" | "NGN" | "GHS" | "KES" | "UGX" | "TZS" | "RWF" | "XOF" | "XAF" | "CDF" | "MZN" | "MWK" | "LSL" | "SLL"} 
-                                        />
+                                        <PriceDisplay amount={selectedPayout.amount} originalCurrency={selectedPayout.currency.toUpperCase() as any} />
                                       </p>
                                     </div>
                                     <div>

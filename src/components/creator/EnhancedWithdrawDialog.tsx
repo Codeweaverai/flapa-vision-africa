@@ -144,7 +144,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     }
 
     // For minimum amount validation, always use current currency
-    const minAmountConverted = await convertPrice(2, 'USD');
+    const minAmountConverted = await convertPrice(5, 'USD');
     if (withdrawAmount < minAmountConverted) {
       toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountConverted, currentCurrency)}`);
       return;
