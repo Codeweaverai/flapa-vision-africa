@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,39 +63,43 @@ const AdminPayouts = () => {
 
   const loadPayouts = async () => {
     try {
-      const { data, error } = await supabase
+      // First get payouts
+      const { data: payoutsData, error } = await supabase
         .from('creator_payouts')
-        .select(`
-          *,
-          creator_profile:profiles!creator_payouts_creator_id_fkey (
-            full_name,
-            username
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get creator emails from auth
-      const payoutsWithEmails = await Promise.all(
-        (data || []).map(async (payout) => {
+      // Then get creator profiles and user emails separately
+      const payoutsWithProfiles = await Promise.all(
+        (payoutsData || []).map(async (payout) => {
           try {
+            // Get creator profile
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('full_name, username')
+              .eq('id', payout.creator_id)
+              .single();
+
+            // Get creator email from auth
             const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
+
             return {
               ...payout,
               creator_profile: {
-                full_name: payout.creator_profile?.full_name || 'N/A',
-                username: payout.creator_profile?.username || 'N/A',
+                full_name: profileData?.full_name || 'N/A',
+                username: profileData?.username || 'N/A',
                 email: userData.user?.email || 'N/A'
               }
             };
           } catch (error) {
-            console.error('Error fetching user email:', error);
+            console.error('Error fetching creator data:', error);
             return {
               ...payout,
               creator_profile: {
-                full_name: payout.creator_profile?.full_name || 'N/A',
-                username: payout.creator_profile?.username || 'N/A',
+                full_name: 'N/A',
+                username: 'N/A',
                 email: 'N/A'
               }
             };
@@ -104,7 +107,7 @@ const AdminPayouts = () => {
         })
       );
 
-      setPayouts(payoutsWithEmails);
+      setPayouts(payoutsWithProfiles);
     } catch (error) {
       console.error('Error loading payouts:', error);
       toast.error('Failed to load payouts');
@@ -123,7 +126,7 @@ const AdminPayouts = () => {
           full_name,
           username
         `)
-        .eq('role', 'user'); // Changed from 'creator' to 'user' to match valid role types
+        .eq('role', 'user'); // Get all users as potential creators
 
       if (error) throw error;
 
