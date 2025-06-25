@@ -37,6 +37,7 @@ import CreatorEventEdit from './pages/creator/CreatorEventEdit';
 import CreatorAnalytics from './pages/creator/CreatorAnalytics';
 import CreatorSettings from './pages/creator/CreatorSettings';
 import CreatorEventRegistrations from './pages/creator/CreatorEventRegistrations';
+import CreatorPayments from './pages/creator/CreatorPayments';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -77,7 +78,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CreatorLayout from './components/creator/CreatorLayout';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminSidebar from './components/admin/AdminSidebar';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 const queryClient = new QueryClient();
 
@@ -136,6 +136,7 @@ function App() {
                 <Route path="/creator/events/:id/registrations" element={<CreatorRoute><CreatorEventRegistrations /></CreatorRoute>} />
                 <Route path="/creator/analytics" element={<CreatorRoute><CreatorAnalytics /></CreatorRoute>} />
                 <Route path="/creator/settings" element={<CreatorRoute><CreatorSettings /></CreatorRoute>} />
+                <Route path="/creator/payments" element={<CreatorRoute><CreatorPayments /></CreatorRoute>} />
 
                 {/* Cart and Checkout */}
                 <Route path="/cart" element={<CheckoutPage />} />
@@ -173,7 +174,6 @@ function App() {
                 {/* Catch-all route for 404 */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
-              <ReactQueryDevtools initialIsOpen={false} />
             </CartProvider>
           </CurrencyProvider>
         </AuthProvider>

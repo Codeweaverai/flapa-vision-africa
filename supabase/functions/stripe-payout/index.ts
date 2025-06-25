@@ -16,6 +16,14 @@ interface StripePayoutRequest {
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+// Timeout wrapper function
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+  );
+  return Promise.race([promise, timeoutPromise]);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -44,11 +52,23 @@ serve(async (req) => {
       .single();
 
     if (profileError || !profile) {
-      throw new Error('Creator profile not found');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Creator profile not found'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
     }
 
     if (!profile.stripe_connect_account_id) {
-      throw new Error('Creator does not have a connected Stripe account');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Creator does not have a connected Stripe account'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     // Get creator's email from auth
@@ -56,49 +76,13 @@ serve(async (req) => {
     
     if (creatorUserError || !creatorUser?.email) {
       console.error('Error getting creator user email:', creatorUserError);
-      throw new Error('Creator email not found');
-    }
-
-    // First, check the account's available balance
-    const balanceResponse = await fetch(`https://api.stripe.com/v1/balance`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${stripeSecretKey}`,
-        "Stripe-Account": profile.stripe_connect_account_id,
-      },
-    });
-
-    const balanceResult = await balanceResponse.json();
-    console.log('Stripe balance check:', balanceResult);
-
-    if (!balanceResponse.ok) {
-      console.error("Stripe balance check error:", balanceResult);
-      throw new Error(`Failed to check account balance: ${balanceResult.error?.message || 'Unknown error'}`);
-    }
-
-    // Check if there are sufficient funds
-    const availableBalance = balanceResult.available?.[0]?.amount || 0;
-    const requestedAmount = Math.round(amount * 100); // Convert to cents
-
-    if (availableBalance < requestedAmount) {
-      console.log(`Insufficient balance: Available ${availableBalance}, Requested ${requestedAmount}`);
-      
-      // Create payout record with failed status
-      const { data: payoutRecord } = await supabaseClient
-        .from('creator_payouts')
-        .insert({
-          creator_id: creatorId,
-          amount: amount,
-          currency: currency.toLowerCase(),
-          method: 'stripe',
-          payout_method: 'stripe',
-          destination: 'Stripe Connected Account',
-          status: 'failed'
-        })
-        .select()
-        .single();
-
-      throw new Error('Insufficient funds in your Stripe account. Please wait for more payments to be processed or contact support.');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Creator email not found'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     // Create payout record in database first
@@ -118,8 +102,16 @@ serve(async (req) => {
 
     if (payoutError) {
       console.error('Error creating payout record:', payoutError);
-      throw new Error(`Failed to create payout record: ${payoutError.message}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Failed to create payout record: ${payoutError.message}`
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
+
+    const requestedAmount = Math.round(amount * 100); // Convert to cents
 
     console.log('Creating Stripe payout for:', {
       amount: requestedAmount,
@@ -127,30 +119,55 @@ serve(async (req) => {
       connectedAccountId: profile.stripe_connect_account_id
     });
 
-    // Create Stripe payout using the Payouts API with manual payouts
-    const stripeResponse = await fetch("https://api.stripe.com/v1/payouts", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${stripeSecretKey}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Stripe-Account": profile.stripe_connect_account_id,
-      },
-      body: new URLSearchParams({
-        amount: requestedAmount.toString(),
-        currency: currency.toLowerCase(),
-        description: `Creator payout for ${profile.full_name || profile.username}`,
-        statement_descriptor: "Creator Payout",
-        method: "instant", // Request instant payout if available
-        "metadata[creator_id]": creatorId,
-        "metadata[payout_record_id]": payoutRecord.id
-      }),
-    });
+    // Create Stripe payout with timeout wrapper (5 seconds)
+    let stripeResult;
+    try {
+      const stripeResponse = await withTimeout(
+        fetch("https://api.stripe.com/v1/payouts", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${stripeSecretKey}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Stripe-Account": profile.stripe_connect_account_id,
+          },
+          body: new URLSearchParams({
+            amount: requestedAmount.toString(),
+            currency: currency.toLowerCase(),
+            description: `Creator payout for ${profile.full_name || profile.username}`,
+            statement_descriptor: "Creator Payout",
+            method: "instant", // Request instant payout if available
+            "metadata[creator_id]": creatorId,
+            "metadata[payout_record_id]": payoutRecord.id
+          }),
+        }),
+        5000 // 5 second timeout
+      );
 
-    const stripeResult = await stripeResponse.json();
-    console.log('Stripe payout response:', stripeResult);
+      stripeResult = await stripeResponse.json();
+      console.log('Stripe payout response:', stripeResult);
 
-    if (!stripeResponse.ok) {
-      console.error("Stripe payout error:", stripeResult);
+      if (!stripeResponse.ok) {
+        console.error("Stripe payout error:", stripeResult);
+        
+        // Update payout record with error
+        await supabaseClient
+          .from('creator_payouts')
+          .update({ 
+            status: 'failed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', payoutRecord.id);
+          
+        return new Response(JSON.stringify({
+          success: false,
+          error: `Stripe payout failed: ${stripeResult.error?.message || 'Unknown error'}`
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+    } catch (error) {
+      console.error("Stripe payout timeout or error:", error);
       
       // Update payout record with error
       await supabaseClient
@@ -161,7 +178,13 @@ serve(async (req) => {
         })
         .eq('id', payoutRecord.id);
         
-      throw new Error(`Stripe payout failed: ${stripeResult.error?.message || 'Unknown error'}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Stripe payout request timed out or failed'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
 
     // Update the payout record with Stripe payout details
@@ -183,41 +206,44 @@ serve(async (req) => {
       console.error("Database update error:", updateError);
     }
 
-    // Send confirmation email using Resend
+    // Send confirmation email using Resend with timeout wrapper
     try {
-      const emailResponse = await resend.emails.send({
-        from: "SkillPulse <onboarding@resend.dev>",
-        to: creatorUser.email,
-        subject: "Payout Request Confirmed - SkillPulse",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #333; border-bottom: 2px solid #f97316; padding-bottom: 10px;">Payout Confirmed</h1>
-            
-            <p>Hello ${profile.full_name || profile.username || 'Creator'},</p>
-            
-            <p>Your payout request has been confirmed and is being processed!</p>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="margin: 0 0 15px 0; color: #333;">Payout Details:</h3>
-              <p><strong>Amount:</strong> $${amount.toFixed(2)} USD</p>
-              <p><strong>Method:</strong> Stripe Connect</p>
-              <p><strong>Destination:</strong> Connected Bank Account</p>
-              <p><strong>Payout ID:</strong> ${payoutRecord.id}</p>
-              <p><strong>Stripe Payout ID:</strong> ${stripeResult.id}</p>
-              <p><strong>Status:</strong> ${payoutStatus === 'completed' ? 'Completed' : 'Processing'}</p>
-              ${stripeResult.arrival_date ? `<p><strong>Expected Arrival:</strong> ${new Date(stripeResult.arrival_date * 1000).toLocaleDateString()}</p>` : ''}
+      await withTimeout(
+        resend.emails.send({
+          from: "SkillPulse <onboarding@resend.dev>",
+          to: creatorUser.email,
+          subject: "Payout Request Confirmed - SkillPulse",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h1 style="color: #333; border-bottom: 2px solid #f97316; padding-bottom: 10px;">Payout Confirmed</h1>
+              
+              <p>Hello ${profile.full_name || profile.username || 'Creator'},</p>
+              
+              <p>Your payout request has been confirmed and is being processed!</p>
+              
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin: 0 0 15px 0; color: #333;">Payout Details:</h3>
+                <p><strong>Amount:</strong> $${amount.toFixed(2)} USD</p>
+                <p><strong>Method:</strong> Stripe Connect</p>
+                <p><strong>Destination:</strong> Connected Bank Account</p>
+                <p><strong>Payout ID:</strong> ${payoutRecord.id}</p>
+                <p><strong>Stripe Payout ID:</strong> ${stripeResult.id}</p>
+                <p><strong>Status:</strong> ${payoutStatus === 'completed' ? 'Completed' : 'Processing'}</p>
+                ${stripeResult.arrival_date ? `<p><strong>Expected Arrival:</strong> ${new Date(stripeResult.arrival_date * 1000).toLocaleDateString()}</p>` : ''}
+              </div>
+              
+              <p>Your funds will be transferred to your connected bank account. Processing typically takes 2-7 business days.</p>
+              
+              <p>Thank you for being a valued creator on SkillPulse!</p>
+              
+              <p>Best regards,<br>The SkillPulse Team</p>
             </div>
-            
-            <p>Your funds will be transferred to your connected bank account. Processing typically takes 2-7 business days.</p>
-            
-            <p>Thank you for being a valued creator on SkillPulse!</p>
-            
-            <p>Best regards,<br>The SkillPulse Team</p>
-          </div>
-        `,
-      });
+          `,
+        }),
+        3000 // 3 second timeout for email
+      );
 
-      console.log('Confirmation email sent successfully:', emailResponse);
+      console.log('Confirmation email sent successfully');
     } catch (emailError) {
       console.error("Failed to send confirmation email:", emailError);
       // Don't fail the payout if email fails
