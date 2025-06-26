@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       ai_chat_history: {
         Row: {
+          action_ids: Json | null
           content: string
           context_data: Json | null
           course_id: string | null
@@ -22,6 +23,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          action_ids?: Json | null
           content: string
           context_data?: Json | null
           course_id?: string | null
@@ -33,6 +35,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          action_ids?: Json | null
           content?: string
           context_data?: Json | null
           course_id?: string | null
