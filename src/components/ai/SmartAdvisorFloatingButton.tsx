@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,18 +24,30 @@ interface Message {
 }
 
 const SmartAdvisorFloatingButton = () => {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: "Hi! I'm your AI Smart Advisor for SkillPulse. I can help you discover personalized courses, events, and learning paths based on your interests and progress. What would you like to learn about today?",
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+
+  // Hide floating button on pages where AI is integrated
+  const hideOnPages = ['/inbox', '/home', '/help', '/faq'];
+  const shouldHide = hideOnPages.some(path => location.pathname === path) || 
+                   location.pathname.startsWith('/courses/') || 
+                   location.pathname.startsWith('/events/');
+
+  // Initialize welcome message when opened
+  React.useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      setMessages([{
+        id: '1',
+        role: 'assistant',
+        content: "Hi! I'm your AI Smart Advisor for SkillPulse. I can help you discover personalized courses, events, and learning paths based on your interests and progress. What would you like to learn about today?",
+        timestamp: new Date()
+      }]);
+    }
+  }, [isOpen, messages.length]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -100,6 +113,10 @@ const SmartAdvisorFloatingButton = () => {
       handleSendMessage();
     }
   };
+
+  if (shouldHide) {
+    return null;
+  }
 
   return (
     <>
