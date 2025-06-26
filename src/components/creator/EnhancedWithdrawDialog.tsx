@@ -170,7 +170,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     }
 
     // Check minimum amount based on local currency
-    const minAmountUSD = 5;
+    const minAmountUSD = 2;
     const minAmountLocal = selectedPayoutMethod === 'mobile_money' ? 
       await convertPrice(minAmountUSD, 'USD') : minAmountUSD;
     
@@ -217,21 +217,21 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // Calculate USD amount to deduct from balance
-        const usdAmountToDeduct = withdrawAmount * (availableBalance / convertedBalance);
+        // Calculate the local currency amount to deduct from balance based on withdrawal
+const localAmountToDeduct = withdrawAmount * (availableBalance / convertedBalance);
 
-        // Process PawaPay payout with local currency
-        const { data, error } = await supabase.functions.invoke('pawapay-payout', {
-          body: {
-            amount: usdAmountToDeduct, // USD amount for internal tracking
-            targetAmount: withdrawAmount, // Local currency amount for payout
-            targetCurrency: localCurrency, // Local currency code
-            phone_number: profileData.mobile_money_number,
-            operator: profileData.mobile_money_operator,
-            country: countryCode,
-            creator_id: user.id
-          }
-        });
+// Process PawaPay payout with local currency
+const { data, error } = await supabase.functions.invoke('pawapay-payout', {
+  body: {
+    amount: localAmountToDeduct,          // Local currency amount to deduct from user balance (internal tracking)
+    targetAmount: withdrawAmount,         // Amount to send to the user via PawaPay (in local currency)
+    targetCurrency: localCurrency,        // Local currency code (e.g., ZMW, KES)
+    phone_number: profileData.mobile_money_number,
+    operator: profileData.mobile_money_operator,
+    country: countryCode,
+    creator_id: user.id
+  }
+});
 
         if (error) {
           console.error('PawaPay payout error:', error);
