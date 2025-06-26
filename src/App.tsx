@@ -177,11 +177,12 @@ function App() {
                 <Route path="/creators/:id" element={<CreatorPublicProfile />} />
                 <Route path="/explore-courses" element={<ExploreCoursesPage />} />
                 <Route path="/explore-events" element={<ExploreEventsPage />} />
-                <Route path="/learn-culture" element={<LearnOurCulturePage />} />
+                <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
                 <Route path="/learning" element={<LearningPage />} />
                 <Route path="/learning/courses/:id" element={<LearningCourseDetailPage />} />
                 <Route path="/learning/courses/:id/learn" element={<LearningCourseLearningPage />} />
                 <Route path="/media" element={<MediaPage />} />
+                <Route path="/account" element={<AccountPage />} />
                 <Route path="/media/:id" element={<MediaPostDetailPage />} />
                 <Route path="/my-courses" element={<MyCoursesPage />} />
                 <Route path="/my-events" element={<MyEventsPage />} />
