@@ -182,6 +182,7 @@ function App() {
                 <Route path="/learning/courses/:id" element={<LearningCourseDetailPage />} />
                 <Route path="/learning/courses/:id/learn" element={<LearningCourseLearningPage />} />
                 <Route path="/media" element={<MediaPage />} />
+                <Route path="/event-detail/:id" element={<EventDetailPage />} />
                 <Route path="/account" element={<AccountPage />} />
                 <Route path="/media/:id" element={<MediaPostDetailPage />} />
                 <Route path="/my-courses" element={<MyCoursesPage />} />
