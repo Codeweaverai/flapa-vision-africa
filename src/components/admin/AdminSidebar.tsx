@@ -21,6 +21,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const sidebarItems = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
@@ -46,37 +47,45 @@ const AdminSidebar = () => {
   const location = useLocation();
 
   return (
-    <div className="w-64 bg-white shadow-lg border-r">
-      <div className="p-6">
+    <div className="w-64 bg-gradient-to-b from-orange-50 via-purple-50 to-pink-50 shadow-lg border-r border-orange-200/50">
+      <div className="p-6 border-b border-orange-200/30">
         <h2 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
           Admin Panel
         </h2>
       </div>
       
-      <nav className="mt-6">
-        <div className="px-3">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.href;
-            
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  'flex items-center px-3 py-2 mb-1 text-sm font-medium rounded-md transition-colors',
-                  isActive
-                    ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                )}
-              >
-                <Icon className="mr-3 h-5 w-5" />
-                {item.name}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <ScrollArea className="h-[calc(100vh-100px)]">
+        <nav className="mt-6 pb-6">
+          <div className="px-3 space-y-1">
+            {sidebarItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.href;
+              
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={cn(
+                    'flex items-center px-3 py-3 mb-2 text-sm font-medium rounded-lg transition-all duration-200 group',
+                    isActive
+                      ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg transform scale-105'
+                      : 'text-gray-700 hover:bg-gradient-to-r hover:from-orange-100 hover:to-purple-100 hover:text-orange-700 hover:shadow-md hover:transform hover:scale-102'
+                  )}
+                >
+                  <Icon className={cn(
+                    "mr-3 h-5 w-5 transition-transform duration-200",
+                    isActive ? "text-white" : "text-orange-600 group-hover:text-orange-700"
+                  )} />
+                  <span className="font-medium">{item.name}</span>
+                  {isActive && (
+                    <div className="ml-auto w-2 h-2 rounded-full bg-white opacity-80"></div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </ScrollArea>
     </div>
   );
 };

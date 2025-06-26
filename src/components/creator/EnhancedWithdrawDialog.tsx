@@ -217,21 +217,20 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // Calculate the local currency amount to deduct from balance based on withdrawal
-const localAmountToDeduct = withdrawAmount * (availableBalance / convertedBalance);
-
-// Process PawaPay payout with local currency
-const { data, error } = await supabase.functions.invoke('pawapay-payout', {
-  body: {
-    amount: localAmountToDeduct,          // Local currency amount to deduct from user balance (internal tracking)
-    targetAmount: withdrawAmount,         // Amount to send to the user via PawaPay (in local currency)
-    targetCurrency: localCurrency,        // Local currency code (e.g., ZMW, KES)
-    phone_number: profileData.mobile_money_number,
-    operator: profileData.mobile_money_operator,
-    country: countryCode,
-    creator_id: user.id
-  }
-});
+        // Fixed logic: For mobile money, deduct the same amount being withdrawn
+        // The withdrawAmount is already in the local currency (ZMW, KES, etc.)
+        // So we deduct the same amount from the user's balance
+        const { data, error } = await supabase.functions.invoke('pawapay-payout', {
+          body: {
+            amount: withdrawAmount,                // Amount to deduct from user balance (same as withdrawal amount)
+            targetAmount: withdrawAmount,         // Amount to send to the user via PawaPay (in local currency)
+            targetCurrency: localCurrency,        // Local currency code (e.g., ZMW, KES)
+            phone_number: profileData.mobile_money_number,
+            operator: profileData.mobile_money_operator,
+            country: countryCode,
+            creator_id: user.id
+          }
+        });
 
         if (error) {
           console.error('PawaPay payout error:', error);

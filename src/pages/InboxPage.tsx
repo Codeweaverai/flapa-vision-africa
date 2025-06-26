@@ -12,7 +12,7 @@ const InboxPage: React.FC = () => {
             <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
               SkillPulse Chat
             </h1>
-            <p className="text-gray-600 mt-2">Connect with learners, creators, and experts</p>
+            <p className="text-gray-600 mt-2">Connect with learners, creators, and experts in real-time</p>
           </div>
           <ModernInboxComponent />
         </div>
