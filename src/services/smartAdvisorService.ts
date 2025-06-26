@@ -38,7 +38,7 @@ export const saveAdvisorMessage = async (
         context_data: contextData,
         action_ids: actionIds
       })
-      .select()
+      .select('id, user_id, message_type, content, context_data, action_ids, created_at')
       .single();
 
     if (error) throw error;
@@ -60,7 +60,7 @@ export const loadAdvisorHistory = async (limit: number = 50): Promise<SmartAdvis
 
     const { data, error } = await supabase
       .from('ai_chat_history')
-      .select('*')
+      .select('id, user_id, message_type, content, context_data, action_ids, created_at')
       .eq('user_id', user.id)
       .is('lesson_id', null)
       .is('course_id', null)
