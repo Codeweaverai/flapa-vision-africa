@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Reply, Trash2, User, Search, Phone, Video, MoreVertical, ArrowLeft, Paperclip, Smile } from 'lucide-react';
+import { Send, Reply, Trash2, User, Search, Phone, Video, MoreVertical, ArrowLeft, Paperclip, Smile, MessageSquare } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
