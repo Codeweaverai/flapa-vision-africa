@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Reply, Trash2, User, Search, Phone, Video, MoreVertical, ArrowLeft, Paperclip, Smile, MessageSquare } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Send, Trash2, User, Search, MoreVertical, ArrowLeft, Paperclip, Smile, MessageSquare, UserPlus, Download, FileText, Image } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -34,6 +35,9 @@ interface Message {
   related_id: string | null;
   created_at: string;
   updated_at: string;
+  file_url?: string;
+  file_name?: string;
+  file_type?: string;
   sender_profile?: Profile | null;
 }
 
@@ -44,11 +48,14 @@ interface Conversation {
   last_message_time: string;
   unread_count: number;
   is_online?: boolean;
+  is_broadcast?: boolean;
+  is_support?: boolean;
 }
 
 const EnhancedInboxComponent: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -57,6 +64,9 @@ const EnhancedInboxComponent: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [newContactUsername, setNewContactUsername] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -113,28 +123,55 @@ const EnhancedInboxComponent: React.FC = () => {
       const conversationMap = new Map<string, Conversation>();
       
       for (const message of data || []) {
-        if (!message.sender_id) continue;
+        let conversationKey: string;
+        let isSpecialType = false;
 
-        const senderId = message.sender_id;
-        if (!conversationMap.has(senderId)) {
-          conversationMap.set(senderId, {
-            user_id: senderId,
-            last_message: message.content,
-            last_message_time: message.created_at,
-            unread_count: 0
-          });
+        // Handle different message types
+        if (message.message_type === 'broadcast' || (message.sender_id === null && message.subject?.startsWith('[BROADCAST]'))) {
+          conversationKey = 'broadcast_messages';
+          isSpecialType = true;
+        } else if (message.message_type === 'support' || message.subject?.includes('Support')) {
+          conversationKey = 'admin_support';
+          isSpecialType = true;
+        } else if (message.sender_id) {
+          conversationKey = message.sender_id;
+        } else {
+          continue; // Skip messages without proper sender
+        }
+
+        if (!conversationMap.has(conversationKey)) {
+          if (isSpecialType) {
+            conversationMap.set(conversationKey, {
+              user_id: conversationKey,
+              last_message: message.content,
+              last_message_time: message.created_at,
+              unread_count: 0,
+              is_broadcast: conversationKey === 'broadcast_messages',
+              is_support: conversationKey === 'admin_support'
+            });
+          } else {
+            conversationMap.set(conversationKey, {
+              user_id: conversationKey,
+              last_message: message.content,
+              last_message_time: message.created_at,
+              unread_count: 0
+            });
+          }
         }
 
         if (!message.is_read) {
-          const conv = conversationMap.get(senderId)!;
+          const conv = conversationMap.get(conversationKey)!;
           conv.unread_count += 1;
         }
       }
 
       const conversationList = Array.from(conversationMap.values());
       
-      // Load user profiles
-      const userIds = conversationList.map(c => c.user_id);
+      // Load user profiles for regular conversations
+      const userIds = conversationList
+        .filter(c => !c.is_broadcast && !c.is_support)
+        .map(c => c.user_id);
+      
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
@@ -142,9 +179,11 @@ const EnhancedInboxComponent: React.FC = () => {
           .in('id', userIds);
 
         conversationList.forEach(conv => {
-          const profile = profiles?.find(p => p.id === conv.user_id);
-          if (profile) {
-            conv.user_profile = profile;
+          if (!conv.is_broadcast && !conv.is_support) {
+            const profile = profiles?.find(p => p.id === conv.user_id);
+            if (profile) {
+              conv.user_profile = profile;
+            }
           }
         });
       }
@@ -162,15 +201,32 @@ const EnhancedInboxComponent: React.FC = () => {
     }
   };
 
-  const loadConversationMessages = async (userId: string) => {
+  const loadConversationMessages = async (conversationId: string) => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('inbox_messages')
-        .select('*')
-        .or(`and(sender_id.eq.${userId},recipient_id.eq.${user.id}),and(sender_id.eq.${user.id},recipient_id.eq.${userId})`)
-        .order('created_at', { ascending: true });
+      let query;
+      
+      if (conversationId === 'broadcast_messages') {
+        query = supabase
+          .from('inbox_messages')
+          .select('*')
+          .eq('recipient_id', user.id)
+          .or('message_type.eq.broadcast,subject.ilike.*[BROADCAST]*');
+      } else if (conversationId === 'admin_support') {
+        query = supabase
+          .from('inbox_messages')
+          .select('*')
+          .eq('recipient_id', user.id)
+          .or('message_type.eq.support,subject.ilike.*Support*');
+      } else {
+        query = supabase
+          .from('inbox_messages')
+          .select('*')
+          .or(`and(sender_id.eq.${conversationId},recipient_id.eq.${user.id}),and(sender_id.eq.${user.id},recipient_id.eq.${conversationId})`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
 
       if (error) {
         console.error('Error fetching conversation messages:', error);
@@ -201,7 +257,7 @@ const EnhancedInboxComponent: React.FC = () => {
 
       // Mark unread messages as read
       const unreadMessages = data?.filter(m => 
-        !m.is_read && m.sender_id === userId && m.recipient_id === user.id
+        !m.is_read && m.recipient_id === user.id
       );
       
       if (unreadMessages && unreadMessages.length > 0) {
@@ -217,6 +273,80 @@ const EnhancedInboxComponent: React.FC = () => {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('inbox-files')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Failed to upload file');
+        return;
+      }
+
+      const { data } = supabase.storage
+        .from('inbox-files')
+        .getPublicUrl(fileName);
+
+      // Send message with file attachment
+      if (selectedConversation) {
+        await sendMessageWithFile(data.publicUrl, file.name, file.type);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Failed to upload file');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const sendMessageWithFile = async (fileUrl: string, fileName: string, fileType: string) => {
+    if (!user || !selectedConversation) return;
+
+    try {
+      const recipientId = selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support' 
+        ? selectedConversation 
+        : selectedConversation;
+
+      const { error } = await supabase
+        .from('inbox_messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: recipientId === 'broadcast_messages' || recipientId === 'admin_support' ? user.id : recipientId,
+          subject: 'File Attachment',
+          content: `Shared a file: ${fileName}`,
+          message_type: 'direct',
+          file_url: fileUrl,
+          file_name: fileName,
+          file_type: fileType
+        });
+
+      if (error) {
+        console.error('Error sending file message:', error);
+        toast.error('Failed to send file');
+        return;
+      }
+
+      toast.success('File sent successfully');
+      loadConversationMessages(selectedConversation);
+      fetchMessages();
+    } catch (error) {
+      console.error('Error in sendMessageWithFile:', error);
+      toast.error('Failed to send file');
+    }
+  };
+
   const sendReply = async () => {
     if (!user || !selectedConversation || !replyContent.trim()) {
       toast.error('Please enter a message');
@@ -225,14 +355,32 @@ const EnhancedInboxComponent: React.FC = () => {
 
     setLoading(true);
     try {
+      let recipientId = selectedConversation;
+      let messageType = 'direct';
+
+      // Handle special conversation types
+      if (selectedConversation === 'admin_support') {
+        // Find admin users to send support message
+        const { data: adminUsers } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+          .limit(1);
+
+        if (adminUsers && adminUsers.length > 0) {
+          recipientId = adminUsers[0].id;
+          messageType = 'support';
+        }
+      }
+
       const { error } = await supabase
         .from('inbox_messages')
         .insert({
           sender_id: user.id,
-          recipient_id: selectedConversation,
-          subject: 'Message Reply',
+          recipient_id: recipientId,
+          subject: selectedConversation === 'admin_support' ? 'Support Request' : 'Message Reply',
           content: replyContent,
-          message_type: 'direct'
+          message_type: messageType
         });
 
       if (error) {
@@ -252,6 +400,51 @@ const EnhancedInboxComponent: React.FC = () => {
     }
   };
 
+  const addContact = async () => {
+    if (!newContactUsername.trim()) {
+      toast.error('Please enter a username');
+      return;
+    }
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id, username, full_name')
+        .eq('username', newContactUsername.trim())
+        .single();
+
+      if (error || !profile) {
+        toast.error('User not found');
+        return;
+      }
+
+      // Start a conversation by sending a welcome message
+      const { error: messageError } = await supabase
+        .from('inbox_messages')
+        .insert({
+          sender_id: user?.id,
+          recipient_id: profile.id,
+          subject: 'New Contact',
+          content: 'Hello! I added you as a contact.',
+          message_type: 'direct'
+        });
+
+      if (messageError) {
+        console.error('Error creating conversation:', messageError);
+        toast.error('Failed to add contact');
+        return;
+      }
+
+      toast.success('Contact added successfully');
+      setNewContactUsername('');
+      setShowAddContact(false);
+      fetchMessages();
+    } catch (error) {
+      console.error('Error adding contact:', error);
+      toast.error('Failed to add contact');
+    }
+  };
+
   const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
     if (isToday(date)) {
@@ -267,8 +460,63 @@ const EnhancedInboxComponent: React.FC = () => {
     return profile?.full_name || profile?.username || 'Unknown User';
   };
 
+  const getConversationDisplayName = (conversation: Conversation) => {
+    if (conversation.is_broadcast) return 'Broadcast Messages';
+    if (conversation.is_support) return 'Admin Support';
+    return getUserDisplayName(conversation.user_profile);
+  };
+
+  const getConversationAvatar = (conversation: Conversation) => {
+    if (conversation.is_broadcast) {
+      return <MessageSquare className="w-6 h-6" />;
+    }
+    if (conversation.is_support) {
+      return <User className="w-6 h-6" />;
+    }
+    return null;
+  };
+
+  const renderFileAttachment = (message: Message) => {
+    if (!message.file_url) return null;
+
+    const isImage = message.file_type?.startsWith('image/');
+    
+    return (
+      <div className="mt-2 p-2 bg-gray-100 rounded-lg max-w-xs">
+        {isImage ? (
+          <div className="space-y-2">
+            <img 
+              src={message.file_url} 
+              alt={message.file_name || 'Image'} 
+              className="rounded max-w-full h-auto max-h-48 object-cover"
+            />
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Image className="w-4 h-4" />
+              <span>{message.file_name}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-gray-500" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{message.file_name}</p>
+              <p className="text-xs text-gray-500">{message.file_type}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => window.open(message.file_url, '_blank')}
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const filteredConversations = conversations.filter(conv =>
-    getUserDisplayName(conv.user_profile).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getConversationDisplayName(conv).toLowerCase().includes(searchTerm.toLowerCase()) ||
     conv.last_message.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -291,7 +539,36 @@ const EnhancedInboxComponent: React.FC = () => {
         
         {/* Header */}
         <div className="p-4 bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-          <h2 className="text-lg font-semibold">Messages</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Messages</h2>
+            <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="text-white hover:bg-white/20">
+                  <UserPlus className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Contact</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Enter username"
+                    value={newContactUsername}
+                    onChange={(e) => setNewContactUsername(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button onClick={addContact} className="flex-1">
+                      Add Contact
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowAddContact(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Search */}
@@ -328,14 +605,22 @@ const EnhancedInboxComponent: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Avatar className="w-12 h-12">
-                      <AvatarImage src={conversation.user_profile?.avatar_url} />
-                      <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white">
-                        {conversation.user_profile?.full_name?.[0] || 
-                         conversation.user_profile?.username?.[0] || 
-                         <User className="w-6 h-6" />}
-                      </AvatarFallback>
+                      {conversation.is_broadcast || conversation.is_support ? (
+                        <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white">
+                          {getConversationAvatar(conversation)}
+                        </AvatarFallback>
+                      ) : (
+                        <>
+                          <AvatarImage src={conversation.user_profile?.avatar_url} />
+                          <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white">
+                            {conversation.user_profile?.full_name?.[0] || 
+                             conversation.user_profile?.username?.[0] || 
+                             <User className="w-6 h-6" />}
+                          </AvatarFallback>
+                        </>
+                      )}
                     </Avatar>
-                    {conversation.is_online && (
+                    {conversation.is_online && !conversation.is_broadcast && !conversation.is_support && (
                       <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                     )}
                   </div>
@@ -343,7 +628,7 @@ const EnhancedInboxComponent: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm truncate">
-                        {getUserDisplayName(conversation.user_profile)}
+                        {getConversationDisplayName(conversation)}
                       </span>
                       <span className="text-xs text-gray-500">
                         {formatMessageTime(conversation.last_message_time)}
@@ -364,6 +649,16 @@ const EnhancedInboxComponent: React.FC = () => {
                     {conversation.user_profile?.is_creator && (
                       <Badge variant="outline" className="text-xs mt-1">
                         Creator
+                      </Badge>
+                    )}
+                    {conversation.is_broadcast && (
+                      <Badge variant="outline" className="text-xs mt-1 bg-orange-50 text-orange-700">
+                        Broadcast
+                      </Badge>
+                    )}
+                    {conversation.is_support && (
+                      <Badge variant="outline" className="text-xs mt-1 bg-purple-50 text-purple-700">
+                        Support
                       </Badge>
                     )}
                   </div>
@@ -395,28 +690,36 @@ const EnhancedInboxComponent: React.FC = () => {
               )}
               
               <Avatar className="w-10 h-10">
-                <AvatarImage src={conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url} />
-                <AvatarFallback className="bg-white/20 text-white">
-                  {conversations.find(c => c.user_id === selectedConversation)?.user_profile?.full_name?.[0] || 
-                   conversations.find(c => c.user_id === selectedConversation)?.user_profile?.username?.[0] || 
-                   <User className="w-5 h-5" />}
-                </AvatarFallback>
+                {selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support' ? (
+                  <AvatarFallback className="bg-white/20 text-white">
+                    {selectedConversation === 'broadcast_messages' ? 
+                      <MessageSquare className="w-5 h-5" /> : 
+                      <User className="w-5 h-5" />
+                    }
+                  </AvatarFallback>
+                ) : (
+                  <>
+                    <AvatarImage src={conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url} />
+                    <AvatarFallback className="bg-white/20 text-white">
+                      {conversations.find(c => c.user_id === selectedConversation)?.user_profile?.full_name?.[0] || 
+                       conversations.find(c => c.user_id === selectedConversation)?.user_profile?.username?.[0] || 
+                       <User className="w-5 h-5" />}
+                    </AvatarFallback>
+                  </>
+                )}
               </Avatar>
               
               <div className="flex-1">
                 <h3 className="font-medium">
-                  {getUserDisplayName(conversations.find(c => c.user_id === selectedConversation)?.user_profile)}
+                  {getConversationDisplayName(conversations.find(c => c.user_id === selectedConversation) || {} as Conversation)}
                 </h3>
-                <p className="text-sm text-white/80">Online</p>
+                <p className="text-sm text-white/80">
+                  {selectedConversation === 'broadcast_messages' ? 'System Messages' :
+                   selectedConversation === 'admin_support' ? 'Support Chat' : 'Online'}
+                </p>
               </div>
               
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
-                  <Phone className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
-                  <Video className="h-4 w-4" />
-                </Button>
                 <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
@@ -439,6 +742,7 @@ const EnhancedInboxComponent: React.FC = () => {
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {renderFileAttachment(message)}
                       <p className={`text-xs mt-1 ${
                         message.sender_id === user?.id ? 'text-white/80' : 'text-gray-500'
                       }`}>
@@ -453,7 +757,20 @@ const EnhancedInboxComponent: React.FC = () => {
             {/* Message Input */}
             <div className="p-4 border-t bg-white">
               <div className="flex items-end gap-2">
-                <Button variant="ghost" size="sm" className="text-gray-500">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  hidden
+                  onChange={handleFileUpload}
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                />
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-gray-500"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
                   <Paperclip className="h-4 w-4" />
                 </Button>
                 <div className="flex-1">
