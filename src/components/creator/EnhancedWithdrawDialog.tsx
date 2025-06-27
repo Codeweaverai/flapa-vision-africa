@@ -51,6 +51,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
   const [convertedBalance, setConvertedBalance] = useState(0);
   const [localCurrency, setLocalCurrency] = useState<CurrencyCode>('USD');
+  const [exchangeRate, setExchangeRate] = useState(1);
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
@@ -69,6 +70,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           const converted = await convertPrice(availableBalance, 'USD');
           setConvertedBalance(converted);
           setLocalCurrency(currentCurrency);
+          setExchangeRate(converted / availableBalance);
         } else if (selectedPayoutMethod === 'mobile_money' && profileData?.mobile_money_operator) {
           // For mobile money, determine local currency from operator
           const operatorParts = profileData.mobile_money_operator.split('_');
@@ -87,17 +89,34 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           
           const targetCurrency = currencyMap[countryCode] || 'USD';
           
-          // Convert from USD to target local currency
-          const localAmount = targetCurrency === 'USD' ? availableBalance : 
-            await convertPrice(availableBalance, 'USD');
+          // Get exchange rate for mobile money
+          let localAmount = availableBalance;
+          let rate = 1;
+          
+          if (targetCurrency !== 'USD') {
+            // Simulate exchange rates (in a real app, you'd fetch from an API)
+            const exchangeRates: Record<string, number> = {
+              'ZMW': 23.4, // 1 USD = 23.4 ZMW
+              'KES': 150.0, // 1 USD = 150 KES
+              'UGX': 3700.0, // 1 USD = 3700 UGX
+              'TZS': 2300.0, // 1 USD = 2300 TZS
+              'RWF': 1100.0, // 1 USD = 1100 RWF
+              'GHS': 12.0, // 1 USD = 12 GHS
+            };
+            
+            rate = exchangeRates[targetCurrency] || 1;
+            localAmount = availableBalance * rate;
+          }
           
           setConvertedBalance(localAmount);
           setLocalCurrency(targetCurrency);
+          setExchangeRate(rate);
         }
       } catch (error) {
         console.error('Error converting balance:', error);
         setConvertedBalance(availableBalance);
         setLocalCurrency('USD');
+        setExchangeRate(1);
       }
     };
 
@@ -172,7 +191,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     // Check minimum amount based on local currency
     const minAmountUSD = 2;
     const minAmountLocal = selectedPayoutMethod === 'mobile_money' ? 
-      await convertPrice(minAmountUSD, 'USD') : minAmountUSD;
+      minAmountUSD * exchangeRate : minAmountUSD;
     
     if (withdrawAmount < minAmountLocal) {
       toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountLocal, localCurrency)}`);
@@ -192,8 +211,10 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           return;
         }
 
-        // For Stripe, always send USD amount (since availableBalance is in USD)
-        const usdAmount = withdrawAmount * (availableBalance / convertedBalance);
+        // For Stripe, convert back to USD if needed
+        const usdAmount = selectedPayoutMethod === 'stripe' && localCurrency !== 'USD' 
+          ? withdrawAmount / exchangeRate 
+          : withdrawAmount;
 
         // Process Stripe transfer
         const { data, error } = await supabase.functions.invoke('stripe-payout', {
@@ -217,14 +238,22 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // Fixed logic: For mobile money, deduct the same amount being withdrawn
-        // The withdrawAmount is already in the local currency (ZMW, KES, etc.)
-        // So we deduct the same amount from the user's balance
+        // Calculate the equivalent USD amount to deduct from balance
+        const usdAmountToDeduct = withdrawAmount / exchangeRate;
+
+        console.log('Mobile Money Withdrawal:', {
+          withdrawAmount,
+          localCurrency,
+          exchangeRate,
+          usdAmountToDeduct,
+          availableBalance
+        });
+
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
-            amount: withdrawAmount,                // Amount to deduct from user balance (same as withdrawal amount)
-            targetAmount: withdrawAmount,         // Amount to send to the user via PawaPay (in local currency)
-            targetCurrency: localCurrency,        // Local currency code (e.g., ZMW, KES)
+            amount: usdAmountToDeduct,          // USD amount to deduct from creator balance
+            targetAmount: withdrawAmount,       // Local currency amount to send to user
+            targetCurrency: localCurrency,      // Local currency code (e.g., ZMW, KES)
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
             country: countryCode,
@@ -238,7 +267,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         }
 
         if (data?.success) {
-          toast.success('Payout request submitted successfully! You will receive an email confirmation.');
+          toast.success(`Payout request submitted successfully! You will receive ${formatPrice(withdrawAmount, localCurrency)} via mobile money.`);
         } else {
           throw new Error(data?.message || 'Payout request failed');
         }
@@ -305,7 +334,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
               Funds available for withdrawal (after 7-day hold period)
               {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
                 <div className="mt-1 text-xs text-blue-600">
-                  USD equivalent: {formatPrice(availableBalance, 'USD')}
+                  USD equivalent: {formatPrice(availableBalance, 'USD')} • Rate: 1 USD = {exchangeRate} {localCurrency}
                 </div>
               )}
             </div>
@@ -405,7 +434,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                   <div className="text-sm text-muted-foreground">
                     {selectedPayoutMethod === 'stripe' ? 
                       formatPrice(withdrawAmount, currentCurrency) :
-                      formatPrice(withdrawAmount, localCurrency)
+                      `${formatPrice(withdrawAmount, localCurrency)} (${formatPrice(withdrawAmount / exchangeRate, 'USD')} USD)`
                     }
                   </div>
                 )}
@@ -429,6 +458,9 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                   <div>• Processing time: {selectedPayoutMethod === 'stripe' ? 'Instant' : 'Within 24 hours'}</div>
                   <div>• Platform fee: 8% (already deducted)</div>
                   <div>• You'll receive an email confirmation</div>
+                  {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
+                    <div>• Exchange rate: 1 USD = {exchangeRate} {localCurrency}</div>
+                  )}
                 </div>
               </div>
             </div>

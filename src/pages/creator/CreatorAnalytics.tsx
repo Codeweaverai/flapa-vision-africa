@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -8,7 +9,10 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { Badge } from '@/components/ui/badge';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
-import { calculateCreatorEarningsFromOrders } from '@/services/creatorEarningsService';
+import { 
+  fetchCreatorEarnings, 
+  fetchCreatorPaymentTransactions 
+} from '@/services/creatorPaymentService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface AnalyticsData {
@@ -23,6 +27,17 @@ interface AnalyticsData {
   monthlyRevenue: any[];
   topCourses: any[];
   topEvents: any[];
+  totalReviews: number;
+  averageRating: number;
+  courseReviews: number;
+  eventReviews: number;
+  courseRating: number;
+  eventRating: number;
+  totalEnrollments: number;
+  totalBookings: number;
+  availableBalance: number;
+  pendingBalance: number;
+  totalPlatformFees: number;
 }
 
 const CreatorAnalytics: React.FC = () => {
@@ -37,7 +52,18 @@ const CreatorAnalytics: React.FC = () => {
     recentBookings: [],
     monthlyRevenue: [],
     topCourses: [],
-    topEvents: []
+    topEvents: [],
+    totalReviews: 0,
+    averageRating: 0,
+    courseReviews: 0,
+    eventReviews: 0,
+    courseRating: 0,
+    eventRating: 0,
+    totalEnrollments: 0,
+    totalBookings: 0,
+    availableBalance: 0,
+    pendingBalance: 0,
+    totalPlatformFees: 0
   });
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -54,117 +80,43 @@ const CreatorAnalytics: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get creator earnings from orders
-      const earnings = await calculateCreatorEarningsFromOrders(user.id);
-
-      // Get total courses
-      const { data: courses } = await supabase
-        .from('courses')
-        .select('id, title')
-        .eq('creator_id', user.id);
-
-      // Get total events
-      const { data: events } = await supabase
-        .from('events')
-        .select('id, title')
-        .eq('creator_id', user.id);
-
-      // Get recent enrollments
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select(`
-          *,
-          courses!inner(title, creator_id),
-          profiles(username, full_name)
-        `)
-        .eq('courses.creator_id', user.id)
-        .eq('payment_status', 'completed')
-        .order('enrollment_date', { ascending: false })
-        .limit(10);
-
-      // Get recent event bookings
-      const { data: bookings } = await supabase
-        .from('event_bookings')
-        .select(`
-          *,
-          events!inner(title, creator_id),
-          profiles(username, full_name)
-        `)
-        .eq('events.creator_id', user.id)
-        .eq('payment_status', 'completed')
-        .order('booking_date', { ascending: false })
-        .limit(10);
-
-      // Get order items for monthly revenue calculation
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          orders!inner(
-            id,
-            user_id,
-            email,
-            total_amount,
-            currency,
-            payment_status,
-            payment_method,
-            created_at
-          )
-        `)
-        .eq('orders.payment_status', 'completed')
-        .gte('orders.created_at', subDays(new Date(), 180).toISOString())
-        .order('orders.created_at', { ascending: true });
-
-      // Process monthly revenue data from creator's order items
-      const monthlyRevenue = await processMonthlyRevenue(orderItems || [], user.id);
-
-      // Get top courses by enrollment
-      const { data: topCoursesData } = await supabase
-        .from('courses')
-        .select(`
-          id,
-          title,
-          course_enrollments(id)
-        `)
-        .eq('creator_id', user.id)
-        .limit(5);
-
-      // Get top events by bookings
-      const { data: topEventsData } = await supabase
-        .from('events')
-        .select(`
-          id,
-          title,
-          event_bookings(id)
-        `)
-        .eq('creator_id', user.id)
-        .limit(5);
-
-      // Calculate unique students
-      const uniqueStudentIds = new Set([
-        ...(enrollments || []).map(e => e.user_id),
-        ...(bookings || []).map(b => b.user_id)
+      // Get creator earnings and transactions from creator payments service
+      const [earnings, transactions] = await Promise.all([
+        fetchCreatorEarnings(user.id),
+        fetchCreatorPaymentTransactions(user.id)
       ]);
 
-      setAnalyticsData({
-        totalRevenue: earnings.total_earnings,
-        totalStudents: uniqueStudentIds.size,
-        totalCourses: courses?.length || 0,
-        totalEvents: events?.length || 0,
-        courseRevenue: earnings.course_revenue,
-        eventRevenue: earnings.event_revenue,
-        recentEnrollments: enrollments || [],
-        recentBookings: bookings || [],
-        monthlyRevenue,
-        topCourses: topCoursesData?.map(course => ({
-          name: course.title,
-          enrollments: course.course_enrollments?.length || 0
-        })) || [],
-        topEvents: topEventsData?.map(event => ({
-          name: event.title,
-          bookings: event.event_bookings?.length || 0
-        })) || []
-      });
+      // Get courses with detailed analytics
+      const { data: courses } = await supabase
+        .from('courses')
+        .select(`
+          id, 
+          title,
+          course_enrollments(id, user_id, enrollment_date, profiles(username, full_name)),
+          course_reviews(id, rating, created_at)
+        `)
+        .eq('creator_id', user.id);
+
+      // Get events with detailed analytics
+      const { data: events } = await supabase
+        .from('events')
+        .select(`
+          id, 
+          title,
+          event_bookings(id, user_id, booking_date, profiles(username, full_name)),
+          event_reviews(id, rating, created_at)
+        `)
+        .eq('creator_id', user.id);
+
+      // Process comprehensive analytics
+      const processedData = await processAnalyticsData(
+        earnings, 
+        transactions, 
+        courses || [], 
+        events || []
+      );
+
+      setAnalyticsData(processedData);
     } catch (error) {
       console.error('Error loading analytics data:', error);
     } finally {
@@ -172,57 +124,106 @@ const CreatorAnalytics: React.FC = () => {
     }
   };
 
-  const processMonthlyRevenue = async (orderItems: any[], creatorId: string) => {
-    const monthlyData: { [key: string]: number } = {};
-    const PLATFORM_FEE_RATE = 0.08;
+  const processAnalyticsData = async (earnings: any, transactions: any[], courses: any[], events: any[]) => {
+    // Calculate enrollments and bookings
+    const allEnrollments = courses.flatMap(c => c.course_enrollments || []);
+    const allBookings = events.flatMap(e => e.event_bookings || []);
     
-    for (const item of orderItems) {
-      let isCreatorItem = false;
-      
-      if (item.item_type === 'course') {
-        const { data: course } = await supabase
-          .from('courses')
-          .select('creator_id')
-          .eq('id', item.item_id)
-          .single();
-        
-        if (course && course.creator_id === creatorId) {
-          isCreatorItem = true;
-        }
-      } else if (item.item_type === 'event_ticket') {
-        const { data: ticket } = await supabase
-          .from('event_tickets')
-          .select('event_id')
-          .eq('id', item.item_id)
-          .single();
-        
-        if (ticket) {
-          const { data: event } = await supabase
-            .from('events')
-            .select('creator_id')
-            .eq('id', ticket.event_id)
-            .single();
-          
-          if (event && event.creator_id === creatorId) {
-            isCreatorItem = true;
-          }
-        }
-      }
-      
-      if (isCreatorItem) {
-        const month = format(new Date(item.orders.created_at), 'MMM yyyy');
-        const itemTotal = Number(item.total_price);
-        const platformFee = itemTotal * PLATFORM_FEE_RATE;
-        const creatorEarning = itemTotal - platformFee;
-        
-        monthlyData[month] = (monthlyData[month] || 0) + creatorEarning;
-      }
-    }
+    // Calculate unique students
+    const uniqueStudentIds = new Set([
+      ...allEnrollments.map(e => e.user_id),
+      ...allBookings.map(b => b.user_id)
+    ]);
 
-    return Object.entries(monthlyData).map(([month, revenue]) => ({
+    // Calculate reviews and ratings
+    const courseReviews = courses.flatMap(c => c.course_reviews || []);
+    const eventReviews = events.flatMap(e => e.event_reviews || []);
+    
+    const courseRating = courseReviews.length > 0 
+      ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length 
+      : 0;
+    
+    const eventRating = eventReviews.length > 0 
+      ? eventReviews.reduce((sum, r) => sum + r.rating, 0) / eventReviews.length 
+      : 0;
+    
+    const totalReviews = courseReviews.length + eventReviews.length;
+    const overallRating = totalReviews > 0 
+      ? (courseReviews.reduce((sum, r) => sum + r.rating, 0) + eventReviews.reduce((sum, r) => sum + r.rating, 0)) / totalReviews
+      : 0;
+
+    // Process monthly revenue from transactions
+    const monthlyRevenue = transactions.reduce((acc, transaction) => {
+      if (transaction.status === 'completed') {
+        const month = format(new Date(transaction.created_at), 'MMM yyyy');
+        acc[month] = (acc[month] || 0) + (transaction.creator_earning || 0);
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    const monthlyRevenueData = Object.entries(monthlyRevenue).map(([month, revenue]) => ({
       month,
       revenue
     }));
+
+    // Top performing content
+    const topCourses = courses
+      .map(course => ({
+        name: course.title,
+        enrollments: course.course_enrollments?.length || 0,
+        reviews: course.course_reviews?.length || 0,
+        rating: course.course_reviews?.length > 0 
+          ? course.course_reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / course.course_reviews.length 
+          : 0
+      }))
+      .sort((a, b) => b.enrollments - a.enrollments)
+      .slice(0, 5);
+
+    const topEvents = events
+      .map(event => ({
+        name: event.title,
+        bookings: event.event_bookings?.length || 0,
+        reviews: event.event_reviews?.length || 0,
+        rating: event.event_reviews?.length > 0 
+          ? event.event_reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / event.event_reviews.length 
+          : 0
+      }))
+      .sort((a, b) => b.bookings - a.bookings)
+      .slice(0, 5);
+
+    // Recent activity
+    const recentEnrollments = allEnrollments
+      .sort((a, b) => new Date(b.enrollment_date).getTime() - new Date(a.enrollment_date).getTime())
+      .slice(0, 10);
+
+    const recentBookings = allBookings
+      .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
+      .slice(0, 10);
+
+    return {
+      totalRevenue: earnings.total_earnings,
+      totalStudents: uniqueStudentIds.size,
+      totalCourses: courses.length,
+      totalEvents: events.length,
+      courseRevenue: earnings.course_revenue,
+      eventRevenue: earnings.event_revenue,
+      recentEnrollments,
+      recentBookings,
+      monthlyRevenue: monthlyRevenueData,
+      topCourses,
+      topEvents,
+      totalReviews,
+      averageRating: overallRating,
+      courseReviews: courseReviews.length,
+      eventReviews: eventReviews.length,
+      courseRating,
+      eventRating,
+      totalEnrollments: allEnrollments.length,
+      totalBookings: allBookings.length,
+      availableBalance: earnings.available_balance,
+      pendingBalance: earnings.pending_balance,
+      totalPlatformFees: earnings.total_platform_fees
+    };
   };
 
   const revenueBreakdown = [
@@ -237,7 +238,7 @@ const CreatorAnalytics: React.FC = () => {
           <div className="space-y-6 p-6">
             <h1 className="text-2xl font-bold">Analytics</h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
+              {Array.from({ length: 8 }).map((_, i) => (
                 <Card key={i}>
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                     <Skeleton className="h-4 w-24" />
@@ -260,9 +261,9 @@ const CreatorAnalytics: React.FC = () => {
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
         <div className="space-y-6 p-6">
-          <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
+          <h1 className="text-2xl font-bold">Advanced Analytics Dashboard</h1>
           
-          {/* Key Metrics */}
+          {/* Enhanced Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -281,17 +282,48 @@ const CreatorAnalytics: React.FC = () => {
             
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  <PriceDisplay amount={analyticsData.availableBalance} originalCurrency="USD" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ready for withdrawal
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-sm font-medium">Total Students</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analyticsData.totalStudents}</div>
                 <p className="text-xs text-muted-foreground">
-                  Unique students enrolled
+                  {analyticsData.totalEnrollments} enrollments, {analyticsData.totalBookings} bookings
                 </p>
               </CardContent>
             </Card>
             
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium">Overall Rating</CardTitle>
+                <Star className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analyticsData.averageRating.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">
+                  From {analyticsData.totalReviews} reviews
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Content Analytics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-sm font-medium">Courses</CardTitle>
@@ -300,7 +332,7 @@ const CreatorAnalytics: React.FC = () => {
               <CardContent>
                 <div className="text-2xl font-bold">{analyticsData.totalCourses}</div>
                 <p className="text-xs text-muted-foreground">
-                  Published courses
+                  {analyticsData.courseReviews} reviews • {analyticsData.courseRating.toFixed(1)} ⭐
                 </p>
               </CardContent>
             </Card>
@@ -313,7 +345,37 @@ const CreatorAnalytics: React.FC = () => {
               <CardContent>
                 <div className="text-2xl font-bold">{analyticsData.totalEvents}</div>
                 <p className="text-xs text-muted-foreground">
-                  Created events
+                  {analyticsData.eventReviews} reviews • {analyticsData.eventRating.toFixed(1)} ⭐
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium">Course Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  <PriceDisplay amount={analyticsData.courseRevenue} originalCurrency="USD" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  From course sales
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  <PriceDisplay amount={analyticsData.eventRevenue} originalCurrency="USD" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  From event tickets
                 </p>
               </CardContent>
             </Card>
@@ -380,6 +442,42 @@ const CreatorAnalytics: React.FC = () => {
             </Card>
           </div>
 
+          {/* Financial Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Financial Summary</CardTitle>
+              <CardDescription>Comprehensive financial overview</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Total Earnings</div>
+                  <div className="text-2xl font-bold">
+                    <PriceDisplay amount={analyticsData.totalRevenue} originalCurrency="USD" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Available Balance</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    <PriceDisplay amount={analyticsData.availableBalance} originalCurrency="USD" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Pending Balance</div>
+                  <div className="text-2xl font-bold text-amber-600">
+                    <PriceDisplay amount={analyticsData.pendingBalance} originalCurrency="USD" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Platform Fees</div>
+                  <div className="text-2xl font-bold text-red-600">
+                    <PriceDisplay amount={analyticsData.totalPlatformFees} originalCurrency="USD" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Recent Activity */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -392,11 +490,11 @@ const CreatorAnalytics: React.FC = () => {
                   {analyticsData.recentEnrollments.length === 0 ? (
                     <p className="text-muted-foreground text-center py-4">No recent enrollments</p>
                   ) : (
-                    analyticsData.recentEnrollments.slice(0, 5).map((enrollment) => (
-                      <div key={enrollment.id} className="flex items-center justify-between">
+                    analyticsData.recentEnrollments.slice(0, 5).map((enrollment, index) => (
+                      <div key={index} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{enrollment.profiles?.username || enrollment.profiles?.full_name || 'Unknown Student'}</p>
-                          <p className="text-sm text-muted-foreground">{enrollment.courses?.title}</p>
+                          <p className="text-sm text-muted-foreground">Course Enrollment</p>
                         </div>
                         <div className="text-right">
                           <Badge variant="outline">Enrolled</Badge>
@@ -421,11 +519,11 @@ const CreatorAnalytics: React.FC = () => {
                   {analyticsData.recentBookings.length === 0 ? (
                     <p className="text-muted-foreground text-center py-4">No recent bookings</p>
                   ) : (
-                    analyticsData.recentBookings.slice(0, 5).map((booking) => (
-                      <div key={booking.id} className="flex items-center justify-between">
+                    analyticsData.recentBookings.slice(0, 5).map((booking, index) => (
+                      <div key={index} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{booking.profiles?.username || booking.profiles?.full_name || 'Unknown Attendee'}</p>
-                          <p className="text-sm text-muted-foreground">{booking.events?.title}</p>
+                          <p className="text-sm text-muted-foreground">Event Booking</p>
                         </div>
                         <div className="text-right">
                           <Badge variant="outline">Booked</Badge>
@@ -457,6 +555,9 @@ const CreatorAnalytics: React.FC = () => {
                       <div key={index} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{course.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {course.reviews} reviews • {course.rating.toFixed(1)} ⭐
+                          </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-muted-foreground" />
@@ -483,6 +584,9 @@ const CreatorAnalytics: React.FC = () => {
                       <div key={index} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{event.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {event.reviews} reviews • {event.rating.toFixed(1)} ⭐
+                          </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
