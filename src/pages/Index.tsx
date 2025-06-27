@@ -18,13 +18,13 @@ const Index = () => {
     <Layout>
       <HeroSection />
       <AboutSection />
-      <TrendingNowSection />
       <BrowseCategoriesSection />
-      <LocalContentSection />
       <CoursesSection />
       <CommunityAISection />
+      <LocalContentSection />
       <MediaSection />
       <LearningSection />
+      <TrendingNowSection />
       <EventsSection />
       <CreatorsSection />
       <CallToAction />
