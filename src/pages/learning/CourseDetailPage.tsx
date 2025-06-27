@@ -505,50 +505,41 @@ const CourseDetailPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Course Header */}
+              {/* Course Header - Removed thumbnail image */}
               <Card>
                 <CardContent className="p-6">
-                  <div className="flex items-start gap-4 mb-6">
-                    {course.thumbnail_url && (
-                      <img
-                        src={course.thumbnail_url}
-                        alt={course.title}
-                        className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="secondary">{course.category}</Badge>
-                        <Badge variant="outline">{course.difficulty_level}</Badge>
-                        {course.certificate_enabled && (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                            <Award className="w-3 h-3 mr-1" />
-                            Certificate
-                          </Badge>
-                        )}
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="secondary">{course.category}</Badge>
+                      <Badge variant="outline">{course.difficulty_level}</Badge>
+                      {course.certificate_enabled && (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          <Award className="w-3 h-3 mr-1" />
+                          Certificate
+                        </Badge>
+                      )}
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{course.title}</h1>
+                    <p className="text-gray-600 mb-4">{course.summary}</p>
+                    
+                    {/* Course Stats */}
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-500" />
+                        <span>{averageRating.toFixed(1)}</span>
+                        <span>({course.course_reviews.length} reviews)</span>
                       </div>
-                      <h1 className="text-3xl font-bold text-gray-900 mb-2">{course.title}</h1>
-                      <p className="text-gray-600 mb-4">{course.summary}</p>
-                      
-                      {/* Course Stats */}
-                      <div className="flex items-center gap-6 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500" />
-                          <span>{averageRating.toFixed(1)}</span>
-                          <span>({course.course_reviews.length} reviews)</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          <span>{course.course_enrollments.length} students</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <BookOpen className="w-4 h-4" />
-                          <span>{totalLessons} lessons</span>
-                        </div>
+                      <div className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        <span>{course.course_enrollments.length} students</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        <span>{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <BookOpen className="w-4 h-4" />
+                        <span>{totalLessons} lessons</span>
                       </div>
                     </div>
                   </div>
@@ -699,10 +690,10 @@ const CourseDetailPage = () => {
               </Tabs>
             </div>
 
-            {/* Sidebar */}
+            {/* Sidebar - Made creator card static instead of sticky */}
             <div className="space-y-6">
               {/* Price and Enrollment Card */}
-              <Card className="sticky top-6">
+              <Card className="lg:sticky lg:top-6">
                 <CardContent className="p-6">
                   <div className="text-center mb-6">
                     {course.is_free ? (
@@ -757,9 +748,11 @@ const CourseDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Creator Card */}
+              {/* Creator Card - Removed sticky positioning */}
               {creatorProfile && (
-                <CreatorCard creator={creatorProfile} />
+                <div className="lg:block">
+                  <CreatorCard creator={creatorProfile} />
+                </div>
               )}
 
               {/* Course Features */}
