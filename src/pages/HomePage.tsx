@@ -12,12 +12,16 @@ import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
 import LearningSection from '@/components/home/LearningSection';
 import CreatorsSection from '@/components/home/CreatorsSection';
+import TrendingNowSection from '@/components/home/TrendingNowSection';
+import LocalContentSection from '@/components/home/LocalContentSection';
 
 const HomePage = () => {
   console.log('HomePage rendering with sections:');
   console.log('- HeroSection');
   console.log('- AboutSection');
+  console.log('- TrendingNowSection');
   console.log('- BrowseCategoriesSection');
+  console.log('- LocalContentSection');
   console.log('- CoursesSection');
   console.log('- CreatorsSection');
   console.log('- CommunityAISection');
@@ -31,7 +35,9 @@ const HomePage = () => {
     <Layout>
       <HeroSection />
       <AboutSection />
+      <TrendingNowSection />
       <BrowseCategoriesSection />
+      <LocalContentSection />
       <CoursesSection />
       <CreatorsSection />
       <CommunityAISection />

@@ -10,13 +10,17 @@ import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
 import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
 import CreatorsSection from '@/components/home/CreatorsSection';
+import TrendingNowSection from '@/components/home/TrendingNowSection';
+import LocalContentSection from '@/components/home/LocalContentSection';
 
 const Index = () => {
   return (
     <Layout>
       <HeroSection />
       <AboutSection />
+      <TrendingNowSection />
       <BrowseCategoriesSection />
+      <LocalContentSection />
       <CoursesSection />
       <CommunityAISection />
       <MediaSection />
