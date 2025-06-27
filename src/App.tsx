@@ -174,7 +174,7 @@ function App() {
                 <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
                 <Route path="/consult" element={<ConsultPage />} />
                 <Route path="/creators" element={<CreatorsPage />} />
-                <Route path="/creators/:id" element={<CreatorPublicProfile />} />
+                <Route path="/creator/:id" element={<CreatorPublicProfile />} />
                 <Route path="/explore-courses" element={<ExploreCoursesPage />} />
                 <Route path="/explore-events" element={<ExploreEventsPage />} />
                 <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
