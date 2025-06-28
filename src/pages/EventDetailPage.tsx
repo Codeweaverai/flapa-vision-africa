@@ -151,12 +151,7 @@ const EventDetailPage = () => {
       itemType: 'event_ticket',
       itemName: `${event.title} - ${ticket.name}`,
       price: ticket.price,
-      quantity: quantity,
-      metadata: {
-        event_title: event.title,
-        event_date: event.start_time,
-        ticket_type: ticket.name
-      }
+      quantity: quantity
     });
 
     toast.success(`${quantity} ticket(s) added to cart`);
