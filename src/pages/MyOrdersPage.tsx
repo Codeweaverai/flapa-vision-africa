@@ -58,8 +58,8 @@ interface Order {
     };
   }[];
   user_profile: {
-    full_name: string;
-  };
+    full_name: string | null;
+  } | null;
 }
 
 const MyOrdersPage = () => {
@@ -123,7 +123,14 @@ const MyOrdersPage = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOrders(data || []);
+      
+      // Transform the data to match our interface
+      const transformedOrders = data?.map(order => ({
+        ...order,
+        user_profile: order.user_profile || { full_name: null }
+      })) || [];
+      
+      setOrders(transformedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error('Failed to load orders');
