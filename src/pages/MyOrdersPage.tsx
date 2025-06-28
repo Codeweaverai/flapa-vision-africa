@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -10,7 +9,7 @@ import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X } from 'l
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Order {
   id: string;
@@ -57,9 +56,7 @@ interface Order {
       creator_id: string;
     };
   }[];
-  user_profile: {
-    full_name: string | null;
-  } | null;
+  user_name?: string;
 }
 
 const MyOrdersPage = () => {
@@ -113,9 +110,6 @@ const MyOrdersPage = () => {
               thumbnail_url,
               creator_id
             )
-          ),
-          user_profile:profiles!orders_user_id_fkey (
-            full_name
           )
         `)
         .eq('user_id', user?.id)
@@ -127,7 +121,7 @@ const MyOrdersPage = () => {
       // Transform the data to match our interface
       const transformedOrders = data?.map(order => ({
         ...order,
-        user_profile: order.user_profile || { full_name: null }
+        user_name: user?.email || 'Customer'
       })) || [];
       
       setOrders(transformedOrders);
@@ -159,7 +153,7 @@ const MyOrdersPage = () => {
     setSelectedTicket({
       ...booking,
       order,
-      user_name: order.user_profile?.full_name || user?.email || 'Ticket Holder'
+      user_name: order.user_name || user?.email || 'Ticket Holder'
     });
     setShowTicketModal(true);
   };
@@ -498,7 +492,7 @@ const MyOrdersPage = () => {
                     <div className="qr-section">
                       <div className="detail-label mb-3">Scan QR Code for Entry</div>
                       <div className="flex justify-center">
-                        <QRCode 
+                        <QRCodeSVG 
                           value={JSON.stringify({
                             booking_code: selectedTicket.booking_code,
                             event_id: selectedTicket.event.id,
@@ -553,7 +547,7 @@ const MyOrdersPage = () => {
                     <div className="mt-4">
                       <p className="text-sm"><strong>Order ID:</strong> #{selectedOrder.id.slice(0, 8)}</p>
                       <p className="text-sm"><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
-                      <p className="text-sm"><strong>Customer:</strong> {selectedOrder.user_profile?.full_name || selectedOrder.email}</p>
+                      <p className="text-sm"><strong>Customer:</strong> {selectedOrder.user_name || selectedOrder.email}</p>
                     </div>
                   </div>
                   
