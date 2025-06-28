@@ -3191,6 +3191,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_unique_ticket_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_available_tickets: {
         Args: { ticket_id: string }
         Returns: number
@@ -3210,6 +3214,10 @@ export type Database = {
       update_newsletter_stats: {
         Args: { newsletter_id: string }
         Returns: undefined
+      }
+      update_ticket_inventory: {
+        Args: { p_ticket_id: string; p_quantity: number }
+        Returns: boolean
       }
     }
     Enums: {

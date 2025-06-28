@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -5,11 +6,12 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Modal } from '@/components/ui/modal';
 import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
+import TicketDisplay from '@/components/tickets/TicketDisplay';
 
 interface Order {
   id: string;
@@ -63,7 +65,7 @@ const MyOrdersPage = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [selectedTickets, setSelectedTickets] = useState<any[]>([]);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -118,7 +120,6 @@ const MyOrdersPage = () => {
 
       if (error) throw error;
       
-      // Transform the data to match our interface
       const transformedOrders = data?.map(order => ({
         ...order,
         user_name: user?.email || 'Customer'
@@ -149,57 +150,51 @@ const MyOrdersPage = () => {
     );
   };
 
-  const handleViewTicket = (booking: any, order: Order) => {
-    setSelectedTicket({
-      ...booking,
-      order,
-      user_name: order.user_name || user?.email || 'Ticket Holder'
-    });
-    setShowTicketModal(true);
-  };
+  const handleViewTickets = async (booking: any, order: Order) => {
+    try {
+      // Fetch generated tickets for this booking
+      const { data: tickets, error } = await supabase
+        .from('generated_tickets')
+        .select(`
+          *,
+          booking:event_bookings!inner (
+            booking_code,
+            event:events (
+              title,
+              start_time,
+              end_time,
+              location,
+              image_url,
+              description
+            ),
+            event_ticket:event_tickets (
+              name,
+              ticket_type
+            )
+          )
+        `)
+        .eq('booking_id', booking.id);
 
-  const handleViewReceipt = (order: Order) => {
-    setSelectedOrder(order);
-    setShowReceiptModal(true);
-  };
+      if (error) throw error;
 
-  const handlePrintTicket = () => {
-    const printContent = document.getElementById('ticket-print-content');
-    if (printContent) {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Event Ticket</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-              .ticket { max-width: 600px; margin: 0 auto; border: 2px solid #333; }
-              .ticket-header { background: linear-gradient(135deg, #f97316, #a855f7); color: white; padding: 20px; text-align: center; }
-              .ticket-body { padding: 30px; background: white; }
-              .qr-section { text-align: center; margin: 20px 0; }
-              .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
-              .detail-item { margin-bottom: 10px; }
-              .detail-label { font-weight: bold; color: #666; }
-              .detail-value { color: #333; margin-top: 5px; }
-              .terms { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
-              @media print { body { margin: 0; } }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-      }
+      const ticketsWithUserInfo = tickets?.map(ticket => ({
+        ...ticket,
+        booking: {
+          ...ticket.booking,
+          user_name: order.user_name || user?.email || 'Ticket Holder'
+        }
+      })) || [];
+
+      setSelectedTickets(ticketsWithUserInfo);
+      setShowTicketModal(true);
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      toast.error('Failed to load tickets');
     }
   };
 
-  const handlePrintReceipt = () => {
-    const printContent = document.getElementById('receipt-print-content');
+  const handlePrintTickets = () => {
+    const printContent = document.getElementById('tickets-print-content');
     if (printContent) {
       const printWindow = window.open('', '_blank');
       if (printWindow) {
@@ -207,18 +202,15 @@ const MyOrdersPage = () => {
           <!DOCTYPE html>
           <html>
           <head>
-            <title>Order Receipt</title>
+            <title>Event Tickets</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-              .receipt { max-width: 600px; margin: 0 auto; }
-              .receipt-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #333; }
-              .receipt-body { background: white; }
-              .order-details { margin: 20px 0; }
-              .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-              .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-              .items-table th { background-color: #f5f5f5; font-weight: bold; }
-              .total-row { font-weight: bold; background-color: #f9f9f9; }
-              @media print { body { margin: 0; } }
+              .ticket-container { page-break-after: always; margin-bottom: 40px; }
+              .ticket-container:last-child { page-break-after: avoid; }
+              @media print { 
+                body { margin: 0; }
+                .ticket-container { margin-bottom: 0; }
+              }
             </style>
           </head>
           <body>
@@ -347,11 +339,11 @@ const MyOrdersPage = () => {
                               
                               <div className="flex gap-3">
                                 <Button 
-                                  onClick={() => handleViewTicket(booking, order)}
+                                  onClick={() => handleViewTickets(booking, order)}
                                   className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
-                                  View Ticket
+                                  View Tickets
                                 </Button>
                               </div>
                             </div>
@@ -397,18 +389,6 @@ const MyOrdersPage = () => {
                           </div>
                         </div>
                       ))}
-
-                      {/* Order Actions */}
-                      <div className="flex gap-3 mt-6 pt-6 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewReceipt(order)}
-                          className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          View Receipt
-                        </Button>
-                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -417,183 +397,27 @@ const MyOrdersPage = () => {
           </div>
         </div>
 
-        {/* Ticket Modal */}
-        {showTicketModal && selectedTicket && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center p-6 border-b">
-                <h2 className="text-2xl font-bold">Event Ticket</h2>
-                <div className="flex gap-2">
-                  <Button onClick={handlePrintTicket} size="sm">
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowTicketModal(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+        {/* Tickets Modal */}
+        <Modal 
+          isOpen={showTicketModal}
+          onClose={() => setShowTicketModal(false)}
+          title="Event Tickets"
+          actions={
+            <Button onClick={handlePrintTickets} size="sm">
+              <Printer className="h-4 w-4 mr-2" />
+              Print All
+            </Button>
+          }
+        >
+          <div id="tickets-print-content" className="space-y-8">
+            {selectedTickets.map((ticket, index) => (
+              <div key={ticket.id}>
+                <TicketDisplay ticket={ticket} showPrintStyles={true} />
+                {index < selectedTickets.length - 1 && <div className="h-8"></div>}
               </div>
-              
-              <div id="ticket-print-content">
-                <div className="ticket">
-                  <div className="ticket-header">
-                    <h1 className="text-3xl font-bold mb-2">SkillPulse Event Ticket</h1>
-                    <p className="text-lg opacity-90">Your gateway to amazing experiences</p>
-                  </div>
-                  
-                  <div className="ticket-body">
-                    <div className="text-center mb-6">
-                      <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                        {selectedTicket.event.title}
-                      </h2>
-                      <p className="text-gray-600">{selectedTicket.event.description}</p>
-                    </div>
-
-                    <div className="details-grid">
-                      <div>
-                        <div className="detail-item">
-                          <div className="detail-label">Date & Time</div>
-                          <div className="detail-value">
-                            {format(new Date(selectedTicket.event.start_time), 'PPP')}
-                            <br />
-                            {format(new Date(selectedTicket.event.start_time), 'p')} - {format(new Date(selectedTicket.event.end_time), 'p')}
-                          </div>
-                        </div>
-                        
-                        <div className="detail-item">
-                          <div className="detail-label">Venue</div>
-                          <div className="detail-value">{selectedTicket.event.location}</div>
-                        </div>
-                        
-                        <div className="detail-item">
-                          <div className="detail-label">Ticket Type</div>
-                          <div className="detail-value">{selectedTicket.event_ticket.name}</div>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <div className="detail-item">
-                          <div className="detail-label">Ticket Holder</div>
-                          <div className="detail-value">{selectedTicket.user_name}</div>
-                        </div>
-                        
-                        <div className="detail-item">
-                          <div className="detail-label">Booking Code</div>
-                          <div className="detail-value font-mono text-lg">{selectedTicket.booking_code}</div>
-                        </div>
-                        
-                        <div className="detail-item">
-                          <div className="detail-label">Order ID</div>
-                          <div className="detail-value">#{selectedTicket.order.id.slice(0, 8)}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="qr-section">
-                      <div className="detail-label mb-3">Scan QR Code for Entry</div>
-                      <div className="flex justify-center">
-                        <QRCodeSVG 
-                          value={JSON.stringify({
-                            booking_code: selectedTicket.booking_code,
-                            event_id: selectedTicket.event.id,
-                            order_id: selectedTicket.order.id,
-                            ticket_type: selectedTicket.event_ticket.name
-                          })}
-                          size={150}
-                          level="M"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="terms">
-                      <h4 className="font-semibold mb-2">Terms & Conditions:</h4>
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>This ticket is non-transferable and non-refundable</li>
-                        <li>Please arrive 30 minutes before the event starts</li>
-                        <li>Valid photo ID required for entry</li>
-                        <li>Event organizers reserve the right to refuse entry</li>
-                        <li>Keep this ticket safe - lost tickets will not be replaced</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
-        )}
-
-        {/* Receipt Modal */}
-        {showReceiptModal && selectedOrder && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center p-6 border-b">
-                <h2 className="text-2xl font-bold">Order Receipt</h2>
-                <div className="flex gap-2">
-                  <Button onClick={handlePrintReceipt} size="sm">
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowReceiptModal(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div id="receipt-print-content">
-                <div className="receipt p-6">
-                  <div className="receipt-header">
-                    <h1 className="text-3xl font-bold text-gray-800">SkillPulse</h1>
-                    <p className="text-lg text-gray-600 mt-2">Order Receipt</p>
-                    <div className="mt-4">
-                      <p className="text-sm"><strong>Order ID:</strong> #{selectedOrder.id.slice(0, 8)}</p>
-                      <p className="text-sm"><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
-                      <p className="text-sm"><strong>Customer:</strong> {selectedOrder.user_name || selectedOrder.email}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="receipt-body">
-                    <div className="order-details">
-                      <p><strong>Payment Method:</strong> {selectedOrder.payment_method}</p>
-                      <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
-                    </div>
-
-                    <table className="items-table">
-                      <thead>
-                        <tr>
-                          <th>Item</th>
-                          <th>Type</th>
-                          <th>Qty</th>
-                          <th>Unit Price</th>
-                          <th>Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedOrder.order_items.map(item => (
-                          <tr key={item.id}>
-                            <td>{item.item_name}</td>
-                            <td>{item.item_type === 'event_ticket' ? 'Event Ticket' : 'Course'}</td>
-                            <td>{item.quantity}</td>
-                            <td>{selectedOrder.currency} {item.unit_price.toFixed(2)}</td>
-                            <td>{selectedOrder.currency} {item.total_price.toFixed(2)}</td>
-                          </tr>
-                        ))}
-                        <tr className="total-row">
-                          <td colSpan={4}><strong>Total Amount</strong></td>
-                          <td><strong>{selectedOrder.currency} {selectedOrder.total_amount.toFixed(2)}</strong></td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    <div className="mt-6 text-center text-sm text-gray-600">
-                      <p>Thank you for your purchase!</p>
-                      <p>For support, contact us at support@skillpulse.com</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </Modal>
       </div>
     </Layout>
   );
