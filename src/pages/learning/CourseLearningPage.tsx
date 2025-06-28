@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -94,16 +95,16 @@ const CourseLearningPage = () => {
         return;
       }
 
-      // Load course with modules and lessons - fix the ambiguous relationship by being more specific
+      // Load course with modules and lessons
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select(`
           *,
-          course_modules!course_modules_course_id_fkey (
+          course_modules (
             *,
-            lessons!lessons_module_id_fkey (
+            lessons (
               *,
-              lesson_progress!lesson_progress_lesson_id_fkey (
+              lesson_progress!inner (
                 id,
                 is_completed,
                 last_position_seconds,

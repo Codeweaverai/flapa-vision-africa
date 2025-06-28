@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -100,12 +101,12 @@ const EventDetailPage = () => {
     try {
       setLoading(true);
 
-      // Load event with related data - fix the ambiguous relationship
+      // Load event with related data
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select(`
           *,
-          event_tickets!event_tickets_event_id_fkey (*),
+          event_tickets (*),
           event_agenda (*),
           keynote_speakers (*)
         `)
@@ -147,11 +148,16 @@ const EventDetailPage = () => {
     }
 
     addToCart({
-      itemId: ticketId,
-      itemType: 'event_ticket',
-      itemName: `${event.title} - ${ticket.name}`,
+      item_id: ticketId,
+      item_type: 'event_ticket',
+      item_name: `${event.title} - ${ticket.name}`,
       price: ticket.price,
-      quantity: quantity
+      quantity: quantity,
+      metadata: {
+        event_title: event.title,
+        event_date: event.start_time,
+        ticket_type: ticket.name
+      }
     });
 
     toast.success(`${quantity} ticket(s) added to cart`);
