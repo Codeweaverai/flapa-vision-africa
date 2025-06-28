@@ -149,7 +149,7 @@ const EventDetailPage = () => {
     addToCart({
       itemId: ticketId,
       itemType: 'event_ticket',
-      name: `${event.title} - ${ticket.name}`,
+      itemName: `${event.title} - ${ticket.name}`,
       price: ticket.price,
       quantity: quantity,
       metadata: {
