@@ -57,6 +57,25 @@ interface Event {
   };
 }
 
+interface SimpleEvent {
+  id: string;
+  title: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  image_url: string;
+  event_type: string;
+  is_free: boolean;
+  price: number;
+  currency: string;
+  capacity: number;
+  online_meeting_link: string;
+  creator_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface EventTicket {
   id: string;
   name: string;
@@ -108,7 +127,7 @@ const EventDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [isRegistered, setIsRegistered] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<{[key: string]: number}>({});
-  const [recommendedEvents, setRecommendedEvents] = useState<Event[]>([]);
+  const [recommendedEvents, setRecommendedEvents] = useState<SimpleEvent[]>([]);
 
   useEffect(() => {
     if (id) {
