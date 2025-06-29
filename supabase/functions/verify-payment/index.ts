@@ -1,187 +1,255 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@14.21.0'
+import { createCanvas } from 'https://esm.sh/canvas@2.11.2'
+import QRCode from 'https://esm.sh/qrcode@1.5.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface OrderItem {
+  id: string;
+  order_id: string;
+  item_id: string;
+  item_type: string;
+  item_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+interface EventTicket {
+  id: string;
+  event_id: string;
+  name: string;
+  price: number;
+  quantity_available: number;
+  quantity_sold: number;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders, status: 204 })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const { orderId, sessionId, paymentIntentId, retry = false } = await req.json()
-
+    const { orderId, paymentStatus } = await req.json()
+    
     if (!orderId) {
-      throw new Error('Order ID is required')
+      return new Response(
+        JSON.stringify({ error: 'Order ID is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
     }
 
-    console.log('[VERIFY-PAYMENT] Starting verification for order:', orderId)
+    // Create Supabase client with service role key
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Get order details
-    const { data: order, error: orderError } = await supabaseClient
+    const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select(`
-        *,
-        order_items (
-          id,
-          item_id,
-          item_type,
-          item_name,
-          quantity,
-          unit_price,
-          total_price
-        )
-      `)
+      .select('*')
       .eq('id', orderId)
       .single()
 
     if (orderError || !order) {
-      throw new Error('Order not found')
+      return new Response(
+        JSON.stringify({ error: 'Order not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      )
     }
 
-    console.log('[VERIFY-PAYMENT] Order found:', { 
-      id: order.id, 
-      status: order.payment_status, 
-      method: order.payment_method,
-      items: order.order_items?.length || 0
-    })
-
-    let paymentCompleted = false
-
-    // Verify Stripe payment if applicable
-    if (order.stripe_session_id && order.payment_method === 'stripe') {
-      const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-        apiVersion: '2023-10-16',
+    // Update order status to completed
+    const { error: updateOrderError } = await supabase
+      .from('orders')
+      .update({ 
+        payment_status: 'completed',
+        updated_at: new Date().toISOString()
       })
+      .eq('id', orderId)
 
-      try {
-        const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id)
-        console.log('[VERIFY-PAYMENT] Stripe session status:', session.payment_status)
-
-        if (session.payment_status === 'paid') {
-          paymentCompleted = true
-        }
-      } catch (stripeError) {
-        console.error('[VERIFY-PAYMENT] Stripe verification error:', stripeError)
-      }
+    if (updateOrderError) {
+      console.error('Error updating order:', updateOrderError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to update order status' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
     }
 
-    // For PawaPay, payment status is updated via webhook
-    if (order.payment_method === 'mobile_money' && order.payment_status === 'completed') {
-      paymentCompleted = true
+    // Get order items
+    const { data: orderItems, error: itemsError } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', orderId)
+
+    if (itemsError) {
+      console.error('Error fetching order items:', itemsError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch order items' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
     }
 
-    // Process payment success if completed
-    if (paymentCompleted && order.payment_status !== 'completed') {
-      console.log('[VERIFY-PAYMENT] Processing payment success for order:', orderId)
-      
-      try {
-        // Call the improved process_payment_success function
-        const { data: processResult, error: processError } = await supabaseClient.rpc(
-          'process_payment_success',
-          {
-            p_order_id: orderId,
-            p_payment_intent_id: paymentIntentId,
-            p_session_id: sessionId
-          }
-        )
+    const processedBookings = []
 
-        if (processError) {
-          console.error('[VERIFY-PAYMENT] Error processing payment success:', processError)
-          throw processError
-        }
-
-        console.log('[VERIFY-PAYMENT] Payment success processed successfully')
-
-        // Generate QR codes for tickets
-        const { data: tickets, error: ticketsError } = await supabaseClient
-          .from('generated_tickets')
+    // Process each order item
+    for (const item of orderItems as OrderItem[]) {
+      if (item.item_type === 'event_ticket') {
+        // Get ticket details
+        const { data: ticket, error: ticketError } = await supabase
+          .from('event_tickets')
           .select('*')
-          .eq('order_id', orderId)
+          .eq('id', item.item_id)
+          .single()
 
-        if (!ticketsError && tickets) {
-          for (const ticket of tickets) {
-            // Generate base64 QR code using a simple approach
-            const qrData = encodeURIComponent(ticket.qr_code_data)
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrData}`
-            
-            await supabaseClient
-              .from('generated_tickets')
-              .update({ qr_code_url: qrUrl })
-              .eq('id', ticket.id)
-          }
-          console.log('[VERIFY-PAYMENT] QR codes generated for', tickets.length, 'tickets')
+        if (ticketError || !ticket) {
+          console.error('Error fetching ticket:', ticketError)
+          continue
         }
 
-        // Send confirmation email
-        try {
-          const { data: profile } = await supabaseClient
+        const eventTicket = ticket as EventTicket
+
+        // Update ticket inventory
+        const newQuantitySold = eventTicket.quantity_sold + item.quantity
+        const newQuantityAvailable = eventTicket.quantity_available - item.quantity
+
+        if (newQuantityAvailable < 0) {
+          console.error('Insufficient ticket inventory')
+          continue
+        }
+
+        const { error: updateTicketError } = await supabase
+          .from('event_tickets')
+          .update({
+            quantity_sold: newQuantitySold,
+            quantity_available: newQuantityAvailable,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.item_id)
+
+        if (updateTicketError) {
+          console.error('Error updating ticket inventory:', updateTicketError)
+          continue
+        }
+
+        // Generate unique booking code
+        const generateBookingCode = () => {
+          return 'EVT-' + Math.random().toString(36).substr(2, 8).toUpperCase()
+        }
+
+        // Create event booking
+        const bookingCode = generateBookingCode()
+        
+        const { data: booking, error: bookingError } = await supabase
+          .from('event_bookings')
+          .insert({
+            user_id: order.user_id,
+            event_id: eventTicket.event_id,
+            event_ticket_id: item.item_id,
+            order_id: orderId,
+            booking_code: bookingCode,
+            status: 'confirmed',
+            payment_status: 'completed',
+            payment_amount: item.total_price,
+            payment_currency: order.currency || 'USD',
+            ticket_quantity: item.quantity,
+            booking_date: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (bookingError) {
+          console.error('Error creating booking:', bookingError)
+          continue
+        }
+
+        // Generate individual tickets with QR codes
+        for (let i = 0; i < item.quantity; i++) {
+          const ticketCode = `TCK-${order.user_id}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`
+          
+          // Generate QR code data
+          const qrData = JSON.stringify({
+            ticketCode,
+            bookingId: booking.id,
+            eventId: eventTicket.event_id,
+            orderId,
+            userId: order.user_id,
+            generatedAt: new Date().toISOString()
+          })
+
+          // Generate QR code as base64
+          let qrCodeBase64 = ''
+          try {
+            qrCodeBase64 = await QRCode.toDataURL(qrData, {
+              width: 200,
+              margin: 2,
+              color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+              }
+            })
+          } catch (qrError) {
+            console.error('Error generating QR code:', qrError)
+          }
+
+          // Get user profile for ticket holder name
+          const { data: profile } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', order.user_id)
             .single()
 
-          await supabaseClient.functions.invoke('send-payment-confirmation', {
-            body: {
-              orderId: order.id,
-              userEmail: order.email,
-              userName: profile?.full_name || 'Valued Customer',
-              orderItems: order.order_items
-            }
-          })
-          
-          console.log('[VERIFY-PAYMENT] Confirmation email sent')
-        } catch (emailError) {
-          console.error('[VERIFY-PAYMENT] Email sending failed:', emailError)
-          // Don't fail the whole process if email fails
+          const ticketHolderName = profile?.full_name || `Ticket Holder ${i + 1}`
+
+          // Insert generated ticket
+          const { error: ticketInsertError } = await supabase
+            .from('generated_tickets')
+            .insert({
+              booking_id: booking.id,
+              event_id: eventTicket.event_id,
+              order_id: orderId,
+              user_id: order.user_id,
+              event_ticket_id: item.item_id,
+              ticket_code: ticketCode,
+              ticket_holder_name: ticketHolderName,
+              qr_code_data: qrData,
+              qr_code_url: qrCodeBase64,
+              ticket_status: 'active',
+              generated_at: new Date().toISOString()
+            })
+
+          if (ticketInsertError) {
+            console.error('Error inserting generated ticket:', ticketInsertError)
+          }
         }
 
-      } catch (fulfillmentError) {
-        console.error('[VERIFY-PAYMENT] Order fulfillment error:', fulfillmentError)
-        
-        // If it's an inventory error, mark order as failed
-        if (fulfillmentError.message?.includes('Insufficient ticket inventory')) {
-          await supabaseClient
-            .from('orders')
-            .update({ 
-              payment_status: 'failed',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', orderId)
-        }
-        
-        throw fulfillmentError
+        processedBookings.push({
+          bookingId: booking.id,
+          bookingCode,
+          ticketQuantity: item.quantity
+        })
       }
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        paymentCompleted,
-        currentStatus: order.payment_status,
-        processed: paymentCompleted && order.payment_status === 'completed'
+        message: 'Payment verified and tickets generated successfully',
+        processedBookings
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
 
   } catch (error) {
-    console.error('[VERIFY-PAYMENT] ERROR:', error.message)
+    console.error('Error in verify-payment function:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ error: 'Internal server error' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })

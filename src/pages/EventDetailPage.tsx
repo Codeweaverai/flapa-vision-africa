@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Calendar, 
   MapPin, 
@@ -18,10 +21,18 @@ import {
   Heart,
   ArrowLeft,
   CheckCircle,
-  Info
+  Info,
+  CalendarPlus,
+  MessageCircle,
+  Facebook,
+  Instagram,
+  Linkedin,
+  MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import PriceDisplay from '@/components/currency/PriceDisplay';
+import { CurrencyCode } from '@/constants/currencies';
 
 interface Event {
   id: string;
@@ -80,27 +91,43 @@ interface Speaker {
   speaking_topic: string;
 }
 
+interface Profile {
+  id: string;
+  full_name: string;
+  avatar_url: string;
+  bio: string;
+}
+
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { addToCart } = useCart();
   const navigate = useNavigate();
   const [event, setEvent] = useState<Event | null>(null);
+  const [creator, setCreator] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRegistered, setIsRegistered] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<{[key: string]: number}>({});
+  const [recommendedEvents, setRecommendedEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     if (id) {
       loadEventData();
+      loadRecommendedEvents();
     }
   }, [id]);
+
+  const getCurrencyCode = (currency?: string): CurrencyCode => {
+    if (!currency) return 'USD';
+    const upperCurrency = currency.toUpperCase() as CurrencyCode;
+    return ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY'].includes(upperCurrency) ? upperCurrency : 'USD';
+  };
 
   const loadEventData = async () => {
     try {
       setLoading(true);
 
-      // Load event with related data - fix the ambiguous relationship
+      // Load event with related data
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select(`
@@ -115,6 +142,17 @@ const EventDetailPage = () => {
       if (eventError) throw eventError;
 
       setEvent(eventData);
+
+      // Load creator profile
+      if (eventData.creator_id) {
+        const { data: creatorData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', eventData.creator_id)
+          .single();
+
+        setCreator(creatorData);
+      }
 
       // Check if user is registered
       if (user) {
@@ -134,6 +172,21 @@ const EventDetailPage = () => {
       toast.error('Failed to load event details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRecommendedEvents = async () => {
+    try {
+      const { data: events, error } = await supabase
+        .from('events')
+        .select('*')
+        .neq('id', id)
+        .limit(3);
+
+      if (error) throw error;
+      setRecommendedEvents(events || []);
+    } catch (error) {
+      console.error('Error loading recommended events:', error);
     }
   };
 
@@ -162,6 +215,45 @@ const EventDetailPage = () => {
       ...prev,
       [ticketId]: Math.max(0, quantity)
     }));
+  };
+
+  const addToGoogleCalendar = () => {
+    if (!event) return;
+    
+    const startDate = new Date(event.start_time);
+    const endDate = new Date(event.end_time);
+    
+    const formatDateForGoogle = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const googleCalendarUrl = new URL('https://calendar.google.com/calendar/render');
+    googleCalendarUrl.searchParams.set('action', 'TEMPLATE');
+    googleCalendarUrl.searchParams.set('text', event.title);
+    googleCalendarUrl.searchParams.set('dates', `${formatDateForGoogle(startDate)}/${formatDateForGoogle(endDate)}`);
+    googleCalendarUrl.searchParams.set('details', `Event: ${event.title}\n\nLocation: ${event.location || 'TBD'}`);
+    googleCalendarUrl.searchParams.set('location', event.location || '');
+
+    window.open(googleCalendarUrl.toString(), '_blank');
+  };
+
+  const shareOnSocial = (platform: string) => {
+    const url = window.location.href;
+    const text = `Check out this event: ${event?.title}`;
+    
+    const shareUrls = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      instagram: `https://www.instagram.com/`, // Instagram doesn't support direct sharing
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`
+    };
+
+    window.open(shareUrls[platform as keyof typeof shareUrls], '_blank');
+  };
+
+  const sendMessage = () => {
+    if (!creator) return;
+    navigate(`/inbox?to=${creator.id}&subject=Regarding ${event?.title}`);
   };
 
   if (loading) {
@@ -228,7 +320,7 @@ const EventDetailPage = () => {
                   
                   <div className="p-6">
                     <div className="flex items-center gap-2 mb-4">
-                      <Badge variant="outline">{event.event_type}</Badge>
+                      <Badge variant="outline" className="bg-gradient-to-r from-orange-100 to-purple-100">{event.event_type}</Badge>
                       {event.is_free && <Badge className="bg-green-500">Free</Badge>}
                     </div>
                     
@@ -254,18 +346,6 @@ const EventDetailPage = () => {
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-4 mb-6">
-                      <Button variant="outline" size="sm">
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Share
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Heart className="h-4 w-4 mr-2" />
-                        Save
-                      </Button>
-                    </div>
-
                     {isRegistered && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                         <div className="flex items-center gap-2 text-green-800">
@@ -278,69 +358,185 @@ const EventDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Event Description */}
+              {/* Add to Google Calendar */}
               <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>About This Event</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose max-w-none">
-                    <p className="text-gray-700 leading-relaxed">{event.description}</p>
-                  </div>
+                <CardContent className="p-6">
+                  <Button 
+                    onClick={addToGoogleCalendar}
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                  >
+                    <CalendarPlus className="h-4 w-4 mr-2" />
+                    Add to Google Calendar
+                  </Button>
                 </CardContent>
               </Card>
 
-              {/* Speakers */}
-              {event.keynote_speakers && event.keynote_speakers.length > 0 && (
-                <Card className="shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Featured Speakers</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {event.keynote_speakers.map((speaker) => (
-                        <div key={speaker.id} className="flex gap-4">
-                          {speaker.image_url && (
-                            <img
-                              src={speaker.image_url}
-                              alt={speaker.name}
-                              className="w-16 h-16 rounded-full object-cover"
-                            />
-                          )}
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{speaker.name}</h4>
-                            <p className="text-sm text-gray-600 mb-2">{speaker.title}</p>
-                            {speaker.speaking_topic && (
-                              <p className="text-sm text-gray-700">Topic: {speaker.speaking_topic}</p>
+              {/* Functional Tabs */}
+              <Card className="shadow-lg">
+                <Tabs defaultValue="description" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-orange-100 to-purple-100">
+                    <TabsTrigger value="description">Description</TabsTrigger>
+                    <TabsTrigger value="agenda">Agenda</TabsTrigger>
+                    <TabsTrigger value="speakers">Speakers</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="description" className="p-6">
+                    <div className="prose max-w-none">
+                      <p className="text-gray-700 leading-relaxed">{event.description}</p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="agenda" className="p-6">
+                    {event.event_agenda && event.event_agenda.length > 0 ? (
+                      <div className="space-y-4">
+                        {event.event_agenda.map((item) => (
+                          <div key={item.id} className="border-l-4 border-gradient-to-b from-orange-500 to-purple-600 pl-4 bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-r-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Clock className="h-4 w-4 text-orange-600" />
+                              <span className="text-sm font-medium text-orange-700">
+                                {format(new Date(item.start_time), 'h:mm a')} - {format(new Date(item.end_time), 'h:mm a')}
+                              </span>
+                            </div>
+                            <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                            {item.description && (
+                              <p className="text-sm text-gray-600 mt-1">{item.description}</p>
                             )}
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-500 py-8">
+                        <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p>No agenda available yet</p>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="speakers" className="p-6">
+                    {event.keynote_speakers && event.keynote_speakers.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {event.keynote_speakers.map((speaker) => (
+                          <div key={speaker.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
+                            <div className="flex gap-4">
+                              {speaker.image_url && (
+                                <img
+                                  src={speaker.image_url}
+                                  alt={speaker.name}
+                                  className="w-16 h-16 rounded-full object-cover"
+                                />
+                              )}
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{speaker.name}</h4>
+                                <p className="text-sm text-gray-600 mb-2">{speaker.title}</p>
+                                {speaker.speaking_topic && (
+                                  <p className="text-sm text-orange-700 font-medium">Topic: {speaker.speaking_topic}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-500 py-8">
+                        <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p>No speakers announced yet</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </Card>
+
+              {/* Creator Card */}
+              {creator && (
+                <Card className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Event Creator</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-start gap-4 mb-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={creator.avatar_url} />
+                        <AvatarFallback>
+                          {creator.full_name?.charAt(0) || 'C'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-lg">{creator.full_name}</h4>
+                        {creator.bio && (
+                          <p className="text-gray-600 text-sm mt-1">{creator.bio}</p>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Social Share Icons */}
+                    <div className="flex gap-2 mb-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => shareOnSocial('facebook')}
+                        className="flex-1"
+                      >
+                        <Facebook className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => shareOnSocial('instagram')}
+                        className="flex-1"
+                      >
+                        <Instagram className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => shareOnSocial('linkedin')}
+                        className="flex-1"
+                      >
+                        <Linkedin className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => shareOnSocial('whatsapp')}
+                        className="flex-1"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <Button
+                      onClick={sendMessage}
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Send Message
+                    </Button>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Agenda */}
-              {event.event_agenda && event.event_agenda.length > 0 && (
+              {/* Recommended Events */}
+              {recommendedEvents.length > 0 && (
                 <Card className="shadow-lg">
                   <CardHeader>
-                    <CardTitle>Event Agenda</CardTitle>
+                    <CardTitle>Recommended Events</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {event.event_agenda.map((item) => (
-                        <div key={item.id} className="border-l-4 border-orange-500 pl-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Clock className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">
-                              {format(new Date(item.start_time), 'h:mm a')} - {format(new Date(item.end_time), 'h:mm a')}
-                            </span>
-                          </div>
-                          <h4 className="font-semibold text-gray-900">{item.title}</h4>
-                          {item.description && (
-                            <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {recommendedEvents.map((recEvent) => (
+                        <div key={recEvent.id} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
+                             onClick={() => navigate(`/events/${recEvent.id}`)}>
+                          {recEvent.image_url && (
+                            <img
+                              src={recEvent.image_url}
+                              alt={recEvent.title}
+                              className="w-full h-32 object-cover rounded mb-2"
+                            />
                           )}
+                          <h5 className="font-medium text-sm mb-1">{recEvent.title}</h5>
+                          <p className="text-xs text-gray-600">
+                            {format(new Date(recEvent.start_time), 'MMM d, yyyy')}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -377,7 +573,10 @@ const EventDetailPage = () => {
                               <div>
                                 <h4 className="font-semibold">{ticket.name}</h4>
                                 <p className="text-2xl font-bold text-orange-600">
-                                  {event.currency} {ticket.price.toFixed(2)}
+                                  <PriceDisplay 
+                                    amount={ticket.price} 
+                                    originalCurrency={getCurrencyCode(event.currency)} 
+                                  />
                                 </p>
                               </div>
                               <Badge variant="outline">{available} left</Badge>
@@ -408,7 +607,7 @@ const EventDetailPage = () => {
                                 </div>
                                 <Button
                                   onClick={() => handleAddToCart(ticket.id, selectedQty || 1)}
-                                  disabled={selectedQty === 0 && !selectedTickets[ticket.id]}
+                                  disabled={selectedQty === 0}
                                   className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600"
                                 >
                                   Add to Cart

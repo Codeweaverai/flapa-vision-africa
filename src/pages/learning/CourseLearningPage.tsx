@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ReactPlayer from 'react-player';
 import { 
   Play, 
   Book, 
@@ -16,7 +19,10 @@ import {
   ArrowLeft,
   Download,
   FileText,
-  Video
+  Video,
+  Users,
+  Star,
+  Award
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -27,6 +33,10 @@ interface Course {
   thumbnail_url: string;
   duration_minutes: number;
   difficulty_level: string;
+  category: string;
+  price: number;
+  is_free: boolean;
+  creator_id: string;
   course_modules: Module[];
 }
 
@@ -69,6 +79,7 @@ const CourseLearningPage = () => {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [videoProgress, setVideoProgress] = useState(0);
+  const [activeTab, setActiveTab] = useState('content');
 
   useEffect(() => {
     if (id && user) {
@@ -94,7 +105,7 @@ const CourseLearningPage = () => {
         return;
       }
 
-      // Load course with modules and lessons - fix the ambiguous relationship by being more specific
+      // Load course with modules and lessons
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select(`
@@ -240,6 +251,10 @@ const CourseLearningPage = () => {
                     <Clock className="h-4 w-4" />
                     <span>{course.duration_minutes} minutes</span>
                   </div>
+                  <div className="flex items-center gap-1 text-gray-600">
+                    <Users className="h-4 w-4" />
+                    <span>Category: {course.category}</span>
+                  </div>
                 </div>
 
                 {/* Progress */}
@@ -259,78 +274,126 @@ const CourseLearningPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Course Content */}
             <div className="lg:col-span-3">
-              {currentLesson && (
-                <Card className="shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Video className="h-5 w-5" />
-                      {currentLesson.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {/* Video Player */}
-                    {currentLesson.video_url && (
-                      <div className="mb-6">
-                        <div className="relative bg-black rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' }}>
-                          <video
-                            className="absolute inset-0 w-full h-full"
-                            controls
-                            src={currentLesson.video_url}
-                            onTimeUpdate={(e) => setVideoProgress((e.target as HTMLVideoElement).currentTime)}
-                          >
-                            Your browser does not support the video tag.
-                          </video>
+              <Card className="shadow-lg">
+                <CardContent className="p-0">
+                  <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <div className="border-b">
+                      <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-orange-100 to-purple-100">
+                        <TabsTrigger value="content">Content</TabsTrigger>
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="notes">Notes</TabsTrigger>
+                        <TabsTrigger value="resources">Resources</TabsTrigger>
+                      </TabsList>
+                    </div>
+
+                    <TabsContent value="content" className="p-6">
+                      {currentLesson && (
+                        <>
+                          <div className="mb-4">
+                            <h2 className="text-2xl font-bold mb-2">{currentLesson.title}</h2>
+                            <p className="text-gray-600">{currentLesson.description}</p>
+                          </div>
+
+                          {/* Video Player */}
+                          {currentLesson.video_url && (
+                            <div className="mb-6">
+                              <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                                <ReactPlayer
+                                  url={currentLesson.video_url}
+                                  width="100%"
+                                  height="100%"
+                                  controls
+                                  onProgress={({ playedSeconds }) => setVideoProgress(playedSeconds)}
+                                  className="absolute inset-0"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Complete Lesson Button */}
+                          {!currentLesson.lesson_progress[0]?.is_completed && (
+                            <Button
+                              onClick={() => markLessonComplete(currentLesson.id)}
+                              className="bg-gradient-to-r from-green-500 to-green-600"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark as Complete
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="overview" className="p-6">
+                      <div className="space-y-6">
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">About This Course</h3>
+                          <p className="text-gray-700">{course.description}</p>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Course Details</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-sm text-gray-600">Duration</span>
+                              <p className="font-medium">{course.duration_minutes} minutes</p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-gray-600">Difficulty</span>
+                              <p className="font-medium">{course.difficulty_level}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-gray-600">Category</span>
+                              <p className="font-medium">{course.category}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-gray-600">Modules</span>
+                              <p className="font-medium">{course.course_modules.length}</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    )}
+                    </TabsContent>
 
-                    {/* Lesson Description */}
-                    {currentLesson.description && (
-                      <div className="mb-6">
-                        <h3 className="text-lg font-semibold mb-2">About this lesson</h3>
-                        <p className="text-gray-600">{currentLesson.description}</p>
+                    <TabsContent value="notes" className="p-6">
+                      <div className="text-center text-gray-500">
+                        <FileText className="h-12 w-12 mx-auto mb-4" />
+                        <p>Notes feature coming soon</p>
                       </div>
-                    )}
+                    </TabsContent>
 
-                    {/* Lesson Materials */}
-                    {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 && (
-                      <div className="mb-6">
-                        <h3 className="text-lg font-semibold mb-2">Resources</h3>
+                    <TabsContent value="resources" className="p-6">
+                      {currentLesson?.materials_urls && currentLesson.materials_urls.length > 0 ? (
                         <div className="space-y-2">
+                          <h3 className="font-semibold mb-4">Lesson Resources</h3>
                           {currentLesson.materials_urls.map((url, index) => (
                             <a
                               key={index}
                               href={url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
+                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 p-2 rounded border hover:bg-blue-50"
                             >
                               <Download className="h-4 w-4" />
                               Resource {index + 1}
                             </a>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Complete Lesson Button */}
-                    {!currentLesson.lesson_progress[0]?.is_completed && (
-                      <Button
-                        onClick={() => markLessonComplete(currentLesson.id)}
-                        className="bg-gradient-to-r from-green-500 to-green-600"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Mark as Complete
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                      ) : (
+                        <div className="text-center text-gray-500">
+                          <Download className="h-12 w-12 mx-auto mb-4" />
+                          <p>No resources available for this lesson</p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Course Curriculum */}
             <div className="lg:col-span-1">
-              <Card className="shadow-lg">
+              <Card className="shadow-lg sticky top-4">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Book className="h-5 w-5" />
@@ -338,7 +401,7 @@ const CourseLearningPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
                     {course.course_modules.map((module) => (
                       <div key={module.id} className="border-b last:border-b-0">
                         <div className="p-4 bg-gray-50">
