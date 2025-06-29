@@ -58,25 +58,6 @@ interface Order {
       creator_id: string;
     };
   }[];
-  generated_tickets: {
-    id: string;
-    ticket_code: string;
-    ticket_holder_name: string;
-    qr_code_data: string;
-    qr_code_url: string;
-    ticket_status: string;
-    event: {
-      title: string;
-      start_time: string;
-      end_time: string;
-      location: string;
-      image_url: string;
-    };
-    event_ticket: {
-      name: string;
-      ticket_type: string;
-    };
-  }[];
   user_name?: string;
 }
 
@@ -84,7 +65,7 @@ const MyOrdersPage = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTickets, setSelectedTickets] = useState<any[]>([]);
+  const [selectedBookings, setSelectedBookings] = useState<any[]>([]);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -131,25 +112,6 @@ const MyOrdersPage = () => {
               thumbnail_url,
               creator_id
             )
-          ),
-          generated_tickets (
-            id,
-            ticket_code,
-            ticket_holder_name,
-            qr_code_data,
-            qr_code_url,
-            ticket_status,
-            event:events (
-              title,
-              start_time,
-              end_time,
-              location,
-              image_url
-            ),
-            event_ticket:event_tickets (
-              name,
-              ticket_type
-            )
           )
         `)
         .eq('user_id', user?.id)
@@ -188,13 +150,20 @@ const MyOrdersPage = () => {
   };
 
   const handleViewTickets = (order: Order) => {
-    const tickets = order.generated_tickets || [];
-    const ticketsWithUserInfo = tickets.map(ticket => ({
-      ...ticket,
-      user_name: order.user_name || user?.email || 'Ticket Holder'
+    const bookings = order.event_bookings || [];
+    const bookingsWithUserInfo = bookings.map(booking => ({
+      ...booking,
+      user_name: order.user_name || user?.email || 'Ticket Holder',
+      ticket_code: booking.booking_code,
+      qr_code_data: JSON.stringify({
+        booking_code: booking.booking_code,
+        event_title: booking.event?.title,
+        ticket_quantity: booking.ticket_quantity,
+        status: booking.status
+      })
     }));
 
-    setSelectedTickets(ticketsWithUserInfo);
+    setSelectedBookings(bookingsWithUserInfo);
     setShowTicketModal(true);
   };
 
@@ -572,7 +541,7 @@ const MyOrdersPage = () => {
                           View Receipt
                         </Button>
                         
-                        {(order.generated_tickets && order.generated_tickets.length > 0) && (
+                        {(order.event_bookings && order.event_bookings.length > 0) && (
                           <Button 
                             onClick={() => handleViewTickets(order)}
                             className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
@@ -607,10 +576,10 @@ const MyOrdersPage = () => {
           }
         >
           <div id="tickets-print-content" className="space-y-8">
-            {selectedTickets.map((ticket, index) => (
-              <div key={ticket.id}>
-                <TicketDisplay ticket={ticket} showPrintStyles={true} />
-                {index < selectedTickets.length - 1 && <div className="h-8"></div>}
+            {selectedBookings.map((booking, index) => (
+              <div key={booking.id}>
+                <TicketDisplay ticket={booking} showPrintStyles={true} />
+                {index < selectedBookings.length - 1 && <div className="h-8"></div>}
               </div>
             ))}
           </div>

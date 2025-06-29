@@ -1,119 +1,91 @@
 
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Download, Printer, Ticket } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
-import { toast } from 'sonner';
-import Layout from '@/components/layout/Layout';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import TicketDisplay from '@/components/tickets/TicketDisplay';
-import html2pdf from 'html2pdf.js';
+import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, MapPin, Download, QrCode, Ticket } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface TicketData {
   id: string;
-  ticket_code: string;
-  ticket_number?: string;
-  ticket_holder_name: string;
-  qr_code_data: string;
-  ticket_status: string;
-  booking: {
-    booking_code: string;
-    event: {
-      title: string;
-      start_time: string;
-      end_time: string;
-      location: string;
-      image_url: string;
-      event_type: string;
-    };
-    event_ticket: {
-      name: string;
-      ticket_type: string;
-    };
+  booking_code: string;
+  ticket_quantity: number;
+  status: string;
+  event: {
+    title: string;
+    start_time: string;
+    location: string;
+    image_url: string;
+  };
+  event_ticket: {
+    name: string;
+    ticket_type: string;
   };
 }
 
 const TicketViewPage = () => {
-  const { bookingId } = useParams<{ bookingId: string }>();
   const { user } = useAuth();
   const [tickets, setTickets] = useState<TicketData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (bookingId && user) {
-      loadTickets();
+    if (user) {
+      fetchTickets();
     }
-  }, [bookingId, user]);
+  }, [user]);
 
-  const loadTickets = async () => {
+  const fetchTickets = async () => {
     try {
       setLoading(true);
       
-      // First verify the booking belongs to the user
-      const { data: booking, error: bookingError } = await supabase
-        .from('event_bookings')
-        .select('user_id')
-        .eq('id', bookingId)
-        .single();
-
-      if (bookingError || !booking || booking.user_id !== user?.id) {
-        throw new Error('Unauthorized access to tickets');
-      }
-
-      // Fetch all generated tickets for this booking
       const { data, error } = await supabase
-        .from('generated_tickets')
+        .from('event_bookings')
         .select(`
           *,
-          booking:event_bookings!inner (
-            booking_code,
-            user_id,
-            event:events (
-              title,
-              start_time,
-              end_time,
-              location,
-              image_url,
-              event_type
-            ),
-            event_ticket:event_tickets (
-              name,
-              ticket_type
-            )
+          event:events (
+            title,
+            start_time,
+            location,
+            image_url
+          ),
+          event_ticket:event_tickets (
+            name,
+            ticket_type
           )
         `)
-        .eq('booking_id', bookingId);
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-
+      
       setTickets(data || []);
     } catch (error) {
-      console.error('Error loading tickets:', error);
+      console.error('Error fetching tickets:', error);
       toast.error('Failed to load tickets');
     } finally {
       setLoading(false);
     }
   };
 
-  const printTickets = () => {
-    window.print();
-  };
-
-  const downloadAsPDF = () => {
-    const element = document.getElementById('tickets-content');
-    if (!element) return;
-
-    const opt = {
-      margin: 0.5,
-      filename: `tickets-${bookingId?.slice(0, 8)}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmed' },
+      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+      cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' }
     };
-
-    html2pdf().set(opt).from(element).save();
+    
+    const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
+    return (
+      <Badge className={statusInfo.color}>
+        {statusInfo.label}
+      </Badge>
+    );
   };
 
   if (loading) {
@@ -126,80 +98,95 @@ const TicketViewPage = () => {
     );
   }
 
-  if (tickets.length === 0) {
-    return (
-      <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <Card className="max-w-md text-center shadow-xl">
-            <CardContent className="pt-6">
-              <Ticket className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-              <h2 className="text-xl font-semibold mb-4">No Tickets Found</h2>
-              <p className="text-gray-600 mb-4">The tickets you're looking for don't exist or you don't have permission to view them.</p>
-              <Button onClick={() => window.history.back()} className="bg-gradient-to-r from-orange-500 to-purple-600">
-                Go Back
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            {/* Print Styles */}
-            <style>
-              {`
-                @media print {
-                  body * {
-                    visibility: hidden;
-                  }
-                  #tickets-content, #tickets-content * {
-                    visibility: visible;
-                  }
-                  #tickets-content {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    width: 100% !important;
-                  }
-                  .no-print {
-                    display: none !important;
-                  }
-                  .ticket-container {
-                    page-break-after: always;
-                  }
-                  .ticket-container:last-child {
-                    page-break-after: avoid;
-                  }
-                }
-              `}
-            </style>
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 justify-center mb-6 no-print">
-              <Button onClick={printTickets} className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
-                <Printer className="h-4 w-4 mr-2" />
-                Print Tickets
-              </Button>
-              <Button onClick={downloadAsPDF} variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50">
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">My Tickets</h1>
+              <p className="text-gray-600">View and manage all your event tickets</p>
             </div>
 
-            {/* Tickets Content */}
-            <div id="tickets-content" className="space-y-8">
-              {tickets.map((ticket, index) => (
-                <div key={ticket.id}>
-                  <TicketDisplay ticket={ticket} showPrintStyles={true} />
-                  {index < tickets.length - 1 && <div className="h-8"></div>}
-                </div>
-              ))}
-            </div>
+            {tickets.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Ticket className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-xl font-semibold mb-2">No Tickets Found</h3>
+                  <p className="text-gray-600 mb-6">You don't have any event tickets yet.</p>
+                  <Link to="/events">
+                    <Button className="bg-gradient-to-r from-orange-500 to-purple-600">
+                      Browse Events
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {tickets.map((ticket) => (
+                  <Card key={ticket.id} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm overflow-hidden">
+                    {ticket.event.image_url && (
+                      <div className="h-48 bg-gray-200 overflow-hidden">
+                        <img
+                          src={ticket.event.image_url}
+                          alt={ticket.event.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <CardTitle className="text-lg line-clamp-2">{ticket.event.title}</CardTitle>
+                        {getStatusBadge(ticket.status)}
+                      </div>
+                      
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>{format(new Date(ticket.event.start_time), 'PPP p')}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          <span className="line-clamp-1">{ticket.event.location}</span>
+                        </div>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="pt-0">
+                      <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg mb-4">
+                        <p className="text-sm font-medium text-orange-800">{ticket.event_ticket.name}</p>
+                        <p className="text-xs text-orange-600">Qty: {ticket.ticket_quantity}</p>
+                        <p className="text-xs text-orange-600 font-mono">
+                          Code: {ticket.booking_code}
+                        </p>
+                      </div>
+                      
+                      <div className="flex justify-center mb-4">
+                        <div className="bg-white p-2 rounded border">
+                          <QRCodeSVG 
+                            value={JSON.stringify({
+                              booking_code: ticket.booking_code,
+                              event_title: ticket.event.title,
+                              ticket_quantity: ticket.ticket_quantity
+                            })}
+                            size={80}
+                            level="M"
+                          />
+                        </div>
+                      </div>
+                      
+                      <Link to={`/ticket/${ticket.id}`}>
+                        <Button size="sm" className="w-full bg-gradient-to-r from-orange-500 to-purple-600">
+                          <QrCode className="h-4 w-4 mr-2" />
+                          View Full Ticket
+                        </Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
