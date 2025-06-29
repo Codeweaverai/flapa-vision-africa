@@ -34,22 +34,19 @@ interface OrderTicketsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface GeneratedTicket {
+interface EventBooking {
   id: string;
-  ticket_code: string;
-  ticket_holder_name: string;
-  ticket_holder_email?: string;
-  ticket_status: string;
-  generated_at: string;
-  qr_code_data: string;
-  pdf_url?: string;
-  event_bookings?: {
-    event_id: string;
-    events?: {
-      title: string;
-      start_time: string;
-      location: string;
-    };
+  booking_code: string;
+  ticket_quantity: number;
+  status: string;
+  event: {
+    title: string;
+    start_time: string;
+    location: string;
+  };
+  event_ticket: {
+    name: string;
+    ticket_type: string;
   };
 }
 
@@ -58,34 +55,35 @@ const OrderTicketsDialog: React.FC<OrderTicketsDialogProps> = ({
   open,
   onOpenChange
 }) => {
-  const { data: tickets = [], isLoading, refetch } = useQuery({
-    queryKey: ['order-tickets', order.id],
+  const { data: bookings = [], isLoading, refetch } = useQuery({
+    queryKey: ['order-bookings', order.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('generated_tickets')
+        .from('event_bookings')
         .select(`
           *,
-          event_bookings!booking_id (
-            event_id,
-            events (
-              title,
-              start_time,
-              location
-            )
+          event:events (
+            title,
+            start_time,
+            location
+          ),
+          event_ticket:event_tickets (
+            name,
+            ticket_type
           )
         `)
         .eq('order_id', order.id);
 
       if (error) throw error;
-      return data as GeneratedTicket[];
+      return data as EventBooking[];
     },
     enabled: open
   });
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'active': return 'default';
-      case 'used': return 'secondary';
+      case 'confirmed': return 'default';
+      case 'pending': return 'secondary';
       case 'cancelled': return 'destructive';
       default: return 'outline';
     }
@@ -93,47 +91,27 @@ const OrderTicketsDialog: React.FC<OrderTicketsDialogProps> = ({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return <CheckCircle className="h-4 w-4" />;
-      case 'used': return <CheckCircle className="h-4 w-4" />;
+      case 'confirmed': return <CheckCircle className="h-4 w-4" />;
+      case 'pending': return <CheckCircle className="h-4 w-4" />;
       case 'cancelled': return <XCircle className="h-4 w-4" />;
       default: return <Ticket className="h-4 w-4" />;
     }
   };
 
-  const handleDownloadTicket = async (ticketId: string) => {
-    try {
-      // Call edge function to generate/download ticket PDF
-      const { data, error } = await supabase.functions.invoke('generate-tickets', {
-        body: { ticketId }
-      });
-
-      if (error) throw error;
-
-      if (data?.pdf_url) {
-        window.open(data.pdf_url, '_blank');
-      } else {
-        toast.error('PDF not available for download');
-      }
-    } catch (error) {
-      console.error('Error downloading ticket:', error);
-      toast.error('Failed to download ticket');
-    }
-  };
-
-  const handleUpdateTicketStatus = async (ticketId: string, newStatus: string) => {
+  const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
     try {
       const { error } = await supabase
-        .from('generated_tickets')
-        .update({ ticket_status: newStatus })
-        .eq('id', ticketId);
+        .from('event_bookings')
+        .update({ status: newStatus })
+        .eq('id', bookingId);
 
       if (error) throw error;
 
-      toast.success('Ticket status updated successfully');
+      toast.success('Booking status updated successfully');
       refetch();
     } catch (error) {
-      console.error('Error updating ticket status:', error);
-      toast.error('Failed to update ticket status');
+      console.error('Error updating booking status:', error);
+      toast.error('Failed to update booking status');
     }
   };
 
@@ -188,108 +166,96 @@ const OrderTicketsDialog: React.FC<OrderTicketsDialogProps> = ({
             </CardContent>
           </Card>
 
-          {/* Generated Tickets */}
+          {/* Event Bookings */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Ticket className="h-5 w-5" />
-                  Generated Tickets ({tickets.length})
+                  Event Bookings ({bookings.length})
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {tickets.length === 0 ? (
+              {bookings.length === 0 ? (
                 <div className="text-center py-8">
                   <Ticket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No tickets generated for this order yet.</p>
+                  <p className="text-muted-foreground">No bookings found for this order yet.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Ticket Code</TableHead>
+                        <TableHead>Booking Code</TableHead>
                         <TableHead>Event</TableHead>
-                        <TableHead>Holder</TableHead>
+                        <TableHead>Ticket Type</TableHead>
+                        <TableHead>Quantity</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Generated</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tickets.map((ticket) => (
-                        <TableRow key={ticket.id}>
+                      {bookings.map((booking) => (
+                        <TableRow key={booking.id}>
                           <TableCell>
                             <div className="font-mono text-sm">
-                              {ticket.ticket_code}
+                              {booking.booking_code}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div>
                               <p className="font-medium">
-                                {ticket.event_bookings?.events?.title || 'Unknown Event'}
+                                {booking.event?.title || 'Unknown Event'}
                               </p>
-                              {ticket.event_bookings?.events?.start_time && (
+                              {booking.event?.start_time && (
                                 <p className="text-sm text-muted-foreground">
-                                  {format(new Date(ticket.event_bookings.events.start_time), 'PPP p')}
+                                  {format(new Date(booking.event.start_time), 'PPP p')}
                                 </p>
                               )}
-                              {ticket.event_bookings?.events?.location && (
+                              {booking.event?.location && (
                                 <p className="text-xs text-muted-foreground">
-                                  {ticket.event_bookings.events.location}
+                                  {booking.event.location}
                                 </p>
                               )}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div>
-                              <p className="font-medium">{ticket.ticket_holder_name}</p>
-                              {ticket.ticket_holder_email && (
-                                <p className="text-sm text-muted-foreground">
-                                  {ticket.ticket_holder_email}
-                                </p>
-                              )}
+                              <p className="font-medium">{booking.event_ticket?.name || 'Standard'}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {booking.event_ticket?.ticket_type || 'Regular'}
+                              </p>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={getStatusBadgeVariant(ticket.ticket_status)}>
-                              {getStatusIcon(ticket.ticket_status)}
-                              <span className="ml-1">{ticket.ticket_status}</span>
+                            <Badge variant="outline">
+                              {booking.ticket_quantity}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">
-                              {format(new Date(ticket.generated_at), 'PPP p')}
-                            </div>
+                            <Badge variant={getStatusBadgeVariant(booking.status)}>
+                              {getStatusIcon(booking.status)}
+                              <span className="ml-1">{booking.status}</span>
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              {ticket.pdf_url && (
+                              {booking.status === 'confirmed' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleDownloadTicket(ticket.id)}
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              )}
-                              
-                              {ticket.ticket_status === 'active' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleUpdateTicketStatus(ticket.id, 'cancelled')}
+                                  onClick={() => handleUpdateBookingStatus(booking.id, 'cancelled')}
                                 >
                                   <XCircle className="h-4 w-4" />
                                 </Button>
                               )}
                               
-                              {ticket.ticket_status === 'cancelled' && (
+                              {booking.status === 'cancelled' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleUpdateTicketStatus(ticket.id, 'active')}
+                                  onClick={() => handleUpdateBookingStatus(booking.id, 'confirmed')}
                                 >
                                   <CheckCircle className="h-4 w-4" />
                                 </Button>
@@ -304,35 +270,6 @@ const OrderTicketsDialog: React.FC<OrderTicketsDialogProps> = ({
               )}
             </CardContent>
           </Card>
-
-          {/* QR Codes Section */}
-          {tickets.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <QrCode className="h-5 w-5" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      tickets.forEach(ticket => {
-                        if (ticket.pdf_url) {
-                          handleDownloadTicket(ticket.id);
-                        }
-                      });
-                    }}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download All Tickets
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </DialogContent>
     </Dialog>

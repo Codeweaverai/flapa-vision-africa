@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -109,6 +110,7 @@ interface Speaker {
   image_url: string;
   linkedin_url: string;
   twitter_url: string;
+  website_url: string;
   speaking_topic: string;
 }
 
