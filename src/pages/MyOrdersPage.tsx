@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X } from 'lucide-react';
+import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -55,6 +56,25 @@ interface Order {
       description: string;
       thumbnail_url: string;
       creator_id: string;
+    };
+  }[];
+  generated_tickets: {
+    id: string;
+    ticket_code: string;
+    ticket_holder_name: string;
+    qr_code_data: string;
+    qr_code_url: string;
+    ticket_status: string;
+    event: {
+      title: string;
+      start_time: string;
+      end_time: string;
+      location: string;
+      image_url: string;
+    };
+    event_ticket: {
+      name: string;
+      ticket_type: string;
     };
   }[];
   user_name?: string;
@@ -111,10 +131,28 @@ const MyOrdersPage = () => {
               thumbnail_url,
               creator_id
             )
+          ),
+          generated_tickets (
+            id,
+            ticket_code,
+            ticket_holder_name,
+            qr_code_data,
+            qr_code_url,
+            ticket_status,
+            event:events (
+              title,
+              start_time,
+              end_time,
+              location,
+              image_url
+            ),
+            event_ticket:event_tickets (
+              name,
+              ticket_type
+            )
           )
         `)
         .eq('user_id', user?.id)
-        .eq('payment_status', 'completed')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -149,47 +187,20 @@ const MyOrdersPage = () => {
     );
   };
 
-  const handleViewTickets = async (booking: any, order: Order) => {
-    try {
-      // Fetch generated tickets for this booking
-      const { data: tickets, error } = await supabase
-        .from('generated_tickets')
-        .select(`
-          *,
-          booking:event_bookings!inner (
-            booking_code,
-            event:events (
-              title,
-              start_time,
-              end_time,
-              location,
-              image_url,
-              description
-            ),
-            event_ticket:event_tickets (
-              name,
-              ticket_type
-            )
-          )
-        `)
-        .eq('booking_id', booking.id);
+  const handleViewTickets = (order: Order) => {
+    const tickets = order.generated_tickets || [];
+    const ticketsWithUserInfo = tickets.map(ticket => ({
+      ...ticket,
+      user_name: order.user_name || user?.email || 'Ticket Holder'
+    }));
 
-      if (error) throw error;
+    setSelectedTickets(ticketsWithUserInfo);
+    setShowTicketModal(true);
+  };
 
-      const ticketsWithUserInfo = tickets?.map(ticket => ({
-        ...ticket,
-        booking: {
-          ...ticket.booking,
-          user_name: order.user_name || user?.email || 'Ticket Holder'
-        }
-      })) || [];
-
-      setSelectedTickets(ticketsWithUserInfo);
-      setShowTicketModal(true);
-    } catch (error) {
-      console.error('Error fetching tickets:', error);
-      toast.error('Failed to load tickets');
-    }
+  const handleViewReceipt = (order: Order) => {
+    setSelectedOrder(order);
+    setShowReceiptModal(true);
   };
 
   const handlePrintTickets = () => {
@@ -239,6 +250,162 @@ const MyOrdersPage = () => {
     }
   };
 
+  const handlePrintReceipt = () => {
+    if (!selectedOrder) return;
+    
+    const receiptHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt - Order #${selectedOrder.id.slice(0, 8)}</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+            min-height: 100vh;
+          }
+          .receipt-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+          }
+          .receipt-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f97316;
+          }
+          .receipt-title {
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #f97316, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+          }
+          .order-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #fef7ed, #faf5ff);
+            border-radius: 8px;
+          }
+          .info-item {
+            margin-bottom: 10px;
+          }
+          .info-label {
+            font-weight: bold;
+            color: #7c2d12;
+          }
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+          .items-table th,
+          .items-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          .items-table th {
+            background: linear-gradient(135deg, #f97316, #a855f7);
+            color: white;
+          }
+          .total-section {
+            text-align: right;
+            padding: 20px;
+            background: linear-gradient(135deg, #fef7ed, #faf5ff);
+            border-radius: 8px;
+            margin-top: 20px;
+          }
+          .total-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #f97316;
+          }
+          @media print {
+            body { background: white; }
+            .receipt-container { box-shadow: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt-container">
+          <div class="receipt-header">
+            <div class="receipt-title">RECEIPT</div>
+            <p>Order #${selectedOrder.id.slice(0, 8).toUpperCase()}</p>
+          </div>
+          
+          <div class="order-info">
+            <div>
+              <div class="info-item">
+                <span class="info-label">Date:</span><br>
+                ${format(new Date(selectedOrder.created_at), 'PPP')}
+              </div>
+              <div class="info-item">
+                <span class="info-label">Customer:</span><br>
+                ${selectedOrder.user_name || selectedOrder.email}
+              </div>
+            </div>
+            <div>
+              <div class="info-item">
+                <span class="info-label">Payment Method:</span><br>
+                ${selectedOrder.payment_method}
+              </div>
+              <div class="info-item">
+                <span class="info-label">Status:</span><br>
+                ${selectedOrder.payment_status.toUpperCase()}
+              </div>
+            </div>
+          </div>
+
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${selectedOrder.order_items.map(item => `
+                <tr>
+                  <td>${item.item_name}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.unit_price.toFixed(2)} ${selectedOrder.currency}</td>
+                  <td>${item.total_price.toFixed(2)} ${selectedOrder.currency}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="total-section">
+            <div class="total-amount">
+              Total: ${selectedOrder.total_amount.toFixed(2)} ${selectedOrder.currency}
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(receiptHTML);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -256,7 +423,7 @@ const MyOrdersPage = () => {
           <div className="max-w-6xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">My Orders</h1>
-              <p className="text-gray-600">View and manage your event tickets and course purchases</p>
+              <p className="text-gray-600">View and manage all your orders, tickets and course purchases</p>
             </div>
 
             {orders.length === 0 ? (
@@ -297,7 +464,7 @@ const MyOrdersPage = () => {
                           <div className="text-2xl font-bold">
                             {order.currency} {order.total_amount.toFixed(2)}
                           </div>
-                          <Badge className="bg-green-500 text-white">Paid</Badge>
+                          {getStatusBadge(order.payment_status)}
                         </div>
                       </div>
                     </CardHeader>
@@ -351,16 +518,6 @@ const MyOrdersPage = () => {
                                   </div>
                                 </div>
                               </div>
-                              
-                              <div className="flex gap-3">
-                                <Button 
-                                  onClick={() => handleViewTickets(booking, order)}
-                                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Tickets
-                                </Button>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -404,6 +561,27 @@ const MyOrdersPage = () => {
                           </div>
                         </div>
                       ))}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+                        <Button
+                          onClick={() => handleViewReceipt(order)}
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          View Receipt
+                        </Button>
+                        
+                        {(order.generated_tickets && order.generated_tickets.length > 0) && (
+                          <Button 
+                            onClick={() => handleViewTickets(order)}
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Tickets
+                          </Button>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -436,6 +614,56 @@ const MyOrdersPage = () => {
               </div>
             ))}
           </div>
+        </Modal>
+
+        {/* Receipt Modal */}
+        <Modal 
+          isOpen={showReceiptModal}
+          onClose={() => setShowReceiptModal(false)}
+          title="Order Receipt"
+          actions={
+            <Button 
+              onClick={handlePrintReceipt} 
+              size="sm"
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Print Receipt
+            </Button>
+          }
+        >
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)}</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
+                    <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
+                  </div>
+                  <div>
+                    <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
+                    <p><strong>Total:</strong> {selectedOrder.currency} {selectedOrder.total_amount.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Items:</h4>
+                <div className="space-y-2">
+                  {selectedOrder.order_items.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium">{item.item_name}</p>
+                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                      </div>
+                      <p className="font-semibold">{item.total_price.toFixed(2)} {selectedOrder.currency}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </Modal>
       </div>
     </Layout>

@@ -37,6 +37,8 @@ serve(async (req) => {
   try {
     const { orderId, paymentStatus } = await req.json()
     
+    console.log('Verify payment called with:', { orderId, paymentStatus })
+    
     if (!orderId) {
       return new Response(
         JSON.stringify({ error: 'Order ID is required' }),
@@ -58,11 +60,14 @@ serve(async (req) => {
       .single()
 
     if (orderError || !order) {
+      console.error('Order not found:', orderError)
       return new Response(
         JSON.stringify({ error: 'Order not found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       )
     }
+
+    console.log('Found order:', order.id, 'current status:', order.payment_status)
 
     // Update order status to completed
     const { error: updateOrderError } = await supabase
@@ -81,6 +86,8 @@ serve(async (req) => {
       )
     }
 
+    console.log('Order status updated to completed')
+
     // Get order items
     const { data: orderItems, error: itemsError } = await supabase
       .from('order_items')
@@ -95,10 +102,14 @@ serve(async (req) => {
       )
     }
 
+    console.log('Found order items:', orderItems?.length)
+
     const processedBookings = []
 
     // Process each order item
     for (const item of orderItems as OrderItem[]) {
+      console.log('Processing item:', item.item_type, item.item_id)
+      
       if (item.item_type === 'event_ticket') {
         // Get ticket details
         const { data: ticket, error: ticketError } = await supabase
@@ -111,6 +122,8 @@ serve(async (req) => {
           console.error('Error fetching ticket:', ticketError)
           continue
         }
+
+        console.log('Found ticket:', ticket.name, 'available:', ticket.quantity_available)
 
         const eventTicket = ticket as EventTicket
 
@@ -136,6 +149,8 @@ serve(async (req) => {
           console.error('Error updating ticket inventory:', updateTicketError)
           continue
         }
+
+        console.log('Updated ticket inventory. New available:', newQuantityAvailable)
 
         // Generate unique booking code
         const generateBookingCode = () => {
@@ -168,9 +183,11 @@ serve(async (req) => {
           continue
         }
 
+        console.log('Created booking:', booking.id, 'with code:', bookingCode)
+
         // Generate individual tickets with QR codes
         for (let i = 0; i < item.quantity; i++) {
-          const ticketCode = `TCK-${order.user_id}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`
+          const ticketCode = `TCK-${order.user_id.slice(0, 8)}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`
           
           // Generate QR code data
           const qrData = JSON.stringify({
@@ -225,6 +242,8 @@ serve(async (req) => {
 
           if (ticketInsertError) {
             console.error('Error inserting generated ticket:', ticketInsertError)
+          } else {
+            console.log('Generated ticket:', ticketCode)
           }
         }
 
@@ -233,13 +252,32 @@ serve(async (req) => {
           bookingCode,
           ticketQuantity: item.quantity
         })
+      } else if (item.item_type === 'course') {
+        // Handle course enrollment
+        const { error: enrollmentError } = await supabase
+          .from('course_enrollments')
+          .insert({
+            user_id: order.user_id,
+            course_id: item.item_id,
+            payment_status: 'confirmed',
+            order_id: orderId,
+            enrollment_date: new Date().toISOString()
+          })
+
+        if (enrollmentError) {
+          console.error('Error creating course enrollment:', enrollmentError)
+        } else {
+          console.log('Created course enrollment for course:', item.item_id)
+        }
       }
     }
+
+    console.log('Payment verification completed successfully')
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Payment verified and tickets generated successfully',
+        message: 'Payment verified and processed successfully',
         processedBookings
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
