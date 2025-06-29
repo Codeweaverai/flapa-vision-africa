@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -204,12 +203,28 @@ const MyOrdersPage = () => {
           <head>
             <title>Event Tickets</title>
             <style>
-              body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-              .ticket-container { page-break-after: always; margin-bottom: 40px; }
-              .ticket-container:last-child { page-break-after: avoid; }
+              body { 
+                font-family: Arial, sans-serif; 
+                margin: 0; 
+                padding: 20px; 
+                background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+                min-height: 100vh;
+              }
+              .ticket-container { 
+                page-break-after: always; 
+                margin-bottom: 40px; 
+              }
+              .ticket-container:last-child { 
+                page-break-after: avoid; 
+              }
               @media print { 
-                body { margin: 0; }
-                .ticket-container { margin-bottom: 0; }
+                body { 
+                  margin: 0; 
+                  background: white;
+                }
+                .ticket-container { 
+                  margin-bottom: 0; 
+                }
               }
             </style>
           </head>
@@ -321,16 +336,16 @@ const MyOrdersPage = () => {
                                 </div>
                               </div>
                               
-                              <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                              <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg mb-4 border border-orange-200">
                                 <div className="flex justify-between items-center">
                                   <div>
-                                    <p className="font-medium">{booking.event_ticket.name}</p>
-                                    <p className="text-sm text-gray-600">
+                                    <p className="font-medium text-orange-800">{booking.event_ticket.name}</p>
+                                    <p className="text-sm text-orange-600">
                                       {booking.event_ticket.ticket_type} • Quantity: {booking.ticket_quantity}
                                     </p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="font-mono text-sm text-gray-600">
+                                    <p className="font-mono text-sm text-orange-700 font-medium">
                                       Code: {booking.booking_code}
                                     </p>
                                   </div>
@@ -403,9 +418,13 @@ const MyOrdersPage = () => {
           onClose={() => setShowTicketModal(false)}
           title="Event Tickets"
           actions={
-            <Button onClick={handlePrintTickets} size="sm">
+            <Button 
+              onClick={handlePrintTickets} 
+              size="sm"
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+            >
               <Printer className="h-4 w-4 mr-2" />
-              Print All
+              Print All Tickets
             </Button>
           }
         >

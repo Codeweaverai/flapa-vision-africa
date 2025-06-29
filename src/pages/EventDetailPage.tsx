@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import EventReviewsTab from '@/components/event/EventReviewsTab';
 import { 
   Calendar, 
   MapPin, 
@@ -27,7 +27,9 @@ import {
   Facebook,
   Instagram,
   Linkedin,
-  MessageSquare
+  MessageSquare,
+  ExternalLink,
+  Twitter
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -128,11 +130,14 @@ const EventDetailPage = () => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<{[key: string]: number}>({});
   const [recommendedEvents, setRecommendedEvents] = useState<SimpleEvent[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
 
   useEffect(() => {
     if (id) {
       loadEventData();
       loadRecommendedEvents();
+      loadReviewStats();
     }
   }, [id]);
 
@@ -206,6 +211,25 @@ const EventDetailPage = () => {
       setRecommendedEvents(events || []);
     } catch (error) {
       console.error('Error loading recommended events:', error);
+    }
+  };
+
+  const loadReviewStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_reviews')
+        .select('rating')
+        .eq('event_id', id);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const avgRating = data.reduce((sum, review) => sum + review.rating, 0) / data.length;
+        setAverageRating(avgRating);
+        setTotalReviews(data.length);
+      }
+    } catch (error) {
+      console.error('Error loading review stats:', error);
     }
   };
 
@@ -393,10 +417,11 @@ const EventDetailPage = () => {
               {/* Functional Tabs */}
               <Card className="shadow-lg">
                 <Tabs defaultValue="description" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-orange-100 to-purple-100">
+                  <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-orange-100 to-purple-100">
                     <TabsTrigger value="description">Description</TabsTrigger>
                     <TabsTrigger value="agenda">Agenda</TabsTrigger>
                     <TabsTrigger value="speakers">Speakers</TabsTrigger>
+                    <TabsTrigger value="reviews">Reviews</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="description" className="p-6">
@@ -433,23 +458,66 @@ const EventDetailPage = () => {
 
                   <TabsContent value="speakers" className="p-6">
                     {event.keynote_speakers && event.keynote_speakers.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 gap-6">
                         {event.keynote_speakers.map((speaker) => (
-                          <div key={speaker.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                            <div className="flex gap-4">
+                          <div key={speaker.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg border">
+                            <div className="flex flex-col md:flex-row gap-6">
                               {speaker.image_url && (
-                                <img
-                                  src={speaker.image_url}
-                                  alt={speaker.name}
-                                  className="w-16 h-16 rounded-full object-cover"
-                                />
+                                <div className="flex-shrink-0">
+                                  <img
+                                    src={speaker.image_url}
+                                    alt={speaker.name}
+                                    className="w-32 h-32 rounded-full object-cover mx-auto md:mx-0"
+                                  />
+                                </div>
                               )}
-                              <div>
-                                <h4 className="font-semibold text-gray-900">{speaker.name}</h4>
-                                <p className="text-sm text-gray-600 mb-2">{speaker.title}</p>
+                              <div className="flex-1">
+                                <h4 className="text-xl font-bold text-gray-900 mb-2">{speaker.name}</h4>
+                                <p className="text-lg text-gray-700 mb-3">{speaker.title}</p>
                                 {speaker.speaking_topic && (
-                                  <p className="text-sm text-orange-700 font-medium">Topic: {speaker.speaking_topic}</p>
+                                  <div className="mb-4">
+                                    <span className="inline-block bg-gradient-to-r from-orange-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                                      Speaking on: {speaker.speaking_topic}
+                                    </span>
+                                  </div>
                                 )}
+                                {speaker.bio && (
+                                  <p className="text-gray-600 mb-4 leading-relaxed">{speaker.bio}</p>
+                                )}
+                                
+                                {/* Social Links */}
+                                <div className="flex gap-3">
+                                  {speaker.linkedin_url && (
+                                    <a 
+                                      href={speaker.linkedin_url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                                    >
+                                      <Linkedin className="h-5 w-5" />
+                                    </a>
+                                  )}
+                                  {speaker.twitter_url && (
+                                    <a 
+                                      href={speaker.twitter_url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-blue-400 hover:text-blue-600 transition-colors"
+                                    >
+                                      <Twitter className="h-5 w-5" />
+                                    </a>
+                                  )}
+                                  {speaker.website_url && (
+                                    <a 
+                                      href={speaker.website_url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-gray-600 hover:text-gray-800 transition-colors"
+                                    >
+                                      <ExternalLink className="h-5 w-5" />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -461,6 +529,14 @@ const EventDetailPage = () => {
                         <p>No speakers announced yet</p>
                       </div>
                     )}
+                  </TabsContent>
+
+                  <TabsContent value="reviews" className="p-6">
+                    <EventReviewsTab 
+                      eventId={event.id}
+                      averageRating={averageRating}
+                      totalReviews={totalReviews}
+                    />
                   </TabsContent>
                 </Tabs>
               </Card>
