@@ -182,18 +182,20 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
       </div>
 
       {showPrintStyles && (
-        <style jsx>{`
-          @media print {
-            .print-ticket {
-              page-break-after: always;
-              margin: 0;
-              box-shadow: none;
+        <style>
+          {`
+            @media print {
+              .print-ticket {
+                page-break-after: always;
+                margin: 0;
+                box-shadow: none;
+              }
+              .print-ticket:last-child {
+                page-break-after: avoid;
+              }
             }
-            .print-ticket:last-child {
-              page-break-after: avoid;
-            }
-          }
-        `}</style>
+          `}
+        </style>
       )}
     </div>
   );
