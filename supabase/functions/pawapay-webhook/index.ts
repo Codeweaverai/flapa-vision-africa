@@ -8,9 +8,14 @@ const supabaseClient = createClient(
   { auth: { persistSession: false } }
 );
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -28,7 +33,7 @@ serve(async (req) => {
     } = payload;
 
     if (status === "COMPLETED" || status === "ACCEPTED") {
-      console.log("Processing successful payment for depositId:", depositId);
+      console.log("Processing successful PawaPay payment:", depositId);
 
       // Find order by payment_provider_id (depositId)
       const { data: order, error: orderError } = await supabaseClient
@@ -45,7 +50,7 @@ serve(async (req) => {
       console.log("Found order:", order.id);
 
       // Update order status to completed
-      const { error: orderUpdateError } = await supabaseClient
+      const { error: updateError } = await supabaseClient
         .from('orders')
         .update({
           payment_status: 'completed',
@@ -53,12 +58,24 @@ serve(async (req) => {
         })
         .eq('id', order.id);
 
-      if (orderUpdateError) {
-        console.error("Error updating order:", orderUpdateError);
-        return new Response("Error updating order", { status: 500 });
+      if (updateError) {
+        console.error("Error updating order:", updateError);
+        throw updateError;
       }
 
-      console.log("Order status updated to completed for order:", order.id);
+      console.log("Order status updated successfully:", order.id);
+
+      // Call verify-payment function for fulfillment
+      const { error: verifyError } = await supabaseClient.functions.invoke('verify-payment', {
+        body: { orderId: order.id }
+      });
+
+      if (verifyError) {
+        console.error("Error calling verify-payment:", verifyError);
+        // Don't throw here - payment is already processed
+      } else {
+        console.log("Verify-payment called successfully for order:", order.id);
+      }
 
       // Create payment transaction record
       await supabaseClient
@@ -78,62 +95,18 @@ serve(async (req) => {
         });
 
       console.log("Payment transaction recorded");
-
-      // Clear the cart for this user
-      if (order.user_id) {
-        await supabaseClient
-          .from('carts')
-          .delete()
-          .eq('user_id', order.user_id);
-        console.log("Cart cleared for user:", order.user_id);
-      }
-
-      // Generate tickets and receipts
-      try {
-        console.log("Starting ticket generation for order:", order.id);
-        
-        const ticketResponse = await supabaseClient.functions.invoke('generate-tickets', {
-          body: { orderId: order.id }
-        });
-
-        if (ticketResponse.error) {
-          console.error("Failed to generate tickets:", ticketResponse.error);
-        } else {
-          console.log("Tickets generated successfully for order:", order.id);
-        }
-      } catch (ticketError) {
-        console.error("Error generating tickets:", ticketError);
-      }
-
-      // Send confirmation email
-      try {
-        console.log("Sending confirmation email for order:", order.id);
-        
-        const emailResponse = await supabaseClient.functions.invoke('send-order-confirmation', {
-          body: { orderId: order.id }
-        });
-
-        if (emailResponse.error) {
-          console.error("Failed to send confirmation email:", emailResponse.error);
-        } else {
-          console.log("Confirmation email sent for order:", order.id);
-        }
-      } catch (emailError) {
-        console.error("Error sending confirmation email:", emailError);
-      }
-
-      console.log("Successfully processed PawaPay payment for order:", order.id);
-    } else {
-      console.log("Payment not completed, status:", status);
     }
 
     return new Response(JSON.stringify({ status: "received" }), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
   } catch (error) {
     console.error("PawaPay webhook error:", error);
-    return new Response("Webhook error", { status: 400 });
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 });

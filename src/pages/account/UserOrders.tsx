@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, PlayCircle, RefreshCw } from 'lucide-react';
+import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, PlayCircle, RefreshCw, MapPin, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -28,7 +29,10 @@ interface EventBooking {
   status: string;
   event: {
     title: string;
+    description: string;
     start_time: string;
+    location: string;
+    image_url: string;
   };
   event_ticket: {
     name: string;
@@ -97,7 +101,10 @@ const UserOrders = () => {
             status,
             event:events (
               title,
-              start_time
+              description,
+              start_time,
+              location,
+              image_url
             ),
             event_ticket:event_tickets (
               name,
@@ -264,25 +271,47 @@ const UserOrders = () => {
     }
   };
 
-  const handleRegenerateTickets = async (orderId: string) => {
-    try {
-      toast.info('Regenerating tickets...');
-      
-      const { data, error } = await supabase.functions.invoke('generate-event-tickets', {
-        body: { orderId }
-      });
+  const handlePrintTicket = (booking: EventBooking) => {
+    const printContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; border: 2px solid #333; padding: 20px; margin-bottom: 20px;">
+          <h1 style="color: #333; margin-bottom: 10px;">EVENT TICKET</h1>
+          <h2 style="color: #666; margin-bottom: 20px;">${booking.event.title}</h2>
+          
+          <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+            <div style="text-align: left;">
+              <strong>Date & Time:</strong><br>
+              ${format(new Date(booking.event.start_time), 'PPP p')}<br><br>
+              <strong>Location:</strong><br>
+              ${booking.event.location}<br><br>
+              <strong>Ticket Type:</strong><br>
+              ${booking.event_ticket.name}
+            </div>
+            <div style="text-align: right;">
+              <strong>Booking Code:</strong><br>
+              <span style="font-size: 18px; font-weight: bold; color: #e67e22;">${booking.booking_code}</span><br><br>
+              <strong>Quantity:</strong><br>
+              ${booking.ticket_quantity}<br><br>
+              <strong>Status:</strong><br>
+              <span style="color: #27ae60;">${booking.status.toUpperCase()}</span>
+            </div>
+          </div>
+          
+          <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: 15px;">
+            <p style="margin: 0; font-size: 12px; color: #666;">
+              Please present this ticket (digital or printed) at the event entrance.
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
 
-      if (error) throw error;
-      
-      if (data?.success) {
-        toast.success('Tickets regenerated successfully');
-        loadOrders();
-      } else {
-        throw new Error(data?.error || 'Failed to regenerate tickets');
-      }
-    } catch (error) {
-      console.error('Error regenerating tickets:', error);
-      toast.error('Failed to regenerate tickets');
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
     }
   };
 
@@ -455,32 +484,78 @@ const UserOrders = () => {
                               </div>
                             </div>
                             
-                            <div className="space-y-2">
-                              {eventBookings.slice(0, 3).map((booking) => (
-                                <div key={booking.id} className="flex items-center justify-between p-2 bg-white rounded border">
-                                  <div>
-                                    <div className="font-medium text-sm">{booking.event?.title || 'Event'}</div>
-                                    <div className="text-xs text-gray-600">{booking.event_ticket?.name}</div>
-                                    <div className="text-xs text-gray-500">Code: {booking.booking_code}</div>
-                                    {booking.event?.start_time && (
-                                      <div className="text-xs text-blue-600">
-                                        {format(new Date(booking.event.start_time), 'PPp')}
+                            <div className="space-y-4">
+                              {eventBookings.map((booking) => (
+                                <div key={booking.id} className="bg-white rounded-lg p-4 border border-green-200">
+                                  <div className="flex gap-4">
+                                    {/* Event Image */}
+                                    {booking.event?.image_url && (
+                                      <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
+                                        <img
+                                          src={booking.event.image_url}
+                                          alt={booking.event.title}
+                                          className="w-full h-full object-cover"
+                                        />
                                       </div>
                                     )}
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-xs text-gray-600">Qty: {booking.ticket_quantity}</div>
-                                    <Badge className={getStatusBadgeColor(booking.status)}>
-                                      {booking.status}
-                                    </Badge>
+                                    
+                                    {/* Event Details */}
+                                    <div className="flex-1">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-medium text-lg">{booking.event?.title || 'Event'}</h4>
+                                        <Badge className={getStatusBadgeColor(booking.status)}>
+                                          {booking.status}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                        {booking.event?.description}
+                                      </p>
+                                      
+                                      <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                                        <div className="flex items-center gap-1">
+                                          <Clock className="h-4 w-4" />
+                                          {booking.event?.start_time && format(new Date(booking.event.start_time), 'PPp')}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <MapPin className="h-4 w-4" />
+                                          {booking.event?.location}
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-sm">
+                                          <span className="font-medium">Ticket:</span> {booking.event_ticket?.name} • 
+                                          <span className="font-medium ml-2">Qty:</span> {booking.ticket_quantity} • 
+                                          <span className="font-medium ml-2">Code:</span> 
+                                          <span className="font-mono text-orange-600 ml-1">{booking.booking_code}</span>
+                                        </div>
+                                        
+                                        {order.payment_status === 'completed' && (
+                                          <div className="flex gap-2">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => navigate(`/ticket/${booking.id}`)}
+                                            >
+                                              <Eye className="h-4 w-4 mr-1" />
+                                              View Ticket
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              onClick={() => handlePrintTicket(booking)}
+                                              className="bg-green-600 hover:bg-green-700"
+                                            >
+                                              <Printer className="h-4 w-4 mr-1" />
+                                              Print
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               ))}
-                              {eventBookings.length > 3 && (
-                                <div className="text-sm text-gray-600 text-center">
-                                  +{eventBookings.length - 3} more bookings
-                                </div>
-                              )}
                             </div>
                           </div>
                         )}
@@ -537,16 +612,6 @@ const UserOrders = () => {
                             <FileText className="h-4 w-4 mr-2" />
                             View Receipt
                           </Button>
-                          
-                          {hasEventTickets && order.payment_status === 'completed' && (
-                            <Button
-                              onClick={() => handleRegenerateTickets(order.id)}
-                              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                            >
-                              <Ticket className="h-4 w-4 mr-2" />
-                              Regenerate Tickets
-                            </Button>
-                          )}
 
                           {order.payment_status === 'pending' && (
                             <Button
