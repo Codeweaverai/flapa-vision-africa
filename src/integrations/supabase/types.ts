@@ -1408,6 +1408,92 @@ export type Database = {
         }
         Relationships: []
       }
+      generated_tickets: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          event_id: string | null
+          event_ticket_id: string | null
+          generated_at: string
+          id: string
+          order_id: string | null
+          pdf_url: string | null
+          qr_code_data: string
+          qr_code_url: string | null
+          ticket_code: string
+          ticket_holder_email: string | null
+          ticket_holder_name: string
+          ticket_status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          event_id?: string | null
+          event_ticket_id?: string | null
+          generated_at?: string
+          id?: string
+          order_id?: string | null
+          pdf_url?: string | null
+          qr_code_data: string
+          qr_code_url?: string | null
+          ticket_code: string
+          ticket_holder_email?: string | null
+          ticket_holder_name: string
+          ticket_status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          event_id?: string | null
+          event_ticket_id?: string | null
+          generated_at?: string
+          id?: string
+          order_id?: string | null
+          pdf_url?: string | null
+          qr_code_data?: string
+          qr_code_url?: string | null
+          ticket_code?: string
+          ticket_holder_email?: string | null
+          ticket_holder_name?: string
+          ticket_status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_tickets_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "event_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_tickets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_tickets_event_ticket_id_fkey"
+            columns: ["event_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "event_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_tickets_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_messages: {
         Row: {
           content: string

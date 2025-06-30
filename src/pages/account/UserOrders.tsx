@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +21,21 @@ interface OrderItem {
   metadata?: any;
 }
 
+interface EventBooking {
+  id: string;
+  booking_code: string;
+  ticket_quantity: number;
+  status: string;
+  event: {
+    title: string;
+    start_time: string;
+  };
+  event_ticket: {
+    name: string;
+    ticket_type: string;
+  };
+}
+
 interface Order {
   id: string;
   total_amount: number;
@@ -35,18 +49,18 @@ interface Order {
   stripe_payment_intent_id?: string;
   payment_provider_id?: string;
   order_items: OrderItem[];
-  generated_tickets?: Array<{
+  event_bookings?: EventBooking[];
+  course_enrollments?: Array<{
     id: string;
-    ticket_code: string;
-    ticket_holder_name: string;
-    pdf_url: string;
-    ticket_status: string;
-    event_id?: string;
-    events?: {
+    course: {
+      id: string;
       title: string;
-      start_time: string;
+      description: string;
+      thumbnail_url: string;
+      creator_id: string;
     };
   }>;
+  user_name?: string;
 }
 
 const UserOrders = () => {
@@ -76,9 +90,29 @@ const UserOrders = () => {
         .select(`
           *,
           order_items (*),
-          generated_tickets (
-            *,
-            events!generated_tickets_event_id_fkey (title, start_time)
+          event_bookings (
+            id,
+            booking_code,
+            ticket_quantity,
+            status,
+            event:events (
+              title,
+              start_time
+            ),
+            event_ticket:event_tickets (
+              name,
+              ticket_type
+            )
+          ),
+          course_enrollments (
+            id,
+            course:courses (
+              id,
+              title,
+              description,
+              thumbnail_url,
+              creator_id
+            )
           )
         `)
         .eq('user_id', user?.id)
@@ -147,7 +181,8 @@ const UserOrders = () => {
 
           return {
             ...order,
-            order_items: enhancedItems
+            order_items: enhancedItems,
+            user_name: user?.email || 'Customer'
           };
         })
       );
@@ -226,23 +261,6 @@ const UserOrders = () => {
       toast.success('Receipt opened in new window');
     } else {
       toast.error('Receipt not available');
-    }
-  };
-
-  const handleDownloadTicket = (ticket: any) => {
-    if (ticket.pdf_url) {
-      const newWindow = window.open();
-      if (newWindow) {
-        if (ticket.pdf_url.startsWith('data:text/html;base64,')) {
-          newWindow.document.write(atob(ticket.pdf_url.split(',')[1]));
-        } else {
-          newWindow.location.href = ticket.pdf_url;
-        }
-        newWindow.document.close();
-      }
-      toast.success('Ticket opened in new window');
-    } else {
-      toast.error('Ticket not available');
     }
   };
 
@@ -345,7 +363,7 @@ const UserOrders = () => {
                 {orders.map((order) => {
                   const hasEventTickets = order.order_items.some(item => item.item_type === 'event_ticket');
                   const hasCourses = order.order_items.some(item => item.item_type === 'course');
-                  const tickets = order.generated_tickets || [];
+                  const eventBookings = order.event_bookings || [];
                   
                   return (
                     <Card key={order.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm overflow-hidden">
@@ -424,94 +442,116 @@ const UserOrders = () => {
                           </div>
                         </div>
 
-                        {/* Tickets Section */}
-                        {hasEventTickets && (
+                        {/* Event Tickets Section */}
+                        {hasEventTickets && eventBookings.length > 0 && (
                           <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
                                 <Ticket className="h-5 w-5 text-green-600" />
                                 <h3 className="font-semibold text-green-800">Event Tickets</h3>
-                                {tickets.length > 0 && (
-                                  <Badge className="bg-green-100 text-green-800">
-                                    {tickets.length} ticket(s)
-                                  </Badge>
-                                )}
+                                <Badge className="bg-green-100 text-green-800">
+                                  {eventBookings.reduce((sum, booking) => sum + booking.ticket_quantity, 0)} ticket(s)
+                                </Badge>
                               </div>
                             </div>
                             
-                            {tickets.length > 0 ? (
-                              <div className="space-y-2">
-                                {tickets.slice(0, 3).map((ticket) => (
-                                  <div key={ticket.id} className="flex items-center justify-between p-2 bg-white rounded border">
-                                    <div>
-                                      <div className="font-medium text-sm">{ticket.events?.title || 'Event'}</div>
-                                      <div className="text-xs text-gray-600">{ticket.ticket_holder_name}</div>
-                                      <div className="text-xs text-gray-500">Code: {ticket.ticket_code}</div>
-                                      {ticket.events?.start_time && (
-                                        <div className="text-xs text-blue-600">
-                                          {format(new Date(ticket.events.start_time), 'PPp')}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleDownloadTicket(ticket)}
-                                      className="border-green-300 text-green-700 hover:bg-green-50"
-                                    >
-                                      <Eye className="h-3 w-3 mr-1" />
-                                      View
-                                    </Button>
+                            <div className="space-y-2">
+                              {eventBookings.slice(0, 3).map((booking) => (
+                                <div key={booking.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                                  <div>
+                                    <div className="font-medium text-sm">{booking.event?.title || 'Event'}</div>
+                                    <div className="text-xs text-gray-600">{booking.event_ticket?.name}</div>
+                                    <div className="text-xs text-gray-500">Code: {booking.booking_code}</div>
+                                    {booking.event?.start_time && (
+                                      <div className="text-xs text-blue-600">
+                                        {format(new Date(booking.event.start_time), 'PPp')}
+                                      </div>
+                                    )}
                                   </div>
-                                ))}
-                                {tickets.length > 3 && (
-                                  <div className="text-sm text-gray-600 text-center">
-                                    +{tickets.length - 3} more tickets
+                                  <div className="text-right">
+                                    <div className="text-xs text-gray-600">Qty: {booking.ticket_quantity}</div>
+                                    <Badge className={getStatusBadgeColor(booking.status)}>
+                                      {booking.status}
+                                    </Badge>
                                   </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="text-sm text-gray-600">
-                                {order.payment_status === 'completed' ? 
-                                  'Tickets are being generated...' : 
-                                  'Tickets will be generated after payment completion'
-                                }
-                              </div>
-                            )}
+                                </div>
+                              ))}
+                              {eventBookings.length > 3 && (
+                                <div className="text-sm text-gray-600 text-center">
+                                  +{eventBookings.length - 3} more bookings
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
 
+                        {/* Course Enrollments */}
+                        {order.course_enrollments?.map((enrollment) => (
+                          <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                              {enrollment.course.thumbnail_url && (
+                                <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                  <img
+                                    src={enrollment.course.thumbnail_url}
+                                    alt={enrollment.course.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+                              
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start mb-3">
+                                  <h3 className="text-xl font-semibold text-gray-900">
+                                    {enrollment.course.title}
+                                  </h3>
+                                  <Badge className={getStatusBadgeColor('completed')}>
+                                    Enrolled
+                                  </Badge>
+                                </div>
+                                
+                                <p className="text-gray-600 mb-4 line-clamp-2">
+                                  {enrollment.course.description}
+                                </p>
+                                
+                                <div className="flex gap-3">
+                                  <Button
+                                    onClick={() => handleStartLearning(enrollment.course.id)}
+                                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                                  >
+                                    <PlayCircle className="h-4 w-4 mr-2" />
+                                    Start Learning
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
                         {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-3">
-                          {/* Receipt Download */}
+                        <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-gray-200">
                           <Button
-                            variant="outline"
                             onClick={() => handleDownloadReceipt(order.receipt_url)}
-                            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                             disabled={!order.receipt_url}
                           >
                             <FileText className="h-4 w-4 mr-2" />
                             View Receipt
                           </Button>
-
-                          {/* Ticket Actions */}
+                          
                           {hasEventTickets && order.payment_status === 'completed' && (
                             <Button
-                              variant="outline"
                               onClick={() => handleRegenerateTickets(order.id)}
-                              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                             >
                               <Ticket className="h-4 w-4 mr-2" />
                               Regenerate Tickets
                             </Button>
                           )}
 
-                          {/* Refresh Payment Status for Pending Orders */}
                           {order.payment_status === 'pending' && (
                             <Button
-                              variant="outline"
                               onClick={() => verifyPaymentStatus(order.id)}
-                              className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
                             >
                               <RefreshCw className="h-4 w-4 mr-2" />
                               Check Payment
