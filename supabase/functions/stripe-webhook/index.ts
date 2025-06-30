@@ -57,7 +57,6 @@ serve(async (req) => {
           payment_status: 'completed',
           stripe_session_id: session.id,
           stripe_payment_intent_id: session.payment_intent,
-          receipt_url: session.receipt_url,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -70,7 +69,7 @@ serve(async (req) => {
       console.log("Order updated successfully:", orderId);
 
       // Call verify-payment function for fulfillment
-      const { error: verifyError } = await supabaseClient.functions.invoke('verify-payment', {
+      const { data: verifyData, error: verifyError } = await supabaseClient.functions.invoke('verify-payment', {
         body: { orderId }
       });
 
@@ -78,7 +77,7 @@ serve(async (req) => {
         console.error("Error calling verify-payment:", verifyError);
         // Don't throw here - payment is already processed
       } else {
-        console.log("Verify-payment called successfully for order:", orderId);
+        console.log("Verify-payment called successfully for order:", orderId, verifyData);
       }
     }
 

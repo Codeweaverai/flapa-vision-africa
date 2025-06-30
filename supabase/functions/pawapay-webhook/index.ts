@@ -66,7 +66,7 @@ serve(async (req) => {
       console.log("Order status updated successfully:", order.id);
 
       // Call verify-payment function for fulfillment
-      const { error: verifyError } = await supabaseClient.functions.invoke('verify-payment', {
+      const { data: verifyData, error: verifyError } = await supabaseClient.functions.invoke('verify-payment', {
         body: { orderId: order.id }
       });
 
@@ -74,7 +74,7 @@ serve(async (req) => {
         console.error("Error calling verify-payment:", verifyError);
         // Don't throw here - payment is already processed
       } else {
-        console.log("Verify-payment called successfully for order:", order.id);
+        console.log("Verify-payment called successfully for order:", order.id, verifyData);
       }
 
       // Create payment transaction record

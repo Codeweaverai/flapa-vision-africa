@@ -1,8 +1,6 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createCanvas } from 'https://esm.sh/canvas@2.11.2'
-import QRCode from 'https://esm.sh/qrcode@1.5.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,9 +33,9 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId, paymentStatus } = await req.json()
+    const { orderId } = await req.json()
     
-    console.log('Verify payment called with:', { orderId, paymentStatus })
+    console.log('Verify payment called with orderId:', orderId)
     
     if (!orderId) {
       return new Response(
@@ -199,21 +197,6 @@ serve(async (req) => {
             generatedAt: new Date().toISOString()
           })
 
-          // Generate QR code as base64
-          let qrCodeBase64 = ''
-          try {
-            qrCodeBase64 = await QRCode.toDataURL(qrData, {
-              width: 200,
-              margin: 2,
-              color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-              }
-            })
-          } catch (qrError) {
-            console.error('Error generating QR code:', qrError)
-          }
-
           // Get user profile for ticket holder name
           const { data: profile } = await supabase
             .from('profiles')
@@ -235,7 +218,6 @@ serve(async (req) => {
               ticket_code: ticketCode,
               ticket_holder_name: ticketHolderName,
               qr_code_data: qrData,
-              qr_code_url: qrCodeBase64,
               ticket_status: 'active',
               generated_at: new Date().toISOString()
             })
@@ -259,7 +241,7 @@ serve(async (req) => {
           .insert({
             user_id: order.user_id,
             course_id: item.item_id,
-            payment_status: 'confirmed',
+            payment_status: 'completed',
             order_id: orderId,
             enrollment_date: new Date().toISOString()
           })
@@ -278,7 +260,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: 'Payment verified and processed successfully',
-        processedBookings
+        processedBookings,
+        paymentCompleted: true
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
