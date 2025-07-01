@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -11,6 +10,186 @@ const corsHeaders = {
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
+};
+
+// Helper function to update event ticket inventory
+const updateTicketInventory = async (supabase: any, ticketId: string, quantity: number) => {
+  logStep("Updating ticket inventory", { ticketId, quantity });
+  
+  const { data: currentTicket, error: fetchError } = await supabase
+    .from('event_tickets')
+    .select('quantity_available, quantity_sold')
+    .eq('id', ticketId)
+    .single();
+
+  if (fetchError) {
+    logStep("Error fetching ticket data", fetchError);
+    throw new Error(`Failed to fetch ticket data: ${fetchError.message}`);
+  }
+
+  if (currentTicket.quantity_available < quantity) {
+    logStep("Insufficient inventory", { available: currentTicket.quantity_available, requested: quantity });
+    throw new Error(`Insufficient ticket inventory. Available: ${currentTicket.quantity_available}, Requested: ${quantity}`);
+  }
+
+  const { error: updateError } = await supabase
+    .from('event_tickets')
+    .update({
+      quantity_available: currentTicket.quantity_available - quantity,
+      quantity_sold: currentTicket.quantity_sold + quantity,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', ticketId);
+
+  if (updateError) {
+    logStep("Error updating ticket inventory", updateError);
+    throw new Error(`Failed to update ticket inventory: ${updateError.message}`);
+  }
+
+  logStep("Ticket inventory updated successfully", { 
+    newAvailable: currentTicket.quantity_available - quantity,
+    newSold: currentTicket.quantity_sold + quantity
+  });
+};
+
+// Helper function to create event booking
+const createEventBooking = async (supabase: any, bookingData: any) => {
+  logStep("Creating event booking", bookingData);
+  
+  const { data: booking, error: bookingError } = await supabase
+    .from('event_bookings')
+    .insert({
+      user_id: bookingData.user_id,
+      event_id: bookingData.event_id,
+      event_ticket_id: bookingData.event_ticket_id,
+      order_id: bookingData.order_id,
+      ticket_quantity: bookingData.quantity,
+      status: 'confirmed',
+      payment_status: 'completed',
+      payment_amount: bookingData.total_price,
+      payment_currency: 'USD',
+      booking_date: new Date().toISOString(),
+      booking_code: `EVT-${crypto.randomUUID().substring(0, 8).toUpperCase()}`
+    })
+    .select()
+    .single();
+
+  if (bookingError) {
+    logStep("Error creating booking", bookingError);
+    throw new Error(`Failed to create booking: ${bookingError.message}`);
+  }
+
+  logStep("Event booking created successfully", { bookingId: booking.id });
+  return booking;
+};
+
+// Helper function to generate tickets
+const generateTickets = async (supabase: any, ticketData: any) => {
+  logStep("Generating individual tickets", { 
+    bookingId: ticketData.bookingId, 
+    quantity: ticketData.quantity,
+    holderNames: ticketData.ticket_holder_names?.length 
+  });
+  
+  const generatedTickets = [];
+  
+  for (let i = 0; i < ticketData.quantity; i++) {
+    const ticketCode = `TCK-${crypto.randomUUID().substring(0, 8).toUpperCase()}`;
+    const holderName = ticketData.ticket_holder_names?.[i] || `Ticket Holder ${i + 1}`;
+    
+    const qrData = JSON.stringify({
+      ticketCode,
+      bookingId: ticketData.bookingId,
+      eventId: ticketData.eventId,
+      orderId: ticketData.orderId,
+      userId: ticketData.userId,
+      ticketHolderName: holderName,
+      generatedAt: new Date().toISOString()
+    });
+
+    const { data: ticket, error: ticketError } = await supabase
+      .from('generated_tickets')
+      .insert({
+        booking_id: ticketData.bookingId,
+        event_id: ticketData.eventId,
+        order_id: ticketData.orderId,
+        user_id: ticketData.userId,
+        event_ticket_id: ticketData.eventTicketId,
+        ticket_code: ticketCode,
+        ticket_holder_name: holderName,
+        qr_code_data: qrData,
+        ticket_status: 'active',
+        generated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (ticketError) {
+      logStep("Error generating ticket", ticketError);
+      throw new Error(`Failed to generate ticket: ${ticketError.message}`);
+    }
+
+    generatedTickets.push(ticket);
+    logStep("Generated ticket", { ticketCode, holderName });
+  }
+
+  logStep("All tickets generated successfully", { count: generatedTickets.length });
+  return generatedTickets;
+};
+
+// Helper function to process event ticket purchase
+const processEventTicketPurchase = async (supabase: any, orderItem: any, order: any, user: any) => {
+  logStep("Processing event ticket purchase", { 
+    ticketId: orderItem.item_id, 
+    quantity: orderItem.quantity 
+  });
+
+  // Get event details from ticket
+  const { data: ticketWithEvent, error: ticketError } = await supabase
+    .from('event_tickets')
+    .select(`
+      *,
+      event:events (
+        id,
+        title
+      )
+    `)
+    .eq('id', orderItem.item_id)
+    .single();
+
+  if (ticketError) {
+    logStep("Error fetching ticket with event", ticketError);
+    throw new Error(`Failed to fetch ticket details: ${ticketError.message}`);
+  }
+
+  // Update ticket inventory
+  await updateTicketInventory(supabase, orderItem.item_id, orderItem.quantity);
+
+  // Create event booking
+  const booking = await createEventBooking(supabase, {
+    user_id: user.id,
+    event_id: ticketWithEvent.event.id,
+    event_ticket_id: orderItem.item_id,
+    order_id: order.id,
+    quantity: orderItem.quantity,
+    total_price: orderItem.total_price
+  });
+
+  // Generate individual tickets
+  await generateTickets(supabase, {
+    bookingId: booking.id,
+    eventId: ticketWithEvent.event.id,
+    orderId: order.id,
+    userId: user.id,
+    eventTicketId: orderItem.item_id,
+    quantity: orderItem.quantity,
+    ticket_holder_names: orderItem.metadata?.ticket_holder_names || []
+  });
+
+  logStep("Event ticket purchase processed successfully", { 
+    bookingId: booking.id,
+    ticketsGenerated: orderItem.quantity 
+  });
 };
 
 serve(async (req) => {
@@ -141,7 +320,7 @@ serve(async (req) => {
       logStep("Order created", { orderId: order.id, totalAmount: itemPrice });
 
       // Create order item
-      const { error: itemError } = await supabaseClient
+      const { data: orderItem, error: itemError } = await supabaseClient
         .from('order_items')
         .insert({
           order_id: order.id,
@@ -151,10 +330,33 @@ serve(async (req) => {
           quantity: 1,
           unit_price: itemPrice,
           total_price: itemPrice
-        });
+        })
+        .select()
+        .single();
 
       if (itemError) throw new Error(`Failed to create order item: ${itemError.message}`);
       logStep("Order item created");
+
+      // Process event ticket purchase if applicable
+      if (itemType === 'event_ticket') {
+        await processEventTicketPurchase(supabaseClient, orderItem, order, user);
+        
+        // Update order status to completed after successful processing
+        const { error: updateOrderError } = await supabaseClient
+          .from('orders')
+          .update({ 
+            payment_status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+
+        if (updateOrderError) {
+          logStep("Error updating order status", updateOrderError);
+          throw new Error(`Failed to update order status: ${updateOrderError.message}`);
+        }
+        
+        logStep("Order status updated to completed");
+      }
 
       sessionData = {
         customer: customerId,
@@ -215,12 +417,39 @@ serve(async (req) => {
         }
       }));
 
-      const { error: itemsError } = await supabaseClient
+      const { data: createdOrderItems, error: itemsError } = await supabaseClient
         .from('order_items')
-        .insert(orderItems);
+        .insert(orderItems)
+        .select();
 
       if (itemsError) throw new Error(`Failed to create order items: ${itemsError.message}`);
-      logStep("Order items created", { itemCount: orderItems.length });
+      logStep("Order items created", { itemCount: createdOrderItems.length });
+
+      // Process each event ticket item
+      for (const orderItem of createdOrderItems) {
+        if (orderItem.item_type === 'event_ticket') {
+          await processEventTicketPurchase(supabaseClient, orderItem, order, user);
+        }
+      }
+
+      // Update order status to completed after all processing
+      const hasEventTickets = createdOrderItems.some(item => item.item_type === 'event_ticket');
+      if (hasEventTickets) {
+        const { error: updateOrderError } = await supabaseClient
+          .from('orders')
+          .update({ 
+            payment_status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+
+        if (updateOrderError) {
+          logStep("Error updating order status", updateOrderError);
+          throw new Error(`Failed to update order status: ${updateOrderError.message}`);
+        }
+        
+        logStep("Order status updated to completed");
+      }
 
       // Create Stripe line items
       const lineItems = items.map((item: any) => ({
@@ -327,8 +556,7 @@ serve(async (req) => {
     await supabaseClient
       .from('orders')
       .update({ 
-        stripe_session_id: session.id,
-        payment_status: 'pending'
+        stripe_session_id: session.id
       })
       .eq('id', sessionData.metadata.order_id);
 
