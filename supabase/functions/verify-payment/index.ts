@@ -67,24 +67,26 @@ serve(async (req) => {
 
     console.log('Found order:', order.id, 'current status:', order.payment_status)
 
-    // Update order status to completed
-    const { error: updateOrderError } = await supabase
-      .from('orders')
-      .update({ 
-        payment_status: 'completed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId)
+    // Update order status to completed if not already
+    if (order.payment_status !== 'completed') {
+      const { error: updateOrderError } = await supabase
+        .from('orders')
+        .update({ 
+          payment_status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
 
-    if (updateOrderError) {
-      console.error('Error updating order:', updateOrderError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to update order status' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
+      if (updateOrderError) {
+        console.error('Error updating order:', updateOrderError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to update order status' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        )
+      }
+
+      console.log('Order status updated to completed')
     }
-
-    console.log('Order status updated to completed')
 
     // Get order items
     const { data: orderItems, error: itemsError } = await supabase
@@ -125,14 +127,15 @@ serve(async (req) => {
 
         const eventTicket = ticket as EventTicket
 
+        // Check if we have enough tickets
+        if (eventTicket.quantity_available < item.quantity) {
+          console.error('Insufficient ticket inventory. Available:', eventTicket.quantity_available, 'Requested:', item.quantity)
+          continue
+        }
+
         // Update ticket inventory
         const newQuantitySold = eventTicket.quantity_sold + item.quantity
         const newQuantityAvailable = eventTicket.quantity_available - item.quantity
-
-        if (newQuantityAvailable < 0) {
-          console.error('Insufficient ticket inventory')
-          continue
-        }
 
         const { error: updateTicketError } = await supabase
           .from('event_tickets')
@@ -269,7 +272,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in verify-payment function:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
