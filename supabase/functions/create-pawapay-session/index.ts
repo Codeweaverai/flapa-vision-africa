@@ -151,12 +151,12 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
     quantity: orderItem.quantity 
   });
 
-  // Get event details from ticket
+  // Get event details from ticket - Fix the relationship issue
   const { data: ticketWithEvent, error: ticketError } = await supabase
     .from('event_tickets')
     .select(`
       *,
-      event:events (
+      events!event_tickets_event_id_fkey (
         id,
         title
       )
@@ -175,7 +175,7 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
   // Create event booking
   const booking = await createEventBooking(supabase, {
     user_id: user.id,
-    event_id: ticketWithEvent.event.id,
+    event_id: ticketWithEvent.events.id,
     event_ticket_id: orderItem.item_id,
     order_id: order.id,
     quantity: orderItem.quantity,
@@ -185,7 +185,7 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
   // Generate individual tickets
   await generateTickets(supabase, {
     bookingId: booking.id,
-    eventId: ticketWithEvent.event.id,
+    eventId: ticketWithEvent.events.id,
     orderId: order.id,
     userId: user.id,
     eventTicketId: orderItem.item_id,
@@ -498,3 +498,4 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 serve(handler);
+

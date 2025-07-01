@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -144,12 +145,12 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
     quantity: orderItem.quantity 
   });
 
-  // Get event details from ticket
+  // Get event details from ticket - Fix the relationship issue
   const { data: ticketWithEvent, error: ticketError } = await supabase
     .from('event_tickets')
     .select(`
       *,
-      event:events (
+      events!event_tickets_event_id_fkey (
         id,
         title
       )
@@ -168,7 +169,7 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
   // Create event booking
   const booking = await createEventBooking(supabase, {
     user_id: user.id,
-    event_id: ticketWithEvent.event.id,
+    event_id: ticketWithEvent.events.id,
     event_ticket_id: orderItem.item_id,
     order_id: order.id,
     quantity: orderItem.quantity,
@@ -178,7 +179,7 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
   // Generate individual tickets
   await generateTickets(supabase, {
     bookingId: booking.id,
-    eventId: ticketWithEvent.event.id,
+    eventId: ticketWithEvent.events.id,
     orderId: order.id,
     userId: user.id,
     eventTicketId: orderItem.item_id,
@@ -272,7 +273,7 @@ serve(async (req) => {
           .select(`
             name,
             price,
-            event:events (
+            events!event_tickets_event_id_fkey (
               title
             )
           `)
@@ -282,7 +283,7 @@ serve(async (req) => {
         if (ticketError) throw new Error(`Event ticket not found: ${ticketError.message}`);
         
         itemData = ticket;
-        itemName = `${ticket.event.title} - ${ticket.name}`;
+        itemName = `${ticket.events.title} - ${ticket.name}`;
         itemPrice = ticket.price || 0;
         itemType = 'event_ticket';
         logStep("Event ticket data retrieved", { eventTicketId, title: itemName, price: itemPrice });
@@ -577,3 +578,4 @@ serve(async (req) => {
     });
   }
 });
+
