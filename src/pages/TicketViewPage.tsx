@@ -48,13 +48,13 @@ const TicketViewPage = () => {
         .from('event_bookings')
         .select(`
           *,
-          event:events (
+          event:events!event_bookings_event_id_fkey (
             title,
             start_time,
             location,
             image_url
           ),
-          event_ticket:event_tickets (
+          event_ticket:event_tickets!event_bookings_event_ticket_id_fkey (
             name,
             ticket_type
           )
@@ -123,9 +123,9 @@ const TicketViewPage = () => {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {tickets.map((ticket) => (
+                {tickets.filter(ticket => ticket.event).map((ticket) => (
                   <Card key={ticket.id} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm overflow-hidden">
-                    {ticket.event.image_url && (
+                    {ticket.event?.image_url && (
                       <div className="h-48 bg-gray-200 overflow-hidden">
                         <img
                           src={ticket.event.image_url}

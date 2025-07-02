@@ -48,13 +48,13 @@ const TicketPage = () => {
         .from('event_bookings')
         .select(`
           *,
-          event:events (
+          event:events!event_bookings_event_id_fkey (
             title,
             start_time,
             location,
             image_url
           ),
-          event_ticket:event_tickets (
+          event_ticket:event_tickets!event_bookings_event_ticket_id_fkey (
             name,
             ticket_type
           )
@@ -98,13 +98,14 @@ const TicketPage = () => {
     );
   }
 
-  if (!ticket) {
+  if (!ticket || !ticket.event) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
           <Card className="max-w-md text-center">
             <CardContent className="pt-6">
               <h2 className="text-xl font-semibold mb-4">Ticket Not Found</h2>
+              <p className="text-gray-600 mb-4">The ticket or event data could not be loaded.</p>
               <Button onClick={() => navigate('/account/orders')}>
                 Back to Orders
               </Button>
