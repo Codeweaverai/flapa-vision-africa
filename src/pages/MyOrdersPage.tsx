@@ -90,7 +90,7 @@ const MyOrdersPage = () => {
             booking_code,
             ticket_quantity,
             status,
-            event:events (
+            event:events!event_bookings_event_id_fkey (
               title,
               start_time,
               end_time,
@@ -98,14 +98,14 @@ const MyOrdersPage = () => {
               image_url,
               description
             ),
-            event_ticket:event_tickets (
+            event_ticket:event_tickets!event_bookings_event_ticket_id_fkey (
               name,
               ticket_type
             )
           ),
           course_enrollments (
             id,
-            course:courses (
+            course:courses!course_enrollments_course_id_fkey (
               id,
               title,
               description,
@@ -440,10 +440,10 @@ const MyOrdersPage = () => {
                     
                     <CardContent className="p-6">
                       {/* Event Bookings */}
-                      {order.event_bookings?.map((booking) => (
+                      {order.event_bookings?.filter(booking => booking.event && booking.event_ticket).map((booking) => (
                         <div key={booking.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
                           <div className="flex flex-col lg:flex-row gap-6">
-                            {booking.event.image_url && (
+                            {booking.event?.image_url && (
                               <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                                 <img
                                   src={booking.event.image_url}
@@ -456,28 +456,32 @@ const MyOrdersPage = () => {
                             <div className="flex-1">
                               <div className="flex justify-between items-start mb-3">
                                 <h3 className="text-xl font-semibold text-gray-900">
-                                  {booking.event.title}
+                                  {booking.event?.title || 'Event'}
                                 </h3>
                                 {getStatusBadge(booking.status)}
                               </div>
                               
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <Calendar className="h-4 w-4" />
-                                  <span>{format(new Date(booking.event.start_time), 'PPP p')}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <MapPin className="h-4 w-4" />
-                                  <span>{booking.event.location}</span>
-                                </div>
+                                {booking.event?.start_time && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <Calendar className="h-4 w-4" />
+                                    <span>{format(new Date(booking.event.start_time), 'PPP p')}</span>
+                                  </div>
+                                )}
+                                {booking.event?.location && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{booking.event.location}</span>
+                                  </div>
+                                )}
                               </div>
                               
                               <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg mb-4 border border-orange-200">
                                 <div className="flex justify-between items-center">
                                   <div>
-                                    <p className="font-medium text-orange-800">{booking.event_ticket.name}</p>
+                                    <p className="font-medium text-orange-800">{booking.event_ticket?.name || 'Standard Ticket'}</p>
                                     <p className="text-sm text-orange-600">
-                                      {booking.event_ticket.ticket_type} • Quantity: {booking.ticket_quantity}
+                                      {booking.event_ticket?.ticket_type || 'Regular'} • Quantity: {booking.ticket_quantity}
                                     </p>
                                   </div>
                                   <div className="text-right">
@@ -493,10 +497,10 @@ const MyOrdersPage = () => {
                       ))}
 
                       {/* Course Enrollments */}
-                      {order.course_enrollments?.map((enrollment) => (
+                      {order.course_enrollments?.filter(enrollment => enrollment.course).map((enrollment) => (
                         <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
                           <div className="flex flex-col lg:flex-row gap-6">
-                            {enrollment.course.thumbnail_url && (
+                            {enrollment.course?.thumbnail_url && (
                               <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                                 <img
                                   src={enrollment.course.thumbnail_url}
@@ -509,17 +513,17 @@ const MyOrdersPage = () => {
                             <div className="flex-1">
                               <div className="flex justify-between items-start mb-3">
                                 <h3 className="text-xl font-semibold text-gray-900">
-                                  {enrollment.course.title}
+                                  {enrollment.course?.title || 'Course'}
                                 </h3>
                                 {getStatusBadge('completed')}
                               </div>
                               
                               <p className="text-gray-600 mb-4 line-clamp-2">
-                                {enrollment.course.description}
+                                {enrollment.course?.description || 'No description available'}
                               </p>
                               
                               <div className="flex gap-3">
-                                <Link to={`/learning/course/${enrollment.course.id}`}>
+                                <Link to={`/learning/course/${enrollment.course?.id}`}>
                                   <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
                                     <BookOpen className="h-4 w-4 mr-2" />
                                     Start Learning
@@ -576,10 +580,10 @@ const MyOrdersPage = () => {
           }
         >
           <div id="tickets-print-content" className="space-y-8">
-            {selectedBookings.map((booking, index) => (
+            {selectedBookings.filter(booking => booking.event).map((booking, index) => (
               <div key={booking.id}>
                 <TicketDisplay ticket={booking} showPrintStyles={true} />
-                {index < selectedBookings.length - 1 && <div className="h-8"></div>}
+                {index < selectedBookings.filter(b => b.event).length - 1 && <div className="h-8"></div>}
               </div>
             ))}
           </div>
