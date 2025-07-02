@@ -50,7 +50,7 @@ const AboutPage = () => {
     {
       name: "Mbolela Pule",
       role: "CEO & Founder",
-      bio: "Passionate about democratizing education through technology. 10+ years in EdTech.",
+      bio: "Driven by a passion to democratize education across Africa through innovative technology. With over 7 years of experience in EdTech and Travel Tech, he is committed to building accessible, impactful learning and event platforms that empower individuals and creators alike..",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
@@ -59,7 +59,7 @@ const AboutPage = () => {
     {
       name: "George Munganga",
       role: "CTO",
-      bio: "Full-stack developer with expertise in scalable learning platforms and AI integration.",
+      bio: "A full-stack developer with deep expertise in building scalable learning platforms and integrating AI to enhance user experiences and educational outcomes.",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
@@ -68,7 +68,7 @@ const AboutPage = () => {
     {
       name: "Nakolo Pule",
       role: "Head of Content",
-      bio: " Specialised in Content Creation and Finance.",
+      bio: " Specializing in content creation and finance, where she leads the development of engaging, high-quality educational material tailored to empower learners and creators alike.",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-06-12_at_17.40.14_5fcc6eb5-removebg-preview.png?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
@@ -78,7 +78,7 @@ const AboutPage = () => {
       name: "Chishala Kapobe",
       role: "Director Learning & Events Operations",
       bio: "Director of Learning & Events Operations with a focus on crafting intuitive, accessible digital learning experiences and managing impactful events for creators across Africa..",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-07-02_at_10.54.42_bec1ba2c-removebg-preview.png?w=400&h=400&fit=crop&crop=face",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-07-02_at_10.54.42_bec1ba2c-removebg-preview%20(1).png?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
       email: "chishala@skillpulse.cloud"
