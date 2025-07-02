@@ -75,13 +75,13 @@ const AboutPage = () => {
       email: "nakolo@skillpulse.cloud"
     },
     {
-      name: "David Kim",
-      role: "Lead Designer",
-      bio: "UX/UI designer focused on creating intuitive and accessible learning experiences.",
-      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
+      name: "Chishala Kapobe",
+      role: "Director Learning & Events Operations",
+      bio: "Director of Learning & Events Operations with a focus on crafting intuitive, accessible digital learning experiences and managing impactful events for creators across Africa..",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-07-02_at_10.54.42_bec1ba2c-removebg-preview.png?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
-      email: "david@skillpulse.cloud"
+      email: "chishala@skillpulse.cloud"
     }
   ];
 
