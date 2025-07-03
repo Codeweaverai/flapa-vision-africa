@@ -13,6 +13,13 @@ import { Link } from 'react-router-dom';
 import TicketDisplay from '@/components/tickets/TicketDisplay';
 import { QRCodeSVG } from 'qrcode.react';
 
+// Extend the Window interface to include QRCode
+declare global {
+  interface Window {
+    QRCode?: any;
+  }
+}
+
 interface Order {
   id: string;
   total_amount: number;
@@ -110,7 +117,10 @@ const MyOrdersPage = () => {
     document.head.appendChild(script);
     
     return () => {
-      document.head.removeChild(script);
+      // Only remove if it exists
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
     };
   }, []);
 
@@ -288,16 +298,24 @@ const MyOrdersPage = () => {
         const qrContainer = document.getElementById(`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`);
         if (qrContainer && window.QRCode) {
           qrContainer.innerHTML = ''; // Clear existing content
-          window.QRCode.toCanvas(qrContainer, ticket.qr_code_data, {
-            width: 150,
-            height: 150,
-            margin: 2
-          }, function (error) {
-            if (error) {
-              console.error('QR Code generation error:', error);
-              qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code</div>';
-            }
-          });
+          try {
+            window.QRCode.toCanvas(qrContainer, ticket.qr_code_data, {
+              width: 150,
+              height: 150,
+              margin: 2
+            }, function (error: any) {
+              if (error) {
+                console.error('QR Code generation error:', error);
+                qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code</div>';
+              }
+            });
+          } catch (err) {
+            console.error('QR Code library error:', err);
+            qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code</div>';
+          }
+        } else if (qrContainer) {
+          // Fallback if QRCode library is not loaded
+          qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">Loading QR...</div>';
         }
       });
     }, 100);
@@ -823,9 +841,115 @@ const MyOrdersPage = () => {
         >
           <div id="tickets-print-content" className="space-y-8 max-h-[70vh] overflow-y-auto">
             {selectedBookings.filter(ticket => ticket.event).map((ticket, index) => (
-              <div key={ticket.id || index} dangerouslySetInnerHTML={{ 
-                __html: generateTicketHTML(ticket, index) 
-              }} />
+              <div key={ticket.id || index} className="max-w-800px mx-auto mb-8 bg-white rounded-2xl overflow-hidden shadow-xl">
+                {/* Header with gradient */}
+                <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-8 text-center text-white">
+                  <h1 className="text-3xl font-bold mb-2">🎫 EVENT TICKET</h1>
+                  <div className="bg-white/20 px-4 py-2 rounded-full inline-block">
+                    <span className="text-sm font-medium">#{ticket.ticket_code || ticket.booking_code}</span>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  {/* Event Image and Title */}
+                  <div className="flex gap-6 mb-8 items-center">
+                    {ticket.event?.image_url && (
+                      <div className="w-32 h-32 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg">
+                        <img src={ticket.event.image_url} alt={ticket.event?.title || 'Event'} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-gray-900 mb-3">{ticket.event?.title || 'Event Title'}</h2>
+                      <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-xl border-l-4 border-orange-500">
+                        <div className="font-semibold text-orange-700 mb-1">{ticket.event_ticket?.name || 'Standard Ticket'}</div>
+                        <div className="text-sm text-orange-600">{ticket.event_ticket?.ticket_type || 'Regular'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Event Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div>
+                      <div className="mb-5">
+                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                          📅 Date & Time
+                        </div>
+                        <div className="text-gray-600 text-base leading-relaxed">
+                          {ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br/>
+                          {ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'h:mm a') : ''} {ticket.event?.end_time ? '- ' + format(new Date(ticket.event.end_time), 'h:mm a') : ''}
+                        </div>
+                      </div>
+                      
+                      <div className="mb-5">
+                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                          📍 Location
+                        </div>
+                        <div className="text-gray-600 text-base leading-relaxed">
+                          {ticket.event?.location || 'TBD'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-5">
+                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                          👤 Ticket Holder
+                        </div>
+                        <div className="text-gray-600 text-base leading-relaxed">
+                          {ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
+                          {ticket.ticket_holder_email && (
+                            <>
+                              <br/>
+                              <span className="text-sm">{ticket.ticket_holder_email}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="mb-5">
+                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                          ✅ Status
+                        </div>
+                        <div>
+                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                            {(ticket.status || 'confirmed').toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* QR Code Section */}
+                  <div className="text-center p-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl mb-6">
+                    <div className="mb-4">
+                      <div className="w-40 h-40 mx-auto p-4 bg-white rounded-2xl shadow-md">
+                        <div 
+                          id={`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`} 
+                          className="w-full h-full flex items-center justify-center"
+                        >
+                          <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500">
+                            Loading QR...
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600 mb-3">Scan this code at the event entrance</div>
+                    <div className="font-mono text-lg font-bold text-orange-600 tracking-wider">
+                      {ticket.ticket_code || ticket.booking_code}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="text-center pt-6 border-t-2 border-dashed border-gray-200 text-gray-600 text-sm leading-relaxed">
+                    <div className="mb-3">
+                      <strong className="text-gray-700">Important:</strong> Please bring this ticket (digital or printed) to the event.
+                    </div>
+                    <div>
+                      For questions, contact us at support@skillpulse.com
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         </Modal>
