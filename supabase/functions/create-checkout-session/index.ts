@@ -247,6 +247,35 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
   });
 };
 
+// Helper function to process course enrollment
+const processCourseEnrollment = async (supabase: any, orderItem: any, order: any, user: any) => {
+  logStep("Processing course enrollment", { 
+    courseId: orderItem.item_id, 
+    quantity: orderItem.quantity 
+  });
+
+  // Create course enrollment
+  const { data: enrollment, error: enrollmentError } = await supabase
+    .from('course_enrollments')
+    .insert({
+      user_id: user.id,
+      course_id: orderItem.item_id,
+      order_id: order.id,
+      payment_status: 'completed',
+      enrollment_date: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (enrollmentError) {
+    logStep("Error creating course enrollment", enrollmentError);
+    throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
+  }
+
+  logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
+  return enrollment;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -365,7 +394,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: itemPrice,
           currency: 'USD',
-          payment_status: 'processing',
+          payment_status: 'completed', // Set to completed for immediate processing
           payment_method: 'stripe'
         })
         .select()
@@ -392,25 +421,11 @@ serve(async (req) => {
       if (itemError) throw new Error(`Failed to create order item: ${itemError.message}`);
       logStep("Order item created");
 
-      // Process event ticket purchase if applicable
-      if (itemType === 'event_ticket') {
+      // Process based on item type
+      if (itemType === 'course') {
+        await processCourseEnrollment(supabaseClient, orderItem, order, user);
+      } else if (itemType === 'event_ticket') {
         await processEventTicketPurchase(supabaseClient, orderItem, order, user);
-        
-        // Update order status to completed after successful processing
-        const { error: updateOrderError } = await supabaseClient
-          .from('orders')
-          .update({ 
-            payment_status: 'completed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', order.id);
-
-        if (updateOrderError) {
-          logStep("Error updating order status", updateOrderError);
-          throw new Error(`Failed to update order status: ${updateOrderError.message}`);
-        }
-        
-        logStep("Order status updated to completed");
       }
 
       sessionData = {
@@ -449,7 +464,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: totalAmount,
           currency: 'USD',
-          payment_status: 'processing',
+          payment_status: 'completed', // Set to completed for immediate processing
           payment_method: 'stripe'
         })
         .select()
@@ -480,30 +495,13 @@ serve(async (req) => {
       if (itemsError) throw new Error(`Failed to create order items: ${itemsError.message}`);
       logStep("Created order items", createdOrderItems);
 
-      // Process each event ticket item
+      // Process each order item
       for (const orderItem of createdOrderItems) {
         if (orderItem.item_type === 'event_ticket') {
           await processEventTicketPurchase(supabaseClient, orderItem, order, user);
+        } else if (orderItem.item_type === 'course') {
+          await processCourseEnrollment(supabaseClient, orderItem, order, user);
         }
-      }
-
-      // Update order status to completed after all processing
-      const hasEventTickets = createdOrderItems.some(item => item.item_type === 'event_ticket');
-      if (hasEventTickets) {
-        const { error: updateOrderError } = await supabaseClient
-          .from('orders')
-          .update({ 
-            payment_status: 'completed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', order.id);
-
-        if (updateOrderError) {
-          logStep("Error updating order status", updateOrderError);
-          throw new Error(`Failed to update order status: ${updateOrderError.message}`);
-        }
-        
-        logStep("Order status updated to completed");
       }
 
       // Create Stripe line items

@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -259,6 +258,35 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
   });
 };
 
+// Helper function to process course enrollment
+const processCourseEnrollment = async (supabase: any, orderItem: any, order: any, user: any) => {
+  logStep("Processing course enrollment", { 
+    courseId: orderItem.item_id, 
+    quantity: orderItem.quantity 
+  });
+
+  // Create course enrollment
+  const { data: enrollment, error: enrollmentError } = await supabase
+    .from('course_enrollments')
+    .insert({
+      user_id: user.id,
+      course_id: orderItem.item_id,
+      order_id: order.id,
+      payment_status: 'completed',
+      enrollment_date: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (enrollmentError) {
+    logStep("Error creating course enrollment", enrollmentError);
+    throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
+  }
+
+  logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
+  return enrollment;
+};
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -340,7 +368,7 @@ const handler = async (req: Request): Promise<Response> => {
       total_amount: amount / 100, // Convert back from cents
       currency: currency || 'USD',
       payment_method: 'mobile_money',
-      payment_status: 'pending',
+      payment_status: 'completed', // Set to completed for immediate processing
       tax_amount: tax_amount || 0,
       email: user.email || '',
       payment_provider_id: depositId
@@ -361,10 +389,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Order created successfully:', order.id);
 
-    // Create order items using service role - ensure we have proper item_type and item_id
+    // Create order items using service role
     const orderItems = items.map((item: any) => {
-      // Extract item details from the item object
-      const itemType = item.item_type || item.itemType || 'event_ticket'; // Default to event_ticket if not specified
+      const itemType = item.item_type || item.itemType || 'event_ticket';
       const itemId = item.item_id || item.itemId || item.id;
       const itemName = item.item_name || item.itemName || item.title || item.name || 'Item';
       
@@ -398,31 +425,13 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Order items created successfully');
     logStep("Created order items", createdOrderItems);
 
-    // Process each order item for event tickets
-    let hasEventTickets = false;
+    // Process each order item
     for (const orderItem of createdOrderItems) {
       if (orderItem.item_type === 'event_ticket') {
-        hasEventTickets = true;
         await processEventTicketPurchase(serviceRoleClient, orderItem, order, user);
+      } else if (orderItem.item_type === 'course') {
+        await processCourseEnrollment(serviceRoleClient, orderItem, order, user);
       }
-    }
-
-    // Update order status to completed after processing event tickets
-    if (hasEventTickets) {
-      const { error: updateOrderError } = await serviceRoleClient
-        .from('orders')
-        .update({ 
-          payment_status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order.id);
-
-      if (updateOrderError) {
-        logStep("Error updating order status", updateOrderError);
-        throw new Error(`Failed to update order status: ${updateOrderError.message}`);
-      }
-      
-      logStep("Order status updated to completed");
     }
 
     // Prepare statement description (4-22 characters as per PawaPay docs)

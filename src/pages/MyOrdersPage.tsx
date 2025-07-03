@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -7,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText } from 'lucide-react';
+import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import TicketDisplay from '@/components/tickets/TicketDisplay';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Order {
   id: string;
@@ -149,21 +149,90 @@ const MyOrdersPage = () => {
     );
   };
 
-  const handleViewTickets = (order: Order) => {
-    const bookings = order.event_bookings || [];
-    const bookingsWithUserInfo = bookings.map(booking => ({
-      ...booking,
-      user_name: order.user_name || user?.email || 'Ticket Holder',
-      ticket_code: booking.booking_code,
-      qr_code_data: JSON.stringify({
-        booking_code: booking.booking_code,
-        event_title: booking.event?.title,
-        ticket_quantity: booking.ticket_quantity,
-        status: booking.status
-      })
-    }));
+  const fetchDetailedTickets = async (order: Order) => {
+    try {
+      // Get detailed event bookings with generated tickets
+      const { data: detailedBookings, error } = await supabase
+        .from('event_bookings')
+        .select(`
+          *,
+          event:events!event_bookings_event_id_fkey (
+            title,
+            start_time,
+            end_time,
+            location,
+            image_url,
+            description
+          ),
+          event_ticket:event_tickets!event_bookings_event_ticket_id_fkey (
+            name,
+            ticket_type,
+            price
+          ),
+          generated_tickets (
+            id,
+            ticket_code,
+            ticket_holder_name,
+            ticket_holder_email,
+            qr_code_data,
+            ticket_status
+          )
+        `)
+        .eq('order_id', order.id);
 
-    setSelectedBookings(bookingsWithUserInfo);
+      if (error) throw error;
+
+      const ticketsWithUserInfo = (detailedBookings || []).flatMap(booking => {
+        if (booking.generated_tickets && booking.generated_tickets.length > 0) {
+          // If we have generated tickets, show them individually
+          return booking.generated_tickets.map(ticket => ({
+            ...ticket,
+            booking_id: booking.id,
+            booking_code: booking.booking_code,
+            event: booking.event,
+            event_ticket: booking.event_ticket,
+            status: booking.status,
+            user_name: order.user_name || user?.email || 'Ticket Holder',
+            qr_code_data: ticket.qr_code_data || JSON.stringify({
+              booking_code: booking.booking_code,
+              event_title: booking.event?.title,
+              ticket_code: ticket.ticket_code,
+              status: booking.status
+            })
+          }));
+        } else {
+          // Fallback to booking-level tickets
+          return [{
+            id: booking.id,
+            booking_code: booking.booking_code,
+            ticket_code: booking.booking_code,
+            ticket_holder_name: order.user_name || user?.email || 'Ticket Holder',
+            event: booking.event,
+            event_ticket: booking.event_ticket,
+            status: booking.status,
+            ticket_quantity: booking.ticket_quantity,
+            user_name: order.user_name || user?.email || 'Ticket Holder',
+            qr_code_data: JSON.stringify({
+              booking_code: booking.booking_code,
+              event_title: booking.event?.title,
+              ticket_quantity: booking.ticket_quantity,
+              status: booking.status
+            })
+          }];
+        }
+      });
+
+      return ticketsWithUserInfo;
+    } catch (error) {
+      console.error('Error fetching detailed tickets:', error);
+      toast.error('Failed to load ticket details');
+      return [];
+    }
+  };
+
+  const handleViewTickets = async (order: Order) => {
+    const tickets = await fetchDetailedTickets(order);
+    setSelectedBookings(tickets);
     setShowTicketModal(true);
   };
 
@@ -217,6 +286,111 @@ const MyOrdersPage = () => {
         printWindow.print();
       }
     }
+  };
+
+  const generateTicketHTML = (ticket: any) => {
+    return `
+      <div style="max-width: 800px; margin: 0 auto 30px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); font-family: Arial, sans-serif;">
+        <!-- Header with gradient -->
+        <div style="background: linear-gradient(135deg, #f97316 0%, #a855f7 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold;">🎫 EVENT TICKET</h1>
+          <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block;">
+            <span style="font-size: 14px; font-weight: 500;">#{ticket.ticket_code || ticket.booking_code}</span>
+          </div>
+        </div>
+
+        <div style="padding: 40px;">
+          <!-- Event Image and Title -->
+          <div style="display: flex; gap: 20px; margin-bottom: 30px; align-items: center;">
+            ${ticket.event?.image_url ? `
+              <div style="width: 120px; height: 120px; border-radius: 15px; overflow: hidden; flex-shrink: 0; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+                <img src="${ticket.event.image_url}" alt="${ticket.event?.title || 'Event'}" style="width: 100%; height: 100%; object-fit: cover;" />
+              </div>
+            ` : ''}
+            <div style="flex: 1;">
+              <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #1f2937; font-weight: bold;">${ticket.event?.title || 'Event Title'}</h2>
+              <div style="background: linear-gradient(135deg, #fef7ed, #faf5ff); padding: 12px 16px; border-radius: 10px; border-left: 4px solid #f97316;">
+                <div style="font-weight: 600; color: #ea580c; margin-bottom: 5px;">${ticket.event_ticket?.name || 'Standard Ticket'}</div>
+                <div style="font-size: 14px; color: #7c2d12;">${ticket.event_ticket?.ticket_type || 'Regular'}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Event Details Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+            <div>
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  📅 Date & Time
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br>
+                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'h:mm a') : ''} ${ticket.event?.end_time ? '- ' + format(new Date(ticket.event.end_time), 'h:mm a') : ''}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  📍 Location
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.event?.location || 'TBD'}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  👤 Ticket Holder
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
+                  ${ticket.ticket_holder_email ? `<br><span style="font-size: 14px;">${ticket.ticket_holder_email}</span>` : ''}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  ✅ Status
+                </div>
+                <div>
+                  <span style="background: #dcfce7; color: #166534; padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">
+                    ${(ticket.status || 'confirmed').toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- QR Code Section -->
+          <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 15px; margin-bottom: 20px;">
+            <div style="margin-bottom: 15px;">
+              <div style="width: 150px; height: 150px; margin: 0 auto; padding: 15px; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                <!-- QR Code placeholder - would be generated with actual QR library -->
+                <div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">
+                  QR Code
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 14px; color: #6b7280; margin-bottom: 10px;">Scan this code at the event entrance</div>
+            <div style="font-family: monospace; font-size: 16px; font-weight: bold; color: #f97316; letter-spacing: 1px;">
+              ${ticket.ticket_code || ticket.booking_code}
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; padding: 20px; border-top: 2px dashed #e5e7eb; color: #6b7280; font-size: 14px; line-height: 1.6;">
+            <div style="margin-bottom: 10px;">
+              <strong style="color: #374151;">Important:</strong> Please bring this ticket (digital or printed) to the event.
+            </div>
+            <div>
+              For questions, contact us at support@skillpulse.com
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   };
 
   const handlePrintReceipt = () => {
@@ -563,7 +737,7 @@ const MyOrdersPage = () => {
           </div>
         </div>
 
-        {/* Tickets Modal */}
+        {/* Enhanced Tickets Modal */}
         <Modal 
           isOpen={showTicketModal}
           onClose={() => setShowTicketModal(false)}
@@ -579,12 +753,11 @@ const MyOrdersPage = () => {
             </Button>
           }
         >
-          <div id="tickets-print-content" className="space-y-8">
-            {selectedBookings.filter(booking => booking.event).map((booking, index) => (
-              <div key={booking.id}>
-                <TicketDisplay ticket={booking} showPrintStyles={true} />
-                {index < selectedBookings.filter(b => b.event).length - 1 && <div className="h-8"></div>}
-              </div>
+          <div id="tickets-print-content" className="space-y-8 max-h-[70vh] overflow-y-auto">
+            {selectedBookings.filter(ticket => ticket.event).map((ticket, index) => (
+              <div key={ticket.id || index} dangerouslySetInnerHTML={{ 
+                __html: generateTicketHTML(ticket) 
+              }} />
             ))}
           </div>
         </Modal>
