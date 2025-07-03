@@ -128,14 +128,18 @@ const generateTickets = async (supabase: any, ticketData: any) => {
   logStep("Generating individual tickets", { 
     bookingId: ticketData.bookingId, 
     quantity: ticketData.quantity,
-    holderNames: ticketData.ticket_holder_names?.length 
+    holderNames: ticketData.ticket_holder_names?.length,
+    holderEmails: ticketData.ticket_holder_emails?.length,
+    userEmail: ticketData.userEmail,
+    userFullName: ticketData.userFullName
   });
   
   const generatedTickets = [];
   
   for (let i = 0; i < ticketData.quantity; i++) {
     const ticketCode = `TCK-${crypto.randomUUID().substring(0, 8).toUpperCase()}`;
-    const holderName = ticketData.ticket_holder_names?.[i] || `Ticket Holder ${i + 1}`;
+    const holderName = ticketData.ticket_holder_names?.[i] || ticketData.userFullName || `Ticket Holder ${i + 1}`;
+    const holderEmail = ticketData.ticket_holder_emails?.[i] || ticketData.userEmail || null;
     
     const qrData = JSON.stringify({
       ticketCode,
@@ -144,6 +148,7 @@ const generateTickets = async (supabase: any, ticketData: any) => {
       orderId: ticketData.orderId,
       userId: ticketData.userId,
       ticketHolderName: holderName,
+      ticketHolderEmail: holderEmail,
       generatedAt: new Date().toISOString()
     });
 
@@ -157,6 +162,7 @@ const generateTickets = async (supabase: any, ticketData: any) => {
         event_ticket_id: ticketData.eventTicketId,
         ticket_code: ticketCode,
         ticket_holder_name: holderName,
+        ticket_holder_email: holderEmail,
         qr_code_data: qrData,
         ticket_status: 'active',
         generated_at: new Date().toISOString()
@@ -170,7 +176,7 @@ const generateTickets = async (supabase: any, ticketData: any) => {
     }
 
     generatedTickets.push(ticket);
-    logStep("Generated ticket", { ticketCode, holderName });
+    logStep("Generated ticket", { ticketCode, holderName, holderEmail });
   }
 
   logStep("All tickets generated successfully", { count: generatedTickets.length });
@@ -223,15 +229,18 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
 
   // Safely parse metadata
   let ticketHolderNames = [];
+  let ticketHolderEmails = [];
   try {
     const metadata = orderItem.metadata || {};
     ticketHolderNames = metadata.ticket_holder_names || [];
+    ticketHolderEmails = metadata.ticket_holder_emails || [];
   } catch (e) {
     logStep("Error parsing metadata", e);
     ticketHolderNames = [];
+    ticketHolderEmails = [];
   }
 
-  // Generate individual tickets
+  // Generate individual tickets with user info
   await generateTickets(supabase, {
     bookingId: booking.id,
     eventId: ticketWithEvent.events.id,
@@ -239,7 +248,10 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
     userId: user.id,
     eventTicketId: orderItem.item_id,
     quantity: orderItem.quantity,
-    ticket_holder_names: ticketHolderNames
+    ticket_holder_names: ticketHolderNames,
+    ticket_holder_emails: ticketHolderEmails,
+    userEmail: user.email,
+    userFullName: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email
   });
 
   logStep("Event ticket purchase processed successfully", { 
@@ -254,6 +266,25 @@ const processCourseEnrollment = async (supabase: any, orderItem: any, order: any
     courseId: orderItem.item_id, 
     quantity: orderItem.quantity 
   });
+
+  // Check if enrollment already exists
+  const { data: existingEnrollment, error: checkError } = await supabase
+    .from('course_enrollments')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('course_id', orderItem.item_id)
+    .eq('order_id', order.id)
+    .maybeSingle();
+
+  if (checkError) {
+    logStep("Error checking existing enrollment", checkError);
+    throw new Error(`Failed to check existing enrollment: ${checkError.message}`);
+  }
+
+  if (existingEnrollment) {
+    logStep("Course enrollment already exists", { enrollmentId: existingEnrollment.id });
+    return existingEnrollment;
+  }
 
   // Create course enrollment
   const { data: enrollment, error: enrollmentError } = await supabase
@@ -397,7 +428,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: itemPrice,
           currency: 'USD',
-          payment_status: 'completed', // Set to completed
+          payment_status: 'completed',
           payment_method: 'stripe'
         })
         .select()
@@ -438,7 +469,7 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: { name: itemName },
-            unit_amount: Math.round(itemPrice * 100), // Convert to cents
+            unit_amount: Math.round(itemPrice * 100),
           },
           quantity: 1,
         }],
@@ -467,7 +498,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: totalAmount,
           currency: 'USD',
-          payment_status: 'completed', // Set to completed
+          payment_status: 'completed',
           payment_method: 'stripe'
         })
         .select()
@@ -486,7 +517,8 @@ serve(async (req) => {
         unit_price: item.price,
         total_price: item.price * (item.quantity || 1),
         metadata: {
-          ticket_holder_names: item.ticket_holder_names || []
+          ticket_holder_names: item.ticket_holder_names || [],
+          ticket_holder_emails: item.ticket_holder_emails || []
         }
       }));
 

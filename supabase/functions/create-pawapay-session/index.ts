@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -132,15 +131,17 @@ const generateTickets = async (supabase: any, ticketData: any) => {
     bookingId: ticketData.bookingId, 
     quantity: ticketData.quantity,
     holderNames: ticketData.ticket_holder_names?.length,
-    holderEmails: ticketData.ticket_holder_emails?.length 
+    holderEmails: ticketData.ticket_holder_emails?.length,
+    userEmail: ticketData.userEmail,
+    userFullName: ticketData.userFullName
   });
   
   const generatedTickets = [];
   
   for (let i = 0; i < ticketData.quantity; i++) {
     const ticketCode = `TCK-${crypto.randomUUID().substring(0, 8).toUpperCase()}`;
-    const holderName = ticketData.ticket_holder_names?.[i] || `Ticket Holder ${i + 1}`;
-    const holderEmail = ticketData.ticket_holder_emails?.[i] || null;
+    const holderName = ticketData.ticket_holder_names?.[i] || ticketData.userFullName || `Ticket Holder ${i + 1}`;
+    const holderEmail = ticketData.ticket_holder_emails?.[i] || ticketData.userEmail || null;
     
     const qrData = JSON.stringify({
       ticketCode,
@@ -177,7 +178,7 @@ const generateTickets = async (supabase: any, ticketData: any) => {
     }
 
     generatedTickets.push(ticket);
-    logStep("Generated ticket", { ticketCode, holderName });
+    logStep("Generated ticket", { ticketCode, holderName, holderEmail });
   }
 
   logStep("All tickets generated successfully", { count: generatedTickets.length });
@@ -241,7 +242,7 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
     ticketHolderEmails = [];
   }
 
-  // Generate individual tickets
+  // Generate individual tickets with user info
   await generateTickets(supabase, {
     bookingId: booking.id,
     eventId: ticketWithEvent.events.id,
@@ -250,7 +251,9 @@ const processEventTicketPurchase = async (supabase: any, orderItem: any, order: 
     eventTicketId: orderItem.item_id,
     quantity: orderItem.quantity,
     ticket_holder_names: ticketHolderNames,
-    ticket_holder_emails: ticketHolderEmails
+    ticket_holder_emails: ticketHolderEmails,
+    userEmail: user.email,
+    userFullName: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email
   });
 
   logStep("Event ticket purchase processed successfully", { 
@@ -265,6 +268,25 @@ const processCourseEnrollment = async (supabase: any, orderItem: any, order: any
     courseId: orderItem.item_id, 
     quantity: orderItem.quantity 
   });
+
+  // Check if enrollment already exists
+  const { data: existingEnrollment, error: checkError } = await supabase
+    .from('course_enrollments')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('course_id', orderItem.item_id)
+    .eq('order_id', order.id)
+    .maybeSingle();
+
+  if (checkError) {
+    logStep("Error checking existing enrollment", checkError);
+    throw new Error(`Failed to check existing enrollment: ${checkError.message}`);
+  }
+
+  if (existingEnrollment) {
+    logStep("Course enrollment already exists", { enrollmentId: existingEnrollment.id });
+    return existingEnrollment;
+  }
 
   // Create course enrollment
   const { data: enrollment, error: enrollmentError } = await supabase
@@ -366,10 +388,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     const orderData = {
       user_id: user.id,
-      total_amount: amount / 100, // Convert back from cents
+      total_amount: amount / 100,
       currency: currency || 'USD',
       payment_method: 'mobile_money',
-      payment_status: 'completed', // Set to completed
+      payment_status: 'completed',
       tax_amount: tax_amount || 0,
       email: user.email || '',
       payment_provider_id: depositId
@@ -431,25 +453,7 @@ const handler = async (req: Request): Promise<Response> => {
       if (orderItem.item_type === 'event_ticket') {
         await processEventTicketPurchase(serviceRoleClient, orderItem, order, user);
       } else if (orderItem.item_type === 'course') {
-        // Create course enrollment with completed payment status
-        const { data: enrollment, error: enrollmentError } = await serviceRoleClient
-          .from('course_enrollments')
-          .insert({
-            user_id: user.id,
-            course_id: orderItem.item_id,
-            order_id: order.id,
-            payment_status: 'completed', // Set to completed
-            enrollment_date: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (enrollmentError) {
-          logStep("Error creating course enrollment", enrollmentError);
-          throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
-        }
-
-        logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
+        await processCourseEnrollment(serviceRoleClient, orderItem, order, user);
       }
     }
 

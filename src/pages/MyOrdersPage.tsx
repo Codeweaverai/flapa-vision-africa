@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -102,6 +101,18 @@ const MyOrdersPage = () => {
       fetchOrders();
     }
   }, [user]);
+
+  // Load QRCode.js library dynamically
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+    script.async = true;
+    document.head.appendChild(script);
+    
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -270,6 +281,26 @@ const MyOrdersPage = () => {
     const tickets = await fetchDetailedTickets(order);
     setSelectedBookings(tickets);
     setShowTicketModal(true);
+    
+    // Generate QR codes after modal opens
+    setTimeout(() => {
+      tickets.forEach((ticket, index) => {
+        const qrContainer = document.getElementById(`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`);
+        if (qrContainer && window.QRCode) {
+          qrContainer.innerHTML = ''; // Clear existing content
+          window.QRCode.toCanvas(qrContainer, ticket.qr_code_data, {
+            width: 150,
+            height: 150,
+            margin: 2
+          }, function (error) {
+            if (error) {
+              console.error('QR Code generation error:', error);
+              qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code</div>';
+            }
+          });
+        }
+      });
+    }, 100);
   };
 
   const handleViewReceipt = (order: Order) => {
@@ -324,7 +355,7 @@ const MyOrdersPage = () => {
     }
   };
 
-  const generateTicketHTML = (ticket: TicketData) => {
+  const generateTicketHTML = (ticket: TicketData, index: number) => {
     return `
       <div style="max-width: 800px; margin: 0 auto 30px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); font-family: Arial, sans-serif;">
         <!-- Header with gradient -->
@@ -403,9 +434,10 @@ const MyOrdersPage = () => {
           <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 15px; margin-bottom: 20px;">
             <div style="margin-bottom: 15px;">
               <div style="width: 150px; height: 150px; margin: 0 auto; padding: 15px; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
-                <!-- QR Code placeholder - would be generated with actual QR library -->
-                <div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">
-                  QR Code
+                <div id="qr-code-${ticket.ticket_code || ticket.booking_code}-${index}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">
+                    Loading QR...
+                  </div>
                 </div>
               </div>
             </div>
@@ -792,7 +824,7 @@ const MyOrdersPage = () => {
           <div id="tickets-print-content" className="space-y-8 max-h-[70vh] overflow-y-auto">
             {selectedBookings.filter(ticket => ticket.event).map((ticket, index) => (
               <div key={ticket.id || index} dangerouslySetInnerHTML={{ 
-                __html: generateTicketHTML(ticket) 
+                __html: generateTicketHTML(ticket, index) 
               }} />
             ))}
           </div>
