@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -103,8 +104,8 @@ const createOrGetEventBooking = async (supabase: any, bookingData: any) => {
       event_ticket_id: bookingData.event_ticket_id,
       order_id: bookingData.order_id,
       ticket_quantity: bookingData.quantity,
-      status: 'confirmed',
-      payment_status: 'completed',
+      status: 'confirmed', // Set to confirmed
+      payment_status: 'completed', // Set to completed
       payment_amount: bookingData.total_price,
       payment_currency: 'USD',
       booking_date: new Date().toISOString(),
@@ -388,7 +389,7 @@ serve(async (req) => {
         logStep("Event data retrieved", { eventId, title: itemName, price: itemPrice });
       }
 
-      // Create order for direct purchase
+      // Create order for direct purchase with completed payment status
       const { data: order, error: orderError } = await supabaseClient
         .from('orders')
         .insert({
@@ -396,7 +397,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: itemPrice,
           currency: 'USD',
-          payment_status: 'completed',
+          payment_status: 'completed', // Set to completed
           payment_method: 'stripe'
         })
         .select()
@@ -425,25 +426,7 @@ serve(async (req) => {
 
       // Process based on item type
       if (itemType === 'course') {
-        // Create course enrollment
-        const { data: enrollment, error: enrollmentError } = await supabaseClient
-          .from('course_enrollments')
-          .insert({
-            user_id: user.id,
-            course_id: courseId,
-            order_id: order.id,
-            payment_status: 'completed',
-            enrollment_date: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (enrollmentError) {
-          logStep("Error creating course enrollment", enrollmentError);
-          throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
-        }
-
-        logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
+        await processCourseEnrollment(supabaseClient, orderItem, order, user);
       } else if (itemType === 'event_ticket') {
         await processEventTicketPurchase(supabaseClient, orderItem, order, user);
       }
@@ -484,7 +467,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: totalAmount,
           currency: 'USD',
-          payment_status: 'completed',
+          payment_status: 'completed', // Set to completed
           payment_method: 'stripe'
         })
         .select()
@@ -520,25 +503,7 @@ serve(async (req) => {
         if (orderItem.item_type === 'event_ticket') {
           await processEventTicketPurchase(supabaseClient, orderItem, order, user);
         } else if (orderItem.item_type === 'course') {
-          // Create course enrollment
-          const { data: enrollment, error: enrollmentError } = await supabaseClient
-            .from('course_enrollments')
-            .insert({
-              user_id: user.id,
-              course_id: orderItem.item_id,
-              order_id: order.id,
-              payment_status: 'completed',
-              enrollment_date: new Date().toISOString()
-            })
-            .select()
-            .single();
-
-          if (enrollmentError) {
-            logStep("Error creating course enrollment", enrollmentError);
-            throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
-          }
-
-          logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
+          await processCourseEnrollment(supabaseClient, orderItem, order, user);
         }
       }
 

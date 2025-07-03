@@ -331,7 +331,7 @@ const MyOrdersPage = () => {
         <div style="background: linear-gradient(135deg, #f97316 0%, #a855f7 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold;">🎫 EVENT TICKET</h1>
           <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block;">
-            <span style="font-size: 14px; font-weight: 500;">#{ticket.ticket_code || ticket.booking_code}</span>
+            <span style="font-size: 14px; font-weight: 500;">#${ticket.ticket_code || ticket.booking_code}</span>
           </div>
         </div>
 

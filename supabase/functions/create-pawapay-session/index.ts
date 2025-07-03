@@ -369,7 +369,7 @@ const handler = async (req: Request): Promise<Response> => {
       total_amount: amount / 100, // Convert back from cents
       currency: currency || 'USD',
       payment_method: 'mobile_money',
-      payment_status: 'completed',
+      payment_status: 'completed', // Set to completed
       tax_amount: tax_amount || 0,
       email: user.email || '',
       payment_provider_id: depositId
@@ -431,14 +431,14 @@ const handler = async (req: Request): Promise<Response> => {
       if (orderItem.item_type === 'event_ticket') {
         await processEventTicketPurchase(serviceRoleClient, orderItem, order, user);
       } else if (orderItem.item_type === 'course') {
-        // Create course enrollment
+        // Create course enrollment with completed payment status
         const { data: enrollment, error: enrollmentError } = await serviceRoleClient
           .from('course_enrollments')
           .insert({
             user_id: user.id,
             course_id: orderItem.item_id,
             order_id: order.id,
-            payment_status: 'completed',
+            payment_status: 'completed', // Set to completed
             enrollment_date: new Date().toISOString()
           })
           .select()
