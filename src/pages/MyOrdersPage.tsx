@@ -109,15 +109,20 @@ const MyOrdersPage = () => {
     }
   }, [user]);
 
-  // Load QRCode.js library dynamically
+  // Load QRCodeJS library dynamically
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
     script.async = true;
+    script.onload = () => {
+      console.log('QRCodeJS library loaded successfully');
+    };
+    script.onerror = () => {
+      console.error('Failed to load QRCodeJS library');
+    };
     document.head.appendChild(script);
     
     return () => {
-      // Only remove if it exists
       if (document.head.contains(script)) {
         document.head.removeChild(script);
       }
@@ -299,19 +304,17 @@ const MyOrdersPage = () => {
         if (qrContainer && window.QRCode) {
           qrContainer.innerHTML = ''; // Clear existing content
           try {
-            window.QRCode.toCanvas(qrContainer, ticket.qr_code_data, {
+            new window.QRCode(qrContainer, {
+              text: ticket.qr_code_data,
               width: 150,
               height: 150,
-              margin: 2
-            }, function (error: any) {
-              if (error) {
-                console.error('QR Code generation error:', error);
-                qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code</div>';
-              }
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: window.QRCode.CorrectLevel.M
             });
           } catch (err) {
-            console.error('QR Code library error:', err);
-            qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code</div>';
+            console.error('QR Code generation error:', err);
+            qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code Error</div>';
           }
         } else if (qrContainer) {
           // Fallback if QRCode library is not loaded
