@@ -290,7 +290,9 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { courseId, eventId, eventTicketId, returnUrl, payment_method = 'stripe', items } = await req.json();
+    const requestBody = await req.json();
+    const { courseId, eventId, eventTicketId, returnUrl, payment_method = 'stripe', items } = requestBody;
+    
     logStep("Request data", { courseId, eventId, eventTicketId, payment_method, itemsCount: items?.length });
 
     const authHeader = req.headers.get("Authorization");
@@ -366,7 +368,7 @@ serve(async (req) => {
         if (ticketError) throw new Error(`Event ticket not found: ${ticketError.message}`);
         
         itemData = ticket;
-        itemName = `${ticket.events.title} - ${ticket.name}`;
+        itemName = `${ticket.events?.title} - ${ticket.name}`;
         itemPrice = ticket.price || 0;
         itemType = 'event_ticket';
         logStep("Event ticket data retrieved", { eventTicketId, title: itemName, price: itemPrice });
@@ -394,7 +396,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: itemPrice,
           currency: 'USD',
-          payment_status: 'completed', // Set to completed for immediate processing
+          payment_status: 'completed',
           payment_method: 'stripe'
         })
         .select()
@@ -423,7 +425,25 @@ serve(async (req) => {
 
       // Process based on item type
       if (itemType === 'course') {
-        await processCourseEnrollment(supabaseClient, orderItem, order, user);
+        // Create course enrollment
+        const { data: enrollment, error: enrollmentError } = await supabaseClient
+          .from('course_enrollments')
+          .insert({
+            user_id: user.id,
+            course_id: courseId,
+            order_id: order.id,
+            payment_status: 'completed',
+            enrollment_date: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (enrollmentError) {
+          logStep("Error creating course enrollment", enrollmentError);
+          throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
+        }
+
+        logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
       } else if (itemType === 'event_ticket') {
         await processEventTicketPurchase(supabaseClient, orderItem, order, user);
       }
@@ -464,7 +484,7 @@ serve(async (req) => {
           email: user.email,
           total_amount: totalAmount,
           currency: 'USD',
-          payment_status: 'completed', // Set to completed for immediate processing
+          payment_status: 'completed',
           payment_method: 'stripe'
         })
         .select()
@@ -500,7 +520,25 @@ serve(async (req) => {
         if (orderItem.item_type === 'event_ticket') {
           await processEventTicketPurchase(supabaseClient, orderItem, order, user);
         } else if (orderItem.item_type === 'course') {
-          await processCourseEnrollment(supabaseClient, orderItem, order, user);
+          // Create course enrollment
+          const { data: enrollment, error: enrollmentError } = await supabaseClient
+            .from('course_enrollments')
+            .insert({
+              user_id: user.id,
+              course_id: orderItem.item_id,
+              order_id: order.id,
+              payment_status: 'completed',
+              enrollment_date: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+          if (enrollmentError) {
+            logStep("Error creating course enrollment", enrollmentError);
+            throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
+          }
+
+          logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
         }
       }
 
@@ -528,78 +566,7 @@ serve(async (req) => {
         cancel_url: cancelUrl,
       };
     } else {
-      // Fallback: try to get cart items from database
-      const { data: cartItems, error: cartError } = await supabaseClient
-        .from('carts')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (cartError || !cartItems || cartItems.length === 0) {
-        throw new Error('No items provided and no items in cart');
-      }
-
-      logStep("Cart items retrieved from database", { itemCount: cartItems.length });
-
-      // Create order first for cart-based purchase
-      const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      
-      const { data: order, error: orderError } = await supabaseClient
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          email: user.email,
-          total_amount: totalAmount,
-          currency: 'USD',
-          payment_status: 'processing',
-          payment_method: 'stripe'
-        })
-        .select()
-        .single();
-
-      if (orderError) throw new Error(`Failed to create order: ${orderError.message}`);
-      logStep("Order created", { orderId: order.id, totalAmount });
-
-      // Create order items
-      const orderItems = cartItems.map(item => ({
-        order_id: order.id,
-        item_id: item.item_id,
-        item_type: item.item_type,
-        item_name: `${item.item_type} Item`,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity
-      }));
-
-      const { error: itemsError } = await supabaseClient
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw new Error(`Failed to create order items: ${itemsError.message}`);
-      logStep("Order items created", { itemCount: orderItems.length });
-
-      // Create Stripe line items
-      const lineItems = cartItems.map(item => ({
-        price_data: {
-          currency: "usd",
-          product_data: { name: `${item.item_type} - ${item.item_id}` },
-          unit_amount: Math.round(item.price * 100),
-        },
-        quantity: item.quantity,
-      }));
-
-      sessionData = {
-        customer: customerId,
-        customer_email: customerId ? undefined : user.email,
-        line_items: lineItems,
-        mode: "payment",
-        metadata: {
-          user_id: user.id,
-          order_id: order.id,
-          type: 'cart'
-        },
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-      };
+      throw new Error('No items provided for checkout');
     }
 
     const session = await stripe.checkout.sessions.create(sessionData);

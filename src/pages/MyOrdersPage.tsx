@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -61,11 +62,37 @@ interface Order {
   user_name?: string;
 }
 
+interface TicketData {
+  id: string;
+  booking_code: string;
+  ticket_code: string;
+  ticket_holder_name: string;
+  ticket_holder_email?: string;
+  event: {
+    title: string;
+    start_time: string;
+    end_time: string;
+    location: string;
+    image_url: string;
+    description: string;
+  };
+  event_ticket: {
+    name: string;
+    ticket_type: string;
+    price?: number;
+  };
+  status: string;
+  user_name: string;
+  qr_code_data: string;
+  booking_id?: string;
+  ticket_status?: string;
+}
+
 const MyOrdersPage = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBookings, setSelectedBookings] = useState<any[]>([]);
+  const [selectedBookings, setSelectedBookings] = useState<TicketData[]>([]);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -149,7 +176,7 @@ const MyOrdersPage = () => {
     );
   };
 
-  const fetchDetailedTickets = async (order: Order) => {
+  const fetchDetailedTickets = async (order: Order): Promise<TicketData[]> => {
     try {
       // Get detailed event bookings with generated tickets
       const { data: detailedBookings, error } = await supabase
@@ -182,27 +209,35 @@ const MyOrdersPage = () => {
 
       if (error) throw error;
 
-      const ticketsWithUserInfo = (detailedBookings || []).flatMap(booking => {
+      const ticketsWithUserInfo: TicketData[] = [];
+
+      (detailedBookings || []).forEach(booking => {
         if (booking.generated_tickets && booking.generated_tickets.length > 0) {
           // If we have generated tickets, show them individually
-          return booking.generated_tickets.map(ticket => ({
-            ...ticket,
-            booking_id: booking.id,
-            booking_code: booking.booking_code,
-            event: booking.event,
-            event_ticket: booking.event_ticket,
-            status: booking.status,
-            user_name: order.user_name || user?.email || 'Ticket Holder',
-            qr_code_data: ticket.qr_code_data || JSON.stringify({
+          booking.generated_tickets.forEach(ticket => {
+            ticketsWithUserInfo.push({
+              id: ticket.id,
               booking_code: booking.booking_code,
-              event_title: booking.event?.title,
               ticket_code: ticket.ticket_code,
-              status: booking.status
-            })
-          }));
+              ticket_holder_name: ticket.ticket_holder_name,
+              ticket_holder_email: ticket.ticket_holder_email,
+              event: booking.event,
+              event_ticket: booking.event_ticket,
+              status: booking.status,
+              user_name: order.user_name || user?.email || 'Ticket Holder',
+              qr_code_data: ticket.qr_code_data || JSON.stringify({
+                booking_code: booking.booking_code,
+                event_title: booking.event?.title,
+                ticket_code: ticket.ticket_code,
+                status: booking.status
+              }),
+              booking_id: booking.id,
+              ticket_status: ticket.ticket_status || 'active'
+            });
+          });
         } else {
           // Fallback to booking-level tickets
-          return [{
+          ticketsWithUserInfo.push({
             id: booking.id,
             booking_code: booking.booking_code,
             ticket_code: booking.booking_code,
@@ -210,15 +245,16 @@ const MyOrdersPage = () => {
             event: booking.event,
             event_ticket: booking.event_ticket,
             status: booking.status,
-            ticket_quantity: booking.ticket_quantity,
             user_name: order.user_name || user?.email || 'Ticket Holder',
             qr_code_data: JSON.stringify({
               booking_code: booking.booking_code,
               event_title: booking.event?.title,
               ticket_quantity: booking.ticket_quantity,
               status: booking.status
-            })
-          }];
+            }),
+            booking_id: booking.id,
+            ticket_status: 'active'
+          });
         }
       });
 
@@ -288,7 +324,7 @@ const MyOrdersPage = () => {
     }
   };
 
-  const generateTicketHTML = (ticket: any) => {
+  const generateTicketHTML = (ticket: TicketData) => {
     return `
       <div style="max-width: 800px; margin: 0 auto 30px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); font-family: Arial, sans-serif;">
         <!-- Header with gradient -->

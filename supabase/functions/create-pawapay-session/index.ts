@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -368,7 +369,7 @@ const handler = async (req: Request): Promise<Response> => {
       total_amount: amount / 100, // Convert back from cents
       currency: currency || 'USD',
       payment_method: 'mobile_money',
-      payment_status: 'completed', // Set to completed for immediate processing
+      payment_status: 'completed',
       tax_amount: tax_amount || 0,
       email: user.email || '',
       payment_provider_id: depositId
@@ -430,7 +431,25 @@ const handler = async (req: Request): Promise<Response> => {
       if (orderItem.item_type === 'event_ticket') {
         await processEventTicketPurchase(serviceRoleClient, orderItem, order, user);
       } else if (orderItem.item_type === 'course') {
-        await processCourseEnrollment(serviceRoleClient, orderItem, order, user);
+        // Create course enrollment
+        const { data: enrollment, error: enrollmentError } = await serviceRoleClient
+          .from('course_enrollments')
+          .insert({
+            user_id: user.id,
+            course_id: orderItem.item_id,
+            order_id: order.id,
+            payment_status: 'completed',
+            enrollment_date: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (enrollmentError) {
+          logStep("Error creating course enrollment", enrollmentError);
+          throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
+        }
+
+        logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
       }
     }
 
@@ -468,7 +487,7 @@ const handler = async (req: Request): Promise<Response> => {
       "depositId": depositId,
       "returnUrl": returnUrl,
       "statementDescription": statementDescription,
-      "amount": Math.round(amount / 100).toString(), // Convert cents to major currency unit
+      "amount": Math.round(amount / 100).toString(),
       "msisdn": msisdn,
       "language": "EN",
       "country": country,
