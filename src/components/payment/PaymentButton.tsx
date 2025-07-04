@@ -32,7 +32,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   currency = 'USD'
 }) => {
   const { user } = useAuth();
-  const { selectedCurrency } = useCurrency();
+  const { currentCurrency } = useCurrency();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -60,7 +60,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
         eventId, 
         price, 
         currency,
-        selectedCurrency 
+        currentCurrency 
       });
 
       // Ensure we have a valid price
@@ -69,27 +69,26 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
         throw new Error("Invalid price amount");
       }
 
-      // Convert price to selected currency if needed
+      // Convert price to current currency if needed
       let finalPrice = validPrice;
       let finalCurrency = currency || 'USD';
 
-      if (selectedCurrency && selectedCurrency !== currency) {
+      if (currentCurrency && currentCurrency !== currency) {
         try {
-          const conversion = await currencyService.convertCurrency(validPrice, currency || 'USD', selectedCurrency);
-          finalPrice = conversion.convertedAmount;
-          finalCurrency = selectedCurrency;
-          
-          // Ensure converted amount is valid
-          if (finalPrice <= 0) {
+          const conversion = await currencyService.convertCurrency(validPrice, currency || 'USD', currentCurrency);
+          if (conversion.convertedAmount > 0) {
+            finalPrice = conversion.convertedAmount;
+            finalCurrency = currentCurrency;
+            
+            console.log('[PAYMENT-BUTTON] Currency conversion:', {
+              original: `${validPrice} ${currency}`,
+              converted: `${finalPrice} ${finalCurrency}`
+            });
+          } else {
             console.warn('[PAYMENT-BUTTON] Currency conversion resulted in 0 amount, using original price');
             finalPrice = validPrice;
             finalCurrency = currency || 'USD';
           }
-          
-          console.log('[PAYMENT-BUTTON] Currency conversion:', {
-            original: `${validPrice} ${currency}`,
-            converted: `${finalPrice} ${finalCurrency}`
-          });
         } catch (conversionError) {
           console.warn('[PAYMENT-BUTTON] Currency conversion failed, using original price:', conversionError);
           finalPrice = validPrice;
