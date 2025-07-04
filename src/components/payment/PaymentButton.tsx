@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,7 +35,9 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  if (price <= 0) {
+  // Early validation of price
+  const validPrice = Math.max(Number(price) || 0, 0);
+  if (validPrice <= 0) {
     // For free items, don't show a payment button
     return null;
   }
@@ -53,21 +54,21 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
       return;
     }
 
+    // Validate price again before processing
+    if (validPrice <= 0) {
+      toast.error("Invalid price amount");
+      return;
+    }
+
     setLoading(true);
     try {
       console.log('[PAYMENT-BUTTON] Starting payment process for:', { 
         courseId, 
         eventId, 
-        price, 
+        price: validPrice, 
         currency,
         currentCurrency 
       });
-
-      // Ensure we have a valid price
-      const validPrice = Math.max(price || 0, 0);
-      if (validPrice <= 0) {
-        throw new Error("Invalid price amount");
-      }
 
       // Convert price to current currency if needed
       let finalPrice = validPrice;
@@ -75,32 +76,36 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
       if (currentCurrency && currentCurrency !== currency) {
         try {
-          const conversion = await currencyService.convertCurrency(validPrice, currency || 'USD', currentCurrency);
-          if (conversion.convertedAmount > 0) {
-            finalPrice = conversion.convertedAmount;
-            finalCurrency = currentCurrency;
-            
-            console.log('[PAYMENT-BUTTON] Currency conversion:', {
-              original: `${validPrice} ${currency}`,
-              converted: `${finalPrice} ${finalCurrency}`
-            });
-          } else {
-            console.warn('[PAYMENT-BUTTON] Currency conversion resulted in 0 amount, using original price');
-            finalPrice = validPrice;
-            finalCurrency = currency || 'USD';
+          console.log('[PAYMENT-BUTTON] Converting currency from', currency, 'to', currentCurrency, 'amount:', validPrice);
+          
+          // Only convert if we have a valid amount > 0
+          if (validPrice > 0) {
+            const conversion = await currencyService.convertCurrency(validPrice, currency || 'USD', currentCurrency);
+            if (conversion.convertedAmount > 0) {
+              finalPrice = conversion.convertedAmount;
+              finalCurrency = currentCurrency;
+              
+              console.log('[PAYMENT-BUTTON] Currency conversion successful:', {
+                original: `${validPrice} ${currency}`,
+                converted: `${finalPrice} ${finalCurrency}`
+              });
+            } else {
+              console.warn('[PAYMENT-BUTTON] Currency conversion resulted in 0 amount, using original price');
+            }
           }
         } catch (conversionError) {
           console.warn('[PAYMENT-BUTTON] Currency conversion failed, using original price:', conversionError);
-          finalPrice = validPrice;
-          finalCurrency = currency || 'USD';
+          // Keep original values on conversion failure
         }
       }
 
-      // Final validation - ensure we have a valid amount
-      const amountToCharge = Math.max(finalPrice, 0.01); // Minimum 1 cent
+      // Final validation - ensure we have a valid amount (minimum 1 cent equivalent)
+      const amountToCharge = Math.max(finalPrice, 0.01);
       if (amountToCharge <= 0) {
         console.error('[PAYMENT-BUTTON] Final price is invalid:', finalPrice);
-        throw new Error("Invalid payment amount");
+        toast.error("Invalid payment amount");
+        setLoading(false);
+        return;
       }
 
       console.log('[PAYMENT-BUTTON] Initiating payment with final price:', {
@@ -146,7 +151,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
     <Button 
       variant={variant} 
       onClick={handlePayment} 
-      disabled={disabled || loading} 
+      disabled={disabled || loading || validPrice <= 0} 
       className={className}
     >
       {loading ? "Processing..." : buttonText}

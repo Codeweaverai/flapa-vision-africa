@@ -64,8 +64,8 @@ export class CurrencyService {
   ): Promise<CurrencyServiceResult> {
     console.log(`Converting ${amount} from ${fromCurrency} to ${toCurrency}`);
     
-    // Validate input amount
-    if (!amount || amount <= 0) {
+    // Validate input amount - must be positive
+    if (!amount || amount <= 0 || !Number.isFinite(amount)) {
       console.error('Invalid amount for conversion:', amount);
       return {
         convertedAmount: 0,
@@ -92,11 +92,11 @@ export class CurrencyService {
       const rates = await this.getExchangeRates();
       console.log('Available rates:', rates);
 
-      const fromRate = rates[fromCurrency] || FALLBACK_RATES[fromCurrency] || 1;
-      const toRate = rates[toCurrency] || FALLBACK_RATES[toCurrency] || 1;
+      const fromRate = rates[fromCurrency] || FALLBACK_RATES[fromCurrency];
+      const toRate = rates[toCurrency] || FALLBACK_RATES[toCurrency];
 
-      if (!fromRate || !toRate) {
-        console.error(`Missing exchange rate for ${fromCurrency} or ${toCurrency}`);
+      if (!fromRate || !toRate || fromRate <= 0 || toRate <= 0) {
+        console.error(`Invalid exchange rate for ${fromCurrency} (${fromRate}) or ${toCurrency} (${toRate})`);
         throw new Error(`Exchange rate not available for ${fromCurrency} to ${toCurrency}`);
       }
 
@@ -105,10 +105,13 @@ export class CurrencyService {
       const convertedAmount = usdAmount * toRate;
       const exchangeRate = toRate / fromRate;
 
-      console.log(`Conversion: ${amount} ${fromCurrency} = ${convertedAmount} ${toCurrency} (rate: ${exchangeRate})`);
+      // Ensure converted amount is positive
+      const finalAmount = Math.max(convertedAmount, 0);
+
+      console.log(`Conversion: ${amount} ${fromCurrency} = ${finalAmount} ${toCurrency} (rate: ${exchangeRate})`);
 
       return {
-        convertedAmount: Math.round(convertedAmount * 100) / 100, // Round to 2 decimal places
+        convertedAmount: Math.round(finalAmount * 100) / 100, // Round to 2 decimal places
         exchangeRate,
         originalAmount: amount,
         originalCurrency: fromCurrency,
@@ -129,11 +132,22 @@ export class CurrencyService {
   }
 
   async convertPrice(amount: number, fromCurrency: string, toCurrency: string): Promise<number> {
+    // Validate input before processing
+    if (!amount || amount <= 0 || !Number.isFinite(amount)) {
+      console.warn('convertPrice called with invalid amount:', amount);
+      return 0;
+    }
+    
     const result = await this.convertCurrency(amount, fromCurrency, toCurrency);
     return result.convertedAmount;
   }
 
   formatPrice(amount: number, currency: string): string {
+    // Handle invalid amounts
+    if (!Number.isFinite(amount) || amount < 0) {
+      amount = 0;
+    }
+    
     try {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
