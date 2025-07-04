@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { Smartphone, AlertCircle } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { currencyService } from '@/services/currencyService';
 
 interface MobileMoneyPaymentDialogProps {
   isOpen: boolean;
@@ -43,6 +44,13 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
       return;
     }
 
+    // Validate amount
+    const validAmount = Math.max(amount || 0, 0);
+    if (validAmount <= 0) {
+      toast.error('Invalid payment amount');
+      return;
+    }
+
     setError(null);
     
     // Remove any non-digit characters except the leading + if present
@@ -66,9 +74,43 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
     setLoading(true);
     
     try {
+      // Convert amount to appropriate currency for the selected country
+      let finalAmount = validAmount;
+      let finalCurrency = currency;
+      
+      // Convert to local currency if needed
+      const countryCurrencyMap: { [key: string]: string } = {
+        'Zambia': 'ZMW',
+        'Nigeria': 'NGN',
+        'Kenya': 'KES',
+        'Ghana': 'GHS',
+        'Uganda': 'UGX',
+        'Tanzania': 'TZS'
+      };
+      
+      const targetCurrency = countryCurrencyMap[selectedCountry];
+      if (targetCurrency && targetCurrency !== currency) {
+        try {
+          const conversion = await currencyService.convertCurrency(validAmount, currency, targetCurrency);
+          finalAmount = conversion.convertedAmount;
+          finalCurrency = targetCurrency;
+          console.log('Currency conversion for PawaPay:', {
+            original: `${validAmount} ${currency}`,
+            converted: `${finalAmount} ${finalCurrency}`
+          });
+        } catch (conversionError) {
+          console.warn('Currency conversion failed for PawaPay, using original amount:', conversionError);
+        }
+      }
+      
+      // Ensure final amount is valid
+      if (finalAmount <= 0) {
+        throw new Error('Invalid converted amount for payment');
+      }
+
       console.log('Initiating PawaPay payment with:', {
-        amount: Math.round(amount * 100),
-        currency: currency,
+        amount: Math.round(finalAmount * 100),
+        currency: finalCurrency,
         msisdn: formattedPhone,
         country: countryInfo.code,
         itemsCount: items.length
@@ -81,8 +123,8 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
 
       const { data, error } = await supabase.functions.invoke('create-pawapay-session', {
         body: {
-          amount: Math.round(amount * 100), // Convert to cents
-          currency: currency,
+          amount: Math.round(finalAmount * 100), // Convert to cents
+          currency: finalCurrency,
           msisdn: formattedPhone,
           country: countryInfo.code,
           returnUrl,

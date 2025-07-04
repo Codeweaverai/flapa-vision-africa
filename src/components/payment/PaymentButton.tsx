@@ -2,9 +2,11 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { currencyService } from '@/services/currencyService';
 
 interface PaymentButtonProps {
   courseId?: string;
@@ -15,6 +17,7 @@ interface PaymentButtonProps {
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   className?: string;
   disabled?: boolean;
+  currency?: string;
 }
 
 const PaymentButton: React.FC<PaymentButtonProps> = ({
@@ -25,9 +28,11 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   buttonText = "Proceed to Payment",
   variant = "default",
   className = "",
-  disabled = false
+  disabled = false,
+  currency = 'USD'
 }) => {
   const { user } = useAuth();
+  const { selectedCurrency } = useCurrency();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -50,13 +55,58 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
     setLoading(true);
     try {
-      console.log('[PAYMENT-BUTTON] Initiating payment for:', { courseId, eventId });
+      console.log('[PAYMENT-BUTTON] Starting payment process for:', { 
+        courseId, 
+        eventId, 
+        price, 
+        currency,
+        selectedCurrency 
+      });
+
+      // Ensure we have a valid price
+      const validPrice = Math.max(price || 0, 0);
+      if (validPrice <= 0) {
+        throw new Error("Invalid price amount");
+      }
+
+      // Convert price to selected currency if needed
+      let finalPrice = validPrice;
+      let finalCurrency = currency || 'USD';
+
+      if (selectedCurrency && selectedCurrency !== currency) {
+        try {
+          const conversion = await currencyService.convertCurrency(validPrice, currency || 'USD', selectedCurrency);
+          finalPrice = conversion.convertedAmount;
+          finalCurrency = selectedCurrency;
+          console.log('[PAYMENT-BUTTON] Currency conversion:', {
+            original: `${validPrice} ${currency}`,
+            converted: `${finalPrice} ${finalCurrency}`
+          });
+        } catch (conversionError) {
+          console.warn('[PAYMENT-BUTTON] Currency conversion failed, using original price:', conversionError);
+        }
+      }
+
+      // Ensure final price is still valid after conversion
+      if (finalPrice <= 0) {
+        console.error('[PAYMENT-BUTTON] Final price is invalid after conversion:', finalPrice);
+        throw new Error("Invalid converted price amount");
+      }
+
+      console.log('[PAYMENT-BUTTON] Initiating payment with final price:', {
+        finalPrice,
+        finalCurrency,
+        courseId,
+        eventId
+      });
       
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           courseId,
           eventId,
-          payment_method: 'stripe'
+          payment_method: 'stripe',
+          amount: finalPrice,
+          currency: finalCurrency
         }
       });
 
@@ -75,7 +125,8 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
       }
     } catch (error) {
       console.error('[PAYMENT-BUTTON] Payment error:', error);
-      toast.error("Payment initialization failed. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : 'Payment initialization failed';
+      toast.error(`Payment failed: ${errorMessage}`);
       setLoading(false);
     }
     // Note: We don't set loading to false here because we're redirecting away from the page
