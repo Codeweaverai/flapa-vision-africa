@@ -5,6 +5,7 @@ import { currencyService } from '@/services/currencyService';
 
 interface CurrencyContextType {
   currentCurrency: CurrencyCode;
+  selectedCurrency: CurrencyCode;
   setCurrency: (currency: CurrencyCode) => void;
   convertPrice: (amount: number, fromCurrency: CurrencyCode) => Promise<number>;
   formatPrice: (amount: number, currency?: CurrencyCode) => string;
@@ -40,7 +41,7 @@ export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) 
         } else {
           // Detect currency based on user's location
           const detectedCurrency = await currencyService.detectUserCurrency();
-          setCurrentCurrency(detectedCurrency);
+          setCurrentCurrency(detectedCurrency as CurrencyCode);
         }
 
         // Pre-fetch exchange rates
@@ -71,6 +72,7 @@ export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) 
 
   const value: CurrencyContextType = {
     currentCurrency,
+    selectedCurrency: currentCurrency, // Add selectedCurrency as alias for currentCurrency
     setCurrency,
     convertPrice,
     formatPrice,

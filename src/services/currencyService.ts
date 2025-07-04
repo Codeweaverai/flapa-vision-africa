@@ -50,26 +50,7 @@ export class CurrencyService {
       return this.exchangeRates;
     }
 
-    try {
-      // Try to fetch from Supabase first
-      const { data, error } = await supabase
-        .from('exchange_rates')
-        .select('*')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!error && data && data.rates) {
-        this.exchangeRates = data.rates;
-        this.lastFetchTime = now;
-        console.log('Fetched exchange rates from Supabase:', this.exchangeRates);
-        return this.exchangeRates;
-      }
-    } catch (error) {
-      console.warn('Failed to fetch exchange rates from Supabase:', error);
-    }
-
-    // Fallback to hardcoded rates
+    // Since exchange_rates table doesn't exist, use fallback rates
     console.log('Using fallback exchange rates');
     this.exchangeRates = { ...FALLBACK_RATES };
     this.lastFetchTime = now;
@@ -147,11 +128,12 @@ export class CurrencyService {
     }
   }
 
-  getSupportedCurrencies(): string[] {
-    return [...SUPPORTED_CURRENCIES];
+  async convertPrice(amount: number, fromCurrency: string, toCurrency: string): Promise<number> {
+    const result = await this.convertCurrency(amount, fromCurrency, toCurrency);
+    return result.convertedAmount;
   }
 
-  formatCurrency(amount: number, currency: string): string {
+  formatPrice(amount: number, currency: string): string {
     try {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -162,6 +144,39 @@ export class CurrencyService {
     } catch (error) {
       console.warn(`Error formatting currency ${currency}:`, error);
       return `${currency} ${amount.toFixed(2)}`;
+    }
+  }
+
+  formatCurrency(amount: number, currency: string): string {
+    return this.formatPrice(amount, currency);
+  }
+
+  getSupportedCurrencies(): string[] {
+    return [...SUPPORTED_CURRENCIES];
+  }
+
+  async detectUserCurrency(): Promise<string> {
+    // Simple detection based on browser locale or return USD as default
+    try {
+      const locale = navigator.language || 'en-US';
+      const country = locale.split('-')[1];
+      
+      // Map common countries to currencies
+      const countryToCurrency: { [key: string]: string } = {
+        'US': 'USD',
+        'GB': 'GBP',
+        'ZM': 'ZMW',
+        'NG': 'NGN',
+        'KE': 'KES',
+        'GH': 'GHS',
+        'UG': 'UGX',
+        'TZ': 'TZS'
+      };
+      
+      return countryToCurrency[country] || 'USD';
+    } catch (error) {
+      console.warn('Could not detect user currency:', error);
+      return 'USD';
     }
   }
 }

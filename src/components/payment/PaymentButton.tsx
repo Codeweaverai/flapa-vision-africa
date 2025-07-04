@@ -78,23 +78,34 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
           const conversion = await currencyService.convertCurrency(validPrice, currency || 'USD', selectedCurrency);
           finalPrice = conversion.convertedAmount;
           finalCurrency = selectedCurrency;
+          
+          // Ensure converted amount is valid
+          if (finalPrice <= 0) {
+            console.warn('[PAYMENT-BUTTON] Currency conversion resulted in 0 amount, using original price');
+            finalPrice = validPrice;
+            finalCurrency = currency || 'USD';
+          }
+          
           console.log('[PAYMENT-BUTTON] Currency conversion:', {
             original: `${validPrice} ${currency}`,
             converted: `${finalPrice} ${finalCurrency}`
           });
         } catch (conversionError) {
           console.warn('[PAYMENT-BUTTON] Currency conversion failed, using original price:', conversionError);
+          finalPrice = validPrice;
+          finalCurrency = currency || 'USD';
         }
       }
 
-      // Ensure final price is still valid after conversion
-      if (finalPrice <= 0) {
-        console.error('[PAYMENT-BUTTON] Final price is invalid after conversion:', finalPrice);
-        throw new Error("Invalid converted price amount");
+      // Final validation - ensure we have a valid amount
+      const amountToCharge = Math.max(finalPrice, 0.01); // Minimum 1 cent
+      if (amountToCharge <= 0) {
+        console.error('[PAYMENT-BUTTON] Final price is invalid:', finalPrice);
+        throw new Error("Invalid payment amount");
       }
 
       console.log('[PAYMENT-BUTTON] Initiating payment with final price:', {
-        finalPrice,
+        finalPrice: amountToCharge,
         finalCurrency,
         courseId,
         eventId
@@ -105,7 +116,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
           courseId,
           eventId,
           payment_method: 'stripe',
-          amount: finalPrice,
+          amount: amountToCharge,
           currency: finalCurrency
         }
       });
