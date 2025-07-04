@@ -68,7 +68,6 @@ const CourseLearningPage = () => {
   const loadCourse = async () => {
     try {
       setLoading(true);
-      // Fix the order clause syntax
       const { data, error } = await supabase
         .from('courses')
         .select(`
@@ -89,8 +88,6 @@ const CourseLearningPage = () => {
           )
         `)
         .eq('id', courseId)
-        .order('order_index', { foreignTable: 'course_modules' })
-        .order('order_index', { foreignTable: 'course_modules.lessons' })
         .single();
 
       if (error) throw error;
@@ -99,11 +96,11 @@ const CourseLearningPage = () => {
         // Sort modules and lessons by order_index
         const sortedCourse = {
           ...data,
-          course_modules: data.course_modules
+          course_modules: (data.course_modules || [])
             .sort((a, b) => a.order_index - b.order_index)
             .map(module => ({
               ...module,
-              lessons: module.lessons.sort((a, b) => a.order_index - b.order_index)
+              lessons: (module.lessons || []).sort((a, b) => a.order_index - b.order_index)
             }))
         };
 
@@ -163,7 +160,7 @@ const CourseLearningPage = () => {
 
           // Calculate overall progress
           const totalLessons = course?.course_modules.reduce((acc, module) => 
-            acc + module.lessons.length, 0) || 0;
+            acc + (module.lessons?.length || 0), 0) || 0;
           const progressPercentage = totalLessons > 0 ? (completed.length / totalLessons) * 100 : 0;
           setProgress(progressPercentage);
         }
@@ -265,7 +262,7 @@ const CourseLearningPage = () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <Book className="h-4 w-4" />
-                      {course?.course_modules.reduce((acc, module) => acc + module.lessons.length, 0)} lessons
+                      {course?.course_modules.reduce((acc, module) => acc + (module.lessons?.length || 0), 0)} lessons
                     </div>
                   </div>
                 </div>
@@ -339,7 +336,7 @@ const CourseLearningPage = () => {
                             </h4>
                           </div>
                           <div className="divide-y">
-                            {module.lessons.map((lesson, lessonIndex) => (
+                            {module.lessons?.map((lesson, lessonIndex) => (
                               <button
                                 key={lesson.id}
                                 onClick={() => setCurrentLesson(lesson)}
