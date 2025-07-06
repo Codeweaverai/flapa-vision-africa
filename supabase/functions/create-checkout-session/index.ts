@@ -323,16 +323,27 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
+    // Parse and log the full request body
     const requestBody = await req.json();
-    const { courseId, eventId, eventTicketId, returnUrl, payment_method = 'stripe', amount, currency = 'USD' } = requestBody;
-    
-    logStep("Request data", { courseId, eventId, eventTicketId, payment_method, amount, currency });
+    logStep("Full request body received", requestBody);
 
-    // Validate amount
-    if (!amount || amount <= 0) {
-      logStep("Invalid amount provided", { amount });
-      throw new Error("Invalid payment amount provided");
+    const { 
+      courseId, 
+      eventId, 
+      eventTicketId, 
+      returnUrl, 
+      payment_method = 'stripe', 
+      amount, 
+      currency = 'USD' 
+    } = requestBody;
+    
+    // Validate request completeness
+    if (!courseId && !eventId && !eventTicketId) {
+      logStep("Missing required identifiers", { courseId, eventId, eventTicketId });
+      throw new Error("Missing required checkout details: please provide courseId, eventTicketId, or eventId");
     }
+
+    logStep("Request validation passed", { courseId, eventId, eventTicketId, payment_method, amount, currency });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -379,133 +390,176 @@ serve(async (req) => {
     
     logStep("Setting up URLs", { successUrl, cancelUrl });
 
-    // Check if this is a direct item purchase (course or event ticket)
-    if (courseId || eventId || eventTicketId) {
-      let itemData;
-      let itemName;
-      let itemPrice;
-      let itemType;
+    // Handle item-specific checkout
+    let itemData;
+    let itemName;
+    let itemPrice;
+    let itemType;
+    let finalItemId;
 
-      if (courseId) {
-        const { data: course, error: courseError } = await supabaseClient
-          .from('courses')
-          .select('title, price')
-          .eq('id', courseId)
-          .single();
-
-        if (courseError) throw new Error(`Course not found: ${courseError.message}`);
-        
-        itemData = course;
-        itemName = course.title;
-        itemPrice = Math.max(course.price || 0, amount || 0); // Use the higher of course price or provided amount
-        itemType = 'course';
-        logStep("Course data retrieved", { courseId, title: itemName, price: itemPrice });
-      } else if (eventTicketId) {
-        const { data: ticket, error: ticketError } = await supabaseClient
-          .from('event_tickets')
-          .select('name, price')
-          .eq('id', eventTicketId)
-          .single();
-
-        if (ticketError) throw new Error(`Event ticket not found: ${ticketError.message}`);
-        
-        itemData = ticket;
-        itemName = ticket.name;
-        itemPrice = Math.max(ticket.price || 0, amount || 0); // Use the higher of ticket price or provided amount
-        itemType = 'event_ticket';
-        logStep("Event ticket data retrieved", { eventTicketId, name: itemName, price: itemPrice });
-      }
-
-      // Final validation of price
-      if (!itemPrice || itemPrice <= 0) {
-        logStep("Invalid item price", { itemPrice, amount });
-        throw new Error("Cannot process payment for items with invalid price");
-      }
-
-      // Create order first
-      const { data: order, error: orderError } = await supabaseClient
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          total_amount: itemPrice,
-          currency: currency,
-          payment_method: 'stripe',
-          payment_status: 'pending',
-          email: user.email
-        })
-        .select()
+    if (courseId) {
+      const { data: course, error: courseError } = await supabaseClient
+        .from('courses')
+        .select('title, price')
+        .eq('id', courseId)
         .single();
 
-      if (orderError) throw new Error(`Failed to create order: ${orderError.message}`);
-      logStep("Order created", { orderId: order.id, amount: itemPrice });
-
-      // Create order item
-      const { data: orderItem, error: orderItemError } = await supabaseClient
-        .from('order_items')
-        .insert({
-          order_id: order.id,
-          item_id: courseId || eventTicketId,
-          item_type: itemType,
-          item_name: itemName,
-          quantity: 1,
-          unit_price: itemPrice,
-          total_price: itemPrice
-        })
-        .select()
+      if (courseError) {
+        logStep("Course not found", { courseId, error: courseError });
+        throw new Error(`Course not found: ${courseError.message}`);
+      }
+      
+      itemData = course;
+      itemName = course.title;
+      // Use the higher of course price or provided amount, fallback to course price if amount is 0 or missing
+      itemPrice = Math.max(course.price || 0, amount || 0);
+      itemType = 'course';
+      finalItemId = courseId;
+      logStep("Course data retrieved", { courseId, title: itemName, coursePrice: course.price, providedAmount: amount, finalPrice: itemPrice });
+      
+    } else if (eventTicketId) {
+      const { data: ticket, error: ticketError } = await supabaseClient
+        .from('event_tickets')
+        .select('name, price, event_id')
+        .eq('id', eventTicketId)
         .single();
 
-      if (orderItemError) throw new Error(`Failed to create order item: ${orderItemError.message}`);
-      logStep("Order item created", { orderItemId: orderItem.id });
-
-      // Create Stripe checkout session
-      const sessionData = await stripe.checkout.sessions.create({
-        customer: customerId,
-        line_items: [
-          {
-            price_data: {
-              currency: currency.toLowerCase(),
-              product_data: { name: itemName },
-              unit_amount: Math.round(itemPrice * 100), // Convert to cents
-            },
-            quantity: 1,
-          },
-        ],
-        mode: "payment",
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        metadata: {
-          orderId: order.id,
-          userId: user.id,
-          itemType: itemType,
-          itemId: courseId || eventTicketId
-        }
-      });
-
-      logStep("Stripe session created", { sessionId: sessionData.id, url: sessionData.url });
-
-      // Process the purchase immediately for course enrollments
-      if (itemType === 'course') {
-        await processCourseEnrollment(supabaseClient, orderItem, order, user);
-        // Update order status to completed
-        await supabaseClient
-          .from('orders')
-          .update({ payment_status: 'completed' })
-          .eq('id', order.id);
-        logStep("Course enrollment processed and order completed");
+      if (ticketError) {
+        logStep("Event ticket not found", { eventTicketId, error: ticketError });
+        throw new Error(`Event ticket not found: ${ticketError.message}`);
       }
+      
+      itemData = ticket;
+      itemName = ticket.name;
+      // Use the higher of ticket price or provided amount, fallback to ticket price if amount is 0 or missing
+      itemPrice = Math.max(ticket.price || 0, amount || 0);
+      itemType = 'event_ticket';
+      finalItemId = eventTicketId;
+      logStep("Event ticket data retrieved", { eventTicketId, name: itemName, ticketPrice: ticket.price, providedAmount: amount, finalPrice: itemPrice });
+      
+    } else if (eventId) {
+      // If only eventId is provided, we need to get the default ticket or create one
+      const { data: event, error: eventError } = await supabaseClient
+        .from('events')
+        .select('title, price')
+        .eq('id', eventId)
+        .single();
 
-      return new Response(JSON.stringify({ url: sessionData.url }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      if (eventError) {
+        logStep("Event not found", { eventId, error: eventError });
+        throw new Error(`Event not found: ${eventError.message}`);
+      }
+      
+      itemData = event;
+      itemName = event.title;
+      // Use the higher of event price or provided amount, fallback to event price if amount is 0 or missing
+      itemPrice = Math.max(event.price || 0, amount || 0);
+      itemType = 'event';
+      finalItemId = eventId;
+      logStep("Event data retrieved", { eventId, title: itemName, eventPrice: event.price, providedAmount: amount, finalPrice: itemPrice });
     }
 
-    // If we reach here, no valid item was found
-    throw new Error("No valid course or event ticket specified");
+    // Now validate the final calculated price (not the raw amount)
+    if (!itemPrice || itemPrice <= 0) {
+      logStep("Invalid final item price after calculation", { 
+        itemPrice, 
+        originalAmount: amount, 
+        itemData: itemData ? { price: itemData.price } : null 
+      });
+      throw new Error(`Cannot process payment: item has no valid price. Item price: ${itemData?.price || 'N/A'}, Provided amount: ${amount || 'N/A'}`);
+    }
+
+    logStep("Price validation passed", { finalPrice: itemPrice });
+
+    // Create order first
+    const { data: order, error: orderError } = await supabaseClient
+      .from('orders')
+      .insert({
+        user_id: user.id,
+        total_amount: itemPrice,
+        currency: currency,
+        payment_method: 'stripe',
+        payment_status: 'pending',
+        email: user.email
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      logStep("Failed to create order", orderError);
+      throw new Error(`Failed to create order: ${orderError.message}`);
+    }
+    logStep("Order created", { orderId: order.id, amount: itemPrice });
+
+    // Create order item
+    const { data: orderItem, error: orderItemError } = await supabaseClient
+      .from('order_items')
+      .insert({
+        order_id: order.id,
+        item_id: finalItemId,
+        item_type: itemType,
+        item_name: itemName,
+        quantity: 1,
+        unit_price: itemPrice,
+        total_price: itemPrice
+      })
+      .select()
+      .single();
+
+    if (orderItemError) {
+      logStep("Failed to create order item", orderItemError);
+      throw new Error(`Failed to create order item: ${orderItemError.message}`);
+    }
+    logStep("Order item created", { orderItemId: orderItem.id });
+
+    // Create Stripe checkout session
+    const sessionData = await stripe.checkout.sessions.create({
+      customer: customerId,
+      line_items: [
+        {
+          price_data: {
+            currency: currency.toLowerCase(),
+            product_data: { name: itemName },
+            unit_amount: Math.round(itemPrice * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        orderId: order.id,
+        userId: user.id,
+        itemType: itemType,
+        itemId: finalItemId
+      }
+    });
+
+    logStep("Stripe session created", { sessionId: sessionData.id, url: sessionData.url });
+
+    // Process immediate enrollment for courses
+    if (itemType === 'course') {
+      await processCourseEnrollment(supabaseClient, orderItem, order, user);
+      // Update order status to completed
+      await supabaseClient
+        .from('orders')
+        .update({ payment_status: 'completed' })
+        .eq('id', order.id);
+      logStep("Course enrollment processed and order completed");
+    }
+
+    return new Response(JSON.stringify({ url: sessionData.url }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
 
   } catch (error) {
     logStep("Error in checkout session creation", { error: error.message });
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: "Check server logs for more information"
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
