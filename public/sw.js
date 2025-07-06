@@ -61,8 +61,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   
-  // Handle API requests with Network First strategy
-  if (isApiRequest(url)) {
+  // Handle API requests with Network First strategy (only for GET requests)
+  if (isApiRequest(url) && request.method === 'GET') {
     event.respondWith(networkFirstStrategy(request));
   }
   // Handle static assets with Cache First strategy
@@ -77,16 +77,23 @@ self.addEventListener('fetch', (event) => {
       })
     );
   }
+  // For non-GET API requests, just fetch without caching
+  else if (isApiRequest(url) && request.method !== 'GET') {
+    event.respondWith(fetch(request));
+  }
 });
 
-// Network First strategy for API calls
+// Network First strategy for API calls (only GET requests)
 async function networkFirstStrategy(request) {
   try {
     const networkResponse = await fetch(request);
     
     if (networkResponse.ok) {
       const cache = await caches.open(API_CACHE);
-      cache.put(request, networkResponse.clone());
+      // Only cache GET requests
+      if (request.method === 'GET') {
+        cache.put(request, networkResponse.clone());
+      }
     }
     
     return networkResponse;
