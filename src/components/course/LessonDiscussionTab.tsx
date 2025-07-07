@@ -43,32 +43,20 @@ const LessonDiscussionTab: React.FC<LessonDiscussionTabProps> = ({ lessonId }) =
 
   const fetchDiscussions = async () => {
     try {
-      // First get all discussions
-      const { data: discussionsData, error } = await supabase
+      const { data, error } = await supabase
         .from('lesson_discussions')
-        .select('*')
+        .select(`
+          *,
+          profiles (
+            full_name,
+            avatar_url
+          )
+        `)
         .eq('lesson_id', lessonId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-
-      // Then get profile data for each discussion
-      const discussionsWithProfiles = await Promise.all(
-        (discussionsData || []).map(async (discussion) => {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('id', discussion.user_id)
-            .single();
-
-          return {
-            ...discussion,
-            profiles: profileData
-          };
-        })
-      );
-
-      setDiscussions(discussionsWithProfiles);
+      setDiscussions(data || []);
     } catch (error) {
       console.error('Error fetching discussions:', error);
       toast.error('Failed to load discussions');

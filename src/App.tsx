@@ -1,415 +1,290 @@
 
-import { Suspense, lazy } from 'react';
-import { Toaster } from '@/components/ui/sonner';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from '@/contexts/AuthContext';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import AdminRoute from '@/components/admin/AdminRoute';
-
-// Lazy load components
-const Index = lazy(() => import('./pages/Index'));
-const About = lazy(() => import('./pages/About'));
-const Contact = lazy(() => import('./pages/Contact'));
-const AuthPage = lazy(() => import('./pages/AuthPage'));
-const UserAccountPage = lazy(() => import('./pages/UserAccountPage'));
-const UserSettingsPage = lazy(() => import('./pages/UserSettingsPage'));
-const LearningPage = lazy(() => import('./pages/LearningPage'));
-const MyCartPage = lazy(() => import('./pages/MyCartPage'));
-const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
-const OrdersPage = lazy(() => import('./pages/OrdersPage'));
-const InboxPage = lazy(() => import('./pages/InboxPage'));
-const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
-const CommunityPage = lazy(() => import('./pages/CommunityPage'));
-const CommunityPostPage = lazy(() => import('./pages/CommunityPostPage'));
-const ConsultationBookingPage = lazy(() => import('./pages/ConsultationBookingPage'));
-const SpeakingBookingPage = lazy(() => import('./pages/SpeakingBookingPage'));
-const VideoCallPage = lazy(() => import('./pages/VideoCallPage'));
-const RecordingsPage = lazy(() => import('./pages/RecordingsPage'));
-const CourseLearningPage = lazy(() => import('./pages/learning/CourseLearningPage'));
-const CourseResultsPage = lazy(() => import('./pages/CourseResultsPage'));
-const LessonPage = lazy(() => import('./pages/LessonPage'));
-const EventsPage = lazy(() => import('./pages/EventsPage'));
-const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
-const ExploreCoursesPage = lazy(() => import('./pages/ExploreCoursesPage'));
-const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage'));
-const ExploreEventsPage = lazy(() => import('./pages/ExploreEventsPage'));
-const CreatorProfilePage = lazy(() => import('./pages/CreatorProfilePage'));
-const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
-const MyTicketsPage = lazy(() => import('./pages/MyTicketsPage'));
-const WatchPartyPage = lazy(() => import('./pages/WatchPartyPage'));
-const PodcastsPage = lazy(() => import('./pages/PodcastsPage'));
-const PodcastDetailPage = lazy(() => import('./pages/PodcastDetailPage'));
-const PodcastEpisodePage = lazy(() => import('./pages/PodcastEpisodePage'));
-const NewsletterPage = lazy(() => import('./pages/NewsletterPage'));
-const ResourcesPage = lazy(() => import('./pages/ResourcesPage'));
-const SupportPage = lazy(() => import('./pages/SupportPage'));
-const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
-const TermsPage = lazy(() => import('./pages/TermsPage'));
-const CareersPage = lazy(() => import('./pages/CareersPage'));
-const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
-
-// Admin pages
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage'));
-const AdminEventsPage = lazy(() => import('./pages/admin/AdminEventsPage'));
-const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
-const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
-const AdminEnrollmentsPage = lazy(() => import('./pages/admin/AdminEnrollmentsPage'));
-const AdminBookingsPage = lazy(() => import('./pages/admin/AdminBookingsPage'));
-const AdminNewsletterPage = lazy(() => import('./pages/admin/AdminNewsletterPage'));
-const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
-const AdminPodcastsPage = lazy(() => import('./pages/admin/AdminPodcastsPage'));
-const AdminResourcesPage = lazy(() => import('./pages/admin/AdminResourcesPage'));
-const AdminMediaPage = lazy(() => import('./pages/admin/AdminMediaPage'));
-const AdminContactPage = lazy(() => import('./pages/admin/AdminContactPage'));
-const AdminSpeakersPage = lazy(() => import('./pages/admin/AdminSpeakersPage'));
-const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
-const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
-const AdminCreatorsPage = lazy(() => import('./pages/admin/AdminCreatorsPage'));
+import { AuthProvider } from './contexts/AuthContext';
+import { CurrencyProvider } from './contexts/CurrencyContext';
+import { CartProvider } from './contexts/CartContext';
+import HomePage from './pages/HomePage';
+import Index from './pages/Index';
+import CoursesPage from './pages/CoursesPage';
+import CourseDetailPage from './pages/learning/CourseDetailPage';
+import CourseLearningPage from './pages/learning/CourseLearningPage';
+import CoursePlayerPage from './pages/CoursePlayerPage';
+import CourseResultsPage from './pages/CourseResultsPage';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
+import BlogPage from './pages/BlogPage';
+import BlogPostPage from './pages/BlogPostPage';
+import ContactPage from './pages/ContactPage';
+import AboutPage from './pages/AboutPage';
+import PricingPage from './pages/PricingPage';
+import HelpCenterPage from './pages/HelpCenterPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import NotFoundPage from './pages/NotFoundPage';
+import NotFound from './pages/NotFound';
+import ProfilePage from './pages/ProfilePage';
+import AccountPage from './pages/AccountPage';
+import SettingsPage from './pages/SettingsPage';
+import AnimationsPage from './pages/AnimationsPage';
+import AuthPage from './pages/AuthPage';
+import BecomeCreatorPage from './pages/BecomeCreatorPage';
+import CommunityChatPage from './pages/CommunityChatPage';
+import CommunityCoursesPage from './pages/CommunityCoursesPage';
+import CommunityNotificationsPage from './pages/CommunityNotificationsPage';
+import CommunityPage from './pages/CommunityPage';
+import ConsultPage from './pages/ConsultPage';
+import CreatorPublicProfile from './pages/CreatorPublicProfile';
+import CreatorsPage from './pages/CreatorsPage';
+import ExploreCoursesPage from './pages/ExploreCoursesPage';
+import ExploreEventsPage from './pages/ExploreEventsPage';
+import InboxPage from './pages/InboxPage';
+import JobDetailPage from './pages/JobDetailPage';
+import LearnOurCulturePage from './pages/LearnOurCulturePage';
+import LearningPage from './pages/LearningPage';
+import MediaPage from './pages/MediaPage';
+import MediaPostDetailPage from './pages/MediaPostDetailPage';
+import MyCoursesPage from './pages/MyCoursesPage';
+import MyEventsPage from './pages/MyEventsPage';
+import MyOrdersPage from './pages/MyOrdersPage';
+import NotificationsPage from './pages/NotificationsPage';
+import SigninPage from './pages/SigninPage';
+import SpeakingPage from './pages/SpeakingPage';
+import TicketDetailPage from './pages/TicketDetailPage';
+import TicketPage from './pages/TicketPage';
+import TicketViewPage from './pages/TicketViewPage';
+import VenturesPage from './pages/VenturesPage';
+import UserProfile from './pages/account/UserProfile';
+import UserCourses from './pages/account/UserCourses';
+import UserEvents from './pages/account/UserEvents';
+import UserOrders from './pages/account/UserOrders';
+import UserSettings from './pages/account/UserSettings';
+import UserConsultations from './pages/account/UserConsultations';
+import CreatorDashboard from './pages/creator/CreatorDashboard';
+import CreatorCourses from './pages/creator/CreatorCourses';
+import CreatorCourseCreate from './pages/creator/CreatorCourseCreate';
+import CreatorCourseEdit from './pages/creator/CreatorCourseEdit';
+import CreatorCourseForm from './pages/creator/CreatorCourseForm';
+import CreatorCourseContent from './pages/creator/CreatorCourseContent';
+import CreatorEvents from './pages/creator/CreatorEvents';
+import CreatorEventCreate from './pages/creator/CreatorEventCreate';
+import CreatorEventEdit from './pages/creator/CreatorEventEdit';
+import CreatorEventForm from './pages/creator/CreatorEventForm';
+import CreatorEventAgenda from './pages/creator/CreatorEventAgenda';
+import CreatorEventSpeakers from './pages/creator/CreatorEventSpeakers';
+import CreatorEventTickets from './pages/creator/CreatorEventTickets';
+import CreatorAnalytics from './pages/creator/CreatorAnalytics';
+import CreatorSettings from './pages/creator/CreatorSettings';
+import CreatorEventRegistrations from './pages/creator/CreatorEventRegistrations';
+import CreatorPayments from './pages/creator/CreatorPayments';
+import CreatorPromoCodes from './pages/creator/CreatorPromoCodes';
+import CreatorStudents from './pages/creator/CreatorStudents';
+import EventAgenda from './pages/creator/EventAgenda';
+import EventSpeakers from './pages/creator/EventSpeakers';
+import LearningCourseDetailPage from './pages/learning/CourseDetailPage';
+import LearningCourseLearningPage from './pages/learning/CourseLearningPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import VerifyPage from './pages/VerifyPage';
+import AuthRoute from './components/ProtectedRoute';
+import CreatorRoute from './components/ProtectedRoute';
+import AdminRoute from './components/ProtectedRoute';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminCourses from './pages/admin/AdminCourses';
+import AdminCourseCreate from './pages/admin/AdminCourseCreate';
+import AdminCourseEdit from './pages/admin/AdminCourseEdit';
+import AdminCourseForm from './pages/admin/AdminCourseForm';
+import AdminCourseContent from './pages/admin/AdminCourseContent';
+import AdminEvents from './pages/admin/AdminEvents';
+import AdminEventCreate from './pages/admin/AdminEventCreate';
+import AdminEventEdit from './pages/admin/AdminEventEdit';
+import AdminEventForm from './pages/admin/AdminEventForm';
+import AdminEventRegistrations from './pages/admin/AdminEventRegistrations';
+import AdminRegistrations from './pages/admin/AdminRegistrations';
+import AdminOrders from './pages/admin/AdminOrders';
+import AdminReviews from './pages/admin/AdminReviews';
+import AdminMedia from './pages/admin/AdminMedia';
+import AdminMediaForm from './pages/admin/AdminMediaForm';
+import AdminNewsletters from './pages/admin/AdminNewsletters';
+import AdminAnalytics from './pages/admin/AdminAnalytics';
+import AdminSettings from './pages/admin/AdminSettings';
+import AdminContactSubmissions from './pages/admin/AdminContactSubmissions';
+import AdminConsultations from './pages/admin/AdminConsultations';
+import AdminSpeaking from './pages/admin/AdminSpeaking';
+import AdminSupportInbox from './pages/admin/AdminSupportInbox';
+import AdminPayouts from './pages/admin/AdminPayouts';
+import AdminCareers from './pages/admin/AdminCareers';
+import AdminLogin from './pages/admin/AdminLogin';
+import CourseContentPage from './pages/admin/CourseContentPage';
+import CourseForm from './pages/admin/CourseForm';
+import EventForm from './pages/admin/EventForm';
+import EventRegistrations from './pages/admin/EventRegistrations';
+import LessonFormDialog from './pages/admin/LessonFormDialog';
+import MediaForm from './pages/admin/MediaForm';
+import CheckoutPage from './pages/CheckoutPage';
+import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
+import PaymentCancelPage from './pages/PaymentCancelPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import CareersPage from './pages/careers';
+import { Toaster } from 'sonner';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import SmartAdvisorFloatingButton from './components/ai/SmartAdvisorFloatingButton';
 
 const queryClient = new QueryClient();
 
-const App = () => {
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <BrowserRouter>
-          <AuthProvider>
-            <Suspense fallback={<div>Loading...</div>}>
+      <BrowserRouter>
+        <AuthProvider>
+          <CurrencyProvider>
+            <CartProvider>
+              <Toaster />
+              <SmartAdvisorFloatingButton />
               <Routes>
-                {/* Public routes */}
+                {/* Public Routes */}
                 <Route path="/" element={<Index />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/home" element={<HomePage />} />
+                <Route path="/courses" element={<CoursesPage />} />
+                <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
+                <Route path="/learning/course/:id" element={<CourseLearningPage />} />
+                <Route path="/courses/:id/player" element={<CoursePlayerPage />} />
+                <Route path="/course-results" element={<CourseResultsPage />} />
                 <Route path="/events" element={<EventsPage />} />
                 <Route path="/events/:id" element={<EventDetailPage />} />
-                <Route path="/explore/courses" element={<ExploreCoursesPage />} />
-                <Route path="/courses/:id" element={<CourseDetailPage />} />
-                <Route path="/explore/events" element={<ExploreEventsPage />} />
-                <Route path="/creator/profile/:id" element={<CreatorProfilePage />} />
-                <Route path="/podcasts" element={<PodcastsPage />} />
-                <Route path="/podcasts/:id" element={<PodcastDetailPage />} />
-                <Route path="/podcasts/:id/episodes/:episodeId" element={<PodcastEpisodePage />} />
-                <Route path="/newsletter" element={<NewsletterPage />} />
-                <Route path="/resources" element={<ResourcesPage />} />
-                <Route path="/support" element={<SupportPage />} />
-                <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:id" element={<BlogPostPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/faq" element={<HelpCenterPage />} />
+                <Route path="/help" element={<HelpCenterPage />} />
+                <Route path="/terms" element={<TermsOfServicePage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/careers" element={<CareersPage />} />
+                <Route path="/careers/:id" element={<JobDetailPage />} />
+                <Route path="/animations" element={<AnimationsPage />} />
+                <Route path="/become-creator" element={<BecomeCreatorPage />} />
+                <Route path="/community" element={<CommunityPage />} />
+                <Route path="/community/chat" element={<CommunityChatPage />} />
+                <Route path="/community/courses" element={<CommunityCoursesPage />} />
+                <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
+                <Route path="/consult" element={<ConsultPage />} />
+                <Route path="/creators" element={<CreatorsPage />} />
+                <Route path="/creator/profile/:id" element={<CreatorPublicProfile />} />
+                <Route path="/explore-courses" element={<ExploreCoursesPage />} />
+                <Route path="/explore-events" element={<ExploreEventsPage />} />
+                <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
+                <Route path="/learning" element={<LearningPage />} />
+                <Route path="/learning/courses/:id" element={<LearningCourseDetailPage />} />
+                <Route path="/learning/courses/:id/learn" element={<LearningCourseLearningPage />} />
+                <Route path="/media" element={<MediaPage />} />
+                <Route path="/event-detail/:id" element={<EventDetailPage />} />
+                <Route path="/account" element={<AccountPage />} />
+                <Route path="/media/:id" element={<MediaPostDetailPage />} />
+                <Route path="/my-courses" element={<MyCoursesPage />} />
+                <Route path="/my-events" element={<MyEventsPage />} />
+                <Route path="/my-orders" element={<MyOrdersPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/speaking" element={<SpeakingPage />} />
+                <Route path="/tickets" element={<TicketPage />} />
+                <Route path="/tickets/:id" element={<TicketDetailPage />} />
+                <Route path="/tickets/:id/view" element={<TicketViewPage />} />
+                <Route path="/ventures" element={<VenturesPage />} />
 
-                {/* Protected routes */}
-                <Route 
-                  path="/account" 
-                  element={
-                    <ProtectedRoute>
-                      <UserAccountPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/settings" 
-                  element={
-                    <ProtectedRoute>
-                      <UserSettingsPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/learning" 
-                  element={
-                    <ProtectedRoute>
-                      <LearningPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/learning/course/:id" 
-                  element={
-                    <ProtectedRoute>
-                      <CourseLearningPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/courses/:courseId/results" 
-                  element={
-                    <ProtectedRoute>
-                      <CourseResultsPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/course/:courseId/lesson/:lessonId" 
-                  element={
-                    <ProtectedRoute>
-                      <LessonPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/cart" 
-                  element={
-                    <ProtectedRoute>
-                      <MyCartPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/checkout" 
-                  element={
-                    <ProtectedRoute>
-                      <CheckoutPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/orders" 
-                  element={
-                    <ProtectedRoute>
-                      <OrdersPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/inbox" 
-                  element={
-                    <ProtectedRoute>
-                      <InboxPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/notifications" 
-                  element={
-                    <ProtectedRoute>
-                      <NotificationsPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/community" 
-                  element={
-                    <ProtectedRoute>
-                      <CommunityPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/community/post/:id" 
-                  element={
-                    <ProtectedRoute>
-                      <CommunityPostPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/book-consultation" 
-                  element={
-                    <ProtectedRoute>
-                      <ConsultationBookingPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/book-speaking" 
-                  element={
-                    <ProtectedRoute>
-                      <SpeakingBookingPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/video-call/:id" 
-                  element={
-                    <ProtectedRoute>
-                      <VideoCallPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/recordings" 
-                  element={
-                    <ProtectedRoute>
-                      <RecordingsPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/payment-success" 
-                  element={
-                    <ProtectedRoute>
-                      <PaymentSuccessPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/tickets" 
-                  element={
-                    <ProtectedRoute>
-                      <MyTicketsPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/watch-party/:id" 
-                  element={
-                    <ProtectedRoute>
-                      <WatchPartyPage />
-                    </ProtectedRoute>
-                  } 
-                />
+                {/* Auth Routes */}
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/signin" element={<SigninPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+                <Route path="/email-verification" element={<VerifyPage />} />
+                <Route path="/verify" element={<VerifyPage />} />
+                <Route path="/logout" element={<LoginPage />} />
 
-                {/* Admin routes */}
-                <Route 
-                  path="/admin" 
-                  element={
-                    <AdminRoute>
-                      <AdminDashboard />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/courses" 
-                  element={
-                    <AdminRoute>
-                      <AdminCoursesPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/events" 
-                  element={
-                    <AdminRoute>
-                      <AdminEventsPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/users" 
-                  element={
-                    <AdminRoute>
-                      <AdminUsersPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/orders" 
-                  element={
-                    <AdminRoute>
-                      <AdminOrdersPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/enrollments" 
-                  element={
-                    <AdminRoute>
-                      <AdminEnrollmentsPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/bookings" 
-                  element={
-                    <AdminRoute>
-                      <AdminBookingsPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/newsletter" 
-                  element={
-                    <AdminRoute>
-                      <AdminNewsletterPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/settings" 
-                  element={
-                    <AdminRoute>
-                      <AdminSettingsPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/podcasts" 
-                  element={
-                    <AdminRoute>
-                      <AdminPodcastsPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/resources" 
-                  element={
-                    <AdminRoute>
-                      <AdminResourcesPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/media" 
-                  element={
-                    <AdminRoute>
-                      <AdminMediaPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/contact" 
-                  element={
-                    <AdminRoute>
-                      <AdminContactPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/speakers" 
-                  element={
-                    <AdminRoute>
-                      <AdminSpeakersPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/payouts" 
-                  element={
-                    <AdminRoute>
-                      <AdminPayoutsPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/analytics" 
-                  element={
-                    <AdminRoute>
-                      <AdminAnalyticsPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="/admin/creators" 
-                  element={
-                    <AdminRoute>
-                      <AdminCreatorsPage />
-                    </AdminRoute>
-                  } 
-                />
+                {/* User Routes */}
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/inbox" element={<InboxPage />} />
+                <Route path="/user" element={<AuthRoute><AccountPage /></AuthRoute>} />
+                <Route path="/user/dashboard" element={<AuthRoute><AccountPage /></AuthRoute>} />
+                <Route path="/user/profile" element={<AuthRoute><UserProfile /></AuthRoute>} />
+                <Route path="/user/courses" element={<AuthRoute><UserCourses /></AuthRoute>} />
+                <Route path="/user/events" element={<AuthRoute><UserEvents /></AuthRoute>} />
+                <Route path="/user/orders" element={<AuthRoute><UserOrders /></AuthRoute>} />
+                <Route path="/user/reviews" element={<AuthRoute><ProfilePage /></AuthRoute>} />
+                <Route path="/user/settings" element={<AuthRoute><UserSettings /></AuthRoute>} />
+                <Route path="/user/consultations" element={<AuthRoute><UserConsultations /></AuthRoute>} />
 
-                {/* 404 route */}
+                {/* Creator Routes */}
+                <Route path="/creator" element={<CreatorRoute><CreatorDashboard /></CreatorRoute>} />
+                <Route path="/creator/dashboard" element={<CreatorRoute><CreatorDashboard /></CreatorRoute>} />
+                <Route path="/creator/courses" element={<CreatorRoute><CreatorCourses /></CreatorRoute>} />
+                <Route path="/creator/courses/create" element={<CreatorRoute><CreatorCourseCreate /></CreatorRoute>} />
+                <Route path="/creator/courses/:id/edit" element={<CreatorRoute><CreatorCourseEdit /></CreatorRoute>} />
+                <Route path="/creator/courses/:id/content" element={<CreatorRoute><CreatorCourseContent /></CreatorRoute>} />
+                <Route path="/creator/events" element={<CreatorRoute><CreatorEvents /></CreatorRoute>} />
+                <Route path="/creator/events/create" element={<CreatorRoute><CreatorEventCreate /></CreatorRoute>} />
+                <Route path="/creator/events/:id/edit" element={<CreatorRoute><CreatorEventEdit /></CreatorRoute>} />
+                <Route path="/creator/events/:id/agenda" element={<CreatorRoute><CreatorEventAgenda /></CreatorRoute>} />
+                <Route path="/creator/events/:id/speakers" element={<CreatorRoute><CreatorEventSpeakers /></CreatorRoute>} />
+                <Route path="/creator/events/:id/tickets" element={<CreatorRoute><CreatorEventTickets /></CreatorRoute>} />
+                <Route path="/creator/events/:id/registrations" element={<CreatorRoute><CreatorEventRegistrations /></CreatorRoute>} />
+                <Route path="/creator/analytics" element={<CreatorRoute><CreatorAnalytics /></CreatorRoute>} />
+                <Route path="/creator/settings" element={<CreatorRoute><CreatorSettings /></CreatorRoute>} />
+                <Route path="/creator/payments" element={<CreatorRoute><CreatorPayments /></CreatorRoute>} />
+                <Route path="/creator/promo-codes" element={<CreatorRoute><CreatorPromoCodes /></CreatorRoute>} />
+                <Route path="/creator/students" element={<CreatorRoute><CreatorStudents /></CreatorRoute>} />
+
+                {/* Cart and Checkout */}
+                <Route path="/cart" element={<CheckoutPage />} />
+                <Route path="/checkout" element={<AuthRoute><CheckoutPage /></AuthRoute>} />
+                <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+                <Route path="/payment/success" element={<PaymentSuccessPage />} />
+                <Route path="/payment/cancel" element={<PaymentCancelPage />} />
+
+                {/* Admin Routes */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
+                <Route path="/admin/courses/create" element={<AdminRoute><AdminCourseCreate /></AdminRoute>} />
+                <Route path="/admin/courses/:id/edit" element={<AdminRoute><AdminCourseEdit /></AdminRoute>} />
+                <Route path="/admin/courses/:id/content" element={<AdminRoute><AdminCourseContent /></AdminRoute>} />
+                <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
+                <Route path="/admin/events/create" element={<AdminRoute><AdminEventCreate /></AdminRoute>} />
+                <Route path="/admin/events/:id/edit" element={<AdminRoute><AdminEventEdit /></AdminRoute>} />
+                <Route path="/admin/events/:id/registrations" element={<AdminRoute><AdminEventRegistrations /></AdminRoute>} />
+                <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
+                <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
+                <Route path="/admin/reviews" element={<AdminRoute><AdminReviews /></AdminRoute>} />
+                <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
+                <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+                <Route path="/admin/media/:id/edit" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+                <Route path="/admin/newsletters" element={<AdminRoute><AdminNewsletters /></AdminRoute>} />
+                <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+                <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+                <Route path="/admin/contact-submissions" element={<AdminRoute><AdminContactSubmissions /></AdminRoute>} />
+                <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
+                <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
+                <Route path="/admin/support-inbox" element={<AdminRoute><AdminSupportInbox /></AdminRoute>} />
+                <Route path="/admin/payouts" element={<AdminRoute><AdminPayouts /></AdminRoute>} />
+                <Route path="/admin/careers" element={<AdminRoute><AdminCareers /></AdminRoute>} />
+
+                {/* Catch-all route for 404 */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
-            </Suspense>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+            </CartProvider>
+          </CurrencyProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;

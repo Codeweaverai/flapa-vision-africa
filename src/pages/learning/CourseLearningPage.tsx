@@ -315,38 +315,6 @@ const CourseLearningPage = () => {
     setShowExamModal(true);
   };
 
-  const handleExamComplete = async (results: any) => {
-    if (!user || !courseId || !enrollment) return;
-
-    try {
-      // Save exam results to database
-      const { error } = await supabase
-        .from('final_exam_results')
-        .insert({
-          user_id: user.id,
-          course_id: courseId,
-          exam_id: finalExamId,
-          enrollment_id: enrollment.id,
-          score: results.score,
-          percentage_score: results.percentage,
-          passed: results.passed,
-          final_grade: results.percentage,
-          quiz_scores: results.quizScores || [],
-          completed_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error saving exam results:', error);
-        toast.error('Failed to save exam results');
-      } else {
-        toast.success('Exam results saved successfully!');
-      }
-    } catch (error) {
-      console.error('Error saving exam results:', error);
-      toast.error('Failed to save exam results');
-    }
-  };
-
   const getLessonStatus = (lessonId: string) => {
     return completedLessons.includes(lessonId) ? 'completed' : 'available';
   };
@@ -507,17 +475,6 @@ const CourseLearningPage = () => {
                               Mark as Complete
                             </Button>
                           )}
-
-                          {/* Video Transcripts */}
-                          <div className="mt-6">
-                            <VideoTranscripts 
-                              lessonId={currentLesson.id}
-                              onSeekTo={(time) => {
-                                // TODO: Implement video seeking functionality
-                                console.log('Seeking to:', time);
-                              }}
-                            />
-                          </div>
                         </CardContent>
                       </Card>
                     )}
@@ -584,7 +541,6 @@ const CourseLearningPage = () => {
                       completedLessons={completedLessons}
                       onQuizStart={handleQuizStart}
                       onFinalExamStart={handleFinalExamStart}
-                      creatorId={course.creator_id}
                     />
                   </CardContent>
                 </Card>
@@ -632,19 +588,8 @@ const CourseLearningPage = () => {
             setFinalExamId('');
             loadProgress(); // Refresh progress after exam
           }}
-          exam={{ 
-            id: finalExamId,
-            course_id: courseId!,
-            title: 'Final Exam',
-            description: 'Complete this exam to finish the course',
-            passing_score: 70,
-            time_limit_minutes: 90,
-            is_published: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }}
+          exam={{ id: finalExamId }} // Pass minimal exam data, component will fetch full data
           enrollmentId={enrollment.id}
-          onComplete={handleExamComplete}
         />
       )}
     </Layout>
