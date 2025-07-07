@@ -136,6 +136,16 @@ Best regards,
                   <div className="space-y-4">
                     <div>
                       <h1 className="text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
+                      
+                      {/* Static Image */}
+                      <div className="mb-4">
+                        <img
+                          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//female-pupil-reviewing-educational-research-collection-library.jpg"
+                          alt="Career opportunity"
+                          className="w-full h-64 object-cover rounded-lg"
+                        />
+                      </div>
+                      
                       <div className="flex flex-wrap gap-3">
                         <Badge variant="outline" className="flex items-center gap-1">
                           <Building className="h-3 w-3" />

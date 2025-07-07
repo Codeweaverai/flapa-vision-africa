@@ -58,16 +58,34 @@ const CourseLearningPage = () => {
   const [isEnrolled, setIsEnrolled] = useState(false);
 
   useEffect(() => {
+    console.log('CourseLearningPage mounted with courseId:', courseId);
+    console.log('User:', user);
+    
     if (courseId && user) {
       loadCourse();
       checkEnrollment();
       loadProgress();
+    } else if (courseId && !user) {
+      // User not authenticated, redirect to auth
+      console.log('User not authenticated, redirecting to auth');
+      navigate('/auth');
+    } else {
+      console.log('Missing courseId or user');
+      setLoading(false);
     }
-  }, [courseId, user]);
+  }, [courseId, user, navigate]);
 
   const loadCourse = async () => {
+    if (!courseId) {
+      console.error('No courseId provided');
+      setLoading(false);
+      return;
+    }
+
     try {
+      console.log('Loading course with ID:', courseId);
       setLoading(true);
+      
       const { data, error } = await supabase
         .from('courses')
         .select(`
@@ -88,63 +106,93 @@ const CourseLearningPage = () => {
           )
         `)
         .eq('id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading course:', error);
+        throw error;
+      }
 
-      if (data) {
-        // Sort modules and lessons by order_index
-        const sortedCourse = {
-          ...data,
-          course_modules: (data.course_modules || [])
-            .sort((a, b) => a.order_index - b.order_index)
-            .map(module => ({
-              ...module,
-              lessons: (module.lessons || []).sort((a, b) => a.order_index - b.order_index)
-            }))
-        };
+      if (!data) {
+        console.log('Course not found');
+        toast.error('Course not found');
+        navigate('/courses');
+        return;
+      }
 
-        setCourse(sortedCourse);
+      console.log('Course loaded successfully:', data);
 
-        // Set first lesson as current if none selected
-        if (sortedCourse.course_modules.length > 0 && sortedCourse.course_modules[0].lessons.length > 0) {
-          setCurrentLesson(sortedCourse.course_modules[0].lessons[0]);
-        }
+      // Sort modules and lessons by order_index
+      const sortedCourse = {
+        ...data,
+        course_modules: (data.course_modules || [])
+          .sort((a, b) => a.order_index - b.order_index)
+          .map(module => ({
+            ...module,
+            lessons: (module.lessons || []).sort((a, b) => a.order_index - b.order_index)
+          }))
+      };
+
+      setCourse(sortedCourse);
+
+      // Set first lesson as current if none selected
+      if (sortedCourse.course_modules.length > 0 && sortedCourse.course_modules[0].lessons.length > 0) {
+        setCurrentLesson(sortedCourse.course_modules[0].lessons[0]);
       }
     } catch (error) {
       console.error('Error loading course:', error);
       toast.error('Failed to load course');
+      navigate('/courses');
     } finally {
       setLoading(false);
     }
   };
 
   const checkEnrollment = async () => {
+    if (!courseId || !user?.id) {
+      console.log('Missing courseId or user for enrollment check');
+      return;
+    }
+
     try {
+      console.log('Checking enrollment for user:', user.id, 'course:', courseId);
+      
       const { data, error } = await supabase
         .from('course_enrollments')
         .select('id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
         .eq('payment_status', 'completed')
-        .single();
+        .maybeSingle();
 
-      if (data) {
-        setIsEnrolled(true);
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking enrollment:', error);
+        return;
       }
+
+      const enrolled = !!data;
+      console.log('Enrollment status:', enrolled);
+      setIsEnrolled(enrolled);
     } catch (error) {
       console.error('Error checking enrollment:', error);
     }
   };
 
   const loadProgress = async () => {
+    if (!courseId || !user?.id) {
+      console.log('Missing courseId or user for progress check');
+      return;
+    }
+
     try {
+      console.log('Loading progress for user:', user.id, 'course:', courseId);
+      
       const { data: enrollment } = await supabase
         .from('course_enrollments')
         .select('id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
       if (enrollment) {
         const { data: progressData } = await supabase
@@ -163,6 +211,8 @@ const CourseLearningPage = () => {
             acc + (module.lessons?.length || 0), 0) || 0;
           const progressPercentage = totalLessons > 0 ? (completed.length / totalLessons) * 100 : 0;
           setProgress(progressPercentage);
+          
+          console.log('Progress loaded:', { completed: completed.length, total: totalLessons, percentage: progressPercentage });
         }
       }
     } catch (error) {
@@ -171,13 +221,18 @@ const CourseLearningPage = () => {
   };
 
   const markLessonComplete = async (lessonId: string) => {
+    if (!user || !courseId || !lessonId) {
+      toast.error('Unable to mark lesson complete');
+      return;
+    }
+
     try {
       const { data: enrollment } = await supabase
         .from('course_enrollments')
         .select('id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
       if (enrollment) {
         const { error } = await supabase
@@ -193,6 +248,9 @@ const CourseLearningPage = () => {
           setCompletedLessons(prev => [...prev, lessonId]);
           toast.success('Lesson completed!');
           loadProgress(); // Refresh progress
+        } else {
+          console.error('Error marking lesson complete:', error);
+          toast.error('Failed to mark lesson complete');
         }
       }
     } catch (error) {
@@ -205,16 +263,40 @@ const CourseLearningPage = () => {
     return completedLessons.includes(lessonId) ? 'completed' : 'available';
   };
 
+  // Show loading state
   if (loading) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading course...</p>
+          </div>
         </div>
       </Layout>
     );
   }
 
+  // Show error state if no course
+  if (!course) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <Card className="max-w-md text-center">
+            <CardContent className="pt-6">
+              <h2 className="text-xl font-semibold mb-4">Course Not Found</h2>
+              <p className="text-gray-600 mb-6">The course you're looking for doesn't exist or has been removed.</p>
+              <Button onClick={() => navigate('/courses')}>
+                Browse Courses
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Show enrollment required state
   if (!isEnrolled) {
     return (
       <Layout>
@@ -253,16 +335,16 @@ const CourseLearningPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    {course?.title}
+                    {course.title}
                   </h1>
                   <div className="flex items-center gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      {course?.duration_minutes} minutes
+                      {course.duration_minutes} minutes
                     </div>
                     <div className="flex items-center gap-1">
                       <Book className="h-4 w-4" />
-                      {course?.course_modules.reduce((acc, module) => acc + (module.lessons?.length || 0), 0)} lessons
+                      {course.course_modules.reduce((acc, module) => acc + (module.lessons?.length || 0), 0)} lessons
                     </div>
                   </div>
                 </div>
@@ -328,7 +410,7 @@ const CourseLearningPage = () => {
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="max-h-96 overflow-y-auto">
-                      {course?.course_modules.map((module, moduleIndex) => (
+                      {course.course_modules.map((module, moduleIndex) => (
                         <div key={module.id} className="border-b last:border-b-0">
                           <div className="p-4 bg-gray-50">
                             <h4 className="font-medium text-sm">
@@ -363,7 +445,7 @@ const CourseLearningPage = () => {
                 </Card>
 
                 {/* Certificate Section */}
-                {course?.certificate_enabled && progress === 100 && (
+                {course.certificate_enabled && progress === 100 && (
                   <Card className="mt-4">
                     <CardContent className="p-4 text-center">
                       <Award className="h-8 w-8 mx-auto mb-2 text-orange-600" />
