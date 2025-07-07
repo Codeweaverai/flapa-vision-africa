@@ -1,74 +1,45 @@
 
 import React, { useState, useEffect } from 'react';
-import { Star, MessageCircle, Send, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { Star, StarHalf } from 'lucide-react';
 
-interface CourseReview {
+interface Review {
   id: string;
-  user_id: string;
   rating: number;
-  review_text: string;
+  review_text?: string;
   created_at: string;
-  updated_at: string;
-  profiles: {
-    full_name: string;
-    avatar_url: string;
+  user_id: string;
+  profiles?: {
+    full_name?: string;
+    avatar_url?: string;
   };
 }
 
 interface CourseReviewsTabProps {
   courseId: string;
-  averageRating: number;
-  totalReviews: number;
 }
 
-const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({ 
-  courseId, 
-  averageRating, 
-  totalReviews 
-}) => {
+const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({ courseId }) => {
   const { user } = useAuth();
-  const [reviews, setReviews] = useState<CourseReview[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [userReview, setUserReview] = useState<Review | null>(null);
   const [newRating, setNewRating] = useState(0);
   const [newReview, setNewReview] = useState('');
-  const [userReview, setUserReview] = useState<CourseReview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    fetchReviews();
-    if (user) {
-      checkUserReview();
+    if (courseId) {
+      fetchReviews();
     }
-
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('course-reviews')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'course_reviews',
-          filter: `course_id=eq.${courseId}`
-        },
-        () => {
-          fetchReviews();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [courseId, user]);
 
   const fetchReviews = async () => {
@@ -76,35 +47,29 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({
       const { data, error } = await supabase
         .from('course_reviews')
         .select(`
-          id,
-          user_id,
-          rating,
-          review_text,
-          created_at,
-          updated_at
+          *,
+          profiles (
+            full_name,
+            avatar_url
+          )
         `)
         .eq('course_id', courseId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      // Fetch user profiles separately
-      const reviewsWithProfiles = await Promise.all(
-        (data || []).map(async (review) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('id', review.user_id)
-            .single();
-
-          return {
-            ...review,
-            profiles: profile || { full_name: 'Anonymous User', avatar_url: null }
-          };
-        })
-      );
-
-      setReviews(reviewsWithProfiles);
+      
+      const allReviews = data || [];
+      setReviews(allReviews);
+      
+      // Find user's existing review
+      if (user) {
+        const existingReview = allReviews.find(r => r.user_id === user.id);
+        if (existingReview) {
+          setUserReview(existingReview);
+          setNewRating(existingReview.rating);
+          setNewReview(existingReview.review_text || '');
+        }
+      }
     } catch (error) {
       console.error('Error fetching reviews:', error);
       toast.error('Failed to load reviews');
@@ -113,39 +78,8 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({
     }
   };
 
-  const checkUserReview = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('course_reviews')
-        .select('*')
-        .eq('course_id', courseId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (data) {
-        // Add default profiles object to match interface
-        const reviewWithProfiles = {
-          ...data,
-          profiles: { full_name: 'You', avatar_url: null }
-        };
-        setUserReview(reviewWithProfiles);
-        setNewRating(data.rating);
-        setNewReview(data.review_text || '');
-      }
-    } catch (error) {
-      // User hasn't reviewed yet, which is fine
-    }
-  };
-
   const submitReview = async () => {
-    if (!user) {
-      toast.error('Please sign in to leave a review');
-      return;
-    }
-
-    if (newRating === 0) {
+    if (!user || newRating === 0) {
       toast.error('Please select a rating');
       return;
     }
@@ -158,7 +92,7 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({
           .from('course_reviews')
           .update({
             rating: newRating,
-            review_text: newReview,
+            review_text: newReview || null,
             updated_at: new Date().toISOString()
           })
           .eq('id', userReview.id);
@@ -173,14 +107,15 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({
             course_id: courseId,
             user_id: user.id,
             rating: newRating,
-            review_text: newReview
+            review_text: newReview || null
           });
 
         if (error) throw error;
         toast.success('Review submitted successfully');
       }
-
-      await checkUserReview();
+      
+      setIsEditing(false);
+      await fetchReviews();
     } catch (error) {
       console.error('Error submitting review:', error);
       toast.error('Failed to submit review');
@@ -189,21 +124,53 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({
     }
   };
 
-  const renderStars = (rating: number, interactive = false, onStarClick?: (rating: number) => void) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-5 w-5 cursor-pointer ${
-          i < rating 
-            ? 'text-yellow-400 fill-current' 
-            : interactive 
-              ? 'text-gray-300 hover:text-yellow-300' 
-              : 'text-gray-300'
-        }`}
-        onClick={() => interactive && onStarClick && onStarClick(i + 1)}
-      />
-    ));
+  const renderStars = (rating: number, interactive = false) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+    
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push(
+          <Star 
+            key={i} 
+            className={`h-5 w-5 ${interactive ? 'cursor-pointer hover:scale-110' : ''} fill-yellow-400 text-yellow-400`}
+            onClick={interactive ? () => setNewRating(i) : undefined}
+          />
+        );
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push(
+          <StarHalf 
+            key={i} 
+            className={`h-5 w-5 ${interactive ? 'cursor-pointer hover:scale-110' : ''} fill-yellow-400 text-yellow-400`}
+            onClick={interactive ? () => setNewRating(i) : undefined}
+          />
+        );
+      } else {
+        stars.push(
+          <Star 
+            key={i} 
+            className={`h-5 w-5 ${interactive ? 'cursor-pointer hover:scale-110' : ''} text-gray-300`}
+            onClick={interactive ? () => setNewRating(i) : undefined}
+          />
+        );
+      }
+    }
+    return stars;
   };
+
+  const averageRating = reviews.length > 0 
+    ? reviews.reduce((acc, review) => acc + review.rating, 0) / reviews.length 
+    : 0;
+
+  if (!user) {
+    return (
+      <div className="text-center py-8">
+        <Star className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+        <p className="text-gray-500">Please sign in to view and write reviews</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -215,103 +182,134 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Overall Rating Summary */}
+      {/* Rating Summary */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-orange-500" />
-            Course Reviews
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="text-3xl font-bold">{averageRating.toFixed(1)}</div>
-            <div className="flex items-center gap-1">
-              {renderStars(Math.round(averageRating))}
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                {renderStars(averageRating)}
+                <span className="text-2xl font-bold">{averageRating.toFixed(1)}</span>
+              </div>
+              <p className="text-gray-600">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</p>
             </div>
-            <Badge variant="outline">{totalReviews} reviews</Badge>
           </div>
         </CardContent>
       </Card>
 
-      {/* Review Form */}
-      {user && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {userReview ? 'Update Your Review' : 'Leave a Review'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Rating</label>
-              <div className="flex gap-1">
-                {renderStars(newRating, true, setNewRating)}
+      {/* User's Review Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {userReview ? (isEditing ? 'Edit Your Review' : 'Your Review') : 'Write a Review'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!userReview || isEditing ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-2">Rating</label>
+                <div className="flex items-center gap-1">
+                  {renderStars(newRating, true)}
+                </div>
               </div>
-            </div>
-            
+              <div>
+                <label className="block text-sm font-medium mb-2">Review (Optional)</label>
+                <Textarea
+                  placeholder="Share your experience with this course..."
+                  value={newReview}
+                  onChange={(e) => setNewReview(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={submitReview}
+                  disabled={submitting || newRating === 0}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                >
+                  {submitting ? 'Submitting...' : userReview ? 'Update Review' : 'Submit Review'}
+                </Button>
+                {isEditing && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setNewRating(userReview?.rating || 0);
+                      setNewReview(userReview?.review_text || '');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </>
+          ) : (
             <div>
-              <label className="block text-sm font-medium mb-2">Review (Optional)</label>
-              <Textarea
-                placeholder="Share your thoughts about this course..."
-                value={newReview}
-                onChange={(e) => setNewReview(e.target.value)}
-                rows={4}
-              />
+              <div className="flex items-center gap-2 mb-2">
+                {renderStars(userReview.rating)}
+                <span className="font-medium">{userReview.rating}/5</span>
+              </div>
+              {userReview.review_text && (
+                <p className="text-gray-700 mb-3">{userReview.review_text}</p>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit Review
+              </Button>
             </div>
-            
-            <Button 
-              onClick={submitReview}
-              disabled={submitting || newRating === 0}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {submitting ? 'Submitting...' : userReview ? 'Update Review' : 'Submit Review'}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Reviews List */}
       <div className="space-y-4">
-        {reviews.length === 0 ? (
+        <h3 className="text-lg font-semibold">All Reviews</h3>
+        
+        {reviews.filter(r => r.user_id !== user.id).length === 0 ? (
           <Card>
             <CardContent className="text-center py-8">
-              <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-gray-500">No reviews yet. Be the first to review this course!</p>
+              <Star className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-500">No other reviews yet.</p>
             </CardContent>
           </Card>
         ) : (
-          reviews.map((review) => (
-            <Card key={review.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={review.profiles?.avatar_url} />
-                    <AvatarFallback>
-                      {review.profiles?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium">{review.profiles?.full_name || 'Anonymous User'}</span>
-                      <div className="flex items-center gap-1">
-                        {renderStars(review.rating)}
+          reviews
+            .filter(r => r.user_id !== user.id)
+            .map((review) => (
+              <Card key={review.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={review.profiles?.avatar_url} />
+                      <AvatarFallback>
+                        {review.profiles?.full_name?.charAt(0) || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm">
+                          {review.profiles?.full_name || 'Anonymous'}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {renderStars(review.rating)}
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {format(new Date(review.created_at), 'MMM d, yyyy')}
+                        </span>
                       </div>
-                      <span className="text-sm text-gray-500">
-                        {format(new Date(review.created_at), 'MMM d, yyyy')}
-                      </span>
+                      {review.review_text && (
+                        <p className="text-gray-700 whitespace-pre-wrap">{review.review_text}</p>
+                      )}
                     </div>
-                    
-                    {review.review_text && (
-                      <p className="text-gray-700">{review.review_text}</p>
-                    )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            ))
         )}
       </div>
     </div>
