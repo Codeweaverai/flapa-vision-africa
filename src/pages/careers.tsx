@@ -321,7 +321,7 @@ const CareersPage = () => {
                         </div>
                       </div>
                       <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
-                        <Link to={`/jobs/${position.id}`}>
+                        <Link to={`/careers/${position.id}`}>
                           Apply Now
                         </Link>
                       </Button>
