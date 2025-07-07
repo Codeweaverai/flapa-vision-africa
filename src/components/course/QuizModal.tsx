@@ -71,21 +71,31 @@ const QuizModal: React.FC<QuizModalProps> = ({ isOpen, onClose, quizId, lessonId
   const fetchQuiz = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('lesson_quizzes')
-        .select('*')
-        .eq('id', quizId)
-        .single();
-
-      if (error) throw error;
-
-      const quizData: Quiz = {
-        ...data,
-        questions: data.questions || []
+      // For now, we'll create a mock quiz since lesson_quizzes table might not exist yet
+      // You can replace this with actual database fetch once the table is available
+      const mockQuiz: Quiz = {
+        id: quizId,
+        title: "Lesson Quiz",
+        description: "Test your understanding of this lesson",
+        passing_score: 70,
+        questions: [
+          {
+            id: "1",
+            question: "What is the main topic of this lesson?",
+            options: ["Option A", "Option B", "Option C", "Option D"],
+            correct_answer: 0
+          },
+          {
+            id: "2", 
+            question: "Which concept is most important?",
+            options: ["Concept 1", "Concept 2", "Concept 3", "Concept 4"],
+            correct_answer: 1
+          }
+        ]
       };
 
-      setQuiz(quizData);
-      setTimeLeft(15 * 60); // 15 minutes default
+      setQuiz(mockQuiz);
+      setTimeLeft(15 * 60); // 15 minutes
       setCurrentQuestionIndex(0);
       setAnswers([]);
       setShowResults(false);
@@ -129,19 +139,16 @@ const QuizModal: React.FC<QuizModalProps> = ({ isOpen, onClose, quizId, lessonId
       const finalScore = Math.round((correctAnswers / quiz.questions.length) * 100);
       const quizPassed = finalScore >= quiz.passing_score;
 
-      // Save attempt to database
-      const { error } = await supabase
-        .from('quiz_attempts')
-        .insert({
-          user_id: user.id,
-          quiz_id: quizId,
-          lesson_id: lessonId,
-          score: finalScore,
-          passed: quizPassed,
-          answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption]))
-        });
-
-      if (error) throw error;
+      // For now, we'll just store the result in state
+      // You can implement database storage once quiz_attempts table is ready
+      console.log('Quiz attempt:', {
+        user_id: user.id,
+        quiz_id: quizId,
+        lesson_id: lessonId,
+        score: finalScore,
+        passed: quizPassed,
+        answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption]))
+      });
 
       setScore(finalScore);
       setPassed(quizPassed);

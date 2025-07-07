@@ -44,26 +44,36 @@ const CourseReviewsTab: React.FC<CourseReviewsTabProps> = ({ courseId }) => {
 
   const fetchReviews = async () => {
     try {
-      const { data, error } = await supabase
+      // First get all reviews
+      const { data: reviewsData, error: reviewsError } = await supabase
         .from('course_reviews')
-        .select(`
-          *,
-          profiles (
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('course_id', courseId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      const allReviews = data || [];
-      setReviews(allReviews);
+      if (reviewsError) throw reviewsError;
+
+      // Then get profile data for each review
+      const reviewsWithProfiles = await Promise.all(
+        (reviewsData || []).map(async (review) => {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', review.user_id)
+            .single();
+
+          return {
+            ...review,
+            profiles: profileData
+          };
+        })
+      );
+
+      setReviews(reviewsWithProfiles);
       
       // Find user's existing review
       if (user) {
-        const existingReview = allReviews.find(r => r.user_id === user.id);
+        const existingReview = reviewsWithProfiles.find(r => r.user_id === user.id);
         if (existingReview) {
           setUserReview(existingReview);
           setNewRating(existingReview.rating);

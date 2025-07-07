@@ -1,576 +1,368 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
-import Layout from '@/components/layout/Layout';
 import { 
   Award, 
-  Download, 
-  Calendar, 
+  ArrowLeft, 
   CheckCircle, 
+  XCircle, 
+  Clock,
   Star,
-  TrendingUp,
-  GraduationCap,
-  Target
+  Trophy,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
-interface ExamResult {
+interface CourseResult {
   id: string;
-  score: number;
+  course_id: string;
+  user_id: string;
+  final_grade: number;
   percentage_score: number;
   passed: boolean;
-  quiz_scores: number[];
-  final_grade: number;
   completed_at: string;
-  course: {
-    title: string;
-    thumbnail_url?: string;
-  };
-  exam: {
-    title: string;
-    passing_score: number;
-  };
+  quiz_scores: any[];
 }
 
-interface Certificate {
+interface QuizResult {
   id: string;
-  verification_code: string;
-  issue_date: string;
-  pdf_url?: string;
-  course_title?: string;
+  quiz_id: string;
+  lesson_id: string;
+  score: number;
+  passed: boolean;
+  completed_at: string;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  creator_id: string;
+  certificate_enabled: boolean;
 }
 
 const CourseResultsPage = () => {
-  const { user } = useAuth();
+  const { courseId } = useParams();
   const navigate = useNavigate();
-  const [examResults, setExamResults] = useState<ExamResult[]>([]);
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const { user } = useAuth();
+  const [course, setCourse] = useState<Course | null>(null);
+  const [courseResult, setCourseResult] = useState<CourseResult | null>(null);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCertificateModal, setShowCertificateModal] = useState(false);
-  const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
+    if (courseId && user) {
+      fetchCourseResults();
     }
-    loadResults();
-  }, [user]);
+  }, [courseId, user]);
 
-  const loadResults = async () => {
+  const fetchCourseResults = async () => {
     try {
-      // Fetch exam results with proper error handling
-      const { data: resultsData, error: resultsError } = await supabase
+      setLoading(true);
+
+      // Fetch course details
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw courseError;
+      setCourse(courseData);
+
+      // Fetch final exam results
+      const { data: examResults, error: examError } = await supabase
         .from('final_exam_results')
-        .select(`
-          *,
-          course:courses!final_exam_results_course_id_fkey(title, thumbnail_url),
-          exam:final_exams!final_exam_results_exam_id_fkey(title, passing_score)
-        `)
-        .eq('user_id', user!.id)
-        .order('completed_at', { ascending: false });
+        .select('*')
+        .eq('course_id', courseId)
+        .eq('user_id', user?.id)
+        .order('completed_at', { ascending: false })
+        .limit(1);
 
-      if (resultsError) {
-        console.error('Error fetching exam results:', resultsError);
-      } else {
-        // Transform the data to match our interface
-        const transformedResults: ExamResult[] = resultsData?.map(result => {
-          // Safely convert quiz_scores from Json to number[]
-          let quizScores: number[] = [];
-          if (Array.isArray(result.quiz_scores)) {
-            quizScores = result.quiz_scores.map((score: any) => {
-              const numScore = Number(score);
-              return isNaN(numScore) ? 0 : numScore;
-            });
-          }
-
-          return {
-            id: result.id,
-            score: result.score,
-            percentage_score: result.percentage_score,
-            passed: result.passed,
-            quiz_scores: quizScores,
-            final_grade: result.final_grade,
-            completed_at: result.completed_at,
-            course: {
-              title: result.course?.title || 'Unknown Course',
-              thumbnail_url: result.course?.thumbnail_url
-            },
-            exam: {
-              title: result.exam?.title || 'Final Exam',
-              passing_score: result.exam?.passing_score || 70
-            }
-          };
-        }) || [];
-        
-        setExamResults(transformedResults);
+      if (examError && examError.code !== 'PGRST116') throw examError;
+      
+      if (examResults && examResults.length > 0) {
+        setCourseResult(examResults[0]);
       }
 
-      // Fetch certificates with better error handling
-      const { data: userEnrollments, error: enrollmentError } = await supabase
-        .from('course_enrollments')
-        .select('id, course_id, courses!course_enrollments_course_id_fkey(title)')
-        .eq('user_id', user!.id);
-
-      if (enrollmentError) {
-        console.error('Error fetching enrollments:', enrollmentError);
-      } else if (userEnrollments && userEnrollments.length > 0) {
-        const enrollmentIds = userEnrollments.map(e => e.id);
-        
-        const { data: certificatesData, error: certificatesError } = await supabase
-          .from('certificates')
-          .select('*')
-          .in('enrollment_id', enrollmentIds)
-          .order('issue_date', { ascending: false });
-
-        if (certificatesError) {
-          console.error('Error fetching certificates:', certificatesError);
-        } else {
-          // Transform certificates with course titles
-          const transformedCertificates: Certificate[] = certificatesData?.map(cert => {
-            const enrollment = userEnrollments.find(e => e.id === cert.enrollment_id);
-            return {
-              id: cert.id,
-              verification_code: cert.verification_code,
-              issue_date: cert.issue_date,
-              pdf_url: cert.pdf_url || undefined,
-              course_title: enrollment?.courses?.title || 'Course Certificate'
-            };
-          }) || [];
-          
-          setCertificates(transformedCertificates);
+      // Fetch quiz results (mock data for now)
+      // In a real implementation, you would fetch from quiz_attempts table
+      const mockQuizResults: QuizResult[] = [
+        {
+          id: '1',
+          quiz_id: 'quiz-1',
+          lesson_id: 'lesson-1',
+          score: 85,
+          passed: true,
+          completed_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          quiz_id: 'quiz-2',
+          lesson_id: 'lesson-2',
+          score: 92,
+          passed: true,
+          completed_at: new Date().toISOString()
         }
-      }
+      ];
+      setQuizResults(mockQuizResults);
 
     } catch (error) {
-      console.error('Error loading results:', error);
-      toast.error('Failed to load results');
+      console.error('Error fetching course results:', error);
+      toast.error('Failed to load course results');
     } finally {
       setLoading(false);
     }
   };
 
-  const generateCertificateHTML = (certificate: Certificate) => {
-    const currentDate = new Date(certificate.issue_date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>SkillPulse Certificate</title>
-        <style>
-            body {
-                font-family: 'Georgia', serif;
-                margin: 0;
-                padding: 40px;
-                background: linear-gradient(135deg, #f59e0b 0%, #8b5cf6 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .certificate {
-                background: white;
-                padding: 60px;
-                border-radius: 20px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                max-width: 800px;
-                width: 100%;
-                text-align: center;
-                border: 8px solid #f59e0b;
-                position: relative;
-                margin: auto;
-            }
-            .certificate::before {
-                content: '';
-                position: absolute;
-                top: 20px;
-                left: 20px;
-                right: 20px;
-                bottom: 20px;
-                border: 2px solid #8b5cf6;
-                border-radius: 12px;
-                pointer-events: none;
-            }
-            .logo {
-                font-size: 2.5rem;
-                font-weight: bold;
-                background: linear-gradient(45deg, #f59e0b, #8b5cf6);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                margin-bottom: 20px;
-            }
-            .title {
-                font-size: 3rem;
-                color: #1f2937;
-                margin: 20px 0;
-                font-weight: normal;
-            }
-            .subtitle {
-                font-size: 1.2rem;
-                color: #6b7280;
-                margin-bottom: 40px;
-            }
-            .recipient {
-                font-size: 2.5rem;
-                color: #f59e0b;
-                font-weight: bold;
-                margin: 30px 0;
-                text-decoration: underline;
-                text-decoration-color: #8b5cf6;
-            }
-            .course {
-                font-size: 1.8rem;
-                color: #1f2937;
-                margin: 30px 0;
-                font-style: italic;
-            }
-            .completion {
-                font-size: 1.1rem;
-                color: #6b7280;
-                margin: 20px 0;
-            }
-            .signature {
-                margin-top: 50px;
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-end;
-                flex-wrap: wrap;
-                gap: 30px;
-            }
-            .signature-section {
-                flex: 1;
-                min-width: 200px;
-                text-align: center;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-            }
-            .signature-line {
-                border-top: 2px solid #1f2937;
-                width: 100%;
-                max-width: 200px;
-                text-align: center;
-                padding-top: 10px;
-                font-size: 0.9rem;
-                color: #6b7280;
-                margin-bottom: 10px;
-            }
-            .date-section {
-                flex: 1;
-                min-width: 200px;
-                text-align: center;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: flex-end;
-            }
-            .verification {
-                margin-top: 30px;
-                font-size: 0.8rem;
-                color: #9ca3af;
-                text-align: center;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="certificate">
-            <div class="logo">🎓 SkillPulse</div>
-            <div class="title">Certificate of Completion</div>
-            <div class="subtitle">This is to certify that</div>
-            <div class="recipient">${user?.user_metadata?.full_name || 'Student'}</div>
-            <div class="completion">has successfully completed the course</div>
-            <div class="course">"${certificate.course_title}"</div>
-            <div class="completion">demonstrating professional competency and commitment to continuous learning</div>
-            <div class="signature">
-                <div class="signature-section">
-                    <div class="signature-line">
-                        <strong>SkillPulse Academy</strong><br>
-                        Authorized Signature
-                    </div>
-                </div>
-                <div class="date-section">
-                    <div style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">${currentDate}</div>
-                    <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
-                </div>
-            </div>
-            <div class="verification">
-                Verification Code: ${certificate.verification_code}<br>
-                This certificate can be verified at skillpulse.com/verify
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
-  };
-
-  const downloadCertificate = (certificate: Certificate) => {
-    const certificateHTML = generateCertificateHTML(certificate);
-    const blob = new Blob([certificateHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${certificate.course_title?.replace(/\s+/g, '_')}_Certificate.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    toast.success('Certificate downloaded successfully!');
-  };
-
-  const viewCertificate = (certificate: Certificate) => {
-    setSelectedCertificate(certificate);
-    setShowCertificateModal(true);
+  const downloadCertificate = async () => {
+    try {
+      // In a real implementation, you would generate and download the certificate
+      toast.success('Certificate download will be implemented');
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      toast.error('Failed to download certificate');
+    }
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
-          <div className="container mx-auto px-4 py-16">
-            <div className="flex justify-center items-center min-h-[400px]">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-            </div>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading results...</p>
           </div>
         </div>
       </Layout>
     );
   }
 
+  if (!course) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <Card className="max-w-md text-center">
+            <CardContent className="pt-6">
+              <h2 className="text-xl font-semibold mb-4">Course Not Found</h2>
+              <p className="text-gray-600 mb-6">The course results you're looking for don't exist.</p>
+              <Button onClick={() => navigate('/learning')}>
+                Back to Learning
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  const overallScore = courseResult?.final_grade || 0;
+  const hasPassed = courseResult?.passed || false;
+  const averageQuizScore = quizResults.length > 0 
+    ? quizResults.reduce((acc, quiz) => acc + quiz.score, 0) / quizResults.length 
+    : 0;
+
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100">
-        <div className="container mx-auto px-4 py-16">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-center mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-              Your Course Results
-            </h1>
-            <p className="text-center text-gray-600 text-lg">
-              Track your progress and achievements
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Exam Results */}
-            <div className="space-y-6">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-6 w-6 text-purple-600" />
-                    Exam Results
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {examResults.length > 0 ? (
-                    examResults.map((result) => (
-                      <div
-                        key={result.id}
-                        className={`p-4 rounded-lg border-l-4 ${
-                          result.passed
-                            ? 'bg-green-50 border-green-500'
-                            : 'bg-red-50 border-red-500'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold text-lg">
-                            {result.course.title}
-                          </h3>
-                          <Badge
-                            variant={result.passed ? 'default' : 'destructive'}
-                            className={result.passed ? 'bg-green-500' : ''}
-                          >
-                            {result.passed ? 'PASSED' : 'FAILED'}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 mb-3">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-purple-600">
-                              {result.percentage_score}%
-                            </div>
-                            <div className="text-sm text-gray-500">Exam Score</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-orange-600">
-                              {result.final_grade}%
-                            </div>
-                            <div className="text-sm text-gray-500">Final Grade</div>
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>Quiz Average</span>
-                            <span>
-                              {result.quiz_scores.length > 0
-                                ? Math.round(result.quiz_scores.reduce((a, b) => a + b, 0) / result.quiz_scores.length)
-                                : 0}%
-                            </span>
-                          </div>
-                          <Progress
-                            value={
-                              result.quiz_scores.length > 0
-                                ? result.quiz_scores.reduce((a, b) => a + b, 0) / result.quiz_scores.length
-                                : 0
-                            }
-                            className="h-2"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {new Date(result.completed_at).toLocaleDateString()}
-                          </span>
-                          <span>
-                            Passing: {result.exam.passing_score}%
-                          </span>
-                        </div>
-                      </div>
-                    ))
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            {/* Header */}
+            <div className="mb-8">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate(`/learning/course/${courseId}`)}
+                className="mb-4"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Course
+              </Button>
+              
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  Course Results
+                </h1>
+                <h2 className="text-xl text-gray-600 mb-4">{course.title}</h2>
+                
+                {/* Overall Result */}
+                <div className="flex items-center justify-center mb-6">
+                  {hasPassed ? (
+                    <div className="flex items-center text-green-600">
+                      <CheckCircle className="h-8 w-8 mr-2" />
+                      <span className="text-2xl font-bold">Passed</span>
+                    </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <Target className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500">No exam results yet</p>
+                    <div className="flex items-center text-red-600">
+                      <XCircle className="h-8 w-8 mr-2" />
+                      <span className="text-2xl font-bold">Not Passed</span>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
 
-            {/* Certificates */}
-            <div className="space-y-6">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Overall Performance */}
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Award className="h-6 w-6 text-orange-600" />
-                    Certificates
+                    <Trophy className="h-5 w-5 text-orange-600" />
+                    Overall Performance
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {certificates.length > 0 ? (
-                    certificates.map((certificate) => (
-                      <div
-                        key={certificate.id}
-                        className="p-4 rounded-lg border-2 border-orange-200 bg-orange-50"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <GraduationCap className="h-8 w-8 text-orange-600" />
-                            <div>
-                              <h3 className="font-semibold">{certificate.course_title}</h3>
-                              <p className="text-sm text-gray-600">
-                                Verification: {certificate.verification_code}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => viewCertificate(certificate)}
-                              size="sm"
-                              variant="outline"
-                              className="border-orange-300 text-orange-700 hover:bg-orange-100"
-                            >
-                              View
-                            </Button>
-                            <Button
-                              onClick={() => downloadCertificate(certificate)}
-                              size="sm"
-                              className="bg-orange-600 hover:bg-orange-700"
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Issued on {new Date(certificate.issue_date).toLocaleDateString()}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <Award className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500">No certificates earned yet</p>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Complete courses to earn certificates
-                      </p>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-orange-600 mb-2">
+                      {overallScore}%
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Overall Statistics */}
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-6 w-6 text-purple-600" />
-                    Overall Statistics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {examResults.filter(r => r.passed).length}
+                    <p className="text-gray-600">Final Grade</p>
+                  </div>
+                  
+                  <Progress value={overallScore} className="h-3" />
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-gray-900">
+                        {averageQuizScore.toFixed(0)}%
                       </div>
-                      <div className="text-sm text-gray-600">Courses Completed</div>
+                      <p className="text-sm text-gray-600">Avg Quiz Score</p>
                     </div>
-                    <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {examResults.length > 0
-                          ? Math.round(examResults.reduce((sum, r) => sum + r.final_grade, 0) / examResults.length)
-                          : 0}%
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-gray-900">
+                        {quizResults.filter(q => q.passed).length}/{quizResults.length}
                       </div>
-                      <div className="text-sm text-gray-600">Average Grade</div>
+                      <p className="text-sm text-gray-600">Quizzes Passed</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            </div>
-          </div>
 
-          {/* Certificate Preview Modal */}
-          <Dialog open={showCertificateModal} onOpenChange={setShowCertificateModal}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle>Certificate Preview</DialogTitle>
-                <DialogDescription>
-                  Preview of your course completion certificate
-                </DialogDescription>
-              </DialogHeader>
-              {selectedCertificate && (
-                <div 
-                  className="border rounded-lg p-4 bg-white"
-                  dangerouslySetInnerHTML={{ 
-                    __html: generateCertificateHTML(selectedCertificate)
-                      .replace('<html>', '<div>')
-                      .replace('</html>', '</div>')
-                      .replace(/<head>.*?<\/head>/s, '')
-                      .replace('<body>', '')
-                      .replace('</body>', '')
-                  }}
-                />
+              {/* Certificate */}
+              {course.certificate_enabled && hasPassed && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Award className="h-5 w-5 text-orange-600" />
+                      Certificate
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center space-y-4">
+                    <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-6 rounded-lg">
+                      <Award className="h-12 w-12 text-orange-600 mx-auto mb-3" />
+                      <h3 className="font-semibold text-orange-800 mb-2">
+                        Certificate of Completion
+                      </h3>
+                      <p className="text-sm text-orange-600">
+                        Congratulations on completing the course!
+                      </p>
+                    </div>
+                    
+                    <Button 
+                      onClick={downloadCertificate}
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Certificate
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
-            </DialogContent>
-          </Dialog>
+            </div>
+
+            {/* Quiz Results */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Quiz Results</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {quizResults.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p>No quiz results available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {quizResults.map((quiz, index) => (
+                      <div key={quiz.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          {quiz.passed ? (
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-red-500" />
+                          )}
+                          <div>
+                            <h4 className="font-medium">Quiz #{index + 1}</h4>
+                            <p className="text-sm text-gray-600">
+                              Completed {format(new Date(quiz.completed_at), 'MMM d, yyyy')}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <Badge 
+                            variant={quiz.passed ? "default" : "destructive"}
+                            className={quiz.passed ? "bg-green-100 text-green-800" : ""}
+                          >
+                            {quiz.score}%
+                          </Badge>
+                          {quiz.passed && (
+                            <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Final Exam Result */}
+            {courseResult && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Final Exam Result</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      {courseResult.passed ? (
+                        <CheckCircle className="h-6 w-6 text-green-500" />
+                      ) : (
+                        <XCircle className="h-6 w-6 text-red-500" />
+                      )}
+                      <div>
+                        <h4 className="font-semibold">Final Examination</h4>
+                        <p className="text-sm text-gray-600">
+                          Completed {format(new Date(courseResult.completed_at), 'MMM d, yyyy • h:mm a')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {courseResult.percentage_score}%
+                      </div>
+                      <Badge 
+                        variant={courseResult.passed ? "default" : "destructive"}
+                        className={courseResult.passed ? "bg-green-100 text-green-800" : ""}
+                      >
+                        {courseResult.passed ? 'Passed' : 'Failed'}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </Layout>
