@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,7 +46,7 @@ interface Course {
 }
 
 const CourseLearningPage = () => {
-  const { courseId } = useParams();
+  const { id: courseId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
@@ -66,11 +65,10 @@ const CourseLearningPage = () => {
       checkEnrollment();
       loadProgress();
     } else if (courseId && !user) {
-      // User not authenticated, redirect to auth
       console.log('User not authenticated, redirecting to auth');
       navigate('/auth');
     } else {
-      console.log('Missing courseId or user');
+      console.log('Missing courseId:', courseId);
       setLoading(false);
     }
   }, [courseId, user, navigate]);
@@ -114,9 +112,8 @@ const CourseLearningPage = () => {
       }
 
       if (!data) {
-        console.log('Course not found');
+        console.log('Course not found for ID:', courseId);
         toast.error('Course not found');
-        navigate('/courses');
         return;
       }
 
@@ -142,7 +139,6 @@ const CourseLearningPage = () => {
     } catch (error) {
       console.error('Error loading course:', error);
       toast.error('Failed to load course');
-      navigate('/courses');
     } finally {
       setLoading(false);
     }
@@ -286,8 +282,8 @@ const CourseLearningPage = () => {
             <CardContent className="pt-6">
               <h2 className="text-xl font-semibold mb-4">Course Not Found</h2>
               <p className="text-gray-600 mb-6">The course you're looking for doesn't exist or has been removed.</p>
-              <Button onClick={() => navigate('/courses')}>
-                Browse Courses
+              <Button onClick={() => navigate('/learning')}>
+                Back to Learning
               </Button>
             </CardContent>
           </Card>
