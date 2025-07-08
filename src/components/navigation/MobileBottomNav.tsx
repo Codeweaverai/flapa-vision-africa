@@ -33,9 +33,9 @@ const MobileBottomNav = () => {
     },
     {
       id: 'profile',
-      label: 'Profile',
+      label: 'account',
       icon: User,
-      path: user ? '/profile' : '/auth',
+      path: user ? '/account' : '/auth',
       color: 'text-indigo-500'
     }
   ];
