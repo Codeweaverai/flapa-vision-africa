@@ -16,21 +16,12 @@ import CourseLearningPage from './pages/learning/CourseLearningPage';
 import CourseResultsPage from './pages/CourseResultsPage';
 import EventsPage from './pages/EventsPage';
 import EventDetailPage from './pages/EventDetailPage';
-import EventBookingPage from './pages/EventBookingPage';
-import EventBookingConfirmationPage from './pages/EventBookingConfirmationPage';
-import CreateEventPage from './pages/CreateEventPage';
-import CreateCoursePage from './pages/CreateCoursePage';
-import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
-import CheckoutCancelPage from './pages/CheckoutCancelPage';
-import PaymentPage from './pages/PaymentPage';
 import MyOrdersPage from './pages/MyOrdersPage';
-import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import ContactPage from './pages/ContactPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
-import MyLearningPage from './pages/MyLearningPage';
 import LearningPage from './pages/LearningPage';
 import InboxPage from './pages/InboxPage';
 import AccountPage from './pages/AccountPage';
@@ -63,6 +54,7 @@ import PodcastPlayerPage from './pages/PodcastPlayerPage';
 import PublicProfilePage from './pages/PublicProfilePage';
 import ResourcesPage from './pages/ResourcesPage';
 import MediaPostPage from './pages/MediaPostPage';
+import MyEventsPage from './pages/MyEventsPage';
 import MobileBottomNav from './components/navigation/MobileBottomNav';
 
 const queryClient = new QueryClient();
@@ -104,14 +96,11 @@ function App() {
                 <Route path="/course/:courseId" element={<CourseDetailPage />} />
                 <Route path="/course/:courseId/learning" element={<CourseLearningPage />} />
                 <Route path="/course/:courseId/results" element={<CourseResultsPage />} />
-                <Route path="/create-course" element={<CreateCoursePage />} />
                 
                 {/* Event Routes */}
                 <Route path="/events" element={<EventsPage />} />
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
-                <Route path="/event/:eventId/book" element={<EventBookingPage />} />
-                <Route path="/event/:eventId/confirmation" element={<EventBookingConfirmationPage />} />
-                <Route path="/create-event" element={<CreateEventPage />} />
+                <Route path="/my-events" element={<MyEventsPage />} />
                 
                 {/* Explore Routes */}
                 <Route path="/explore/courses" element={<ExploreCoursesPage />} />
@@ -121,16 +110,11 @@ function App() {
                 
                 {/* Learning Routes */}
                 <Route path="/learning" element={<LearningPage />} />
-                <Route path="/my-learning" element={<MyLearningPage />} />
                 
                 {/* Commerce Routes */}
-                <Route path="/cart" element={<CartPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
-                <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
-                <Route path="/payment" element={<PaymentPage />} />
                 <Route path="/my-orders" element={<MyOrdersPage />} />
-                <Route path="/order/:orderId/confirmation" element={<OrderConfirmationPage />} />
                 
                 {/* User Routes */}
                 <Route path="/account" element={<AccountPage />} />
