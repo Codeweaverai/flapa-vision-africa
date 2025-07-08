@@ -29,20 +29,8 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({ lessonId, onSeekTo 
 
   const fetchTranscript = async () => {
     try {
-      const { data, error } = await supabase
-        .from('lesson_transcripts')
-        .select('transcript_data')
-        .eq('lesson_id', lessonId)
-        .eq('language', 'en')
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (data?.transcript_data) {
-        setTranscript(data.transcript_data as TranscriptSegment[]);
-      }
+      // Since we don't have lesson_transcripts table, we'll use placeholder data
+      setTranscript([]);
     } catch (error) {
       console.error('Error fetching transcript:', error);
       toast.error('Failed to load transcript');
@@ -68,17 +56,6 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({ lessonId, onSeekTo 
     );
   }
 
-  if (transcript.length === 0) {
-    return (
-      <Card>
-        <CardContent className="text-center py-8">
-          <Book className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-500">No transcript available for this lesson</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -88,21 +65,9 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({ lessonId, onSeekTo 
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-          {transcript.map((segment, index) => (
-            <div key={index} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onSeekTo?.(segment.start)}
-                className="flex-shrink-0 text-orange-600 hover:text-orange-700"
-              >
-                <Play className="h-3 w-3 mr-1" />
-                {formatTime(segment.start)}
-              </Button>
-              <p className="text-sm text-gray-700 leading-relaxed">{segment.text}</p>
-            </div>
-          ))}
+        <div className="text-center py-8">
+          <Book className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p className="text-gray-500">No transcript available for this lesson</p>
         </div>
       </CardContent>
     </Card>

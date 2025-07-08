@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Play, 
   CheckCircle, 
@@ -17,10 +18,15 @@ import {
   Video,
   HelpCircle,
   Award,
-  BookOpen
+  BookOpen,
+  User,
+  ChevronLeft,
+  ChevronRight,
+  Trophy
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface Quiz {
   id: string;
@@ -53,11 +59,20 @@ interface FinalExam {
   description?: string;
   passing_score: number;
   time_limit_minutes: number;
+  course_id: string;
+}
+
+interface CreatorProfile {
+  id: string;
+  full_name?: string;
+  avatar_url?: string;
+  bio?: string;
 }
 
 interface EnhancedCourseModuleListProps {
   modules: Module[];
   courseId: string;
+  creatorId?: string;
   onLessonSelect: (lesson: Lesson) => void;
   currentLessonId?: string;
   completedLessons?: string[];
@@ -68,6 +83,7 @@ interface EnhancedCourseModuleListProps {
 const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   modules,
   courseId,
+  creatorId,
   onLessonSelect,
   currentLessonId,
   completedLessons = [],
@@ -75,47 +91,25 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   onFinalExamStart
 }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [openModules, setOpenModules] = useState<string[]>([]);
-  const [quizzes, setQuizzes] = useState<Record<string, Quiz[]>>({});
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
+  const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
   const [courseProgress, setCourseProgress] = useState(0);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
     if (courseId) {
-      fetchQuizzes();
       fetchFinalExam();
     }
-  }, [courseId]);
+    if (creatorId) {
+      fetchCreatorProfile();
+    }
+  }, [courseId, creatorId]);
 
   useEffect(() => {
     calculateProgress();
   }, [modules, completedLessons]);
-
-  const fetchQuizzes = async () => {
-    try {
-      const lessonIds = modules.flatMap(m => m.lessons.map(l => l.id));
-      if (lessonIds.length === 0) return;
-
-      const { data, error } = await supabase
-        .from('lesson_quizzes')
-        .select('*')
-        .in('lesson_id', lessonIds);
-
-      if (error) throw error;
-
-      const quizzesByLesson: Record<string, Quiz[]> = {};
-      data?.forEach(quiz => {
-        if (!quizzesByLesson[quiz.lesson_id]) {
-          quizzesByLesson[quiz.lesson_id] = [];
-        }
-        quizzesByLesson[quiz.lesson_id].push(quiz);
-      });
-
-      setQuizzes(quizzesByLesson);
-    } catch (error) {
-      console.error('Error fetching quizzes:', error);
-    }
-  };
 
   const fetchFinalExam = async () => {
     try {
@@ -133,6 +127,23 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     }
   };
 
+  const fetchCreatorProfile = async () => {
+    if (!creatorId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, bio')
+        .eq('id', creatorId)
+        .single();
+
+      if (error) throw error;
+      setCreatorProfile(data);
+    } catch (error) {
+      console.error('Error fetching creator profile:', error);
+    }
+  };
+
   const calculateProgress = () => {
     const totalLessons = modules.reduce((acc, module) => acc + module.lessons.length, 0);
     if (totalLessons === 0) {
@@ -143,19 +154,135 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     setCourseProgress(Math.round(progress));
   };
 
+  const getCurrentLessonPosition = () => {
+    if (!currentLessonId) return null;
+    
+    for (let moduleIndex = 0; moduleIndex < modules.length; moduleIndex++) {
+      const module = modules[moduleIndex];
+      const lessonIndex = module.lessons.findIndex(lesson => lesson.id === currentLessonId);
+      if (lessonIndex !== -1) {
+        return { moduleIndex, lessonIndex };
+      }
+    }
+    return null;
+  };
+
+  const getNextLesson = () => {
+    const position = getCurrentLessonPosition();
+    if (!position) return null;
+    
+    const { moduleIndex, lessonIndex } = position;
+    const currentModule = modules[moduleIndex];
+    
+    // Check if there's a next lesson in current module
+    if (lessonIndex < currentModule.lessons.length - 1) {
+      return currentModule.lessons[lessonIndex + 1];
+    }
+    
+    // Check if there's a next module
+    if (moduleIndex < modules.length - 1) {
+      const nextModule = modules[moduleIndex + 1];
+      if (nextModule.lessons.length > 0) {
+        return nextModule.lessons[0];
+      }
+    }
+    
+    return null;
+  };
+
+  const getPreviousLesson = () => {
+    const position = getCurrentLessonPosition();
+    if (!position) return null;
+    
+    const { moduleIndex, lessonIndex } = position;
+    
+    // Check if there's a previous lesson in current module
+    if (lessonIndex > 0) {
+      return modules[moduleIndex].lessons[lessonIndex - 1];
+    }
+    
+    // Check if there's a previous module
+    if (moduleIndex > 0) {
+      const previousModule = modules[moduleIndex - 1];
+      if (previousModule.lessons.length > 0) {
+        return previousModule.lessons[previousModule.lessons.length - 1];
+      }
+    }
+    
+    return null;
+  };
+
+  const markLessonComplete = async (lessonId: string) => {
+    if (!user) return;
+    
+    try {
+      // Find enrollment
+      const { data: enrollment } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .single();
+
+      if (!enrollment) return;
+
+      // Mark lesson as complete
+      await supabase
+        .from('lesson_progress')
+        .upsert({
+          enrollment_id: enrollment.id,
+          lesson_id: lessonId,
+          is_completed: true,
+          completion_date: new Date().toISOString()
+        });
+
+      // Update course progress
+      const totalLessons = modules.reduce((acc, module) => acc + module.lessons.length, 0);
+      const newCompletedCount = completedLessons.length + 1;
+      const newProgress = Math.round((newCompletedCount / totalLessons) * 100);
+
+      await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          progress_percentage: newProgress,
+          last_lesson_completed: lessonId
+        });
+
+    } catch (error) {
+      console.error('Error marking lesson complete:', error);
+    }
+  };
+
+  const handleNextLesson = async () => {
+    const nextLesson = getNextLesson();
+    if (!nextLesson || isNavigating) return;
+    
+    setIsNavigating(true);
+    
+    // Mark current lesson as complete if not already
+    if (currentLessonId && !completedLessons.includes(currentLessonId)) {
+      await markLessonComplete(currentLessonId);
+    }
+    
+    onLessonSelect(nextLesson);
+    setIsNavigating(false);
+  };
+
+  const handlePreviousLesson = () => {
+    const previousLesson = getPreviousLesson();
+    if (!previousLesson || isNavigating) return;
+    
+    onLessonSelect(previousLesson);
+  };
+
   const isLessonCompleted = (lessonId: string) => {
     return completedLessons.includes(lessonId);
   };
 
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
-  };
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" style={{ width: '450px' }}>
       {/* Course Progress */}
       <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-4 rounded-lg">
         <div className="flex items-center justify-between mb-2">
@@ -164,6 +291,31 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         </div>
         <Progress value={courseProgress} className="h-2" />
       </div>
+
+      {/* Navigation Controls */}
+      {currentLessonId && (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePreviousLesson}
+            disabled={!getPreviousLesson() || isNavigating}
+            className="flex-1"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleNextLesson}
+            disabled={!getNextLesson() || isNavigating}
+            className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
 
       {/* Modules */}
       <Accordion 
@@ -199,8 +351,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               {module.lessons && module.lessons.length > 0 ? (
                 <div className="space-y-2">
                   {module.lessons.map((lesson, index) => (
-                    <div key={lesson.id} className="space-y-2">
-                      {/* Lesson Item */}
+                    <div key={lesson.id}>
                       <div 
                         className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-all ${
                           currentLessonId === lesson.id 
@@ -246,45 +397,6 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                           </Button>
                         </div>
                       </div>
-
-                      {/* Lesson Quizzes */}
-                      {quizzes[lesson.id] && quizzes[lesson.id].length > 0 && (
-                        <div className="ml-8 space-y-2">
-                          {quizzes[lesson.id].map((quiz) => (
-                            <div 
-                              key={quiz.id}
-                              className="flex items-center justify-between p-2 border border-orange-200 rounded bg-orange-50"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <HelpCircle className="h-4 w-4 text-orange-500" />
-                                <div>
-                                  <span className="text-sm font-medium">{quiz.title}</span>
-                                  {quiz.description && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {quiz.description}
-                                    </p>
-                                  )}
-                                  <p className="text-xs text-orange-600">
-                                    Passing Score: {quiz.passing_score}%
-                                  </p>
-                                </div>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onQuizStart?.(quiz.id, lesson.id);
-                                }}
-                                className="border-orange-300 text-orange-600 hover:bg-orange-100"
-                              >
-                                <HelpCircle className="h-4 w-4 mr-1" />
-                                Take Quiz
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -326,6 +438,60 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
             >
               <Award className="h-4 w-4 mr-2" />
               Take Final Exam
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Course Results Button */}
+      {courseProgress === 100 && (
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Trophy className="h-6 w-6 text-green-600" />
+              <div>
+                <h4 className="font-semibold text-green-800">Course Completed!</h4>
+                <p className="text-sm text-green-600 mt-1">View your final results and certificate</p>
+              </div>
+            </div>
+            <Button 
+              className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+              onClick={() => navigate(`/course/${courseId}/results`)}
+            >
+              <Trophy className="h-4 w-4 mr-2" />
+              View Course Results
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Creator Profile */}
+      {creatorProfile && (
+        <div className="bg-gradient-to-r from-orange-50 to-purple-50 border-2 border-orange-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={creatorProfile.avatar_url || undefined} />
+                <AvatarFallback>
+                  {creatorProfile.full_name?.charAt(0) || 'I'}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h4 className="font-semibold text-orange-800">Your Instructor</h4>
+                <p className="text-sm font-medium text-orange-700">{creatorProfile.full_name}</p>
+                {creatorProfile.bio && (
+                  <p className="text-xs text-orange-600 mt-1 line-clamp-2">{creatorProfile.bio}</p>
+                )}
+              </div>
+            </div>
+            <Button 
+              variant="outline"
+              size="sm"
+              className="border-orange-300 text-orange-600 hover:bg-orange-100"
+              onClick={() => navigate(`/creator/profile/${creatorProfile.id}`)}
+            >
+              <User className="h-4 w-4 mr-1" />
+              View Profile
             </Button>
           </div>
         </div>

@@ -33,6 +33,7 @@ interface FinalExam {
   description?: string;
   passing_score: number;
   time_limit_minutes: number;
+  course_id: string;
   questions: Question[];
 }
 
