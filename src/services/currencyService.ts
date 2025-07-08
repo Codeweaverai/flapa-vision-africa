@@ -3,6 +3,13 @@ interface ExchangeRates {
   [key: string]: number;
 }
 
+interface ConversionResult {
+  convertedAmount: number;
+  rate: number;
+  fromCurrency: string;
+  toCurrency: string;
+}
+
 const DEFAULT_EXCHANGE_RATES: ExchangeRates = {
   USD: 1,
   EUR: 0.85,
@@ -57,7 +64,7 @@ class CurrencyService {
     try {
       localStorage.setItem(this.cacheKey, JSON.stringify(this.exchangeRates));
       localStorage.setItem(this.cacheTimestamp, new Date().toISOString());
-      console.info('Using cached exchange rates:', this.exchangeRates);
+      console.info('Cached exchange rates:', this.exchangeRates);
     } catch (error) {
       console.warn('Failed to cache exchange rates:', error);
     }
@@ -74,6 +81,59 @@ class CurrencyService {
       console.error('Failed to update exchange rates:', error);
       // Keep using cached or default rates
     }
+  }
+
+  async getExchangeRates(): Promise<ExchangeRates> {
+    return this.exchangeRates;
+  }
+
+  async detectUserCurrency(): Promise<string> {
+    try {
+      // Try to detect from browser locale
+      const locale = navigator.language;
+      const currencyMap: { [key: string]: string } = {
+        'en-US': 'USD',
+        'en-GB': 'GBP',
+        'de': 'EUR',
+        'fr': 'EUR',
+        'es': 'EUR',
+        'it': 'EUR',
+        'zh': 'USD',
+        'ja': 'USD',
+      };
+      
+      return currencyMap[locale] || 'USD';
+    } catch (error) {
+      console.warn('Failed to detect user currency:', error);
+      return 'USD';
+    }
+  }
+
+  async convertPrice(amount: number, fromCurrency: string, toCurrency: string): Promise<number> {
+    if (fromCurrency === toCurrency) {
+      return amount;
+    }
+
+    const fromRate = this.exchangeRates[fromCurrency] || 1;
+    const toRate = this.exchangeRates[toCurrency] || 1;
+    
+    // Convert to USD first, then to target currency
+    const usdAmount = amount / fromRate;
+    const convertedAmount = usdAmount * toRate;
+    
+    return Math.round(convertedAmount * 100) / 100;
+  }
+
+  async convertCurrency(amount: number, fromCurrency: string, toCurrency: string): Promise<ConversionResult> {
+    const convertedAmount = await this.convertPrice(amount, fromCurrency, toCurrency);
+    const rate = this.exchangeRates[toCurrency] / this.exchangeRates[fromCurrency];
+    
+    return {
+      convertedAmount,
+      rate,
+      fromCurrency,
+      toCurrency
+    };
   }
 
   convert(amount: number, fromCurrency: string, toCurrency: string): number {
@@ -111,6 +171,10 @@ class CurrencyService {
     }).format(amount);
 
     return `${symbol}${formattedAmount}`;
+  }
+
+  formatPrice(amount: number, currency: string): string {
+    return this.formatCurrency(amount, currency);
   }
 
   getSupportedCurrencies(): string[] {
