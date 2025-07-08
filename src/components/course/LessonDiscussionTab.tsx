@@ -43,20 +43,31 @@ const LessonDiscussionTab: React.FC<LessonDiscussionTabProps> = ({ lessonId }) =
 
   const fetchDiscussions = async () => {
     try {
+      // Fetch discussions without join to profiles table for now
       const { data, error } = await supabase
         .from('lesson_discussions')
-        .select(`
-          *,
-          profiles (
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('lesson_id', lessonId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setDiscussions(data || []);
+      
+      const allDiscussions = data || [];
+      
+      // Fetch user profiles separately
+      const userIds = allDiscussions.map(d => d.user_id);
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+
+      // Combine discussions with profiles
+      const discussionsWithProfiles = allDiscussions.map(discussion => ({
+        ...discussion,
+        profiles: profilesData?.find(p => p.id === discussion.user_id)
+      }));
+
+      setDiscussions(discussionsWithProfiles);
     } catch (error) {
       console.error('Error fetching discussions:', error);
       toast.error('Failed to load discussions');

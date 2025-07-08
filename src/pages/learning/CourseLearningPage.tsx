@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -71,6 +70,7 @@ const CourseLearningPage = () => {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollment, setEnrollment] = useState<any>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [instructor, setInstructor] = useState<any>(null);
   
   // Quiz and Exam state
   const [showQuizModal, setShowQuizModal] = useState(false);
@@ -154,6 +154,17 @@ const CourseLearningPage = () => {
       };
 
       setCourse(sortedCourse);
+
+      // Fetch instructor profile
+      if (sortedCourse.creator_id) {
+        const { data: instructorData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', sortedCourse.creator_id)
+          .single();
+        
+        setInstructor(instructorData);
+      }
 
       // Set first lesson as current if none selected
       if (sortedCourse.course_modules.length > 0 && sortedCourse.course_modules[0].lessons.length > 0) {
@@ -304,6 +315,33 @@ const CourseLearningPage = () => {
     setCurrentLessonId(lesson.id);
   };
 
+  const handleNextLesson = () => {
+    if (!course || !currentLesson) return;
+
+    const allLessons = course.course_modules.flatMap(module => module.lessons);
+    const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
+    
+    if (currentIndex < allLessons.length - 1) {
+      const nextLesson = allLessons[currentIndex + 1];
+      markLessonComplete(currentLesson.id);
+      setCurrentLesson(nextLesson);
+      setCurrentLessonId(nextLesson.id);
+    }
+  };
+
+  const handlePreviousLesson = () => {
+    if (!course || !currentLesson) return;
+
+    const allLessons = course.course_modules.flatMap(module => module.lessons);
+    const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
+    
+    if (currentIndex > 0) {
+      const previousLesson = allLessons[currentIndex - 1];
+      setCurrentLesson(previousLesson);
+      setCurrentLessonId(previousLesson.id);
+    }
+  };
+
   const handleQuizStart = (quizId: string, lessonId: string) => {
     setCurrentQuizId(quizId);
     setCurrentLessonId(lessonId);
@@ -319,7 +357,6 @@ const CourseLearningPage = () => {
     return completedLessons.includes(lessonId) ? 'completed' : 'available';
   };
 
-  // Show loading state
   if (loading) {
     return (
       <Layout>
@@ -333,7 +370,6 @@ const CourseLearningPage = () => {
     );
   }
 
-  // Show error state if no course
   if (!course) {
     return (
       <Layout>
@@ -352,7 +388,6 @@ const CourseLearningPage = () => {
     );
   }
 
-  // Show enrollment required state
   if (!isEnrolled) {
     return (
       <Layout>
@@ -377,7 +412,6 @@ const CourseLearningPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
             <div className="mb-8">
               <Button 
                 variant="outline" 
@@ -416,7 +450,6 @@ const CourseLearningPage = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-              {/* Course Content */}
               <div className="lg:col-span-3">
                 <Tabs defaultValue="lesson-notes" className="w-full">
                   <TabsList className="grid w-full grid-cols-4">
@@ -466,6 +499,26 @@ const CourseLearningPage = () => {
                           
                           <p className="text-gray-600 mb-4">{currentLesson.description}</p>
                           
+                          <div className="flex gap-2 mb-4">
+                            <Button
+                              onClick={handlePreviousLesson}
+                              disabled={!course || course.course_modules.flatMap(m => m.lessons).findIndex(l => l.id === currentLesson.id) === 0}
+                              variant="outline"
+                            >
+                              <ChevronRight className="h-4 w-4 mr-2 rotate-180" />
+                              Previous
+                            </Button>
+                            
+                            <Button
+                              onClick={handleNextLesson}
+                              disabled={!course || course.course_modules.flatMap(m => m.lessons).findIndex(l => l.id === currentLesson.id) === course.course_modules.flatMap(m => m.lessons).length - 1}
+                              className="bg-gradient-to-r from-orange-500 to-purple-600"
+                            >
+                              Next
+                              <ChevronRight className="h-4 w-4 ml-2" />
+                            </Button>
+                          </div>
+                          
                           {getLessonStatus(currentLesson.id) !== 'completed' && (
                             <Button 
                               onClick={() => markLessonComplete(currentLesson.id)}
@@ -477,6 +530,15 @@ const CourseLearningPage = () => {
                           )}
                         </CardContent>
                       </Card>
+                    )}
+                    
+                    {currentLesson && (
+                      <VideoTranscripts 
+                        lessonId={currentLesson.id}
+                        onSeekTo={(time) => {
+                          console.log('Seeking to:', time);
+                        }}
+                      />
                     )}
                     
                     <LessonNotesTab 
@@ -507,7 +569,6 @@ const CourseLearningPage = () => {
                       <VideoTranscripts 
                         lessonId={currentLesson.id}
                         onSeekTo={(time) => {
-                          // TODO: Implement video seeking functionality
                           console.log('Seeking to:', time);
                         }}
                       />
@@ -523,72 +584,113 @@ const CourseLearningPage = () => {
                 </Tabs>
               </div>
 
-              {/* Enhanced Course Modules Sidebar */}
               <div className="lg:col-span-1">
-                <Card className="sticky top-4">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Book className="h-5 w-5" />
-                      Course Curriculum
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <EnhancedCourseModuleList 
-                      modules={course.course_modules}
-                      courseId={courseId!}
-                      onLessonSelect={handleLessonSelect}
-                      currentLessonId={currentLesson?.id}
-                      completedLessons={completedLessons}
-                      onQuizStart={handleQuizStart}
-                      onFinalExamStart={handleFinalExamStart}
-                    />
-                  </CardContent>
-                </Card>
+                <div className="sticky top-4 space-y-4" style={{ width: '450px' }}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Book className="h-5 w-5" />
+                        Course Curriculum
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <EnhancedCourseModuleList 
+                        modules={course.course_modules}
+                        courseId={courseId!}
+                        onLessonSelect={handleLessonSelect}
+                        currentLessonId={currentLesson?.id}
+                        completedLessons={completedLessons}
+                        onQuizStart={handleQuizStart}
+                        onFinalExamStart={handleFinalExamStart}
+                      />
+                    </CardContent>
+                  </Card>
 
-                {/* Certificate Section */}
-                {course.certificate_enabled && progress === 100 && (
-                  <Card className="mt-4">
+                  <Card className="bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-200">
                     <CardContent className="p-4 text-center">
-                      <Award className="h-8 w-8 mx-auto mb-2 text-orange-600" />
-                      <h4 className="font-medium mb-2">Certificate Available</h4>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Congratulations! You've completed the course.
+                      <Award className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                      <h4 className="font-medium mb-2 text-blue-800">Course Results</h4>
+                      <p className="text-sm text-blue-600 mb-3">
+                        View your quiz and exam results
                       </p>
-                      <Button size="sm" className="w-full">
-                        <Download className="h-4 w-4 mr-2" />
-                        Download Certificate
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        onClick={() => navigate(`/course-results?courseId=${courseId}`)}
+                      >
+                        View Results
                       </Button>
                     </CardContent>
                   </Card>
-                )}
+
+                  {instructor && (
+                    <Card className="bg-gradient-to-r from-orange-100 to-purple-100 border-orange-200">
+                      <CardContent className="p-4 text-center">
+                        <Avatar className="h-12 w-12 mx-auto mb-3">
+                          <AvatarImage src={instructor.avatar_url} />
+                          <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                            {instructor.full_name?.charAt(0) || 'I'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <h4 className="font-medium mb-1 text-orange-800">
+                          {instructor.full_name || 'Instructor'}
+                        </h4>
+                        <p className="text-sm text-orange-600 mb-3">Course Instructor</p>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
+                          onClick={() => navigate(`/creator/profile/${instructor.id}`)}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          View Profile
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {course.certificate_enabled && progress === 100 && (
+                    <Card className="bg-gradient-to-r from-green-100 to-emerald-100 border-green-200">
+                      <CardContent className="p-4 text-center">
+                        <Award className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                        <h4 className="font-medium mb-2 text-green-800">Certificate Available</h4>
+                        <p className="text-sm text-green-600 mb-3">
+                          Congratulations! You've completed the course.
+                        </p>
+                        <Button size="sm" className="w-full bg-green-600 hover:bg-green-700">
+                          <Download className="h-4 w-4 mr-2" />
+                          Download Certificate
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Quiz Modal */}
       <QuizModal
         isOpen={showQuizModal}
         onClose={() => {
           setShowQuizModal(false);
           setCurrentQuizId('');
-          loadProgress(); // Refresh progress after quiz
+          loadProgress();
         }}
         quizId={currentQuizId}
         lessonId={currentLessonId}
       />
 
-      {/* Final Exam Modal */}
       {finalExamId && enrollment && (
         <FinalExamModal
           isOpen={showExamModal}
           onClose={() => {
             setShowExamModal(false);
             setFinalExamId('');
-            loadProgress(); // Refresh progress after exam
+            loadProgress();
           }}
-          exam={{ id: finalExamId }} // Pass minimal exam data, component will fetch full data
+          exam={{ id: finalExamId }}
           enrollmentId={enrollment.id}
         />
       )}

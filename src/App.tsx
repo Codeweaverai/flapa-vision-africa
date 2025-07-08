@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { CartProvider } from './contexts/CartContext';
+import MobileBottomNav from './components/navigation/MobileBottomNav';
 import HomePage from './pages/HomePage';
 import Index from './pages/Index';
 import CoursesPage from './pages/CoursesPage';
@@ -144,6 +144,7 @@ function App() {
             <CartProvider>
               <Toaster />
               <SmartAdvisorFloatingButton />
+              <MobileBottomNav />
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Index />} />
