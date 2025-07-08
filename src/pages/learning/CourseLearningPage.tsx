@@ -163,17 +163,26 @@ const CourseLearningPage = () => {
   useEffect(() => {
     if (courseId) {
       fetchCourseData();
-      if (user) {
-        fetchEnrollmentData();
-        fetchProgress();
-        fetchCompletedLessons();
-      }
     }
-  }, [courseId, user]);
+  }, [courseId]);
+
+  useEffect(() => {
+    if (user && courseId) {
+      fetchEnrollmentData();
+      fetchProgress();
+      fetchCompletedLessons();
+    }
+  }, [user, courseId]);
 
   const fetchCourseData = async () => {
-    setLoading(true);
+    if (!courseId) {
+      setLoading(false);
+      return;
+    }
+
     try {
+      setLoading(true);
+      
       // Fetch course details
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
@@ -181,7 +190,12 @@ const CourseLearningPage = () => {
         .eq('id', courseId)
         .single();
 
-      if (courseError) throw courseError;
+      if (courseError) {
+        console.error('Error fetching course:', courseError);
+        setLoading(false);
+        return;
+      }
+
       setCourse(courseData as Course);
 
       // Fetch modules with lessons
@@ -191,46 +205,46 @@ const CourseLearningPage = () => {
         .eq('course_id', courseId)
         .order('order_index', { ascending: true });
 
-      if (modulesError) throw modulesError;
+      if (modulesError) {
+        console.error('Error fetching modules:', modulesError);
+        setModules([]);
+      } else {
+        // Fetch lessons for each module
+        const modulesWithLessons = await Promise.all(
+          (modulesData as CourseModule[]).map(async (module) => {
+            const { data: lessonsData, error: lessonsError } = await supabase
+              .from('lessons')
+              .select('*')
+              .eq('module_id', module.id)
+              .order('order_index', { ascending: true });
 
-      // Fetch lessons for each module
-      const modulesWithLessons = await Promise.all(
-        (modulesData as CourseModule[]).map(async (module) => {
-          const { data: lessonsData, error: lessonsError } = await supabase
-            .from('lessons')
-            .select('*')
-            .eq('module_id', module.id)
-            .order('order_index', { ascending: true });
+            if (lessonsError) {
+              console.error('Error fetching lessons:', lessonsError);
+              return { ...module, lessons: [] };
+            }
 
-          if (lessonsError) {
-            console.error('Error fetching lessons:', lessonsError);
-            return module;
-          }
-
-          return {
-            ...module,
-            lessons: lessonsData as CourseLesson[],
-          };
-        })
-      );
-      setModules(modulesWithLessons);
+            return {
+              ...module,
+              lessons: lessonsData as CourseLesson[],
+            };
+          })
+        );
+        setModules(modulesWithLessons);
+      }
 
       // Fetch enrollment count
-      const { count: enrolledCount, error: enrollCountError } = await supabase
+      const { count: enrolledCount } = await supabase
         .from('course_enrollments')
         .select('*', { count: 'exact' })
         .eq('course_id', courseId);
 
-      if (enrollCountError) throw enrollCountError;
       setEnrollmentCount(enrolledCount || 0);
 
       // Fetch average rating and review count
-      const { data: ratingData, error: ratingError } = await supabase
+      const { data: ratingData } = await supabase
         .from('course_reviews')
         .select('rating')
         .eq('course_id', courseId);
-
-      if (ratingError) throw ratingError;
 
       const ratings = ratingData?.map((review) => review.rating) || [];
       const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
@@ -240,40 +254,31 @@ const CourseLearningPage = () => {
       setReviewCount(ratings.length);
 
       // Fetch learning outcomes
-      const { data: outcomesData, error: outcomesError } = await supabase
+      const { data: outcomesData } = await supabase
         .from('course_learning_outcomes')
         .select('*')
         .eq('course_id', courseId);
 
-      if (outcomesError) throw outcomesError;
-      setLearningOutcomes(outcomesData as LearningOutcome[]);
+      setLearningOutcomes(outcomesData as LearningOutcome[] || []);
 
       // Fetch final exam
-      const { data: examData, error: examError } = await supabase
+      const { data: examData } = await supabase
         .from('final_exams')
         .select('*')
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (examError) {
-        console.error('Error fetching final exam:', examError);
-      } else {
-        setFinalExam(examData as FinalExam);
-      }
+      setFinalExam(examData as FinalExam);
 
       // Fetch instructor profile
-      if (courseData) {
-        const { data: instructorData, error: instructorError } = await supabase
+      if (courseData?.creator_id) {
+        const { data: instructorData } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', courseData.creator_id)
-          .single();
+          .maybeSingle();
 
-        if (instructorError) {
-          console.error('Error fetching instructor profile:', instructorError);
-        } else {
-          setInstructor(instructorData as Profile);
-        }
+        setInstructor(instructorData as Profile);
       }
     } catch (error) {
       console.error('Error fetching course data:', error);
@@ -284,46 +289,36 @@ const CourseLearningPage = () => {
   };
 
   const fetchEnrollmentData = async () => {
+    if (!user || !courseId) return;
+
     try {
-      const { data: enrollmentData, error: enrollmentError } = await supabase
+      const { data: enrollmentData } = await supabase
         .from('course_enrollments')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (enrollmentError) {
-        if (enrollmentError.message !== 'No rows found') {
-          console.error('Error fetching enrollment data:', enrollmentError);
-          toast.error('Failed to load enrollment data');
-        }
-        setEnrollment(null);
-      } else {
-        setEnrollment(enrollmentData as CourseEnrollment);
-      }
+      setEnrollment(enrollmentData as CourseEnrollment);
     } catch (error) {
       console.error('Error fetching enrollment data:', error);
-      toast.error('Failed to load enrollment data');
     }
   };
 
   const fetchProgress = async () => {
+    if (!user || !courseId) return;
+
     try {
-      const { data: progressData, error: progressError } = await supabase
+      const { data: progressData } = await supabase
         .from('course_progress')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (progressError) {
-        setProgress(null);
-      } else {
-        setProgress(progressData as ProgressData);
-      }
+      setProgress(progressData as ProgressData);
     } catch (error) {
       console.error('Error fetching progress data:', error);
-      toast.error('Failed to load progress data');
     }
   };
 
@@ -331,14 +326,12 @@ const CourseLearningPage = () => {
     if (!user || !enrollment) return;
     
     try {
-      const { data: completedData, error } = await supabase
+      const { data: completedData } = await supabase
         .from('lesson_progress')
         .select('lesson_id')
         .eq('enrollment_id', enrollment.id)
         .eq('is_completed', true);
 
-      if (error) throw error;
-      
       setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
     } catch (error) {
       console.error('Error fetching completed lessons:', error);
@@ -424,20 +417,21 @@ const CourseLearningPage = () => {
 
   const enrolledUser = enrollment && enrollment.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
-  const isNotComplete = progressPercentage < 100;
-  const hasLessons = modules.some(module => module.lessons.length > 0);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading course...</p>
+        </div>
       </div>
     );
   }
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
           <Link to="/explore/courses">
@@ -495,34 +489,6 @@ const CourseLearningPage = () => {
                 <p className="text-sm text-gray-600">
                   Keep going! You're doing great.
                 </p>
-                <div className="flex gap-2">
-                  {isNotComplete && hasLessons && (
-                    <Button
-                      onClick={markAllLessonsComplete}
-                      disabled={markingComplete}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {markingComplete ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                      )}
-                      {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
-                    </Button>
-                  )}
-                  
-                  {(!hasLessons || progressPercentage === 100) && finalExam && (
-                    <Button
-                      onClick={handleTakeExam}
-                      size="sm"
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <GraduationCap className="h-4 w-4 mr-2" />
-                      Take Final Exam
-                    </Button>
-                  )}
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -543,11 +509,15 @@ const CourseLearningPage = () => {
                   modules={modules}
                   courseId={courseId!}
                   creatorId={course.creator_id}
-                  onLessonSelect={handleLessonSelect}
+                  onLessonSelect={(lesson) => setCurrentLessonId(lesson.id)}
                   currentLessonId={currentLessonId}
                   completedLessons={completedLessons}
-                  onQuizStart={handleQuizStart}
-                  onFinalExamStart={handleTakeExam}
+                  onQuizStart={(quizId, lessonId) => {
+                    setCurrentQuizId(quizId);
+                    setCurrentLessonId(lessonId);
+                    setShowQuizModal(true);
+                  }}
+                  onFinalExamStart={() => setShowExamModal(true)}
                 />
               </CardContent>
             </Card>

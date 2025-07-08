@@ -17,7 +17,11 @@ let notificationSound: NotificationSound | null = null;
 // Initialize sound
 export const initializeNotificationSound = () => {
   if (!notificationSound) {
-    notificationSound = createNotificationSound();
+    try {
+      notificationSound = createNotificationSound();
+    } catch (error) {
+      console.warn('Could not initialize notification sound:', error);
+    }
   }
 };
 
@@ -34,42 +38,96 @@ export const playNotificationSound = () => {
 
 // Setup realtime notification listener
 export const setupNotificationListener = (userId: string, onNotification: (notification: any) => void) => {
-  const channel = supabase
-    .channel('notifications-listener')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'notifications',
-      filter: `user_id=eq.${userId}`
-    }, (payload) => {
-      console.log('New notification received:', payload);
-      onNotification(payload.new);
-      playNotificationSound();
-    })
-    .subscribe();
+  try {
+    const channel = supabase
+      .channel(`notifications-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`
+      }, (payload) => {
+        console.log('New notification received:', payload);
+        onNotification(payload.new);
+        playNotificationSound();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to notifications channel');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Error subscribing to notifications channel');
+        }
+      });
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (error) {
+    console.error('Error setting up notification listener:', error);
+    return () => {}; // Return empty cleanup function
+  }
 };
 
 // Setup inbox message listener
 export const setupInboxMessageListener = (userId: string, onMessage: (message: any) => void) => {
-  const channel = supabase
-    .channel('inbox-messages-listener')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'inbox_messages',
-      filter: `recipient_id=eq.${userId}`
-    }, (payload) => {
-      console.log('New inbox message received:', payload);
-      onMessage(payload.new);
-      playNotificationSound();
-    })
-    .subscribe();
+  try {
+    const channel = supabase
+      .channel(`inbox-messages-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'inbox_messages',
+        filter: `recipient_id=eq.${userId}`
+      }, (payload) => {
+        console.log('New inbox message received:', payload);
+        onMessage(payload.new);
+        playNotificationSound();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to inbox messages channel');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Error subscribing to inbox messages channel');
+        }
+      });
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (error) {
+    console.error('Error setting up inbox message listener:', error);
+    return () => {}; // Return empty cleanup function
+  }
+};
+
+// Setup admin notification listener for support messages
+export const setupAdminNotificationListener = (onSupportMessage: (message: any) => void) => {
+  try {
+    const channel = supabase
+      .channel('admin-support-messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'inbox_messages',
+        filter: `recipient_id=eq.null` // Messages to admin/support
+      }, (payload) => {
+        console.log('New support message received:', payload);
+        onSupportMessage(payload.new);
+        playNotificationSound();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to admin support messages');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Error subscribing to admin support messages');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (error) {
+    console.error('Error setting up admin notification listener:', error);
+    return () => {}; // Return empty cleanup function
+  }
 };

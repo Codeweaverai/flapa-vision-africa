@@ -1,22 +1,9 @@
-
-import { supabase } from '@/lib/supabaseClient';
-
+// Currency conversion service with caching and fallback rates
 interface ExchangeRates {
   [key: string]: number;
 }
 
-interface CurrencyServiceResult {
-  convertedAmount: number;
-  exchangeRate: number;
-  originalAmount: number;
-  originalCurrency: string;
-  targetCurrency: string;
-}
-
-const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'ZMW', 'NGN', 'KES', 'GHS', 'UGX', 'TZS'];
-
-// Fallback exchange rates (updated rates)
-const FALLBACK_RATES: ExchangeRates = {
+const DEFAULT_EXCHANGE_RATES: ExchangeRates = {
   USD: 1,
   EUR: 0.85,
   GBP: 0.73,
@@ -25,174 +12,119 @@ const FALLBACK_RATES: ExchangeRates = {
   KES: 129,
   GHS: 15.8,
   UGX: 3730,
-  TZS: 2500
+  TZS: 2500,
 };
 
-export class CurrencyService {
-  private static instance: CurrencyService;
-  private exchangeRates: ExchangeRates = {};
-  private lastFetchTime: number = 0;
-  private readonly CACHE_DURATION = 3600000; // 1 hour
+class CurrencyService {
+  private exchangeRates: ExchangeRates = DEFAULT_EXCHANGE_RATES;
+  private lastUpdated: Date | null = null;
+  private cacheKey = 'currency_exchange_rates';
+  private cacheTimestamp = 'currency_cache_timestamp';
 
-  static getInstance(): CurrencyService {
-    if (!CurrencyService.instance) {
-      CurrencyService.instance = new CurrencyService();
-    }
-    return CurrencyService.instance;
+  constructor() {
+    this.loadCachedRates();
   }
 
-  async getExchangeRates(): Promise<ExchangeRates> {
-    const now = Date.now();
-    
-    // Use cache if it's still valid
-    if (now - this.lastFetchTime < this.CACHE_DURATION && Object.keys(this.exchangeRates).length > 0) {
-      console.log('Using cached exchange rates:', this.exchangeRates);
-      return this.exchangeRates;
-    }
-
-    // Since exchange_rates table doesn't exist, use fallback rates
-    console.log('Using fallback exchange rates');
-    this.exchangeRates = { ...FALLBACK_RATES };
-    this.lastFetchTime = now;
-    return this.exchangeRates;
-  }
-
-  async convertCurrency(
-    amount: number, 
-    fromCurrency: string, 
-    toCurrency: string
-  ): Promise<CurrencyServiceResult> {
-    console.log(`Converting ${amount} from ${fromCurrency} to ${toCurrency}`);
-    
-    // Validate input amount - must be positive
-    if (!amount || amount <= 0 || !Number.isFinite(amount)) {
-      console.error('Invalid amount for conversion:', amount);
-      return {
-        convertedAmount: 0,
-        exchangeRate: 1,
-        originalAmount: amount,
-        originalCurrency: fromCurrency,
-        targetCurrency: toCurrency
-      };
-    }
-
-    // If same currency, return original amount
-    if (fromCurrency === toCurrency) {
-      console.log('Same currency conversion, returning original amount:', amount);
-      return {
-        convertedAmount: amount,
-        exchangeRate: 1,
-        originalAmount: amount,
-        originalCurrency: fromCurrency,
-        targetCurrency: toCurrency
-      };
-    }
-
+  private loadCachedRates() {
     try {
-      const rates = await this.getExchangeRates();
-      console.log('Available rates:', rates);
-
-      const fromRate = rates[fromCurrency] || FALLBACK_RATES[fromCurrency];
-      const toRate = rates[toCurrency] || FALLBACK_RATES[toCurrency];
-
-      if (!fromRate || !toRate || fromRate <= 0 || toRate <= 0) {
-        console.error(`Invalid exchange rate for ${fromCurrency} (${fromRate}) or ${toCurrency} (${toRate})`);
-        throw new Error(`Exchange rate not available for ${fromCurrency} to ${toCurrency}`);
-      }
-
-      // Convert to USD first, then to target currency
-      const usdAmount = amount / fromRate;
-      const convertedAmount = usdAmount * toRate;
-      const exchangeRate = toRate / fromRate;
-
-      // Ensure converted amount is positive
-      const finalAmount = Math.max(convertedAmount, 0);
-
-      console.log(`Conversion: ${amount} ${fromCurrency} = ${finalAmount} ${toCurrency} (rate: ${exchangeRate})`);
-
-      return {
-        convertedAmount: Math.round(finalAmount * 100) / 100, // Round to 2 decimal places
-        exchangeRate,
-        originalAmount: amount,
-        originalCurrency: fromCurrency,
-        targetCurrency: toCurrency
-      };
-    } catch (error) {
-      console.error('Currency conversion error:', error);
+      const cachedRates = localStorage.getItem(this.cacheKey);
+      const cachedTimestamp = localStorage.getItem(this.cacheTimestamp);
       
-      // Return original amount as fallback
-      return {
-        convertedAmount: amount,
-        exchangeRate: 1,
-        originalAmount: amount,
-        originalCurrency: fromCurrency,
-        targetCurrency: toCurrency
-      };
-    }
-  }
-
-  async convertPrice(amount: number, fromCurrency: string, toCurrency: string): Promise<number> {
-    // Validate input before processing
-    if (!amount || amount <= 0 || !Number.isFinite(amount)) {
-      console.warn('convertPrice called with invalid amount:', amount);
-      return 0;
-    }
-    
-    const result = await this.convertCurrency(amount, fromCurrency, toCurrency);
-    return result.convertedAmount;
-  }
-
-  formatPrice(amount: number, currency: string): string {
-    // Handle invalid amounts
-    if (!Number.isFinite(amount) || amount < 0) {
-      amount = 0;
-    }
-    
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount);
+      if (cachedRates && cachedTimestamp) {
+        const timestamp = new Date(cachedTimestamp);
+        const now = new Date();
+        const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
+        
+        // Use cached rates if they're less than 24 hours old
+        if (hoursDiff < 24) {
+          this.exchangeRates = { ...DEFAULT_EXCHANGE_RATES, ...JSON.parse(cachedRates) };
+          this.lastUpdated = timestamp;
+          console.info('Using cached exchange rates:', this.exchangeRates);
+          return;
+        }
+      }
     } catch (error) {
-      console.warn(`Error formatting currency ${currency}:`, error);
-      return `${currency} ${amount.toFixed(2)}`;
+      console.warn('Failed to load cached exchange rates:', error);
     }
+    
+    // Fallback to default rates
+    console.info('Using fallback exchange rates');
+    this.exchangeRates = DEFAULT_EXCHANGE_RATES;
+    this.cacheRates();
+  }
+
+  private cacheRates() {
+    try {
+      localStorage.setItem(this.cacheKey, JSON.stringify(this.exchangeRates));
+      localStorage.setItem(this.cacheTimestamp, new Date().toISOString());
+      console.info('Using cached exchange rates:', this.exchangeRates);
+    } catch (error) {
+      console.warn('Failed to cache exchange rates:', error);
+    }
+  }
+
+  async updateExchangeRates(): Promise<void> {
+    try {
+      // In a real app, you would fetch from a currency API
+      // For now, we'll use the default rates
+      this.exchangeRates = DEFAULT_EXCHANGE_RATES;
+      this.lastUpdated = new Date();
+      this.cacheRates();
+    } catch (error) {
+      console.error('Failed to update exchange rates:', error);
+      // Keep using cached or default rates
+    }
+  }
+
+  convert(amount: number, fromCurrency: string, toCurrency: string): number {
+    if (fromCurrency === toCurrency) {
+      return amount;
+    }
+
+    const fromRate = this.exchangeRates[fromCurrency] || 1;
+    const toRate = this.exchangeRates[toCurrency] || 1;
+    
+    // Convert to USD first, then to target currency
+    const usdAmount = amount / fromRate;
+    const convertedAmount = usdAmount * toRate;
+    
+    return Math.round(convertedAmount * 100) / 100;
   }
 
   formatCurrency(amount: number, currency: string): string {
-    return this.formatPrice(amount, currency);
+    const symbols: { [key: string]: string } = {
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
+      ZMW: 'ZK',
+      NGN: '₦',
+      KES: 'KSh',
+      GHS: '₵',
+      UGX: 'USh',
+      TZS: 'TSh',
+    };
+
+    const symbol = symbols[currency] || currency;
+    const formattedAmount = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+
+    return `${symbol}${formattedAmount}`;
   }
 
   getSupportedCurrencies(): string[] {
-    return [...SUPPORTED_CURRENCIES];
+    return Object.keys(this.exchangeRates);
   }
 
-  async detectUserCurrency(): Promise<string> {
-    // Simple detection based on browser locale or return USD as default
-    try {
-      const locale = navigator.language || 'en-US';
-      const country = locale.split('-')[1];
-      
-      // Map common countries to currencies
-      const countryToCurrency: { [key: string]: string } = {
-        'US': 'USD',
-        'GB': 'GBP',
-        'ZM': 'ZMW',
-        'NG': 'NGN',
-        'KE': 'KES',
-        'GH': 'GHS',
-        'UG': 'UGX',
-        'TZ': 'TZS'
-      };
-      
-      return countryToCurrency[country] || 'USD';
-    } catch (error) {
-      console.warn('Could not detect user currency:', error);
-      return 'USD';
-    }
+  getExchangeRate(currency: string): number {
+    return this.exchangeRates[currency] || 1;
+  }
+
+  getLastUpdated(): Date | null {
+    return this.lastUpdated;
   }
 }
 
-export const currencyService = CurrencyService.getInstance();
+export const currencyService = new CurrencyService();
+export default currencyService;
