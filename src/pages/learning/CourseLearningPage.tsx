@@ -531,7 +531,7 @@ const CourseLearningPage = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
-          <Link to="/explore/courses">
+          <Link to="/explore-courses">
             <Button>Browse Courses</Button>
           </Link>
         </div>
