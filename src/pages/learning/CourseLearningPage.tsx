@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -163,42 +162,88 @@ const CourseLearningPage = () => {
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
 
   useEffect(() => {
-    if (courseId) {
+    // Debug logging
+    console.log("courseId:", courseId, "user:", user);
+    
+    // Only proceed if we have both courseId and user is initialized
+    if (courseId && user?.id) {
+      console.log("Both courseId and user.id are available, fetching data...");
       fetchCourseData();
-      if (user) {
-        fetchEnrollmentData();
-        fetchProgress();
-        fetchCompletedLessons();
-      }
+      fetchEnrollmentData();
+      fetchProgress();
+      fetchCompletedLessons();
+    } else if (courseId && user === null) {
+      // User is explicitly null (not logged in)
+      console.log("User not logged in, fetching public course data only");
+      fetchCourseData();
+    } else {
+      console.log("Waiting for courseId or user to be available...");
+      // Keep loading until we have the required data
     }
   }, [courseId, user]);
 
   const fetchCourseData = async () => {
+    if (!courseId) {
+      console.error("No courseId provided");
+      setLoading(false);
+      return;
+    }
+
+    console.log("Fetching course data for courseId:", courseId);
     setLoading(true);
+    
     try {
-      // Fetch course details
+      // Get current user if context user is not available
+      let currentUser = user;
+      if (!currentUser) {
+        const { data: { user: sessionUser } } = await supabase.auth.getUser();
+        currentUser = sessionUser;
+        console.log("Fetched user from session:", sessionUser);
+      }
+
+      // Fetch course details with maybeSingle() for better error handling
+      console.log("Fetching course with ID:", courseId);
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select('*')
         .eq('id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (courseError) throw courseError;
+      if (courseError) {
+        console.error('Error fetching course:', courseError);
+        throw courseError;
+      }
+
+      if (!courseData) {
+        console.log("No course found with ID:", courseId);
+        setCourse(null);
+        setLoading(false);
+        return;
+      }
+
+      console.log("Course data fetched successfully:", courseData);
       setCourse(courseData as Course);
 
-      // Fetch modules first
+      // Fetch modules
+      console.log("Fetching modules for course:", courseId);
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
         .select('*')
         .eq('course_id', courseId)
         .order('order_index', { ascending: true });
 
-      if (modulesError) throw modulesError;
+      if (modulesError) {
+        console.error('Error fetching modules:', modulesError);
+        throw modulesError;
+      }
 
-      // Fetch lessons for each module separately to avoid complex join issues
+      console.log("Modules data fetched:", modulesData);
+
+      // Fetch lessons for each module separately
       const modulesWithLessons = await Promise.all(
         (modulesData as CourseModule[]).map(async (module) => {
           try {
+            console.log("Fetching lessons for module:", module.id);
             const { data: lessonsData, error: lessonsError } = await supabase
               .from('lessons')
               .select('*')
@@ -210,6 +255,7 @@ const CourseLearningPage = () => {
               return { ...module, lessons: [] };
             }
 
+            console.log(`Lessons for module ${module.id}:`, lessonsData);
             return {
               ...module,
               lessons: lessonsData as CourseLesson[],
@@ -220,6 +266,7 @@ const CourseLearningPage = () => {
           }
         })
       );
+      
       setModules(modulesWithLessons);
 
       // Fetch enrollment count
@@ -276,7 +323,7 @@ const CourseLearningPage = () => {
       }
 
       // Fetch instructor profile
-      if (courseData) {
+      if (courseData?.creator_id) {
         const { data: instructorData, error: instructorError } = await supabase
           .from('profiles')
           .select('*')
@@ -298,19 +345,31 @@ const CourseLearningPage = () => {
   };
 
   const fetchEnrollmentData = async () => {
-    if (!user?.id || !courseId) return;
+    // Get current user if context user is not available
+    let currentUser = user;
+    if (!currentUser) {
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      currentUser = sessionUser;
+    }
+
+    if (!currentUser?.id || !courseId) {
+      console.log("No user or courseId for enrollment fetch");
+      return;
+    }
     
     try {
+      console.log("Fetching enrollment data for user:", currentUser.id, "course:", courseId);
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
         .eq('course_id', courseId)
         .maybeSingle();
 
       if (enrollmentError && enrollmentError.code !== 'PGRST116') {
         console.error('Error fetching enrollment data:', enrollmentError);
       } else {
+        console.log("Enrollment data:", enrollmentData);
         setEnrollment(enrollmentData as CourseEnrollment);
       }
     } catch (error) {
@@ -319,19 +378,31 @@ const CourseLearningPage = () => {
   };
 
   const fetchProgress = async () => {
-    if (!user?.id || !courseId) return;
+    // Get current user if context user is not available
+    let currentUser = user;
+    if (!currentUser) {
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      currentUser = sessionUser;
+    }
+
+    if (!currentUser?.id || !courseId) {
+      console.log("No user or courseId for progress fetch");
+      return;
+    }
     
     try {
+      console.log("Fetching progress for user:", currentUser.id, "course:", courseId);
       const { data: progressData, error: progressError } = await supabase
         .from('course_progress')
-        .select('progress_percentage, user_id, course_id, id, created_at, updated_at')
-        .eq('user_id', user.id)
+        .select('*')
+        .eq('user_id', currentUser.id)
         .eq('course_id', courseId)
         .maybeSingle();
 
       if (progressError && progressError.code !== 'PGRST116') {
         console.error('Error fetching progress data:', progressError);
       } else if (progressData) {
+        console.log("Progress data:", progressData);
         setProgress(progressData as ProgressData);
       }
     } catch (error) {
@@ -340,9 +411,13 @@ const CourseLearningPage = () => {
   };
 
   const fetchCompletedLessons = async () => {
-    if (!user || !enrollment) return;
+    if (!user || !enrollment) {
+      console.log("No user or enrollment for completed lessons fetch");
+      return;
+    }
     
     try {
+      console.log("Fetching completed lessons for enrollment:", enrollment.id);
       const { data: completedData, error } = await supabase
         .from('lesson_progress')
         .select('lesson_id')
@@ -352,7 +427,9 @@ const CourseLearningPage = () => {
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching completed lessons:', error);
       } else {
-        setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
+        const completedIds = completedData?.map(item => item.lesson_id) || [];
+        console.log("Completed lessons:", completedIds);
+        setCompletedLessons(completedIds);
       }
     } catch (error) {
       console.error('Error fetching completed lessons:', error);
