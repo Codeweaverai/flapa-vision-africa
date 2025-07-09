@@ -170,7 +170,7 @@ const MyEventsPage = () => {
                               View Event
                             </Button>
                           </Link>
-                          <Link to="/my-orders" className="flex-1">
+                          <Link to="/account/orders" className="flex-1">
                             <Button size="sm" className="w-full bg-gradient-to-r from-orange-500 to-purple-600">
                               <Download className="h-4 w-4 mr-2" />
                               View Tickets
