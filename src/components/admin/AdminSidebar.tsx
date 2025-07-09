@@ -50,7 +50,7 @@ const AdminSidebar = () => {
     <div className="w-64 bg-gradient-to-b from-orange-50 via-purple-50 to-pink-50 shadow-lg border-r border-orange-200/50">
       <div className="p-6 border-b border-orange-200/30">
         <h2 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-          Admin Panel
+          SkillPulse
         </h2>
       </div>
       
