@@ -141,7 +141,13 @@ interface Profile {
 }
 
 const CourseLearningPage = () => {
-  const { courseId } = useParams<{ courseId: string }>();
+  // Try multiple parameter names to catch the courseId
+  const params = useParams();
+  const courseId = params.courseId || params.id;
+  
+  console.log("All URL params:", params);
+  console.log("Extracted courseId:", courseId);
+  
   const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
@@ -162,23 +168,23 @@ const CourseLearningPage = () => {
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
 
   useEffect(() => {
-    // Debug logging
     console.log("courseId:", courseId, "user:", user);
     
-    // Only proceed if we have both courseId and user is initialized
-    if (courseId && user?.id) {
-      console.log("Both courseId and user.id are available, fetching data...");
+    // Only proceed if we have courseId (user can be null for public access)
+    if (courseId) {
+      console.log("courseId available, fetching data...");
       fetchCourseData();
-      fetchEnrollmentData();
-      fetchProgress();
-      fetchCompletedLessons();
-    } else if (courseId && user === null) {
-      // User is explicitly null (not logged in)
-      console.log("User not logged in, fetching public course data only");
-      fetchCourseData();
+      
+      // Only fetch user-specific data if user is available
+      if (user?.id) {
+        console.log("User available, fetching enrollment and progress...");
+        fetchEnrollmentData();
+        fetchProgress();
+        fetchCompletedLessons();
+      }
     } else {
-      console.log("Waiting for courseId or user to be available...");
-      // Keep loading until we have the required data
+      console.log("No courseId found in URL params");
+      setLoading(false);
     }
   }, [courseId, user]);
 
@@ -193,14 +199,6 @@ const CourseLearningPage = () => {
     setLoading(true);
     
     try {
-      // Get current user if context user is not available
-      let currentUser = user;
-      if (!currentUser) {
-        const { data: { user: sessionUser } } = await supabase.auth.getUser();
-        currentUser = sessionUser;
-        console.log("Fetched user from session:", sessionUser);
-      }
-
       // Fetch course details with maybeSingle() for better error handling
       console.log("Fetching course with ID:", courseId);
       const { data: courseData, error: courseError } = await supabase
@@ -526,6 +524,20 @@ const CourseLearningPage = () => {
     );
   }
 
+  if (!courseId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid course URL</h1>
+          <p className="text-gray-600 mb-4">The course ID is missing from the URL.</p>
+          <Link to="/explore-courses">
+            <Button>Browse Courses</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!course) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -574,14 +586,14 @@ const CourseLearningPage = () => {
         </div>
 
         {/* Progress Bar for Enrolled Users */}
-        {enrolledUser && (
+        {enrollment && enrollment.payment_status === 'completed' && (
           <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Your Progress</h3>
-                <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
+                <span className="text-2xl font-bold text-orange-600">{progress?.progress_percentage || 0}%</span>
               </div>
-              <Progress value={progressPercentage} className="h-3" />
+              <Progress value={progress?.progress_percentage || 0} className="h-3" />
               <div className="flex items-center justify-between mt-4">
                 <p className="text-sm text-gray-600">
                   Keep going! You're doing great.
@@ -637,8 +649,12 @@ const CourseLearningPage = () => {
                   onLessonSelect={handleLessonSelect}
                   currentLessonId={currentLessonId}
                   completedLessons={completedLessons}
-                  onQuizStart={handleQuizStart}
-                  onFinalExamStart={handleTakeExam}
+                  onQuizStart={(quizId, lessonId) => {
+                    setCurrentQuizId(quizId);
+                    setCurrentLessonId(lessonId);
+                    setShowQuizModal(true);
+                  }}
+                  onFinalExamStart={() => setShowExamModal(true)}
                 />
               </CardContent>
             </Card>
@@ -658,7 +674,7 @@ const CourseLearningPage = () => {
               </TabsList>
               
               <TabsContent value="lesson-notes" className="space-y-6">
-                {enrolledUser ? (
+                {enrollment && enrollment.payment_status === 'completed' ? (
                   <LessonNotesTab 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
                     currentVideoTime={0}
@@ -680,7 +696,7 @@ const CourseLearningPage = () => {
               </TabsContent>
               
               <TabsContent value="transcripts">
-                {enrolledUser ? (
+                {enrollment && enrollment.payment_status === 'completed' ? (
                   <VideoTranscripts 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
                     onSeekTo={(time) => console.log('Seek to:', time)}
@@ -713,7 +729,7 @@ const CourseLearningPage = () => {
         </div>
 
         {/* Enrollment Actions */}
-        {!enrolledUser && (
+        {(!enrollment || enrollment.payment_status !== 'completed') && (
           <Card className="mt-8 sticky bottom-4">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
