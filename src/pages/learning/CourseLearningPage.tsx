@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +21,8 @@ import {
   CheckCircle,
   StickyNote,
   CheckCircle2,
-  GraduationCap
+  GraduationCap,
+  Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
@@ -32,6 +33,8 @@ import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
+import VideoPlayer from '@/components/video/VideoPlayer';
+import QuizResultsModal from '@/components/course/QuizResultsModal';
 
 interface Course {
   id?: string;
@@ -141,8 +144,8 @@ interface Profile {
 }
 
 const CourseLearningPage = () => {
-  // Try multiple parameter names to catch the courseId
   const params = useParams();
+  const navigate = useNavigate();
   const courseId = params.courseId || params.id;
   
   console.log("All URL params:", params);
@@ -166,6 +169,11 @@ const CourseLearningPage = () => {
   const [currentQuizId, setCurrentQuizId] = useState<string>('');
   const [currentLessonId, setCurrentLessonId] = useState<string>('');
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [showQuizResultsModal, setShowQuizResultsModal] = useState(false);
+  const [currentQuiz, setCurrentQuiz] = useState<any>(null);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizPassed, setQuizPassed] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
 
   useEffect(() => {
     console.log("courseId:", courseId, "user:", user);
@@ -434,6 +442,31 @@ const CourseLearningPage = () => {
     }
   };
 
+  const updateCourseProgress = async (progressPercentage: number) => {
+    if (!user || !courseId) return;
+
+    try {
+      const { error: progressError } = await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          progress_percentage: progressPercentage,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+
+      if (progressError) {
+        console.error('Error updating course progress:', progressError);
+      } else {
+        await fetchProgress();
+      }
+    } catch (error) {
+      console.error('Error updating course progress:', error);
+    }
+  };
+
   const markAllLessonsComplete = async () => {
     if (!user || !courseId || !modules.length || !enrollment) {
       toast.error('Unable to mark lessons complete');
@@ -463,24 +496,9 @@ const CourseLearningPage = () => {
         }
       }
 
-      const { error: progressError } = await supabase
-        .from('course_progress')
-        .upsert({
-          user_id: user.id,
-          course_id: courseId,
-          progress_percentage: 100,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,course_id'
-        });
-
-      if (progressError) {
-        console.error('Error updating course progress:', progressError);
-      } else {
-        await fetchProgress();
-        await fetchCompletedLessons();
-        toast.success('All lessons marked as complete!');
-      }
+      await updateCourseProgress(100);
+      await fetchCompletedLessons();
+      toast.success('All lessons marked as complete!');
     } catch (error) {
       console.error('Error marking lessons complete:', error);
       toast.error('Failed to mark lessons complete');
@@ -492,7 +510,7 @@ const CourseLearningPage = () => {
   const handleStartLearning = () => {
     if (modules.length > 0 && modules[0].lessons.length > 0) {
       const firstLesson = modules[0].lessons[0];
-      window.location.href = `/course/${courseId}/lesson/${firstLesson.id}`;
+      setSelectedLesson(firstLesson);
     }
   };
 
@@ -506,9 +524,54 @@ const CourseLearningPage = () => {
     setShowQuizModal(true);
   };
 
+  const handleQuizComplete = (quiz: any, score: number, passed: boolean) => {
+    setCurrentQuiz(quiz);
+    setQuizScore(score);
+    setQuizPassed(passed);
+    setShowQuizModal(false);
+    setShowQuizResultsModal(true);
+  };
+
+  const handleRetakeQuiz = () => {
+    setShowQuizResultsModal(false);
+    setShowQuizModal(true);
+  };
+
   const handleLessonSelect = (lesson: CourseLesson) => {
     setCurrentLessonId(lesson.id);
-    // Here you would typically navigate to lesson view or update current lesson
+    setSelectedLesson(lesson);
+  };
+
+  const handleVideoProgress = (currentTime: number, duration: number) => {
+    // Update lesson progress based on video watch time
+    if (currentTime > 0 && duration > 0) {
+      const watchPercentage = (currentTime / duration) * 100;
+      if (watchPercentage > 80 && selectedLesson && enrollment) {
+        // Mark lesson as complete if 80% watched
+        supabase
+          .from('lesson_progress')
+          .upsert({
+            enrollment_id: enrollment.id,
+            lesson_id: selectedLesson.id,
+            is_completed: true,
+            completion_date: new Date().toISOString()
+          }, {
+            onConflict: 'enrollment_id,lesson_id'
+          })
+          .then(() => {
+            fetchCompletedLessons();
+            // Update overall course progress
+            const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
+            const completedCount = completedLessons.length + 1;
+            const progressPercentage = Math.round((completedCount / totalLessons) * 100);
+            updateCourseProgress(progressPercentage);
+          });
+      }
+    }
+  };
+
+  const navigateToCourseResults = () => {
+    navigate(`/course/${courseId}/results`);
   };
 
   const enrolledUser = enrollment && enrollment.payment_status === 'completed';
@@ -625,6 +688,17 @@ const CourseLearningPage = () => {
                       Take Final Exam
                     </Button>
                   )}
+
+                  {progressPercentage === 100 && (
+                    <Button
+                      onClick={navigateToCourseResults}
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Course Results
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -649,11 +723,7 @@ const CourseLearningPage = () => {
                   onLessonSelect={handleLessonSelect}
                   currentLessonId={currentLessonId}
                   completedLessons={completedLessons}
-                  onQuizStart={(quizId, lessonId) => {
-                    setCurrentQuizId(quizId);
-                    setCurrentLessonId(lessonId);
-                    setShowQuizModal(true);
-                  }}
+                  onQuizStart={handleQuizStart}
                   onFinalExamStart={() => setShowExamModal(true)}
                 />
               </CardContent>
@@ -662,6 +732,29 @@ const CourseLearningPage = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-7">
+            {/* Video Player Section */}
+            {enrollment && enrollment.payment_status === 'completed' && selectedLesson && selectedLesson.video_url && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Play className="h-5 w-5" />
+                    {selectedLesson.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <VideoPlayer
+                    src={selectedLesson.video_url}
+                    poster={course.thumbnail_url}
+                    onTimeUpdate={handleVideoProgress}
+                    className="w-full aspect-video rounded-lg"
+                  />
+                  {selectedLesson.description && (
+                    <p className="mt-4 text-gray-600">{selectedLesson.description}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Tabs defaultValue="lesson-notes" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
@@ -831,7 +924,22 @@ const CourseLearningPage = () => {
           onClose={() => setShowQuizModal(false)}
           quizId={currentQuizId}
           lessonId={currentLessonId}
+          onComplete={handleQuizComplete}
         />
+
+        {/* Quiz Results Modal */}
+        {currentQuiz && (
+          <QuizResultsModal
+            isOpen={showQuizResultsModal}
+            onClose={() => setShowQuizResultsModal(false)}
+            quiz={currentQuiz}
+            score={quizScore}
+            passed={quizPassed}
+            onRetake={handleRetakeQuiz}
+            onProceed={() => setShowQuizResultsModal(false)}
+            hasNextContent={true}
+          />
+        )}
       </div>
     </div>
   );

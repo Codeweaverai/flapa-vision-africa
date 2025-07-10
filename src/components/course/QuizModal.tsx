@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -39,9 +38,16 @@ interface QuizModalProps {
   onClose: () => void;
   quizId: string;
   lessonId: string;
+  onComplete?: (quiz: Quiz, score: number, passed: boolean) => void;
 }
 
-const QuizModal: React.FC<QuizModalProps> = ({ isOpen, onClose, quizId, lessonId }) => {
+const QuizModal: React.FC<QuizModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  quizId, 
+  lessonId, 
+  onComplete 
+}) => {
   const { user } = useAuth();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -132,19 +138,31 @@ const QuizModal: React.FC<QuizModalProps> = ({ isOpen, onClose, quizId, lessonId
       const finalScore = Math.round((correctAnswers / quiz.questions.length) * 100);
       const quizPassed = finalScore >= quiz.passing_score;
 
-      // Save attempt to database (placeholder - would use actual quiz_attempts table)
-      console.log('Quiz attempt:', {
-        user_id: user.id,
-        quiz_id: quizId,
-        lesson_id: lessonId,
-        score: finalScore,
-        passed: quizPassed,
-        answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption]))
-      });
+      // Try to save attempt to database if possible
+      try {
+        console.log('Quiz attempt:', {
+          user_id: user.id,
+          quiz_id: quizId,
+          lesson_id: lessonId,
+          score: finalScore,
+          passed: quizPassed,
+          answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption]))
+        });
+        
+        // Save to a generic attempts table if available
+        // This is a placeholder for when quiz functionality is fully implemented
+      } catch (dbError) {
+        console.log('Database save failed, continuing with local results:', dbError);
+      }
 
       setScore(finalScore);
       setPassed(quizPassed);
       setShowResults(true);
+
+      // Call completion callback
+      if (onComplete) {
+        onComplete(quiz, finalScore, quizPassed);
+      }
 
       if (quizPassed) {
         toast.success(`Congratulations! You passed with ${finalScore}%`);
@@ -182,124 +200,4 @@ const QuizModal: React.FC<QuizModalProps> = ({ isOpen, onClose, quizId, lessonId
   if (showResults) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Quiz Results</DialogTitle>
-          </DialogHeader>
-          <div className="text-center py-6">
-            {passed ? (
-              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            ) : (
-              <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            )}
-            <h3 className="text-2xl font-bold mb-2">
-              {passed ? 'Congratulations!' : 'Better luck next time!'}
-            </h3>
-            <p className="text-lg mb-4">
-              Your Score: <span className="font-bold">{score}%</span>
-            </p>
-            <p className="text-gray-600 mb-6">
-              Passing Score: {quiz.passing_score}%
-            </p>
-            <Button onClick={onClose} className="bg-gradient-to-r from-orange-500 to-purple-600">
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  const currentQuestion = quiz.questions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>{quiz.title}</span>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center text-orange-600">
-                <Clock className="h-4 w-4 mr-1" />
-                {formatTime(timeLeft)}
-              </div>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Progress */}
-          <div>
-            <div className="flex justify-between text-sm mb-2">
-              <span>Question {currentQuestionIndex + 1} of {quiz.questions.length}</span>
-              <span>{Math.round(progress)}% Complete</span>
-            </div>
-            <Progress value={progress} />
-          </div>
-
-          {/* Question */}
-          {currentQuestion && (
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">{currentQuestion.question}</h3>
-                <div className="space-y-3">
-                  {currentQuestion.options.map((option, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleAnswerSelect(currentQuestion.id, index)}
-                      className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                        answers.find(a => a.questionId === currentQuestion.id)?.selectedOption === index
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <span className="w-6 h-6 rounded-full border-2 border-gray-300 mr-3 flex items-center justify-center text-sm">
-                          {String.fromCharCode(65 + index)}
-                        </span>
-                        {option}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Navigation */}
-          <div className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
-              disabled={currentQuestionIndex === 0}
-            >
-              Previous
-            </Button>
-            
-            <div className="flex gap-2">
-              {currentQuestionIndex < quiz.questions.length - 1 ? (
-                <Button
-                  onClick={() => setCurrentQuestionIndex(prev => Math.min(quiz.questions.length - 1, prev + 1))}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600"
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmitQuiz}
-                  disabled={isSubmitting || answers.length !== quiz.questions.length}
-                  className="bg-gradient-to-r from-green-500 to-blue-600"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-export default QuizModal;
+        <DialogContent className="max
