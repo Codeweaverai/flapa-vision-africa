@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -200,4 +201,135 @@ const QuizModal: React.FC<QuizModalProps> = ({
   if (showResults) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Quiz Results</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="text-center">
+              {passed ? (
+                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              ) : (
+                <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              )}
+              <h3 className="text-2xl font-bold mb-2">
+                {passed ? 'Congratulations!' : 'Not quite there yet'}
+              </h3>
+              <p className="text-lg mb-4">
+                Your score: {score}% (Need {quiz.passing_score}% to pass)
+              </p>
+            </div>
+            
+            <div className="flex justify-center gap-4">
+              <Button onClick={onClose} variant="outline">
+                Close
+              </Button>
+              {!passed && (
+                <Button onClick={() => {
+                  setShowResults(false);
+                  setCurrentQuestionIndex(0);
+                  setAnswers([]);
+                  setTimeLeft(15 * 60);
+                }}>
+                  Retake Quiz
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const currentQuestion = quiz.questions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{quiz.title}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {/* Progress and Timer */}
+          <div className="flex justify-between items-center">
+            <div className="flex-1">
+              <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Question {currentQuestionIndex + 1} of {quiz.questions.length}</span>
+                <span>Progress: {Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="w-full" />
+            </div>
+            <div className="ml-6 flex items-center text-orange-600">
+              <Clock className="w-4 h-4 mr-1" />
+              <span className="font-mono">{formatTime(timeLeft)}</span>
+            </div>
+          </div>
+
+          {/* Question */}
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4">{currentQuestion.question}</h3>
+              <div className="space-y-3">
+                {currentQuestion.options.map((option, index) => {
+                  const isSelected = answers.find(a => a.questionId === currentQuestion.id)?.selectedOption === index;
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleAnswerSelect(currentQuestion.id, index)}
+                      className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                        isSelected
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <div className={`w-4 h-4 rounded-full border-2 mr-3 ${
+                          isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
+                        }`}>
+                          {isSelected && <div className="w-2 h-2 bg-white rounded-full mx-auto mt-0.5" />}
+                        </div>
+                        {option}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Navigation */}
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
+              disabled={currentQuestionIndex === 0}
+            >
+              Previous
+            </Button>
+            
+            {currentQuestionIndex === quiz.questions.length - 1 ? (
+              <Button
+                onClick={handleSubmitQuiz}
+                disabled={isSubmitting || answers.length !== quiz.questions.length}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
+                disabled={!answers.find(a => a.questionId === currentQuestion.id)}
+              >
+                Next
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default QuizModal;
