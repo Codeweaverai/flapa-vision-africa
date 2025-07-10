@@ -34,6 +34,7 @@ import FinalExamModal from '@/components/course/FinalExamModal';
 import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import VideoPlayer from '@/components/video/VideoPlayer';
+import ReactPlayer from 'react-player';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 
 interface Course {
@@ -742,7 +743,7 @@ const CourseLearningPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <VideoPlayer
+                  <ReactPlayer
                     src={selectedLesson.video_url}
                     poster={course.thumbnail_url}
                     onTimeUpdate={handleVideoProgress}
