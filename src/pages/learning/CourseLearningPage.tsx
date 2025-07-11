@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import ReactPlayer from 'react-player';
 import { 
   Play, 
   Clock, 
@@ -34,6 +33,7 @@ import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
+import VideoPlayer from '@/components/video/VideoPlayer';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 
 interface Course {
@@ -542,15 +542,12 @@ const CourseLearningPage = () => {
     setSelectedLesson(lesson);
   };
 
-  const handleVideoProgress = (progress: { played: number; playedSeconds: number }) => {
-    const { played, playedSeconds } = progress;
-    
+  const handleVideoProgress = (currentTime: number, duration: number) => {
     // Update lesson progress based on video watch time
-    if (playedSeconds > 0 && played > 0) {
-      const watchPercentage = played * 100;
-      
-      // Mark lesson as complete if 80% watched
-      if (watchPercentage > 80 && selectedLesson && enrollment && !completedLessons.includes(selectedLesson.id)) {
+    if (currentTime > 0 && duration > 0) {
+      const watchPercentage = (currentTime / duration) * 100;
+      if (watchPercentage > 80 && selectedLesson && enrollment) {
+        // Mark lesson as complete if 80% watched
         supabase
           .from('lesson_progress')
           .upsert({
@@ -745,28 +742,12 @@ const CourseLearningPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="aspect-video rounded-lg overflow-hidden">
-                    <ReactPlayer
-                      url={selectedLesson.video_url}
-                      controls={true}
-                      playing={false}
-                      width="100%"
-                      height="100%"
-                      light={course.thumbnail_url}
-                      onProgress={handleVideoProgress}
-                      progressInterval={5000}
-                      config={{
-                        file: {
-                          attributes: {
-                            controlsList: 'nodownload noremoteplayback',
-                            disablePictureInPicture: true,
-                            onContextMenu: (e: React.MouseEvent) => e.preventDefault()
-                          }
-                        }
-                      }}
-                      style={{ borderRadius: '8px' }}
-                    />
-                  </div>
+                  <VideoPlayer
+                    src={selectedLesson.video_url}
+                    poster={course.thumbnail_url}
+                    onTimeUpdate={handleVideoProgress}
+                    className="w-full aspect-video rounded-lg"
+                  />
                   {selectedLesson.description && (
                     <p className="mt-4 text-gray-600">{selectedLesson.description}</p>
                   )}

@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -119,7 +117,7 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
       const finalScore = Math.round((correctAnswers / questions.length) * 100);
       const examPassed = finalScore >= exam.passing_score;
 
-      // Get current attempt number to avoid conflicts
+      // Get current attempt number
       const { data: existingAttempts, error: attemptError } = await supabase
         .from('final_exam_results')
         .select('attempt_number')
@@ -136,10 +134,10 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         ? existingAttempts[0].attempt_number + 1 
         : 1;
 
-      // Use upsert to handle conflicts gracefully
+      // Insert new exam result with proper attempt number
       const { error: resultError } = await supabase
         .from('final_exam_results')
-        .upsert({
+        .insert({
           user_id: user.id,
           exam_id: exam.id,
           course_id: exam.course_id,
@@ -151,8 +149,6 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           completed_at: new Date().toISOString(),
           quiz_scores: [],
           final_grade: finalScore
-        }, {
-          onConflict: 'user_id,exam_id,attempt_number'
         });
 
       if (resultError) {
@@ -160,10 +156,10 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         throw resultError;
       }
 
-      // Create exam attempt record with upsert
+      // Create exam attempt record
       const { error: attemptInsertError } = await supabase
         .from('final_exam_attempts')
-        .upsert({
+        .insert({
           user_id: user.id,
           exam_id: exam.id,
           enrollment_id: enrollmentId,
@@ -173,8 +169,6 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption])),
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,exam_id,attempt_number'
         });
 
       if (attemptInsertError) {
@@ -245,10 +239,6 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Loading Exam</DialogTitle>
-            <DialogDescription>Please wait while we load the exam questions.</DialogDescription>
-          </DialogHeader>
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
           </div>
@@ -267,21 +257,21 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
               <span>{exam.title}</span>
             </div>
             {!showResults && (
-              <div className="flex items-center text-orange-600">
-                <Clock className="h-4 w-4 mr-1" />
-                {formatTime(timeLeft)}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center text-orange-600">
+                  <Clock className="h-4 w-4 mr-1" />
+                  {formatTime(timeLeft)}
+                </div>
               </div>
             )}
           </DialogTitle>
-          <DialogDescription>
-            {showResults ? 
-              `Exam completed. ${passed ? 'Congratulations on passing!' : 'Review and try again.'}` :
-              `${exam.description || 'Complete this final exam to finish the course.'} Time limit: ${exam.time_limit_minutes} minutes.`
-            }
-          </DialogDescription>
         </DialogHeader>
 
-        {showResults ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          </div>
+        ) : showResults ? (
           <div className="text-center py-6">
             {passed ? (
               <div>
