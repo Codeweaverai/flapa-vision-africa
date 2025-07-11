@@ -31,11 +31,11 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <Router>
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CurrencyProvider>
           <CartProvider>
-            <QueryClientProvider client={queryClient}>
+            <Router>
               <div className="App">
                 <Toaster />
                 <Layout>
@@ -68,11 +68,11 @@ function App() {
                   </Routes>
                 </Layout>
               </div>
-            </QueryClientProvider>
+            </Router>
           </CartProvider>
         </CurrencyProvider>
       </AuthProvider>
-    </Router>
+    </QueryClientProvider>
   );
 }
 
