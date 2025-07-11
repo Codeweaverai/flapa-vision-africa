@@ -107,7 +107,7 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Calculate score
+      // Calculate score properly
       let correctAnswers = 0;
       questions.forEach(question => {
         const userAnswer = answers.find(a => a.questionId === question.id);
@@ -116,8 +116,16 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         }
       });
 
-      const finalScore = Math.round((correctAnswers / questions.length) * 100);
+      // Ensure we have valid numeric score
+      const finalScore = questions.length > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
       const examPassed = finalScore >= exam.passing_score;
+
+      console.log('Calculated score:', finalScore, 'Questions:', questions.length, 'Correct:', correctAnswers);
+
+      // Validate score before submission
+      if (typeof finalScore !== 'number' || isNaN(finalScore)) {
+        throw new Error('Invalid score calculated');
+      }
 
       // Get current attempt number
       const { data: existingAttempts, error: attemptError } = await supabase
@@ -136,22 +144,27 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         ? existingAttempts[0].attempt_number + 1 
         : 1;
 
-      // Use upsert with onConflict to handle 409 errors
+      // Prepare exam result data with all required fields
+      const examResultData = {
+        user_id: user.id,
+        exam_id: exam.id,
+        course_id: exam.course_id,
+        enrollment_id: enrollmentId,
+        score: finalScore, // Ensure this is a valid number
+        percentage_score: finalScore,
+        passed: examPassed,
+        attempt_number: nextAttemptNumber,
+        completed_at: new Date().toISOString(),
+        quiz_scores: [],
+        final_grade: finalScore
+      };
+
+      console.log('Submitting exam result:', examResultData);
+
+      // Use upsert with proper conflict resolution
       const { error: resultError } = await supabase
         .from('final_exam_results')
-        .upsert({
-          user_id: user.id,
-          exam_id: exam.id,
-          course_id: exam.course_id,
-          enrollment_id: enrollmentId,
-          score: finalScore,
-          percentage_score: finalScore,
-          passed: examPassed,
-          attempt_number: nextAttemptNumber,
-          completed_at: new Date().toISOString(),
-          quiz_scores: [],
-          final_grade: finalScore
-        }, {
+        .upsert(examResultData, {
           onConflict: 'user_id,exam_id,attempt_number'
         });
 
@@ -160,20 +173,22 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         throw resultError;
       }
 
-      // Create exam attempt record with upsert
+      // Create exam attempt record
+      const examAttemptData = {
+        user_id: user.id,
+        exam_id: exam.id,
+        enrollment_id: enrollmentId,
+        score: finalScore,
+        passed: examPassed,
+        attempt_number: nextAttemptNumber,
+        answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption])),
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString()
+      };
+
       const { error: attemptInsertError } = await supabase
         .from('final_exam_attempts')
-        .upsert({
-          user_id: user.id,
-          exam_id: exam.id,
-          enrollment_id: enrollmentId,
-          score: finalScore,
-          passed: examPassed,
-          attempt_number: nextAttemptNumber,
-          answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption])),
-          started_at: new Date().toISOString(),
-          completed_at: new Date().toISOString()
-        }, {
+        .upsert(examAttemptData, {
           onConflict: 'user_id,exam_id,attempt_number'
         });
 
@@ -245,6 +260,10 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Loading Exam</DialogTitle>
+            <DialogDescription>Please wait while we prepare your exam.</DialogDescription>
+          </DialogHeader>
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
           </div>
@@ -279,11 +298,7 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-          </div>
-        ) : showResults ? (
+        {showResults ? (
           <div className="text-center py-6">
             {passed ? (
               <div>

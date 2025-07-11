@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,13 +21,15 @@ import {
   CheckCircle,
   StickyNote,
   CheckCircle2,
-  GraduationCap
+  GraduationCap,
+  Lock,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CourseModuleList from '@/components/course/CourseModuleList';
 import CourseReviews from '@/components/course/CourseReviews';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
-import AddToCartButton from '@/components/cart/AddToCartButton';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 
@@ -154,6 +155,8 @@ const CourseLearningPage = () => {
   const [instructor, setInstructor] = useState<Profile | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
+  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -161,9 +164,143 @@ const CourseLearningPage = () => {
       if (user) {
         fetchEnrollmentData();
         fetchProgress();
+        fetchCompletedLessons();
       }
     }
   }, [courseId, user]);
+
+  const fetchCompletedLessons = async () => {
+    if (!user || !enrollment) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id')
+        .eq('enrollment_id', enrollment.id)
+        .eq('is_completed', true);
+
+      if (error) throw error;
+      setCompletedLessons(data?.map(item => item.lesson_id) || []);
+    } catch (error) {
+      console.error('Error fetching completed lessons:', error);
+    }
+  };
+
+  const updateLessonProgress = async (lessonId: string, isCompleted: boolean = true) => {
+    if (!user || !enrollment) return;
+
+    try {
+      const { error } = await supabase
+        .from('lesson_progress')
+        .upsert({
+          enrollment_id: enrollment.id,
+          lesson_id: lessonId,
+          is_completed: isCompleted,
+          completion_date: isCompleted ? new Date().toISOString() : null
+        }, {
+          onConflict: 'enrollment_id,lesson_id'
+        });
+
+      if (error) throw error;
+
+      // Update local state
+      if (isCompleted) {
+        setCompletedLessons(prev => [...new Set([...prev, lessonId])]);
+      }
+
+      // Update course progress
+      await updateCourseProgress();
+      toast.success('Lesson marked as complete!');
+    } catch (error) {
+      console.error('Error updating lesson progress:', error);
+      toast.error('Failed to update lesson progress');
+    }
+  };
+
+  const updateCourseProgress = async () => {
+    if (!user || !courseId || !modules.length) return;
+
+    const allLessons = modules.flatMap(m => m.lessons);
+    const completedCount = completedLessons.length;
+    const progressPercentage = Math.round((completedCount / allLessons.length) * 100);
+
+    try {
+      const { error } = await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          progress_percentage: progressPercentage,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+
+      if (error) throw error;
+
+      // Update local progress state
+      setProgress(prev => prev ? { ...prev, progress_percentage: progressPercentage } : null);
+    } catch (error) {
+      console.error('Error updating course progress:', error);
+    }
+  };
+
+  const isLessonUnlocked = (lesson: CourseLesson, moduleIndex: number, lessonIndex: number) => {
+    // First lesson is always unlocked
+    if (moduleIndex === 0 && lessonIndex === 0) return true;
+    
+    // Get all lessons before this one
+    const allLessons = modules.flatMap(m => m.lessons);
+    const currentLessonGlobalIndex = allLessons.findIndex(l => l.id === lesson.id);
+    
+    if (currentLessonGlobalIndex === 0) return true;
+    
+    // Check if previous lesson is completed
+    const previousLesson = allLessons[currentLessonGlobalIndex - 1];
+    return completedLessons.includes(previousLesson.id);
+  };
+
+  const handleLessonSelect = (lesson: CourseLesson) => {
+    const moduleIndex = modules.findIndex(m => m.lessons.some(l => l.id === lesson.id));
+    const lessonIndex = modules[moduleIndex].lessons.findIndex(l => l.id === lesson.id);
+    
+    if (!isLessonUnlocked(lesson, moduleIndex, lessonIndex)) {
+      toast.error('Complete the previous lesson to unlock this one');
+      return;
+    }
+    
+    setCurrentLessonId(lesson.id);
+    // Navigate to lesson player
+    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
+  };
+
+  const handleNextLesson = () => {
+    if (!currentLessonId) return;
+    
+    const allLessons = modules.flatMap(m => m.lessons);
+    const currentIndex = allLessons.findIndex(l => l.id === currentLessonId);
+    
+    if (currentIndex < allLessons.length - 1) {
+      // Mark current lesson as complete
+      updateLessonProgress(currentLessonId, true);
+      
+      // Move to next lesson
+      const nextLesson = allLessons[currentIndex + 1];
+      handleLessonSelect(nextLesson);
+    }
+  };
+
+  const handlePreviousLesson = () => {
+    if (!currentLessonId) return;
+    
+    const allLessons = modules.flatMap(m => m.lessons);
+    const currentIndex = allLessons.findIndex(l => l.id === currentLessonId);
+    
+    if (currentIndex > 0) {
+      const previousLesson = allLessons[currentIndex - 1];
+      handleLessonSelect(previousLesson);
+    }
+  };
 
   const fetchCourseData = async () => {
     setLoading(true);
@@ -284,22 +421,19 @@ const CourseLearningPage = () => {
         .select('*')
         .eq('user_id', user!.id)
         .eq('course_id', courseId)
+        .eq('payment_status', 'completed') // Only allow completed payments
         .single();
 
       if (enrollmentError) {
-        // Check if the error is because no record was found
         if (enrollmentError.message !== 'No rows found') {
           console.error('Error fetching enrollment data:', enrollmentError);
-          toast.error('Failed to load enrollment data');
         }
-        // If no record found, it's not an error, just means the user isn't enrolled
         setEnrollment(null);
       } else {
         setEnrollment(enrollmentData as CourseEnrollment);
       }
     } catch (error) {
       console.error('Error fetching enrollment data:', error);
-      toast.error('Failed to load enrollment data');
     }
   };
 
@@ -313,14 +447,12 @@ const CourseLearningPage = () => {
         .single();
 
       if (progressError) {
-        // If no record found, it's not an error, just means no progress yet
         setProgress(null);
       } else {
         setProgress(progressData as ProgressData);
       }
     } catch (error) {
       console.error('Error fetching progress data:', error);
-      toast.error('Failed to load progress data');
     }
   };
 
@@ -332,12 +464,10 @@ const CourseLearningPage = () => {
 
     setMarkingComplete(true);
     try {
-      // Get all lesson IDs from all modules
       const allLessonIds = modules.flatMap(module => 
         module.lessons.map(lesson => lesson.id)
       );
 
-      // Mark all lessons as complete using enrollment_id instead of user_id
       for (const lessonId of allLessonIds) {
         const { error } = await supabase
           .from('lesson_progress')
@@ -355,7 +485,6 @@ const CourseLearningPage = () => {
         }
       }
 
-      // Update course progress to 100%
       const { error: progressError } = await supabase
         .from('course_progress')
         .upsert({
@@ -370,8 +499,8 @@ const CourseLearningPage = () => {
       if (progressError) {
         console.error('Error updating course progress:', progressError);
       } else {
-        // Refresh progress data
         await fetchProgress();
+        await fetchCompletedLessons();
         toast.success('All lessons marked as complete!');
       }
     } catch (error) {
@@ -385,7 +514,7 @@ const CourseLearningPage = () => {
   const handleStartLearning = () => {
     if (modules.length > 0 && modules[0].lessons.length > 0) {
       const firstLesson = modules[0].lessons[0];
-      window.location.href = `/course/${courseId}/lesson/${firstLesson.id}`;
+      handleLessonSelect(firstLesson);
     }
   };
 
@@ -414,6 +543,27 @@ const CourseLearningPage = () => {
           <Link to="/explore/courses">
             <Button>Browse Courses</Button>
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Show payment required message if not enrolled
+  if (!enrolledUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Payment Required</h1>
+            <p className="text-lg text-gray-600 mb-6">
+              You need to complete payment for this course to access the content.
+            </p>
+            <Link to={`/course-detail/${courseId}`}>
+              <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                Go to Course Details
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -453,53 +603,49 @@ const CourseLearningPage = () => {
           </div>
         </div>
 
-        {/* Progress Bar for Enrolled Users */}
-        {enrolledUser && (
-          <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Your Progress</h3>
-                <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
+        {/* Progress Bar */}
+        <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Your Progress</h3>
+              <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
+            </div>
+            <Progress value={progressPercentage} className="h-3" />
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-gray-600">
+                Keep going! You're doing great.
+              </p>
+              <div className="flex gap-2">
+                {isNotComplete && hasLessons && (
+                  <Button
+                    onClick={markAllLessonsComplete}
+                    disabled={markingComplete}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {markingComplete ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                    )}
+                    {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
+                  </Button>
+                )}
+                
+                {(!hasLessons || progressPercentage === 100) && finalExam && (
+                  <Button
+                    onClick={handleTakeExam}
+                    size="sm"
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    <GraduationCap className="h-4 w-4 mr-2" />
+                    Take Final Exam
+                  </Button>
+                )}
               </div>
-              <Progress value={progressPercentage} className="h-3" />
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-gray-600">
-                  Keep going! You're doing great.
-                </p>
-                <div className="flex gap-2">
-                  {/* Mark All Lessons Complete Button */}
-                  {isNotComplete && hasLessons && (
-                    <Button
-                      onClick={markAllLessonsComplete}
-                      disabled={markingComplete}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {markingComplete ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                      )}
-                      {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
-                    </Button>
-                  )}
-                  
-                  {/* Take Final Exam Button */}
-                  {(!hasLessons || progressPercentage === 100) && finalExam && (
-                    <Button
-                      onClick={handleTakeExam}
-                      size="sm"
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <GraduationCap className="h-4 w-4 mr-2" />
-                      Take Final Exam
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Course Curriculum Sidebar */}
@@ -512,17 +658,92 @@ const CourseLearningPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <CourseModuleList 
-                  modules={modules}
-                  onLessonSelect={(lesson) => {
-                    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
-                  }}
-                  currentLessonId={undefined}
-                  completedLessons={[]}
-                  onQuizStart={(quizId) => {
-                    console.log('Starting quiz:', quizId);
-                  }}
-                />
+                <div className="space-y-4">
+                  {modules.map((module, moduleIndex) => (
+                    <div key={module.id} className="bg-card rounded-lg border">
+                      <div className="p-4 border-b">
+                        <h4 className="font-medium text-sm text-muted-foreground">
+                          Module {moduleIndex + 1}
+                        </h4>
+                        <h3 className="font-semibold">{module.title}</h3>
+                        {module.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
+                        )}
+                      </div>
+                      <div className="p-4 space-y-2">
+                        {module.lessons.map((lesson, lessonIndex) => {
+                          const isUnlocked = isLessonUnlocked(lesson, moduleIndex, lessonIndex);
+                          const isCompleted = completedLessons.includes(lesson.id);
+                          const isCurrent = currentLessonId === lesson.id;
+                          
+                          return (
+                            <button
+                              key={lesson.id}
+                              onClick={() => handleLessonSelect(lesson)}
+                              disabled={!isUnlocked}
+                              className={`w-full text-left p-3 rounded-md border transition-colors ${
+                                isCurrent
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : isUnlocked
+                                  ? 'hover:bg-muted border-border'
+                                  : 'opacity-50 cursor-not-allowed border-border bg-muted'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs font-medium opacity-60">
+                                    {moduleIndex + 1}.{lessonIndex + 1}
+                                  </span>
+                                  <div>
+                                    <p className="font-medium text-sm">{lesson.title}</p>
+                                    {lesson.description && (
+                                      <p className="text-xs opacity-60 mt-1">{lesson.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {isCompleted && (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  )}
+                                  {!isUnlocked && (
+                                    <Lock className="h-4 w-4 text-gray-400" />
+                                  )}
+                                  {lesson.content_type === 'video' && (
+                                    <Clock className="h-4 w-4 opacity-60" />
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Navigation Buttons */}
+                {currentLessonId && (
+                  <div className="flex justify-between mt-6 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviousLesson}
+                      className="flex-1 max-w-[120px]"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                    
+                    <Button
+                      onClick={handleNextLesson}
+                      size="sm"
+                      className="flex-1 max-w-[120px] bg-gradient-to-r from-orange-500 to-purple-600"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
                 
                 {/* Final Exam */}
                 {finalExam && (
@@ -537,15 +758,13 @@ const CourseLearningPage = () => {
                       </Badge>
                     </div>
                     <p className="text-sm text-orange-600 mt-2">{finalExam.description}</p>
-                    {enrolledUser && (
-                      <Button 
-                        size="sm" 
-                        className="mt-3 bg-orange-600 hover:bg-orange-700"
-                        onClick={handleTakeExam}
-                      >
-                        Take Final Exam
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      className="mt-3 bg-orange-600 hover:bg-orange-700"
+                      onClick={handleTakeExam}
+                    >
+                      Take Final Exam
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -566,39 +785,81 @@ const CourseLearningPage = () => {
               </TabsList>
               
               <TabsContent value="lesson-notes" className="space-y-6">
-                {enrolledUser ? (
-                  <LessonNotesTab 
-                    lessonId={modules[0]?.lessons[0]?.id || ''} 
-                    currentVideoTime={0}
-                  />
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Enroll in this course to start taking lesson notes</p>
-                      <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        Enroll Now
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
+                <LessonNotesTab 
+                  lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                  currentVideoTime={0}
+                />
               </TabsContent>
               
               <TabsContent value="curriculum">
-                <CourseModuleList 
-                  modules={modules}
-                  onLessonSelect={(lesson) => {
-                    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
-                  }}
-                  currentLessonId={undefined}
-                  completedLessons={[]}
-                  onQuizStart={(quizId) => {
-                    console.log('Starting quiz:', quizId);
-                  }}
-                />
+                {/* Mobile-friendly curriculum view */}
+                <div className="lg:hidden">
+                  <div className="space-y-4">
+                    {modules.map((module, moduleIndex) => (
+                      <div key={module.id} className="bg-card rounded-lg border">
+                        <div className="p-4 border-b">
+                          <h4 className="font-medium text-sm text-muted-foreground">
+                            Module {moduleIndex + 1}
+                          </h4>
+                          <h3 className="font-semibold">{module.title}</h3>
+                          {module.description && (
+                            <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
+                          )}
+                        </div>
+                        <div className="p-4 space-y-2">
+                          {module.lessons.map((lesson, lessonIndex) => {
+                            const isUnlocked = isLessonUnlocked(lesson, moduleIndex, lessonIndex);
+                            const isCompleted = completedLessons.includes(lesson.id);
+                            const isCurrent = currentLessonId === lesson.id;
+                            
+                            return (
+                              <button
+                                key={lesson.id}
+                                onClick={() => handleLessonSelect(lesson)}
+                                disabled={!isUnlocked}
+                                className={`w-full text-left p-3 rounded-md border transition-colors ${
+                                  isCurrent
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : isUnlocked
+                                    ? 'hover:bg-muted border-border'
+                                    : 'opacity-50 cursor-not-allowed border-border bg-muted'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs font-medium opacity-60">
+                                      {moduleIndex + 1}.{lessonIndex + 1}
+                                    </span>
+                                    <div>
+                                      <p className="font-medium text-sm">{lesson.title}</p>
+                                      {lesson.description && (
+                                        <p className="text-xs opacity-60 mt-1">{lesson.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {isCompleted && (
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
+                                    )}
+                                    {!isUnlocked && (
+                                      <Lock className="h-4 w-4 text-gray-400" />
+                                    )}
+                                    {lesson.content_type === 'video' && (
+                                      <Clock className="h-4 w-4 opacity-60" />
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="hidden lg:block">
+                  <p className="text-muted-foreground">View curriculum in the sidebar</p>
+                </div>
               </TabsContent>
               
               <TabsContent value="reviews">
@@ -611,49 +872,6 @@ const CourseLearningPage = () => {
             </Tabs>
           </div>
         </div>
-
-        {/* Enrollment Actions */}
-        {!enrolledUser && (
-          <Card className="mt-8 sticky bottom-4">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-orange-600 mb-2">
-                    {course.is_free ? 'Free' : `$${course.price}`}
-                  </div>
-                  {!course.is_free && (
-                    <p className="text-sm text-gray-600">One-time payment</p>
-                  )}
-                </div>
-                {user ? (
-                  <div className="flex gap-2">
-                    {!course.is_free && (
-                      <AddToCartButton
-                        itemType="course"
-                        itemId={courseId!}
-                        itemName={course.title}
-                        price={course.price || 0}
-                      />
-                    )}
-                    <Button 
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                      onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                    >
-                      {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                    onClick={() => window.location.href = '/auth'}
-                  >
-                    Sign in to Enroll
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Instructor Card */}
         {instructor && (
