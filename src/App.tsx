@@ -25,7 +25,7 @@ import CommunityNotificationsPage from './pages/CommunityNotificationsPage';
 import CommunityPage from './pages/CommunityPage';
 import ConsultPage from './pages/ConsultPage';
 import ContactPage from './pages/ContactPage';
-import CourseDetailPage from './pages/CourseDetailPage';
+import CourseDetailPage from './pages/learning/CourseDetailPage';
 import CoursePlayerPage from './pages/CoursePlayerPage';
 import CourseResultsPage from './pages/CourseResultsPage';
 import CoursesPage from './pages/CoursesPage';
@@ -171,7 +171,7 @@ function App() {
                   <Route path="/consult" element={<ConsultPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/courses" element={<CoursesPage />} />
-                  <Route path="/course-detail/:id" element={<CourseDetailPage />} />
+                  <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
                   <Route path="/course/:courseId/player" element={<CoursePlayerPage />} />
                   <Route path="/course/:courseId/results" element={<CourseResultsPage />} />
                   <Route path="/course/:courseId/enroll" element={<CourseEnrollmentPage />} />
@@ -214,7 +214,7 @@ function App() {
                   <Route path="/careers" element={<CareersPage />} />
 
                   {/* Learning routes */}
-                  <Route path="/course/:courseId/learn" element={<CourseLearningPage />} />
+                  <Route path="/learning/course/:id" element={<CourseLearningPage />} />
 
                   {/* Creator routes */}
                   <Route path="/creator/dashboard" element={<CreatorDashboard />} />
