@@ -171,7 +171,7 @@ function App() {
                   <Route path="/consult" element={<ConsultPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/courses" element={<CoursesPage />} />
-                  <Route path="/course/:courseId" element={<CourseDetailPage />} />
+                  <Route path="/course-detail/:id" element={<CourseDetailPage />} />
                   <Route path="/course/:courseId/player" element={<CoursePlayerPage />} />
                   <Route path="/course/:courseId/results" element={<CourseResultsPage />} />
                   <Route path="/course/:courseId/enroll" element={<CourseEnrollmentPage />} />
@@ -180,8 +180,8 @@ function App() {
                   <Route path="/creator/profile/:creatorId" element={<CreatorPublicProfile />} />
                   <Route path="/events" element={<EventsPage />} />
                   <Route path="/event-detail/:id" element={<EventDetailPage />} />
-                  <Route path="/explore/courses" element={<ExploreCoursesPage />} />
-                  <Route path="/explore/events" element={<ExploreEventsPage />} />
+                  <Route path="/explore-courses" element={<ExploreCoursesPage />} />
+                  <Route path="/explore-events" element={<ExploreEventsPage />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                   <Route path="/help" element={<HelpCenterPage />} />
                   <Route path="/inbox" element={<InboxPage />} />
