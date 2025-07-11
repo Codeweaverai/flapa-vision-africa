@@ -1,52 +1,33 @@
 
-import React from 'react';
-import Layout from '@/components/layout/Layout';
 import HeroSection from '@/components/home/HeroSection';
 import AboutSection from '@/components/home/AboutSection';
-import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
+import LearningSection from '@/components/home/LearningSection';
 import EventsSection from '@/components/home/EventsSection';
-import PastEventsSection from '@/components/home/PastEventsSection';
 import CoursesSection from '@/components/home/CoursesSection';
 import MediaSection from '@/components/home/MediaSection';
 import CommunityAISection from '@/components/home/CommunityAISection';
 import CallToAction from '@/components/home/CallToAction';
-import LearningSection from '@/components/home/LearningSection';
+import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
 import CreatorsSection from '@/components/home/CreatorsSection';
 import TrendingNowSection from '@/components/home/TrendingNowSection';
 import LocalContentSection from '@/components/home/LocalContentSection';
 
 const HomePage = () => {
-  console.log('HomePage rendering with sections:');
-  console.log('- HeroSection');
-  console.log('- AboutSection');
-  console.log('- TrendingNowSection');
-  console.log('- BrowseCategoriesSection');
-  console.log('- LocalContentSection');
-  console.log('- CoursesSection');
-  console.log('- CreatorsSection');
-  console.log('- CommunityAISection');
-  console.log('- EventsSection');
-  console.log('- PastEventsSection');
-  console.log('- LearningSection');
-  console.log('- MediaSection');
-  console.log('- CallToAction');
-
   return (
-    <Layout>
+    <>
       <HeroSection />
       <AboutSection />
-      <TrendingNowSection />
       <BrowseCategoriesSection />
-      <LocalContentSection />
       <CoursesSection />
-      <CreatorsSection />
       <CommunityAISection />
-      <EventsSection />
-      <PastEventsSection />
-      <LearningSection />
+      <LocalContentSection />
       <MediaSection />
+      <LearningSection />
+      <TrendingNowSection />
+      <EventsSection />
+      <CreatorsSection />
       <CallToAction />
-    </Layout>
+    </>
   );
 };
 
