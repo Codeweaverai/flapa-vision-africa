@@ -16,16 +16,18 @@ import ContactPage from './pages/ContactPage';
 import AuthPage from './pages/AuthPage';
 import ProfilePage from './pages/ProfilePage';
 import CreatorPublicProfile from './pages/CreatorPublicProfile';
-import CartPage from './pages/cart/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CourseLearningPage from './pages/learning/CourseLearningPage';
 import CourseResultsPage from './pages/CourseResultsPage';
 import InboxPage from './pages/InboxPage';
-import MessagesPage from './pages/MessagesPage';
 import ExploreCoursesPage from './pages/ExploreCoursesPage';
+import NotFoundPage from './pages/NotFoundPage';
+
+// Import the cart page from the correct location
+import CartPage from './pages/cart/CartPage';
+import MessagesPage from './pages/MessagesPage';  
 import CourseEnrollmentPage from './pages/CourseEnrollmentPage';
 import LessonPage from './pages/LessonPage';
-import NotFoundPage from './pages/NotFoundPage';
 
 const queryClient = new QueryClient();
 
@@ -57,14 +59,12 @@ function App() {
                     <Route path="/course/:courseId/lesson/:lessonId" element={<LessonPage />} />
                     <Route path="/inbox" element={<InboxPage />} />
                     <Route path="/messages/:userId" element={<MessagesPage />} />
-                    <Route path="*" element={<NotFoundPage />} />
                     
-                    {/* Course Learning and Results Routes */}
+                    {/* Course Learning Routes - Remove duplicates and use consistent parameter names */}
                     <Route path="/course/:courseId/learn" element={<CourseLearningPage />} />
-                    <Route path="/course/:id/learn" element={<CourseLearningPage />} />
                     <Route path="/course/:courseId/results" element={<CourseResultsPage />} />
-                    <Route path="/course/:id/results" element={<CourseResultsPage />} />
                     
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Layout>
               </div>

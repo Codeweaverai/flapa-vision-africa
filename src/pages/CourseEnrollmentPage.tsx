@@ -1,17 +1,16 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { useParams } from 'react-router-dom';
 
 const CourseEnrollmentPage = () => {
+  const { courseId } = useParams();
+
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Course Enrollment</h1>
-        <p className="text-gray-600 mb-4">Enrollment functionality coming soon</p>
-        <Link to="/">
-          <Button>Go Home</Button>
-        </Link>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6">Course Enrollment</h1>
+      <p>Enrolling in course: {courseId}</p>
+      <div className="bg-white rounded-lg shadow p-6">
+        <p>Course enrollment functionality will be implemented here.</p>
       </div>
     </div>
   );
