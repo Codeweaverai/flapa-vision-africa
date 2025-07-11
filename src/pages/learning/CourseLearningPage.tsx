@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import ReactPlayer from 'react-player';
 import { 
   Play, 
   Clock, 
@@ -22,7 +23,8 @@ import {
   StickyNote,
   CheckCircle2,
   GraduationCap,
-  Eye
+  Eye,
+  FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
@@ -33,7 +35,6 @@ import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
-import VideoPlayer from '@/components/video/VideoPlayer';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 
 interface Course {
@@ -542,11 +543,10 @@ const CourseLearningPage = () => {
     setSelectedLesson(lesson);
   };
 
-  const handleVideoProgress = (currentTime: number, duration: number) => {
-    // Update lesson progress based on video watch time
-    if (currentTime > 0 && duration > 0) {
-      const watchPercentage = (currentTime / duration) * 100;
-      if (watchPercentage > 80 && selectedLesson && enrollment) {
+  const handleVideoProgress = (progress: { played: number, playedSeconds: number, loaded: number, loadedSeconds: number }) => {
+    if (progress.playedSeconds > 0 && selectedLesson && enrollment) {
+      const watchPercentage = progress.played * 100;
+      if (watchPercentage > 80) {
         // Mark lesson as complete if 80% watched
         supabase
           .from('lesson_progress')
@@ -742,12 +742,24 @@ const CourseLearningPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <VideoPlayer
-                    src={selectedLesson.video_url}
-                    poster={course.thumbnail_url}
-                    onTimeUpdate={handleVideoProgress}
-                    className="w-full aspect-video rounded-lg"
-                  />
+                  <div className="aspect-video rounded-lg overflow-hidden bg-black">
+                    <ReactPlayer
+                      url={selectedLesson.video_url}
+                      width="100%"
+                      height="100%"
+                      controls={true}
+                      config={{
+                        file: {
+                          attributes: {
+                            controlsList: 'nodownload'
+                          }
+                        }
+                      }}
+                      onProgress={handleVideoProgress}
+                      progressInterval={5000}
+                      light={course.thumbnail_url}
+                    />
+                  </div>
                   {selectedLesson.description && (
                     <p className="mt-4 text-gray-600">{selectedLesson.description}</p>
                   )}
@@ -755,8 +767,12 @@ const CourseLearningPage = () => {
               </Card>
             )}
 
-            <Tabs defaultValue="lesson-notes" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+            <Tabs defaultValue="content" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="content" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Content
+                </TabsTrigger>
                 <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
                   <StickyNote className="h-4 w-4" />
                   Notes
@@ -766,6 +782,46 @@ const CourseLearningPage = () => {
                 <TabsTrigger value="discussion">Discussion</TabsTrigger>
               </TabsList>
               
+              <TabsContent value="content" className="space-y-6">
+                {enrollment && enrollment.payment_status === 'completed' ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      {selectedLesson ? (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-4">{selectedLesson.title}</h3>
+                          {selectedLesson.description && (
+                            <p className="text-gray-600 mb-4">{selectedLesson.description}</p>
+                          )}
+                          {selectedLesson.content && (
+                            <div className="prose max-w-none">
+                              {typeof selectedLesson.content === 'string' 
+                                ? selectedLesson.content 
+                                : JSON.stringify(selectedLesson.content)
+                              }
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">Select a lesson to view its content</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-500 mb-4">Enroll in this course to access lesson content</p>
+                      <Button 
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
+                      >
+                        Enroll Now
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
               <TabsContent value="lesson-notes" className="space-y-6">
                 {enrollment && enrollment.payment_status === 'completed' ? (
                   <LessonNotesTab 

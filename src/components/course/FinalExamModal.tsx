@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -134,10 +136,10 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         ? existingAttempts[0].attempt_number + 1 
         : 1;
 
-      // Insert new exam result with proper attempt number
+      // Use upsert with onConflict to handle 409 errors
       const { error: resultError } = await supabase
         .from('final_exam_results')
-        .insert({
+        .upsert({
           user_id: user.id,
           exam_id: exam.id,
           course_id: exam.course_id,
@@ -149,6 +151,8 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           completed_at: new Date().toISOString(),
           quiz_scores: [],
           final_grade: finalScore
+        }, {
+          onConflict: 'user_id,exam_id,attempt_number'
         });
 
       if (resultError) {
@@ -156,10 +160,10 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         throw resultError;
       }
 
-      // Create exam attempt record
+      // Create exam attempt record with upsert
       const { error: attemptInsertError } = await supabase
         .from('final_exam_attempts')
-        .insert({
+        .upsert({
           user_id: user.id,
           exam_id: exam.id,
           enrollment_id: enrollmentId,
@@ -169,6 +173,8 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption])),
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,exam_id,attempt_number'
         });
 
       if (attemptInsertError) {
@@ -265,6 +271,12 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
               </div>
             )}
           </DialogTitle>
+          <DialogDescription>
+            {showResults 
+              ? "Your exam results are ready" 
+              : `Complete this ${exam.time_limit_minutes}-minute exam to test your knowledge`
+            }
+          </DialogDescription>
         </DialogHeader>
 
         {loading ? (
