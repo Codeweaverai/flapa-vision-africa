@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Clock, Users, Star, DollarSign } from 'lucide-react';
+import { BookOpen, Clock, Users, Star, Play } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
@@ -19,6 +19,9 @@ interface Course {
   is_free: boolean;
   thumbnail_url?: string;
   creator_id: string;
+  average_rating?: number;
+  total_reviews?: number;
+  total_students?: number;
 }
 
 const CoursesSection = () => {
@@ -30,13 +33,37 @@ const CoursesSection = () => {
       try {
         const { data, error } = await supabase
           .from('courses')
-          .select('*')
+          .select(`
+            *,
+            course_reviews (rating),
+            course_enrollments (id)
+          `)
           .eq('is_published', true)
           .order('created_at', { ascending: false })
-          .limit(6);
+          .limit(10);
 
         if (error) throw error;
-        setCourses(data || []);
+
+        // Calculate ratings and student counts
+        const coursesWithStats = (data || []).map(course => {
+          const reviews = course.course_reviews || [];
+          const enrollments = course.course_enrollments || [];
+          
+          const averageRating = reviews.length > 0 
+            ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length 
+            : 0;
+
+          return {
+            ...course,
+            average_rating: Math.round(averageRating * 10) / 10,
+            total_reviews: reviews.length,
+            total_students: enrollments.length,
+            course_reviews: undefined,
+            course_enrollments: undefined
+          };
+        });
+
+        setCourses(coursesWithStats);
       } catch (error) {
         console.error('Error fetching courses:', error);
       } finally {
@@ -65,12 +92,12 @@ const CoursesSection = () => {
               Discover high-quality courses designed to accelerate your learning journey
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[...Array(6)].map((_, index) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {[...Array(10)].map((_, index) => (
               <div key={index} className="animate-pulse">
-                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-96">
-                  <div className="bg-gray-300 h-48"></div>
-                  <div className="p-6 space-y-3">
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden h-80">
+                  <div className="bg-gray-300 h-32"></div>
+                  <div className="p-4 space-y-2">
                     <div className="h-4 bg-gray-300 rounded"></div>
                     <div className="h-4 bg-gray-300 rounded w-3/4"></div>
                     <div className="h-4 bg-gray-300 rounded w-1/2"></div>
@@ -96,10 +123,10 @@ const CoursesSection = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
           {courses.map((course) => (
-            <Card key={course.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-purple-200 hover:border-purple-300 overflow-hidden">
-              <div className="relative h-48 overflow-hidden">
+            <Card key={course.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-purple-200 hover:border-purple-300 overflow-hidden h-fit">
+              <div className="relative h-32 overflow-hidden">
                 {course.thumbnail_url ? (
                   <img 
                     src={course.thumbnail_url} 
@@ -108,49 +135,73 @@ const CoursesSection = () => {
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-purple-400 to-orange-400 flex items-center justify-center">
-                    <BookOpen className="h-16 w-16 text-white opacity-80" />
+                    <BookOpen className="h-8 w-8 text-white opacity-80" />
                   </div>
                 )}
-                <div className="absolute top-4 left-4">
-                  <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                
+                {/* Video Play Icon */}
+                <Link 
+                  to={`/learning/course-detail/${course.id}`}
+                  className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                >
+                  <div className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors">
+                    <Play className="h-4 w-4 text-purple-600" />
+                  </div>
+                </Link>
+
+                <div className="absolute top-2 left-2">
+                  <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
                     {course.category}
                   </Badge>
                 </div>
-                <div className="absolute top-4 right-4">
+                <div className="absolute top-2 right-2">
                   {course.is_free ? (
-                    <Badge className="bg-green-100 text-green-800 border-green-200">
+                    <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
                       Free
                     </Badge>
                   ) : (
-                    <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
                       <PriceDisplay amount={course.price} originalCurrency="USD" />
                     </Badge>
                   )}
                 </div>
               </div>
               
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg group-hover:text-purple-600 transition-colors line-clamp-2">
+              <CardHeader className="pb-2 p-3">
+                <CardTitle className="text-sm group-hover:text-purple-600 transition-colors line-clamp-2 h-10">
                   {course.title}
                 </CardTitle>
-                <CardDescription className="line-clamp-3">
+                <CardDescription className="line-clamp-2 text-xs h-8">
                   {course.summary}
                 </CardDescription>
               </CardHeader>
               
-              <CardContent className="pt-0">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Clock className="h-4 w-4 mr-1" />
+              <CardContent className="pt-0 p-3">
+                <div className="flex items-center justify-between mb-2 text-xs">
+                  <div className="flex items-center text-gray-600">
+                    <Clock className="h-3 w-3 mr-1" />
                     {formatDuration(course.duration_minutes)}
                   </div>
-                  <Badge variant="outline" className="border-orange-200 text-orange-600">
+                  <Badge variant="outline" className="border-orange-200 text-orange-600 text-xs">
                     {course.difficulty_level}
                   </Badge>
                 </div>
+
+                {/* Reviews and Students */}
+                <div className="flex items-center justify-between mb-3 text-xs">
+                  <div className="flex items-center text-gray-600">
+                    <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
+                    <span>{course.average_rating || 0}</span>
+                    <span className="ml-1">({course.total_reviews || 0})</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Users className="h-3 w-3 mr-1" />
+                    <span>{course.total_students || 0}</span>
+                  </div>
+                </div>
                 
                 <Link to={`/learning/course-detail/${course.id}`}>
-                  <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0">
+                  <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-xs py-1 h-8">
                     View Course
                   </Button>
                 </Link>
