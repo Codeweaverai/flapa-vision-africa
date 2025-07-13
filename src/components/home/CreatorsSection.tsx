@@ -30,7 +30,7 @@ const CreatorsSection = () => {
 
   const fetchCreators = async () => {
     try {
-      // Fetch creators with their course stats
+      // Fetch creators using is_creator field instead of role
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select(`
@@ -39,9 +39,9 @@ const CreatorsSection = () => {
           username,
           avatar_url,
           bio,
-          role
+          is_creator
         `)
-        .eq('role', 'creator')
+        .eq('is_creator', true)
         .limit(6);
 
       if (error) throw error;
