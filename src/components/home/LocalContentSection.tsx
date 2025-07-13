@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Globe, Users, Calendar, Star, Play, BookOpen } from 'lucide-react';
+import { MapPin, Globe, Users, Calendar, Star, Play, BookOpen, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
@@ -35,6 +35,10 @@ interface Event {
   price?: number;
   is_free: boolean;
   total_attendees?: number;
+}
+
+interface ContentItem extends Course, Event {
+  type: 'course' | 'event';
 }
 
 const LocalContentSection = () => {
@@ -159,8 +163,8 @@ const LocalContentSection = () => {
 
   // Combine and limit to 20 items
   const allContent = [
-    ...courses.map(c => ({ ...c, type: 'course' })),
-    ...events.map(e => ({ ...e, type: 'event' }))
+    ...courses.map(c => ({ ...c, type: 'course' as const })),
+    ...events.map(e => ({ ...e, type: 'event' as const }))
   ].slice(0, 20);
 
   return (
@@ -182,9 +186,9 @@ const LocalContentSection = () => {
           {allContent.map((item) => (
             <Card key={item.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-orange-200 hover:border-orange-300 overflow-hidden h-fit">
               <div className="relative h-32 overflow-hidden">
-                {(item.type === 'course' ? item.thumbnail_url : item.image_url) ? (
+                {(item.type === 'course' ? (item as any).thumbnail_url : (item as any).image_url) ? (
                   <img 
-                    src={item.type === 'course' ? item.thumbnail_url : item.image_url} 
+                    src={item.type === 'course' ? (item as any).thumbnail_url : (item as any).image_url} 
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -221,13 +225,13 @@ const LocalContentSection = () => {
                 
                 {item.type === 'course' && (
                   <div className="absolute top-2 right-2">
-                    {item.is_free ? (
+                    {(item as any).is_free ? (
                       <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
                         Free
                       </Badge>
                     ) : (
                       <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
-                        <PriceDisplay amount={item.price} originalCurrency="USD" />
+                        <PriceDisplay amount={(item as any).price} originalCurrency="USD" />
                       </Badge>
                     )}
                   </div>
@@ -239,7 +243,7 @@ const LocalContentSection = () => {
                   {item.title}
                 </CardTitle>
                 <CardDescription className="line-clamp-2 text-xs h-8">
-                  {item.type === 'course' ? item.summary : item.description}
+                  {item.type === 'course' ? (item as any).summary : (item as any).description}
                 </CardDescription>
               </CardHeader>
               
@@ -249,21 +253,21 @@ const LocalContentSection = () => {
                     <div className="flex items-center justify-between mb-2 text-xs">
                       <div className="flex items-center text-gray-600">
                         <Clock className="h-3 w-3 mr-1" />
-                        {formatDuration(item.duration_minutes)}
+                        {formatDuration((item as any).duration_minutes)}
                       </div>
                       <Badge variant="outline" className="border-purple-200 text-purple-600 text-xs">
-                        {item.difficulty_level}
+                        {(item as any).difficulty_level}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between mb-3 text-xs">
                       <div className="flex items-center text-gray-600">
                         <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
-                        <span>{item.average_rating || 0}</span>
-                        <span className="ml-1">({item.total_reviews || 0})</span>
+                        <span>{(item as any).average_rating || 0}</span>
+                        <span className="ml-1">({(item as any).total_reviews || 0})</span>
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Users className="h-3 w-3 mr-1" />
-                        <span>{item.total_students || 0}</span>
+                        <span>{(item as any).total_students || 0}</span>
                       </div>
                     </div>
                     <Link to={`/learning/course-detail/${item.id}`}>
@@ -277,16 +281,16 @@ const LocalContentSection = () => {
                     <div className="flex items-center justify-between mb-2 text-xs">
                       <div className="flex items-center text-gray-600">
                         <Calendar className="h-3 w-3 mr-1" />
-                        {formatDate(item.start_time)}
+                        {formatDate((item as any).start_time)}
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Users className="h-3 w-3 mr-1" />
-                        <span>{item.total_attendees || 0}</span>
+                        <span>{(item as any).total_attendees || 0}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-gray-600 mb-3">
                       <MapPin className="h-3 w-3" />
-                      <span className="truncate">{item.location || 'Online'}</span>
+                      <span className="truncate">{(item as any).location || 'Online'}</span>
                     </div>
                     <Link to={`/event-detail/${item.id}`}>
                       <Button className="w-full bg-gradient-to-r from-orange-600 to-purple-600 hover:from-orange-700 hover:to-purple-700 text-white border-0 text-xs py-1 h-8">
