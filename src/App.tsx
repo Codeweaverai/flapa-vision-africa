@@ -221,7 +221,7 @@ function App() {
                   <Route path="/creator/analytics" element={<CreatorAnalytics />} />
                   <Route path="/creator/courses" element={<CreatorCourses />} />
                   <Route path="/creator/courses/create" element={<CreatorCourseCreate />} />
-                  <Route path="/creator/courses/:id/edit" element={<CreatorCourseEdit />} />
+                  <Route path="/creator/courses/edit/:id" element={<CreatorCourseEdit />} />
                   <Route path="/creator/courses/:id/content" element={<CreatorCourseContent />} />
                   <Route path="/creator/events" element={<CreatorEvents />} />
                   <Route path="/creator/events/create" element={<CreatorEventCreate />} />
