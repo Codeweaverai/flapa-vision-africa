@@ -192,7 +192,7 @@ const CreatorsSection = () => {
                     variant="outline" 
                     className="w-full border-2 border-gradient-to-r from-orange-200 to-purple-200 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all duration-300"
                   >
-                    <Link to={`/creator/profile/${creator.username || creator.id}`}>
+                    <Link to={`/creator/profile/${creator.id}`}>
                       View Profile
                     </Link>
                   </Button>
