@@ -1,4 +1,5 @@
 
+import Layout from '@/components/layout/Layout';
 import HeroSection from '@/components/home/HeroSection';
 import AboutSection from '@/components/home/AboutSection';
 import LearningSection from '@/components/home/LearningSection';
@@ -14,7 +15,7 @@ import LocalContentSection from '@/components/home/LocalContentSection';
 
 const HomePage = () => {
   return (
-    <>
+    <Layout>
       <HeroSection />
       <AboutSection />
       <BrowseCategoriesSection />
@@ -27,7 +28,7 @@ const HomePage = () => {
       <EventsSection />
       <CreatorsSection />
       <CallToAction />
-    </>
+    </Layout>
   );
 };
 

@@ -1,18 +1,24 @@
 
-import { ReactNode } from 'react';
+import React from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import MobileBottomNav from '@/components/navigation/MobileBottomNav';
+import SmartAdvisorFloatingButton from '@/components/ai/SmartAdvisorFloatingButton';
 
 interface LayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
-const Layout = ({ children }: LayoutProps) => {
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow pt-20">{children}</main>
+      <main className="flex-1 pt-20">
+        {children}
+      </main>
       <Footer />
+      <MobileBottomNav />
+      <SmartAdvisorFloatingButton />
     </div>
   );
 };
