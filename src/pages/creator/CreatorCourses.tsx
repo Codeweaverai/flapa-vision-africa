@@ -1,313 +1,306 @@
 
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock, BookOpen, Video, Play } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Eye, 
-  Trash2, 
-  Book, 
-  Users, 
-  DollarSign,
-  Settings,
-  PlayCircle,
-  Percent
-} from 'lucide-react';
-import { toast } from 'sonner';
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  summary: string;
-  category: string;
-  price: number;
-  is_free: boolean;
-  is_published: boolean;
-  difficulty_level: string;
-  duration_minutes: number;
-  thumbnail_url?: string;
-  created_at: string;
-  updated_at: string;
-}
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
+import { Course, fetchCreatorCourses, deleteCourse, updateCourse } from '@/services/courseService';
+import { useAuth } from '@/contexts/AuthContext';
+import CoursePreviewUpload from '@/components/creator/CoursePreviewUpload';
 
 const CreatorCourses = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState<boolean>(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   useEffect(() => {
-    if (user) {
-      fetchCourses();
-    }
+    loadCourses();
   }, [user]);
 
-  const fetchCourses = async () => {
+  const loadCourses = async () => {
     if (!user) return;
     
     setLoading(true);
     try {
-      const { data: coursesData, error } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCourses(coursesData || []);
+      const coursesData = await fetchCreatorCourses(user.id);
+      setCourses(coursesData);
     } catch (error) {
-      console.error('Error fetching courses:', error);
-      toast.error('Failed to load courses');
+      console.error('Error loading courses:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load courses",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteCourse = async (courseId: string) => {
-    if (!confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteCourse = async () => {
+    if (!courseToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', courseId);
-
-      if (error) throw error;
-
-      setCourses(courses.filter(course => course.id !== courseId));
-      toast.success('Course deleted successfully');
+      const success = await deleteCourse(courseToDelete.id);
+      if (success) {
+        setCourses(courses.filter(course => course.id !== courseToDelete.id));
+        toast({
+          title: "Course Deleted",
+          description: `${courseToDelete.title} has been deleted successfully.`,
+        });
+      }
     } catch (error) {
       console.error('Error deleting course:', error);
-      toast.error('Failed to delete course');
+      toast({
+        title: "Error",
+        description: "Failed to delete course",
+        variant: "destructive",
+      });
     }
-  };
-
-  const togglePublishStatus = async (courseId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ is_published: !currentStatus })
-        .eq('id', courseId);
-
-      if (error) throw error;
-
-      setCourses(courses.map(course =>
-        course.id === courseId ? { ...course, is_published: !currentStatus } : course
-      ));
-
-      toast.success(`Course ${!currentStatus ? 'published' : 'unpublished'} successfully`);
-    } catch (error) {
-      console.error('Error updating course status:', error);
-      toast.error('Failed to update course status');
-    }
-  };
-
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || 
-                         (filterStatus === 'published' && course.is_published) ||
-                         (filterStatus === 'draft' && !course.is_published);
-    const matchesCategory = filterCategory === 'all' || course.category === filterCategory;
     
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
+    setDeleteDialogOpen(false);
+    setCourseToDelete(null);
+  };
 
-  const categories = [...new Set(courses.map(course => course.category))];
+  const handleTogglePublish = async (course: Course) => {
+    try {
+      const updatedCourse = await updateCourse(course.id, {
+        is_published: !course.is_published
+      });
+      
+      if (updatedCourse) {
+        setCourses(courses.map(c => c.id === course.id ? updatedCourse : c));
+        toast({
+          title: updatedCourse.is_published ? "Course Published" : "Course Unpublished",
+          description: `${updatedCourse.title} has been ${updatedCourse.is_published ? 'published' : 'unpublished'}.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling publish status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update course status",
+        variant: "destructive",
+      });
+    }
+  };
 
-  if (loading) {
-    return (
-      <CreatorLayout title="My Courses">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </CreatorLayout>
-    );
-  }
+  const handlePreviewUploadSuccess = (courseId: string, previewUrl: string) => {
+    setCourses(courses.map(course => 
+      course.id === courseId 
+        ? { ...course, course_preview: { ...course.course_preview, preview_video_url: previewUrl } }
+        : course
+    ));
+    setPreviewDialogOpen(false);
+    setSelectedCourse(null);
+  };
 
   return (
-    <CreatorLayout title="My Courses">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
+    <CreatorLayout>
+      <div>
+        <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">My Courses</h1>
-            <p className="text-muted-foreground">Manage your course content and settings</p>
+            <h1 className="text-3xl font-bold tracking-tight">My Courses</h1>
+            <p className="text-muted-foreground">Create and manage your online courses.</p>
           </div>
-          <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+          
+          <Button asChild>
             <Link to="/creator/courses/create">
-              <Plus className="h-4 w-4 mr-2" />
+              <PlusCircle className="mr-2 h-4 w-4" />
               Create Course
             </Link>
           </Button>
         </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search courses..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        
+        {loading ? (
+          <div className="flex justify-center my-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map(category => (
-                <SelectItem key={category} value={category}>{category}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Courses Grid */}
-        {filteredCourses.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Book className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No courses found</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                {courses.length === 0 
-                  ? "You haven't created any courses yet. Start building your first course!"
-                  : "No courses match your current filters."}
-              </p>
-              {courses.length === 0 && (
-                <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                  <Link to="/creator/courses/create">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Course
-                  </Link>
-                </Button>
-              )}
-            </CardContent>
-          </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((course) => (
-              <Card key={course.id} className="group hover:shadow-lg transition-shadow">
-                {/* Course Thumbnail */}
-                {course.thumbnail_url && (
-                  <div className="w-full h-48 overflow-hidden rounded-t-lg">
-                    <img 
-                      src={course.thumbnail_url} 
-                      alt={course.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                )}
-                
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <Badge variant={course.is_published ? "default" : "outline"}>
-                      {course.is_published ? "Published" : "Draft"}
-                    </Badge>
-                    <Badge variant="secondary">{course.category}</Badge>
-                  </div>
-                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                  <CardDescription className="line-clamp-3">
-                    {course.summary || course.description}
-                  </CardDescription>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      0 students
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" />
-                      {course.is_free ? 'Free' : `$${course.price}`}
-                    </span>
+            {courses.length === 0 ? (
+              <div className="col-span-full">
+                <Card className="border-dashed">
+                  <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
+                    <div className="mb-4 rounded-full bg-primary/10 p-6">
+                      <BookOpen className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="mb-2">No courses yet</CardTitle>
+                    <CardDescription className="mb-6">
+                      Get started by creating your first course
+                    </CardDescription>
+                    <Button asChild>
+                      <Link to="/creator/courses/create">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Create Course
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              courses.map((course) => (
+                <Card key={course.id} className="flex flex-col">
+                  <div className="relative">
+                    {course.thumbnail_url ? (
+                      <img
+                        src={course.thumbnail_url}
+                        alt={course.title}
+                        className="w-full h-48 object-cover rounded-t-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-muted flex items-center justify-center rounded-t-lg">
+                        <span className="text-muted-foreground">No thumbnail</span>
+                      </div>
+                    )}
+                    <div className="absolute top-2 right-2">
+                      <Badge variant={course.is_published ? "default" : "secondary"}>
+                        {course.is_published ? "Published" : "Draft"}
+                      </Badge>
+                    </div>
+                    {course.course_preview?.preview_video_url && (
+                      <div className="absolute bottom-2 left-2">
+                        <Badge variant="secondary" className="bg-black/50 text-white">
+                          <Play className="h-3 w-3 mr-1" />
+                          Preview
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" asChild className="flex-1">
-                      <Link to={`/creator/courses/${course.id}/edit`}>
-                        <Edit className="h-4 w-4 mr-2" />
+                  <CardHeader>
+                    <div className="flex justify-between">
+                      <Badge variant="outline">{course.category}</Badge>
+                      <Badge variant="outline">{course.difficulty_level}</Badge>
+                    </div>
+                    <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                    <CardDescription className="line-clamp-2">{course.summary}</CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="flex-grow">
+                    <div className="flex text-sm text-muted-foreground mb-2">
+                      <div className="mr-4">{Math.ceil(course.duration_minutes / 60)} hours</div>
+                      <div>{course.price && course.price > 0 ? `$${course.price}` : "Free"}</div>
+                    </div>
+                  </CardContent>
+                  
+                  <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/creator/courses/edit/${course.id}`}>
+                        <Edit className="h-4 w-4 mr-1" />
                         Edit
                       </Link>
                     </Button>
                     
-                    <Button variant="outline" size="sm" asChild className="flex-1">
-                      <Link to={`/creator/courses/${course.id}/content`}>
-                        <Settings className="h-4 w-4 mr-2" />
+                    <Button
+                      variant={course.is_published ? "destructive" : "default"}
+                      size="sm"
+                      onClick={() => handleTogglePublish(course)}
+                    >
+                      {course.is_published ? (
+                        <>
+                          <Lock className="h-4 w-4 mr-1" />
+                          Unpublish
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="h-4 w-4 mr-1" />
+                          Publish
+                        </>
+                      )}
+                    </Button>
+
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/creator/courses/content/${course.id}`}>
+                        <BookOpen className="h-4 w-4 mr-1" />
                         Content
                       </Link>
                     </Button>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" asChild className="flex-1">
-                      <Link to={`/learning/course/${course.id}`}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Course
+
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCourse(course);
+                        setPreviewDialogOpen(true);
+                      }}
+                    >
+                      <Video className="h-4 w-4 mr-1" />
+                      Preview
+                    </Button>
+                    
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/learning/course/${course.id}`} target="_blank">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
                       </Link>
                     </Button>
                     
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => togglePublishStatus(course.id, course.is_published)}
-                      className="flex-1"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        setCourseToDelete(course);
+                        setDeleteDialogOpen(true);
+                      }}
                     >
-                      <PlayCircle className="h-4 w-4 mr-2" />
-                      {course.is_published ? 'Unpublish' : 'Publish'}
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
                     </Button>
-                  </div>
-
-                  <Button variant="outline" size="sm" asChild className="w-full">
-                    <Link to={`/creator/promo-codes?item_type=course&item_id=${course.id}`}>
-                      <Percent className="h-4 w-4 mr-2" />
-                      Promo Codes
-                    </Link>
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteCourse(course.id)}
-                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Course
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardFooter>
+                </Card>
+              ))
+            )}
           </div>
         )}
+        
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Course</DialogTitle>
+              <DialogDescription>
+                This will permanently delete the course and all related content.
+              </DialogDescription>
+            </DialogHeader>
+            <p className="py-4">
+              Are you sure you want to delete <strong>{courseToDelete?.title}</strong>? 
+              This will also delete all modules, lessons, and student progress data. 
+              This action cannot be undone.
+            </p>
+            <DialogFooter className="flex space-x-2 justify-end">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleDeleteCourse}>Delete Course</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Preview Video Upload Dialog */}
+        <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Course Preview Video</DialogTitle>
+              <DialogDescription>
+                Upload a preview video for your course to help students understand what they'll learn.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedCourse && (
+              <CoursePreviewUpload
+                courseId={selectedCourse.id}
+                existingPreviewUrl={selectedCourse.course_preview?.preview_video_url}
+                onUploadSuccess={(previewUrl) => handlePreviewUploadSuccess(selectedCourse.id, previewUrl)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </CreatorLayout>
   );
