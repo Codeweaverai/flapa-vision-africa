@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock, BookOpen, Video, Play } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, Lock, Unlock, BookOpen, Video, Play, Percent, Search, Filter } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { Course, fetchCreatorCourses, deleteCourse, updateCourse } from '@/services/courseService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,15 +17,23 @@ import CoursePreviewUpload from '@/components/creator/CoursePreviewUpload';
 const CreatorCourses = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState<boolean>(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     loadCourses();
   }, [user]);
+
+  useEffect(() => {
+    filterCourses();
+  }, [courses, searchTerm, categoryFilter, statusFilter]);
 
   const loadCourses = async () => {
     if (!user) return;
@@ -42,6 +52,29 @@ const CreatorCourses = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterCourses = () => {
+    let filtered = courses;
+
+    if (searchTerm) {
+      filtered = filtered.filter(course =>
+        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(course => course.category === categoryFilter);
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(course => 
+        statusFilter === 'published' ? course.is_published : !course.is_published
+      );
+    }
+
+    setFilteredCourses(filtered);
   };
 
   const handleDeleteCourse = async () => {
@@ -102,6 +135,8 @@ const CreatorCourses = () => {
     setSelectedCourse(null);
   };
 
+  const categories = [...new Set(courses.map(course => course.category))];
+
   return (
     <CreatorLayout>
       <div>
@@ -118,6 +153,44 @@ const CreatorCourses = () => {
             </Link>
           </Button>
         </div>
+
+        {/* Filters */}
+        <div className="mb-6 flex flex-wrap gap-4 items-center">
+          <div className="flex-1 min-w-[200px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search courses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map(category => (
+                <SelectItem key={category} value={category}>{category}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         
         {loading ? (
           <div className="flex justify-center my-12">
@@ -125,28 +198,35 @@ const CreatorCourses = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.length === 0 ? (
+            {filteredCourses.length === 0 ? (
               <div className="col-span-full">
                 <Card className="border-dashed">
                   <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
                     <div className="mb-4 rounded-full bg-primary/10 p-6">
                       <BookOpen className="h-8 w-8 text-primary" />
                     </div>
-                    <CardTitle className="mb-2">No courses yet</CardTitle>
+                    <CardTitle className="mb-2">
+                      {courses.length === 0 ? 'No courses yet' : 'No courses found'}
+                    </CardTitle>
                     <CardDescription className="mb-6">
-                      Get started by creating your first course
+                      {courses.length === 0 
+                        ? 'Get started by creating your first course'
+                        : 'Try adjusting your search or filter criteria'
+                      }
                     </CardDescription>
-                    <Button asChild>
-                      <Link to="/creator/courses/create">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Create Course
-                      </Link>
-                    </Button>
+                    {courses.length === 0 && (
+                      <Button asChild>
+                        <Link to="/creator/courses/create">
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Create Course
+                        </Link>
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               </div>
             ) : (
-              courses.map((course) => (
+              filteredCourses.map((course) => (
                 <Card key={course.id} className="flex flex-col">
                   <div className="relative">
                     {course.thumbnail_url ? (
@@ -234,6 +314,13 @@ const CreatorCourses = () => {
                     >
                       <Video className="h-4 w-4 mr-1" />
                       Preview
+                    </Button>
+
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/creator/promo-codes?course=${course.id}`}>
+                        <Percent className="h-4 w-4 mr-1" />
+                        Promo Codes
+                      </Link>
                     </Button>
                     
                     <Button variant="outline" size="sm" asChild>

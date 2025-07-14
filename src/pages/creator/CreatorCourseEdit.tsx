@@ -31,7 +31,7 @@ interface Course {
 }
 
 const CreatorCourseEdit = () => {
-  const { courseId } = useParams<{ courseId: string }>();
+  const { id: courseId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
@@ -45,15 +45,23 @@ const CreatorCourseEdit = () => {
   }, [courseId, user]);
 
   const fetchCourse = async () => {
+    if (!courseId || !user) return;
+    
     try {
       const { data, error } = await supabase
         .from('courses')
         .select('*')
         .eq('id', courseId)
-        .eq('creator_id', user!.id)
+        .eq('creator_id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching course:', error);
+        toast.error('Failed to load course');
+        navigate('/creator/courses');
+        return;
+      }
+      
       setCourse(data);
     } catch (error) {
       console.error('Error fetching course:', error);
@@ -65,7 +73,7 @@ const CreatorCourseEdit = () => {
   };
 
   const handleSave = async () => {
-    if (!course) return;
+    if (!course || !courseId) return;
 
     setSaving(true);
     try {
@@ -100,8 +108,10 @@ const CreatorCourseEdit = () => {
   };
 
   const handleThumbnailUpload = (url: string, path: string) => {
-    setCourse(prev => prev ? { ...prev, thumbnail_url: url } : null);
-    toast.success('Thumbnail uploaded successfully!');
+    if (course) {
+      setCourse({ ...course, thumbnail_url: url });
+      toast.success('Thumbnail uploaded successfully!');
+    }
   };
 
   if (loading) {
