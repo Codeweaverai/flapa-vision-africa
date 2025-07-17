@@ -197,8 +197,8 @@ function App() {
                 <Route path="/event/:eventId/register" element={<EventRegistrationForm />} />
 
                 {/* Explore Routes */}
-                <Route path="/explore/courses" element={<ExploreCoursesPage />} />
-                <Route path="/explore/events" element={<ExploreEventsPage />} />
+                <Route path="/explore-courses" element={<ExploreCoursesPage />} />
+                <Route path="/explore-events" element={<ExploreEventsPage />} />
 
                 {/* Job Routes */}
                 <Route path="/job/:jobId" element={<JobDetailPage />} />
