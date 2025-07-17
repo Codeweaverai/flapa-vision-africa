@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
@@ -196,6 +197,8 @@ function App() {
                 <Route path="/event/:eventId/register" element={<EventRegistrationPage />} />
 
                 {/* Explore Routes */}
+                <Route path="/explore-courses" element={<ExploreCoursesPage />} />
+                <Route path="/explore-events" element={<ExploreEventsPage />} />
                 <Route path="/explore/courses" element={<ExploreCoursesPage />} />
                 <Route path="/explore/events" element={<ExploreEventsPage />} />
 
@@ -204,6 +207,12 @@ function App() {
 
                 {/* Auth Routes */}
                 <Route path="/auth" element={<AuthPage />} />
+                <Route path="/auth/login" element={<LoginPage />} />
+                <Route path="/auth/register" element={<RegisterPage />} />
+                <Route path="/auth/signin" element={<SigninPage />} />
+                <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/auth/verify" element={<VerifyPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/signin" element={<SigninPage />} />
