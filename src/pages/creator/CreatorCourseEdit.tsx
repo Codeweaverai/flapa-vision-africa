@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import CreatorLayout from '@/components/creator/CreatorLayout';
+import CreatorLayout from '@/components/layout/CreatorLayout';
 import FileUpload from '@/components/common/FileUpload';
 
 interface Course {
@@ -31,7 +31,7 @@ interface Course {
 }
 
 const CreatorCourseEdit = () => {
-  const { id: courseId } = useParams<{ id: string }>();
+  const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
@@ -45,23 +45,15 @@ const CreatorCourseEdit = () => {
   }, [courseId, user]);
 
   const fetchCourse = async () => {
-    if (!courseId || !user) return;
-    
     try {
       const { data, error } = await supabase
         .from('courses')
         .select('*')
         .eq('id', courseId)
-        .eq('creator_id', user.id)
+        .eq('creator_id', user!.id)
         .single();
 
-      if (error) {
-        console.error('Error fetching course:', error);
-        toast.error('Failed to load course');
-        navigate('/creator/courses');
-        return;
-      }
-      
+      if (error) throw error;
       setCourse(data);
     } catch (error) {
       console.error('Error fetching course:', error);
@@ -73,7 +65,7 @@ const CreatorCourseEdit = () => {
   };
 
   const handleSave = async () => {
-    if (!course || !courseId) return;
+    if (!course) return;
 
     setSaving(true);
     try {
@@ -108,10 +100,8 @@ const CreatorCourseEdit = () => {
   };
 
   const handleThumbnailUpload = (url: string, path: string) => {
-    if (course) {
-      setCourse({ ...course, thumbnail_url: url });
-      toast.success('Thumbnail uploaded successfully!');
-    }
+    setCourse(prev => prev ? { ...prev, thumbnail_url: url } : null);
+    toast.success('Thumbnail uploaded successfully!');
   };
 
   if (loading) {
