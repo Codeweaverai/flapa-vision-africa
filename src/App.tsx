@@ -1,11 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { QueryClient } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Auth
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import AuthPage from '@/pages/AuthPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -19,7 +19,7 @@ import { CurrencyProvider } from '@/contexts/CurrencyContext';
 
 // Cart
 import { CartProvider } from '@/contexts/CartContext';
-import CartPage from '@/pages/CartPage';
+import CartPage from '@/pages/cart/CartPage';
 
 // Public Pages
 import HomePage from '@/pages/HomePage';
@@ -55,7 +55,7 @@ import CourseResultsPage from '@/pages/CourseResultsPage';
 
 // Event Pages
 import EventDetailPage from '@/pages/EventDetailPage';
-import EventRegistrationForm from '@/pages/EventRegistrationForm';
+import EventRegistrationPage from '@/pages/EventRegistrationPage';
 
 // Explore Pages
 import ExploreCoursesPage from '@/pages/ExploreCoursesPage';
@@ -88,12 +88,12 @@ import InboxPage from '@/pages/InboxPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 
 // User Account Pages
-import UserProfile from '@/pages/user/UserProfile';
-import UserCourses from '@/pages/user/UserCourses';
-import UserEvents from '@/pages/user/UserEvents';
-import UserOrders from '@/pages/user/UserOrders';
-import UserConsultations from '@/pages/user/UserConsultations';
-import UserSettings from '@/pages/user/UserSettings';
+import UserProfile from '@/pages/account/UserProfile';
+import UserCourses from '@/pages/account/UserCourses';
+import UserEvents from '@/pages/account/UserEvents';
+import UserOrders from '@/pages/account/UserOrders';
+import UserConsultations from '@/pages/account/UserConsultations';
+import UserSettings from '@/pages/account/UserSettings';
 
 // Community Pages
 import CommunityPage from '@/pages/CommunityPage';
@@ -148,13 +148,15 @@ import AdminContactSubmissions from '@/pages/admin/AdminContactSubmissions';
 import AdminSupportInbox from '@/pages/admin/AdminSupportInbox';
 import AdminPayouts from '@/pages/admin/AdminPayouts';
 
+const queryClient = new QueryClient();
+
 function App() {
   return (
     <Router>
       <AuthProvider>
         <CurrencyProvider>
           <CartProvider>
-            <QueryClient>
+            <QueryClientProvider client={queryClient}>
               <Toaster />
               <Routes>
                 {/* Public Routes */}
@@ -191,7 +193,7 @@ function App() {
 
                 {/* Event Routes */}
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
-                <Route path="/event/:eventId/register" element={<EventRegistrationForm />} />
+                <Route path="/event/:eventId/register" element={<EventRegistrationPage />} />
 
                 {/* Explore Routes */}
                 <Route path="/explore/courses" element={<ExploreCoursesPage />} />
@@ -224,7 +226,7 @@ function App() {
                 <Route path="/tickets/:ticketId/view" element={<TicketViewPage />} />
 
                 {/* Protected User Routes */}
-                <Route element={<ProtectedRoute />}>
+                <Route element={<ProtectedRoute><div /></ProtectedRoute>}>
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/account" element={<AccountPage />} />
@@ -252,7 +254,7 @@ function App() {
                 </Route>
 
                 {/* Creator Routes */}
-                <Route element={<ProtectedRoute />}>
+                <Route element={<ProtectedRoute><div /></ProtectedRoute>}>
                   <Route path="/creator/dashboard" element={<CreatorDashboard />} />
                   <Route path="/creator/analytics" element={<CreatorAnalytics />} />
                   <Route path="/creator/courses" element={<CreatorCourses />} />
@@ -273,41 +275,45 @@ function App() {
                 </Route>
 
                 {/* Admin Routes */}
-                <Route path="/admin" element={<AdminRoute />}>
-                  <Route index element={<AdminDashboard />} />
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="courses" element={<AdminCourses />} />
-                  <Route path="courses/create" element={<AdminCourseCreate />} />
-                  <Route path="courses/:id/edit" element={<AdminCourseEdit />} />
-                  <Route path="courses/:id/content" element={<AdminCourseContent />} />
-                  <Route path="events" element={<AdminEvents />} />
-                  <Route path="events/create" element={<AdminEventCreate />} />
-                  <Route path="events/:id/edit" element={<AdminEventEdit />} />
-                  <Route path="events/:id/registrations" element={<AdminEventRegistrations />} />
-                  <Route path="users" element={<AdminUsers />} />
-                  <Route path="orders" element={<AdminOrders />} />
-                  <Route path="analytics" element={<AdminAnalytics />} />
-                  <Route path="settings" element={<AdminSettings />} />
-                  <Route path="media" element={<AdminMedia />} />
-                  <Route path="media/create" element={<AdminMediaForm />} />
-                  <Route path="media/:id/edit" element={<AdminMediaForm />} />
-                  <Route path="newsletters" element={<AdminNewsletters />} />
-                  <Route path="reviews" element={<AdminReviews />} />
-                  <Route path="registrations" element={<AdminRegistrations />} />
-                  <Route path="consultations" element={<AdminConsultations />} />
-                  <Route path="speaking" element={<AdminSpeaking />} />
-                  <Route path="careers" element={<AdminCareers />} />
-                  <Route path="contact" element={<AdminContactSubmissions />} />
-                  <Route path="support" element={<AdminSupportInbox />} />
-                  <Route path="payouts" element={<AdminPayouts />} />
-                </Route>
+                <Route path="/admin/*" element={
+                  <AdminRoute>
+                    <Routes>
+                      <Route index element={<AdminDashboard />} />
+                      <Route path="dashboard" element={<AdminDashboard />} />
+                      <Route path="courses" element={<AdminCourses />} />
+                      <Route path="courses/create" element={<AdminCourseCreate />} />
+                      <Route path="courses/:id/edit" element={<AdminCourseEdit />} />
+                      <Route path="courses/:id/content" element={<AdminCourseContent />} />
+                      <Route path="events" element={<AdminEvents />} />
+                      <Route path="events/create" element={<AdminEventCreate />} />
+                      <Route path="events/:id/edit" element={<AdminEventEdit />} />
+                      <Route path="events/:id/registrations" element={<AdminEventRegistrations />} />
+                      <Route path="users" element={<AdminUsers />} />
+                      <Route path="orders" element={<AdminOrders />} />
+                      <Route path="analytics" element={<AdminAnalytics />} />
+                      <Route path="settings" element={<AdminSettings />} />
+                      <Route path="media" element={<AdminMedia />} />
+                      <Route path="media/create" element={<AdminMediaForm />} />
+                      <Route path="media/:id/edit" element={<AdminMediaForm />} />
+                      <Route path="newsletters" element={<AdminNewsletters />} />
+                      <Route path="reviews" element={<AdminReviews />} />
+                      <Route path="registrations" element={<AdminRegistrations />} />
+                      <Route path="consultations" element={<AdminConsultations />} />
+                      <Route path="speaking" element={<AdminSpeaking />} />
+                      <Route path="careers" element={<AdminCareers />} />
+                      <Route path="contact" element={<AdminContactSubmissions />} />
+                      <Route path="support" element={<AdminSupportInbox />} />
+                      <Route path="payouts" element={<AdminPayouts />} />
+                    </Routes>
+                  </AdminRoute>
+                } />
 
                 <Route path="/admin/login" element={<AdminLogin />} />
 
                 {/* 404 Route */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
-            </QueryClient>
+            </QueryClientProvider>
           </CartProvider>
         </CurrencyProvider>
       </AuthProvider>
