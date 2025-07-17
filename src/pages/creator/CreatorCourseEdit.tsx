@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import CreatorLayout from '@/components/layout/CreatorLayout';
+import CreatorLayout from '@/components/creator/CreatorLayout';
 import FileUpload from '@/components/common/FileUpload';
 
 interface Course {

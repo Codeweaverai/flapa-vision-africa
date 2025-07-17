@@ -125,46 +125,46 @@ const CreatorsSection = () => {
             <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {creators.slice(0, 10).map((creator) => (
-              <Card key={creator.id} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/90 backdrop-blur-sm hover:bg-white hover:scale-105">
-                <CardContent className="p-4 text-center">
+              <Card key={creator.id} className="group hover:shadow-lg transition-all duration-300 border-0 bg-white/90 backdrop-blur-sm hover:bg-white hover:scale-105 overflow-hidden">
+                <CardContent className="p-3 text-center">
                   <div className="relative mb-3">
-                    <Avatar className="h-12 w-12 mx-auto ring-2 ring-gradient-to-r from-orange-200 to-purple-200">
+                    <Avatar className="h-10 w-10 mx-auto ring-2 ring-orange-200">
                       <AvatarImage src={creator.avatar_url} alt={creator.full_name} />
-                      <AvatarFallback className="text-sm font-semibold bg-gradient-to-r from-orange-100 to-purple-100">
+                      <AvatarFallback className="text-xs font-semibold bg-gradient-to-r from-orange-100 to-purple-100 text-orange-700">
                         {creator.full_name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <Star className="h-2 w-2 text-white fill-current" />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <Star className="h-1.5 w-1.5 text-white fill-current" />
                     </div>
                   </div>
                   
-                  <h3 className="font-semibold text-sm mb-1 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent line-clamp-1">
+                  <h3 className="font-semibold text-xs mb-1 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent line-clamp-1">
                     {creator.full_name}
                   </h3>
                   
-                  <div className="flex justify-center items-center gap-3 mb-2 text-xs text-gray-500">
+                  <div className="flex justify-center items-center gap-2 mb-2 text-xs text-gray-500">
                     {creator.average_rating > 0 && (
                       <div className="flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        <span>{creator.average_rating}</span>
+                        <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs">{creator.average_rating}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-1">
-                      <Users className="h-3 w-3 text-orange-500" />
-                      <span>{creator.total_students}</span>
+                      <Users className="h-2.5 w-2.5 text-orange-500" />
+                      <span className="text-xs">{creator.total_students}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <BookOpen className="h-3 w-3 text-purple-500" />
-                      <span>{creator.total_courses}</span>
+                      <BookOpen className="h-2.5 w-2.5 text-purple-500" />
+                      <span className="text-xs">{creator.total_courses}</span>
                     </div>
                   </div>
                   
                   <div className="flex flex-wrap justify-center gap-1 mb-3">
-                    {creator.specialties.map((specialty) => (
-                      <Badge key={specialty} variant="secondary" className="text-xs bg-gradient-to-r from-orange-100 to-purple-100 text-gray-700 border-0 px-2 py-0">
+                    {creator.specialties.slice(0, 1).map((specialty) => (
+                      <Badge key={specialty} variant="secondary" className="text-xs bg-gradient-to-r from-orange-100 to-purple-100 text-gray-700 border-0 px-1.5 py-0 h-4 text-xs">
                         {specialty}
                       </Badge>
                     ))}
@@ -173,7 +173,7 @@ const CreatorsSection = () => {
                   <Button 
                     asChild
                     size="sm"
-                    className="w-full text-xs bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 transition-all duration-300"
+                    className="w-full text-xs h-7 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 transition-all duration-300 shadow-sm hover:shadow-md"
                   >
                     <Link to={`/creator/profile/${creator.id}`}>
                       View Profile
