@@ -25,9 +25,7 @@ interface Event {
   image_url: string;
   currency: string;
   creator_id: string;
-  profiles?: {
-    full_name: string;
-  } | null;
+  creator_name?: string;
 }
 
 const ExploreEventsPage = () => {
@@ -59,28 +57,39 @@ const ExploreEventsPage = () => {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // First get events
+      const { data: eventsData, error: eventsError } = await supabase
         .from('events')
-        .select(`
-          *,
-          profiles (
-            full_name
-          )
-        `)
+        .select('*')
         .gte('end_time', new Date().toISOString())
         .order('start_time', { ascending: true });
 
-      if (error) throw error;
+      if (eventsError) throw eventsError;
+
+      // Then get creator names for each event
+      const eventsWithCreators = await Promise.all(
+        (eventsData || []).map(async (event) => {
+          if (event.creator_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', event.creator_id)
+              .single();
+            
+            return {
+              ...event,
+              creator_name: profile?.full_name || 'Unknown Creator'
+            };
+          }
+          return {
+            ...event,
+            creator_name: 'Unknown Creator'
+          };
+        })
+      );
       
-      // Transform the data to match our Event interface
-      const transformedEvents: Event[] = (data || []).map(event => ({
-        ...event,
-        profiles: event.profiles && typeof event.profiles === 'object' && 'full_name' in event.profiles 
-          ? { full_name: event.profiles.full_name }
-          : null
-      }));
-      
-      setEvents(transformedEvents);
+      setEvents(eventsWithCreators);
     } catch (error) {
       console.error('Error fetching events:', error);
       toast.error('Failed to load events');
@@ -123,7 +132,7 @@ const ExploreEventsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -134,19 +143,21 @@ const ExploreEventsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header with Gradient */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Explore Events</h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <div className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold mb-4">Explore Events</h1>
+          </div>
+          <p className="text-xl text-gray-700 max-w-2xl mx-auto">
             Discover amazing events happening around you. From workshops to conferences, 
             find the perfect event to expand your knowledge and network.
           </p>
         </div>
 
-        {/* Search and Filters */}
-        <div className="mb-8 bg-white rounded-lg shadow-md p-6">
+        {/* Search and Filters with Gradient Accent */}
+        <div className="mb-8 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 border border-orange-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -154,12 +165,12 @@ const ExploreEventsPage = () => {
                 placeholder="Search events..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 border-orange-200 focus:border-purple-400"
               />
             </div>
             
             <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger>
+              <SelectTrigger className="border-orange-200 focus:border-purple-400">
                 <SelectValue placeholder="Event Type" />
               </SelectTrigger>
               <SelectContent>
@@ -172,7 +183,10 @@ const ExploreEventsPage = () => {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" className="w-full">
+            <Button 
+              variant="outline" 
+              className="w-full border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50"
+            >
               <Filter className="h-4 w-4 mr-2" />
               More Filters
             </Button>
@@ -197,10 +211,10 @@ const ExploreEventsPage = () => {
             {filteredEvents.map((event) => (
               <Card 
                 key={event.id} 
-                className="group hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
+                className="group hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden bg-white/95 backdrop-blur-sm border border-orange-200 hover:border-purple-300"
                 onClick={() => navigate(`/events/${event.id}`)}
               >
-                {/* Event Image */}
+                {/* Event Image with Gradient Overlay */}
                 <div className="relative h-48 overflow-hidden">
                   {event.image_url ? (
                     <img
@@ -209,22 +223,27 @@ const ExploreEventsPage = () => {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                      <Calendar className="h-12 w-12 text-blue-500" />
+                    <div className="w-full h-full bg-gradient-to-br from-orange-200 to-purple-200 flex items-center justify-center">
+                      <Calendar className="h-12 w-12 text-orange-600" />
                     </div>
                   )}
                   
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
                   {/* Event Type Badge */}
                   <Badge 
-                    className={`absolute top-3 left-3 ${getEventTypeColor(event.event_type)}`}
+                    className={`absolute top-3 left-3 ${getEventTypeColor(event.event_type)} shadow-sm`}
                   >
                     {event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1)}
                   </Badge>
                   
                   {/* Price Badge */}
                   <Badge 
-                    className={`absolute top-3 right-3 ${
-                      event.is_free ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    className={`absolute top-3 right-3 shadow-sm ${
+                      event.is_free 
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' 
+                        : 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white'
                     }`}
                   >
                     {event.is_free ? 'Free' : `${event.currency} ${event.price}`}
@@ -232,7 +251,7 @@ const ExploreEventsPage = () => {
                 </div>
 
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-semibold line-clamp-2 group-hover:text-primary transition-colors">
+                  <CardTitle className="text-lg font-semibold line-clamp-2 group-hover:bg-gradient-to-r group-hover:from-orange-600 group-hover:to-purple-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
                     {event.title}
                   </CardTitle>
                   <CardDescription className="line-clamp-2">
@@ -244,7 +263,7 @@ const ExploreEventsPage = () => {
                   <div className="space-y-2 text-sm text-gray-600">
                     {/* Date and Time */}
                     <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                      <Clock className="h-4 w-4 mr-2 text-orange-500" />
                       <span className="text-xs">
                         {formatEventTime(event.start_time, event.end_time)}
                       </span>
@@ -252,7 +271,7 @@ const ExploreEventsPage = () => {
 
                     {/* Location */}
                     <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                      <MapPin className="h-4 w-4 mr-2 text-purple-500" />
                       <span className="text-xs line-clamp-1">
                         {event.location || 'Online Event'}
                       </span>
@@ -261,7 +280,7 @@ const ExploreEventsPage = () => {
                     {/* Capacity */}
                     {event.capacity && (
                       <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2 text-gray-400" />
+                        <Users className="h-4 w-4 mr-2 text-orange-500" />
                         <span className="text-xs">
                           Up to {event.capacity} attendees
                         </span>
@@ -269,18 +288,17 @@ const ExploreEventsPage = () => {
                     )}
 
                     {/* Creator */}
-                    {event.profiles?.full_name && (
-                      <div className="flex items-center pt-2 border-t">
+                    {event.creator_name && (
+                      <div className="flex items-center pt-2 border-t border-orange-100">
                         <span className="text-xs text-gray-500">
-                          by {event.profiles.full_name}
+                          by {event.creator_name}
                         </span>
                       </div>
                     )}
                   </div>
 
                   <Button 
-                    className="w-full mt-4 group-hover:bg-primary group-hover:text-white transition-colors"
-                    variant="outline"
+                    className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-md"
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/events/${event.id}`);
@@ -294,10 +312,14 @@ const ExploreEventsPage = () => {
           </div>
         )}
 
-        {/* Load More Button */}
+        {/* Load More Button with Gradient */}
         {filteredEvents.length > 0 && (
           <div className="text-center mt-12">
-            <Button variant="outline" size="lg">
+            <Button 
+              variant="outline" 
+              size="lg"
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 hover:from-orange-600 hover:to-purple-700 shadow-lg"
+            >
               Load More Events
             </Button>
           </div>
