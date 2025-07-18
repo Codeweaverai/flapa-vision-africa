@@ -61,7 +61,7 @@ const CreatorStudents = () => {
     try {
       console.log('Fetching students data for creator:', user?.id);
       
-      // Get course enrollment data with user emails from auth
+      // Get course enrollment data
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select(`
@@ -85,7 +85,7 @@ const CreatorStudents = () => {
       
       console.log('Enrollment data:', enrollmentData);
       
-      // Get event registration data with user emails from auth
+      // Get event registration data
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
@@ -117,12 +117,10 @@ const CreatorStudents = () => {
       
       console.log('All user IDs:', allUserIds);
       
-      // Get user profiles and auth data
+      // Get user profiles
       let userProfiles: any[] = [];
-      let authUsers: any[] = [];
       
       if (allUserIds.length > 0) {
-        // Get profiles
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name, avatar_url, created_at')
@@ -133,25 +131,13 @@ const CreatorStudents = () => {
         } else {
           userProfiles = profiles || [];
         }
-        
-        // Get auth users (need admin access for this)
-        try {
-          const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-          if (!authError && authData) {
-            authUsers = authData.users.filter(u => allUserIds.includes(u.id));
-          }
-        } catch (error) {
-          console.log('Cannot access auth users directly, using profiles only');
-        }
       }
       
       console.log('User profiles:', userProfiles);
-      console.log('Auth users:', authUsers);
       
-      // Create user map combining profiles and auth data
+      // Create user map with fallback emails
       const userMap = new Map();
       
-      // Add profiles to map
       userProfiles.forEach(profile => {
         userMap.set(profile.id, {
           id: profile.id,
@@ -159,17 +145,6 @@ const CreatorStudents = () => {
           avatar_url: profile.avatar_url,
           created_at: profile.created_at,
           email: `user-${profile.id.substring(0, 8)}@platform.com` // Fallback email
-        });
-      });
-      
-      // Add/update with auth data if available
-      authUsers.forEach(authUser => {
-        const existing = userMap.get(authUser.id) || {};
-        userMap.set(authUser.id, {
-          ...existing,
-          id: authUser.id,
-          email: authUser.email,
-          created_at: existing.created_at || authUser.created_at
         });
       });
       
@@ -269,7 +244,7 @@ const CreatorStudents = () => {
   );
 
   // Export functions
-  const exportToCSV = (data: any[], filename: string) => {
+  const exportToExcel = (data: any[], filename: string) => {
     try {
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
@@ -313,21 +288,21 @@ const CreatorStudents = () => {
     }
   };
 
-  const handleExportAllStudents = (format: 'csv' | 'pdf') => {
+  const handleExportAllStudents = (format: 'excel' | 'pdf') => {
     const data = filteredAllStudents.map(student => ({
       'Full Name': student.full_name || 'N/A',
       'Email': student.email,
       'Joined Date': format(new Date(student.created_at), 'PP')
     }));
     
-    if (format === 'csv') {
-      exportToCSV(data, 'all-students');
+    if (format === 'excel') {
+      exportToExcel(data, 'all-students');
     } else {
       exportToPDF(data, 'all-students', 'All Students Report');
     }
   };
 
-  const handleExportCourseStudents = (format: 'csv' | 'pdf') => {
+  const handleExportCourseStudents = (format: 'excel' | 'pdf') => {
     const data = filteredCourseStudents.map(student => ({
       'Student Name': student.full_name || 'N/A',
       'Email': student.email,
@@ -337,14 +312,14 @@ const CreatorStudents = () => {
       'Payment Status': student.payment_status
     }));
     
-    if (format === 'csv') {
-      exportToCSV(data, 'course-enrollments');
+    if (format === 'excel') {
+      exportToExcel(data, 'course-enrollments');
     } else {
       exportToPDF(data, 'course-enrollments', 'Course Enrollments Report');
     }
   };
 
-  const handleExportEventAttendees = (format: 'csv' | 'pdf') => {
+  const handleExportEventAttendees = (format: 'excel' | 'pdf') => {
     const data = filteredEventAttendees.map(attendee => ({
       'Attendee Name': attendee.full_name || 'N/A',
       'Email': attendee.email,
@@ -355,8 +330,8 @@ const CreatorStudents = () => {
       'Booking Code': attendee.booking_code || 'N/A'
     }));
     
-    if (format === 'csv') {
-      exportToCSV(data, 'event-attendees');
+    if (format === 'excel') {
+      exportToExcel(data, 'event-attendees');
     } else {
       exportToPDF(data, 'event-attendees', 'Event Attendees Report');
     }
@@ -411,7 +386,7 @@ const CreatorStudents = () => {
                 <div className="flex gap-2">
                   <Button 
                     variant="outline" 
-                    onClick={() => handleExportAllStudents('csv')}
+                    onClick={() => handleExportAllStudents('excel')}
                     className="border-orange-300 text-orange-600 hover:bg-orange-50"
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -477,7 +452,7 @@ const CreatorStudents = () => {
                 <div className="flex gap-2">
                   <Button 
                     variant="outline" 
-                    onClick={() => handleExportCourseStudents('csv')}
+                    onClick={() => handleExportCourseStudents('excel')}
                     className="border-orange-300 text-orange-600 hover:bg-orange-50"
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -574,7 +549,7 @@ const CreatorStudents = () => {
                 <div className="flex gap-2">
                   <Button 
                     variant="outline" 
-                    onClick={() => handleExportEventAttendees('csv')}
+                    onClick={() => handleExportEventAttendees('excel')}
                     className="border-orange-300 text-orange-600 hover:bg-orange-50"
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
