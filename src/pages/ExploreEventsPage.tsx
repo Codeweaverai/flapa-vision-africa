@@ -27,7 +27,7 @@ interface Event {
   creator_id: string;
   profiles?: {
     full_name: string;
-  };
+  } | null;
 }
 
 const ExploreEventsPage = () => {
@@ -71,7 +71,16 @@ const ExploreEventsPage = () => {
         .order('start_time', { ascending: true });
 
       if (error) throw error;
-      setEvents(data || []);
+      
+      // Transform the data to match our Event interface
+      const transformedEvents: Event[] = (data || []).map(event => ({
+        ...event,
+        profiles: event.profiles && typeof event.profiles === 'object' && 'full_name' in event.profiles 
+          ? { full_name: event.profiles.full_name }
+          : null
+      }));
+      
+      setEvents(transformedEvents);
     } catch (error) {
       console.error('Error fetching events:', error);
       toast.error('Failed to load events');
