@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -66,7 +65,7 @@ const CreatorCourses = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [previewCourse, setPreviewCourse] = useState<Course | null>(null);
+  const [previewCourseId, setPreviewCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -231,7 +230,7 @@ const CreatorCourses = () => {
 
         {/* Courses Grid */}
         {filteredCourses.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
             {filteredCourses.map(course => {
               const stats = courseStats[course.id] || {
                 enrollments: 0,
@@ -267,7 +266,7 @@ const CreatorCourses = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setPreviewCourse(course)}>
+                          <DropdownMenuItem onClick={() => setPreviewCourseId(course.id)}>
                             <Play className="h-4 w-4 mr-2" />
                             Preview Video
                           </DropdownMenuItem>
@@ -339,7 +338,8 @@ const CreatorCourses = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => setPreviewCourse(course)}
+                        onClick={() => setPreviewCourseId(course.id)}
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
                       >
                         <Play className="h-4 w-4" />
                       </Button>
@@ -376,11 +376,15 @@ const CreatorCourses = () => {
         )}
 
         {/* Course Preview Dialog */}
-        <CoursePreviewDialog
-          course={previewCourse}
-          isOpen={!!previewCourse}
-          onClose={() => setPreviewCourse(null)}
-        />
+        {previewCourseId && (
+          <CoursePreviewDialog
+            courseId={previewCourseId}
+            onPreviewUpdated={() => {
+              fetchCourses();
+              setPreviewCourseId(null);
+            }}
+          />
+        )}
       </div>
     </CreatorLayout>
   );
