@@ -117,10 +117,12 @@ const CreatorStudents = () => {
       
       console.log('All user IDs:', allUserIds);
       
-      // Get user profiles
+      // Get user profiles and auth data
       let userProfiles: any[] = [];
+      let authUsers: any[] = [];
       
       if (allUserIds.length > 0) {
+        // Get profiles
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name, avatar_url, created_at')
@@ -131,21 +133,44 @@ const CreatorStudents = () => {
         } else {
           userProfiles = profiles || [];
         }
+
+        // Get auth users for emails
+        const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
+        if (usersError) {
+          console.error('Auth users error:', usersError);
+        } else {
+          authUsers = users?.filter(u => allUserIds.includes(u.id)) || [];
+        }
       }
       
       console.log('User profiles:', userProfiles);
+      console.log('Auth users:', authUsers);
       
-      // Create user map with fallback emails
+      // Create user map with auth emails
       const userMap = new Map();
       
       userProfiles.forEach(profile => {
+        const authUser = authUsers.find(u => u.id === profile.id);
         userMap.set(profile.id, {
           id: profile.id,
           full_name: profile.full_name,
           avatar_url: profile.avatar_url,
           created_at: profile.created_at,
-          email: `user-${profile.id.substring(0, 8)}@platform.com` // Fallback email
+          email: authUser?.email || `user-${profile.id.substring(0, 8)}@platform.com`
         });
+      });
+      
+      // Add users who might not have profiles but have auth records
+      authUsers.forEach(authUser => {
+        if (!userMap.has(authUser.id)) {
+          userMap.set(authUser.id, {
+            id: authUser.id,
+            full_name: null,
+            avatar_url: null,
+            created_at: authUser.created_at,
+            email: authUser.email
+          });
+        }
       });
       
       // Format course students data
@@ -288,21 +313,21 @@ const CreatorStudents = () => {
     }
   };
 
-  const handleExportAllStudents = (format: 'excel' | 'pdf') => {
+  const handleExportAllStudents = (exportFormat: 'excel' | 'pdf') => {
     const data = filteredAllStudents.map(student => ({
       'Full Name': student.full_name || 'N/A',
       'Email': student.email,
       'Joined Date': format(new Date(student.created_at), 'PP')
     }));
     
-    if (format === 'excel') {
+    if (exportFormat === 'excel') {
       exportToExcel(data, 'all-students');
     } else {
       exportToPDF(data, 'all-students', 'All Students Report');
     }
   };
 
-  const handleExportCourseStudents = (format: 'excel' | 'pdf') => {
+  const handleExportCourseStudents = (exportFormat: 'excel' | 'pdf') => {
     const data = filteredCourseStudents.map(student => ({
       'Student Name': student.full_name || 'N/A',
       'Email': student.email,
@@ -312,14 +337,14 @@ const CreatorStudents = () => {
       'Payment Status': student.payment_status
     }));
     
-    if (format === 'excel') {
+    if (exportFormat === 'excel') {
       exportToExcel(data, 'course-enrollments');
     } else {
       exportToPDF(data, 'course-enrollments', 'Course Enrollments Report');
     }
   };
 
-  const handleExportEventAttendees = (format: 'excel' | 'pdf') => {
+  const handleExportEventAttendees = (exportFormat: 'excel' | 'pdf') => {
     const data = filteredEventAttendees.map(attendee => ({
       'Attendee Name': attendee.full_name || 'N/A',
       'Email': attendee.email,
@@ -330,7 +355,7 @@ const CreatorStudents = () => {
       'Booking Code': attendee.booking_code || 'N/A'
     }));
     
-    if (format === 'excel') {
+    if (exportFormat === 'excel') {
       exportToExcel(data, 'event-attendees');
     } else {
       exportToPDF(data, 'event-attendees', 'Event Attendees Report');
