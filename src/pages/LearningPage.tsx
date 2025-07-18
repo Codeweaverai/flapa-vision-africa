@@ -74,6 +74,7 @@ interface Skill {
   level: number;
   progress: number;
   category: string;
+  courseTitle: string;
 }
 
 const LearningPage = () => {
@@ -86,22 +87,10 @@ const LearningPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
-  
-  // Weekly goals and skills tracking
-  const [weeklyGoals] = useState<WeeklyGoal[]>([
-    { id: '1', title: 'Hours Studied', target: 10, current: 6.5, unit: 'hours' },
-    { id: '2', title: 'Lessons Completed', target: 15, current: 8, unit: 'lessons' },
-    { id: '3', title: 'Quizzes Passed', target: 5, current: 3, unit: 'quizzes' }
-  ]);
-  
-  const [skills] = useState<Skill[]>([
-    { id: '1', name: 'JavaScript', level: 3, progress: 75, category: 'Programming' },
-    { id: '2', name: 'React', level: 2, progress: 60, category: 'Frontend' },
-    { id: '3', name: 'Node.js', level: 2, progress: 45, category: 'Backend' },
-    { id: '4', name: 'Database Design', level: 1, progress: 30, category: 'Data' }
-  ]);
+  const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoal[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
 
-  const coursesPerPage = 10;
+  const coursesPerPage = 5;
 
   useEffect(() => {
     const fetchEnrolledCourses = async () => {
@@ -133,24 +122,27 @@ const LearningPage = () => {
 
           setEnrolledCourses(courses || []);
 
-          // Fetch course progress for the user with authentication check
-          if (user) {
-            const { data: progressData, error: progressError } = await supabase
-              .from('course_progress')
-              .select('*')
-              .eq('user_id', user.id)
-              .in('course_id', courseIds);
+          // Fetch course progress for the user
+          const { data: progressData, error: progressError } = await supabase
+            .from('course_progress')
+            .select('*')
+            .eq('user_id', user.id)
+            .in('course_id', courseIds);
 
-            if (!progressError) {
-              setCourseProgress(progressData || []);
-            }
+          if (!progressError) {
+            setCourseProgress(progressData || []);
           }
+
+          // Generate dynamic weekly goals and skills
+          await generateDynamicData(courses || [], progressData || []);
 
           // Fetch real-time course statistics
           await fetchCourseStats(courseIds);
         } else {
           setEnrolledCourses([]);
           setCourseProgress([]);
+          setWeeklyGoals([]);
+          setSkills([]);
         }
       } catch (error) {
         console.error('Error fetching enrolled courses:', error);
@@ -161,31 +153,82 @@ const LearningPage = () => {
     };
 
     fetchEnrolledCourses();
-
-    // Set up real-time subscription for progress updates
-    if (user) {
-      const channel = supabase
-        .channel('course-progress-updates')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'course_progress',
-            filter: `user_id=eq.${user.id}`
-          },
-          () => {
-            // Refresh data when progress changes
-            fetchEnrolledCourses();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
   }, [user, navigate]);
+
+  const generateDynamicData = async (courses: Course[], progressData: CourseProgress[]) => {
+    if (!user) return;
+
+    try {
+      // Calculate dynamic weekly goals
+      const totalHoursStudied = courses.reduce((sum, course) => {
+        const progress = progressData.find(p => p.course_id === course.id);
+        const completionRate = progress ? progress.progress_percentage / 100 : 0;
+        return sum + (course.duration_minutes / 60) * completionRate;
+      }, 0);
+
+      // Count completed lessons
+      const { data: lessonProgress } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id, is_completed')
+        .eq('enrollment_id', user.id);
+
+      const completedLessons = lessonProgress?.filter(lp => lp.is_completed).length || 0;
+
+      // Count passed exams/quizzes (simplified)
+      const { data: examResults } = await supabase
+        .from('final_exam_results')
+        .select('passed')
+        .eq('user_id', user.id)
+        .eq('passed', true);
+
+      const passedExams = examResults?.length || 0;
+
+      const dynamicWeeklyGoals: WeeklyGoal[] = [
+        { 
+          id: '1', 
+          title: 'Hours Studied', 
+          target: 20, 
+          current: Math.round(totalHoursStudied * 10) / 10, 
+          unit: 'hours' 
+        },
+        { 
+          id: '2', 
+          title: 'Lessons Completed', 
+          target: 25, 
+          current: completedLessons, 
+          unit: 'lessons' 
+        },
+        { 
+          id: '3', 
+          title: 'Exams Passed', 
+          target: 5, 
+          current: passedExams, 
+          unit: 'exams' 
+        }
+      ];
+
+      setWeeklyGoals(dynamicWeeklyGoals);
+
+      // Generate dynamic skills based on enrolled courses
+      const dynamicSkills: Skill[] = courses.map((course, index) => {
+        const progress = progressData.find(p => p.course_id === course.id);
+        const progressPercentage = progress ? progress.progress_percentage : 0;
+        
+        return {
+          id: course.id,
+          name: course.category,
+          level: progressPercentage >= 75 ? 3 : progressPercentage >= 50 ? 2 : 1,
+          progress: progressPercentage,
+          category: course.category,
+          courseTitle: course.title
+        };
+      });
+
+      setSkills(dynamicSkills);
+    } catch (error) {
+      console.error('Error generating dynamic data:', error);
+    }
+  };
 
   const fetchCourseStats = async (courseIds: string[]) => {
     const stats: Record<string, CourseStats> = {};
@@ -204,7 +247,7 @@ const LearningPage = () => {
           .select('id')
           .eq('course_id', courseId);
 
-        // Calculate actual duration from lessons - simplified query
+        // Calculate actual duration from lessons
         const { data: modules } = await supabase
           .from('course_modules')
           .select('id')
@@ -300,54 +343,78 @@ const LearningPage = () => {
             </p>
           </div>
 
-          {/* Weekly Goals and Skills Tracking Section */}
+          {/* Dynamic Weekly Goals and Skills Tracking Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             {/* Weekly Goals */}
-            <Card className="bg-white/90 backdrop-blur-sm">
-              <CardHeader>
+            <Card className="bg-gradient-to-r from-orange-100 to-purple-100 border-0 shadow-xl">
+              <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-orange-500" />
-                  Weekly Goals
+                  <Target className="h-6 w-6" />
+                  Weekly Learning Goals
                 </CardTitle>
+                <p className="text-white/90 text-sm">Track your learning progress this week</p>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-6 space-y-6">
                 {weeklyGoals.map(goal => (
-                  <div key={goal.id} className="space-y-2">
+                  <div key={goal.id} className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="font-medium">{goal.title}</span>
-                      <span className="text-sm text-gray-600">
+                      <span className="font-semibold text-gray-800">{goal.title}</span>
+                      <span className="text-sm font-bold text-orange-600">
                         {goal.current} / {goal.target} {goal.unit}
                       </span>
                     </div>
-                    <Progress value={(goal.current / goal.target) * 100} className="h-2" />
+                    <div className="relative">
+                      <Progress value={(goal.current / goal.target) * 100} className="h-3 bg-white/50" />
+                      <div 
+                        className="absolute top-0 left-0 h-3 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min((goal.current / goal.target) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {Math.round((goal.current / goal.target) * 100)}% Complete
+                    </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
 
             {/* Skills Tracking */}
-            <Card className="bg-white/90 backdrop-blur-sm">
-              <CardHeader>
+            <Card className="bg-gradient-to-r from-purple-100 to-orange-100 border-0 shadow-xl">
+              <CardHeader className="bg-gradient-to-r from-purple-600 to-orange-500 text-white rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-purple-500" />
-                  Skills Progress
+                  <BarChart3 className="h-6 w-6" />
+                  Skills Development
                 </CardTitle>
+                <p className="text-white/90 text-sm">Your skill progress from enrolled courses</p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {skills.map(skill => (
-                  <div key={skill.id} className="space-y-2">
+              <CardContent className="p-6 space-y-6">
+                {skills.length > 0 ? skills.map(skill => (
+                  <div key={skill.id} className="space-y-3">
                     <div className="flex justify-between items-center">
                       <div>
-                        <span className="font-medium">{skill.name}</span>
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          Level {skill.level}
-                        </Badge>
+                        <span className="font-semibold text-gray-800">{skill.name}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-xs">
+                            Level {skill.level}
+                          </Badge>
+                          <span className="text-xs text-gray-500">{skill.courseTitle}</span>
+                        </div>
                       </div>
-                      <span className="text-sm text-gray-600">{skill.progress}%</span>
+                      <span className="text-sm font-bold text-purple-600">{skill.progress}%</span>
                     </div>
-                    <Progress value={skill.progress} className="h-2" />
+                    <div className="relative">
+                      <Progress value={skill.progress} className="h-3 bg-white/50" />
+                      <div 
+                        className="absolute top-0 left-0 h-3 bg-gradient-to-r from-purple-500 to-orange-500 rounded-full transition-all duration-500"
+                        style={{ width: `${skill.progress}%` }}
+                      />
+                    </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center py-4">
+                    <p className="text-gray-600">Enroll in courses to start tracking your skills!</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

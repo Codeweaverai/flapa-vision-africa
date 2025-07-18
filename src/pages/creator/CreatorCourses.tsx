@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -23,7 +24,9 @@ import {
   Play,
   Tag,
   Settings,
-  FileText
+  FileText,
+  Trash2,
+  Globe
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -31,6 +34,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import CoursePreviewDialog from '@/components/creator/CoursePreviewDialog';
 
 interface Course {
@@ -66,6 +79,8 @@ const CreatorCourses = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [previewCourseId, setPreviewCourseId] = useState<string | null>(null);
+  const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
+  const [publishingCourse, setPublishingCourse] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -89,46 +104,42 @@ const CreatorCourses = () => {
 
       setCourses(coursesData || []);
 
-      // Fetch stats for each course
+      // Fetch stats for each course efficiently
       const stats: Record<string, CourseStats> = {};
-      for (const course of coursesData || []) {
+      
+      // Use Promise.allSettled to handle potential errors gracefully
+      const statsPromises = (coursesData || []).map(async (course) => {
         try {
-          // Get enrollments count
-          const { count: enrollmentCount } = await supabase
-            .from('course_enrollments')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id);
+          const [enrollmentCount, payments, completionCount, reviews] = await Promise.all([
+            supabase
+              .from('course_enrollments')
+              .select('*', { count: 'exact', head: true })
+              .eq('course_id', course.id),
+            supabase
+              .from('course_enrollments')
+              .select('*')
+              .eq('course_id', course.id)
+              .eq('payment_status', 'completed'),
+            supabase
+              .from('course_progress')
+              .select('*', { count: 'exact', head: true })
+              .eq('course_id', course.id)
+              .eq('progress_percentage', 100),
+            supabase
+              .from('course_reviews')
+              .select('rating')
+              .eq('course_id', course.id)
+          ]);
 
-          // Get revenue (sum of payments for this course)
-          const { data: payments } = await supabase
-            .from('course_enrollments')
-            .select('*')
-            .eq('course_id', course.id)
-            .eq('payment_status', 'completed');
-
-          const revenue = payments?.reduce((sum, payment) => sum + (course.price || 0), 0) || 0;
-
-          // Get completions
-          const { count: completionCount } = await supabase
-            .from('course_progress')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id)
-            .eq('progress_percentage', 100);
-
-          // Get average rating
-          const { data: reviews } = await supabase
-            .from('course_reviews')
-            .select('rating')
-            .eq('course_id', course.id);
-
-          const avgRating = reviews && reviews.length > 0 
-            ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
+          const revenue = payments.data?.reduce((sum, payment) => sum + (course.price || 0), 0) || 0;
+          const avgRating = reviews.data && reviews.data.length > 0 
+            ? reviews.data.reduce((sum, review) => sum + review.rating, 0) / reviews.data.length 
             : 0;
 
           stats[course.id] = {
-            enrollments: enrollmentCount || 0,
+            enrollments: enrollmentCount.count || 0,
             revenue,
-            completions: completionCount || 0,
+            completions: completionCount.count || 0,
             averageRating: Math.round(avgRating * 10) / 10
           };
         } catch (error) {
@@ -140,14 +151,69 @@ const CreatorCourses = () => {
             averageRating: 0
           };
         }
-      }
+      });
 
+      await Promise.allSettled(statsPromises);
       setCourseStats(stats);
     } catch (error) {
       console.error('Error fetching courses:', error);
       toast.error('Failed to load courses');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePublishToggle = async (courseId: string, currentStatus: boolean) => {
+    setPublishingCourse(courseId);
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({ 
+          is_published: !currentStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      toast.success(currentStatus ? 'Course unpublished successfully!' : 'Course published successfully!');
+      fetchCourses();
+    } catch (error) {
+      console.error('Error updating course status:', error);
+      toast.error('Failed to update course status');
+    } finally {
+      setPublishingCourse(null);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    try {
+      // Check if course has enrollments
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('course_id', courseId);
+
+      if (enrollments && enrollments.length > 0) {
+        toast.error('Cannot delete course with existing enrollments');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId)
+        .eq('creator_id', user!.id);
+
+      if (error) throw error;
+
+      toast.success('Course deleted successfully!');
+      fetchCourses();
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast.error('Failed to delete course');
+    } finally {
+      setDeletingCourse(null);
     }
   };
 
@@ -228,9 +294,9 @@ const CreatorCourses = () => {
           </CardContent>
         </Card>
 
-        {/* Courses Grid */}
+        {/* Courses Grid - 3 courses per row */}
         {filteredCourses.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredCourses.map(course => {
               const stats = courseStats[course.id] || {
                 enrollments: 0,
@@ -240,25 +306,25 @@ const CreatorCourses = () => {
               };
 
               return (
-                <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <Card key={course.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 h-full flex flex-col">
                   <div className="relative">
                     {course.thumbnail_url ? (
                       <img
                         src={course.thumbnail_url}
                         alt={course.title}
-                        className="w-full h-48 object-cover"
+                        className="w-full h-56 object-cover"
                       />
                     ) : (
-                      <div className="w-full h-48 bg-gradient-to-r from-orange-200 to-purple-200 flex items-center justify-center">
-                        <BookOpen className="h-16 w-16 text-white/80" />
+                      <div className="w-full h-56 bg-gradient-to-r from-orange-200 to-purple-200 flex items-center justify-center">
+                        <BookOpen className="h-20 w-20 text-white/80" />
                       </div>
                     )}
-                    <div className="absolute top-2 left-2">
+                    <div className="absolute top-3 left-3">
                       <Badge variant={course.is_published ? "default" : "secondary"}>
                         {course.is_published ? 'Published' : 'Draft'}
                       </Badge>
                     </div>
-                    <div className="absolute top-2 right-2">
+                    <div className="absolute top-3 right-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="secondary" size="sm" className="bg-white/90 backdrop-blur-sm">
@@ -288,21 +354,28 @@ const CreatorCourses = () => {
                               Promo Codes
                             </Link>
                           </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => setDeletingCourse(course.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Course
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   </div>
 
-                  <CardHeader>
-                    <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                    <CardDescription className="line-clamp-3">
+                  <CardHeader className="flex-1">
+                    <CardTitle className="line-clamp-2 text-lg">{course.title}</CardTitle>
+                    <CardDescription className="line-clamp-3 text-sm">
                       {course.summary}
                     </CardDescription>
                   </CardHeader>
 
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 pt-0">
                     {/* Course Stats */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-blue-500" />
                         <span>{stats.enrollments} students</span>
@@ -322,27 +395,52 @@ const CreatorCourses = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      <Button asChild variant="outline" size="sm" className="flex-1">
-                        <Link to={`/creator/courses/${course.id}/edit`}>
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" size="sm" className="flex-1">
-                        <Link to={`/creator/courses/${course.id}/content`}>
-                          <FileText className="h-4 w-4 mr-1" />
-                          Content
-                        </Link>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setPreviewCourseId(course.id)}
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
-                      >
-                        <Play className="h-4 w-4" />
-                      </Button>
+                    <div className="space-y-3">
+                      {/* Primary Actions */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button asChild variant="outline" size="sm">
+                          <Link to={`/creator/courses/${course.id}/edit`}>
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Link>
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                          <Link to={`/creator/courses/${course.id}/content`}>
+                            <FileText className="h-4 w-4 mr-1" />
+                            Content
+                          </Link>
+                        </Button>
+                      </div>
+                      
+                      {/* Secondary Actions */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setPreviewCourseId(course.id)}
+                          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
+                        >
+                          <Play className="h-4 w-4 mr-1" />
+                          Preview
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePublishToggle(course.id, course.is_published)}
+                          disabled={publishingCourse === course.id}
+                          className={course.is_published 
+                            ? "bg-orange-500 hover:bg-orange-600 text-white border-0"
+                            : "bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white border-0"
+                          }
+                        >
+                          <Globe className="h-4 w-4 mr-1" />
+                          {publishingCourse === course.id 
+                            ? 'Updating...' 
+                            : course.is_published ? 'Unpublish' : 'Publish'
+                          }
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -385,6 +483,28 @@ const CreatorCourses = () => {
             }}
           />
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deletingCourse} onOpenChange={() => setDeletingCourse(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the course and all its content.
+                Note: Courses with existing enrollments cannot be deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingCourse && handleDeleteCourse(deletingCourse)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete Course
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </CreatorLayout>
   );

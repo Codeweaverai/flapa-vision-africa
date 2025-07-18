@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -37,35 +37,50 @@ const CreatorCourseEdit = () => {
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
 
-  useEffect(() => {
-    if (courseId && user) {
-      fetchCourse();
-    }
-  }, [courseId, user]);
+  const fetchCourse = useCallback(async () => {
+    if (!courseId || !user) return;
 
-  const fetchCourse = async () => {
     try {
+      if (initialLoad) {
+        setLoading(true);
+      }
+
       const { data, error } = await supabase
         .from('courses')
         .select('*')
         .eq('id', courseId)
-        .eq('creator_id', user!.id)
+        .eq('creator_id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          toast.error('Course not found or access denied');
+        } else {
+          toast.error('Failed to load course');
+        }
+        navigate('/creator/courses');
+        return;
+      }
+
       setCourse(data);
     } catch (error) {
       console.error('Error fetching course:', error);
-      toast.error('Failed to load course');
+      toast.error('An unexpected error occurred');
       navigate('/creator/courses');
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
-  };
+  }, [courseId, user, navigate, initialLoad]);
+
+  useEffect(() => {
+    fetchCourse();
+  }, [fetchCourse]);
 
   const handleSave = async () => {
-    if (!course) return;
+    if (!course || !courseId) return;
 
     setSaving(true);
     try {
@@ -85,7 +100,8 @@ const CreatorCourseEdit = () => {
           certificate_enabled: course.certificate_enabled,
           updated_at: new Date().toISOString()
         })
-        .eq('id', courseId);
+        .eq('id', courseId)
+        .eq('creator_id', user!.id);
 
       if (error) throw error;
 
@@ -99,16 +115,23 @@ const CreatorCourseEdit = () => {
     }
   };
 
-  const handleThumbnailUpload = (url: string, path: string) => {
+  const handleThumbnailUpload = useCallback((url: string, path: string) => {
     setCourse(prev => prev ? { ...prev, thumbnail_url: url } : null);
     toast.success('Thumbnail uploaded successfully!');
-  };
+  }, []);
+
+  const updateCourse = useCallback((updates: Partial<Course>) => {
+    setCourse(prev => prev ? { ...prev, ...updates } : null);
+  }, []);
 
   if (loading) {
     return (
       <CreatorLayout>
         <div className="flex justify-center items-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            <p className="text-muted-foreground">Loading course details...</p>
+          </div>
         </div>
       </CreatorLayout>
     );
@@ -137,7 +160,10 @@ const CreatorCourseEdit = () => {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Courses
             </Button>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Course</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Edit Course</h1>
+              <p className="text-muted-foreground">Update your course information</p>
+            </div>
           </div>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? (
@@ -160,14 +186,14 @@ const CreatorCourseEdit = () => {
                 <Input
                   id="title"
                   value={course.title}
-                  onChange={(e) => setCourse({ ...course, title: e.target.value })}
+                  onChange={(e) => updateCourse({ title: e.target.value })}
                   placeholder="Enter course title"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select value={course.category} onValueChange={(value) => setCourse({ ...course, category: value })}>
+                <Select value={course.category} onValueChange={(value) => updateCourse({ category: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -186,7 +212,7 @@ const CreatorCourseEdit = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="difficulty">Difficulty Level</Label>
-                <Select value={course.difficulty_level} onValueChange={(value) => setCourse({ ...course, difficulty_level: value })}>
+                <Select value={course.difficulty_level} onValueChange={(value) => updateCourse({ difficulty_level: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select difficulty" />
                   </SelectTrigger>
@@ -204,7 +230,7 @@ const CreatorCourseEdit = () => {
                   id="duration"
                   type="number"
                   value={course.duration_minutes}
-                  onChange={(e) => setCourse({ ...course, duration_minutes: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => updateCourse({ duration_minutes: parseInt(e.target.value) || 0 })}
                   placeholder="Duration in minutes"
                 />
               </div>
@@ -215,7 +241,7 @@ const CreatorCourseEdit = () => {
               <Textarea
                 id="summary"
                 value={course.summary}
-                onChange={(e) => setCourse({ ...course, summary: e.target.value })}
+                onChange={(e) => updateCourse({ summary: e.target.value })}
                 placeholder="Brief description of the course"
                 rows={3}
               />
@@ -226,7 +252,7 @@ const CreatorCourseEdit = () => {
               <Textarea
                 id="description"
                 value={course.description}
-                onChange={(e) => setCourse({ ...course, description: e.target.value })}
+                onChange={(e) => updateCourse({ description: e.target.value })}
                 placeholder="Detailed description of the course"
                 rows={5}
               />
@@ -249,7 +275,7 @@ const CreatorCourseEdit = () => {
                 <Switch
                   id="is_free"
                   checked={course.is_free}
-                  onCheckedChange={(checked) => setCourse({ ...course, is_free: checked, price: checked ? 0 : course.price })}
+                  onCheckedChange={(checked) => updateCourse({ is_free: checked, price: checked ? 0 : course.price })}
                 />
                 <Label htmlFor="is_free">Free Course</Label>
               </div>
@@ -262,7 +288,7 @@ const CreatorCourseEdit = () => {
                     type="number"
                     step="0.01"
                     value={course.price}
-                    onChange={(e) => setCourse({ ...course, price: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateCourse({ price: parseFloat(e.target.value) || 0 })}
                     placeholder="Course price"
                   />
                 </div>
@@ -273,7 +299,7 @@ const CreatorCourseEdit = () => {
               <Switch
                 id="certificate_enabled"
                 checked={course.certificate_enabled}
-                onCheckedChange={(checked) => setCourse({ ...course, certificate_enabled: checked })}
+                onCheckedChange={(checked) => updateCourse({ certificate_enabled: checked })}
               />
               <Label htmlFor="certificate_enabled">Enable Certificates</Label>
             </div>
@@ -282,7 +308,7 @@ const CreatorCourseEdit = () => {
               <Switch
                 id="is_published"
                 checked={course.is_published}
-                onCheckedChange={(checked) => setCourse({ ...course, is_published: checked })}
+                onCheckedChange={(checked) => updateCourse({ is_published: checked })}
               />
               <Label htmlFor="is_published">Publish Course</Label>
             </div>
