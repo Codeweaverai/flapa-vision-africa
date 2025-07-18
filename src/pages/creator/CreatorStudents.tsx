@@ -134,12 +134,22 @@ const CreatorStudents = () => {
           userProfiles = profiles || [];
         }
 
-        // Get auth users for emails
-        const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
-        if (usersError) {
-          console.error('Auth users error:', usersError);
-        } else {
-          authUsers = users?.filter(u => allUserIds.includes(u.id)) || [];
+        // Get auth users for emails using the service role
+        try {
+          const { data: authData, error: authError } = await supabase.rpc('get_user_emails', {
+            user_ids: allUserIds
+          });
+          
+          if (authError) {
+            console.error('Auth data error:', authError);
+            // Fallback: try to get from profiles if RPC doesn't work
+            authUsers = [];
+          } else {
+            authUsers = authData || [];
+          }
+        } catch (error) {
+          console.error('Error fetching auth users:', error);
+          authUsers = [];
         }
       }
       
@@ -150,7 +160,7 @@ const CreatorStudents = () => {
       const userMap = new Map();
       
       userProfiles.forEach(profile => {
-        const authUser = authUsers.find(u => u.id === profile.id);
+        const authUser = authUsers.find((u: any) => u.id === profile.id);
         userMap.set(profile.id, {
           id: profile.id,
           full_name: profile.full_name,
@@ -161,7 +171,7 @@ const CreatorStudents = () => {
       });
       
       // Add users who might not have profiles but have auth records
-      authUsers.forEach(authUser => {
+      authUsers.forEach((authUser: any) => {
         if (!userMap.has(authUser.id)) {
           userMap.set(authUser.id, {
             id: authUser.id,
@@ -185,7 +195,7 @@ const CreatorStudents = () => {
           course_id: enrollment.course_id,
           course_title: enrollment.courses?.title || 'Unnamed Course',
           enrollment_date: enrollment.enrollment_date,
-          progress: 0, // This would need to be calculated from course progress
+          progress: 0,
           is_completed: enrollment.is_completed || false,
           payment_status: enrollment.payment_status || 'pending'
         };
@@ -286,17 +296,14 @@ const CreatorStudents = () => {
     try {
       const doc = new jsPDF();
       
-      // Add title
       doc.setFontSize(18);
       doc.text(title, 14, 22);
       doc.setFontSize(12);
       doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 32);
       
-      // Prepare table data
       const headers = Object.keys(data[0] || {});
       const rows = data.map(item => headers.map(header => item[header]));
       
-      // Create table
       autoTable(doc, {
         head: [headers],
         body: rows,
@@ -569,7 +576,7 @@ const CreatorStudents = () => {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Event Registrations</CardTitle>
-                  <CardDescription>Students registered for your events</CardDescription>
+                  <CardDescription>People registered for your events</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <Button 
@@ -629,12 +636,8 @@ const CreatorStudents = () => {
                           <TableCell>{format(new Date(attendee.registration_date), 'PP')}</TableCell>
                           <TableCell>
                             <Badge 
-                              variant={attendee.status === 'confirmed' ? 'default' : 
-                                      attendee.status === 'cancelled' ? 'destructive' : 'outline'}
-                              className={
-                                attendee.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                                attendee.status === 'cancelled' ? 'bg-red-100 text-red-800' : ''
-                              }
+                              variant={attendee.status === 'confirmed' ? 'default' : 'outline'}
+                              className={attendee.status === 'confirmed' ? 'bg-green-100 text-green-800' : ''}
                             >
                               {attendee.status}
                             </Badge>

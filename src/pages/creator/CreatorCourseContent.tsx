@@ -88,21 +88,24 @@ const CreatorCourseContent = () => {
     try {
       const { data: examData, error } = await supabase
         .from('final_exams')
-        .select(`
-          *,
-          final_exam_questions(count)
-        `)
+        .select('*')
         .eq('course_id', courseId)
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Final exam query error:', error);
+        return;
       }
 
       if (examData) {
+        const { count } = await supabase
+          .from('final_exam_questions')
+          .select('*', { count: 'exact', head: true })
+          .eq('exam_id', examData.id);
+
         setFinalExam({
           ...examData,
-          question_count: examData.final_exam_questions?.[0]?.count || 0
+          question_count: count || 0
         });
       }
     } catch (error) {
