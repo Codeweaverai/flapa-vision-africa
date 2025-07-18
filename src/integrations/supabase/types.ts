@@ -3195,6 +3195,14 @@ export type Database = {
         Args: { ticket_id: string }
         Returns: number
       }
+      get_user_emails: {
+        Args: { user_ids: string[] }
+        Returns: {
+          id: string
+          email: string
+          created_at: string
+        }[]
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

@@ -11,8 +11,7 @@ import { Calendar, MapPin, Users, Clock, Search, Filter, Star, CalendarDays, His
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { format } from 'date-fns';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import Layout from '@/components/layout/Layout';
 
 interface Event {
   id: string;
@@ -247,25 +246,21 @@ const ExploreEventsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <div className="flex-1 bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
           <div className="container mx-auto px-4 py-8">
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           </div>
         </div>
-        <Footer />
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      
-      <div className="flex-1 bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
         <div className="container mx-auto px-4 py-8">
           {/* Header with Gradient */}
           <div className="text-center mb-8">
@@ -359,9 +354,7 @@ const ExploreEventsPage = () => {
           )}
         </div>
       </div>
-      
-      <Footer />
-    </div>
+    </Layout>
   );
 };
 

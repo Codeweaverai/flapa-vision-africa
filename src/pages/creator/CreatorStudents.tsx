@@ -142,10 +142,9 @@ const CreatorStudents = () => {
           
           if (authError) {
             console.error('Auth data error:', authError);
-            // Fallback: try to get from profiles if RPC doesn't work
             authUsers = [];
           } else {
-            authUsers = authData || [];
+            authUsers = Array.isArray(authData) ? authData : [];
           }
         } catch (error) {
           console.error('Error fetching auth users:', error);
