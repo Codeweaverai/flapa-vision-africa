@@ -50,10 +50,41 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({
         .from('lesson_transcripts')
         .select('*')
         .eq('lesson_id', lessonId)
-        .order('start_time', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setTranscripts(data || []);
+      
+      // Transform the database data to match our interface
+      const transformedTranscripts: TranscriptSegment[] = data?.map((item: any) => {
+        // Parse transcript_data if it's JSON, otherwise create segments from text
+        let segments: TranscriptSegment[] = [];
+        
+        if (item.transcript_data && typeof item.transcript_data === 'object') {
+          // If transcript_data contains segments
+          if (Array.isArray(item.transcript_data.segments)) {
+            segments = item.transcript_data.segments.map((seg: any, index: number) => ({
+              id: `${item.id}-${index}`,
+              start_time: seg.start_time || seg.start || 0,
+              end_time: seg.end_time || seg.end || 30,
+              text: seg.text || seg.content || '',
+              lesson_id: lessonId
+            }));
+          } else if (item.transcript_data.text) {
+            // Single text block - create one segment
+            segments = [{
+              id: item.id,
+              start_time: 0,
+              end_time: 300, // Default 5 minutes
+              text: item.transcript_data.text,
+              lesson_id: lessonId
+            }];
+          }
+        }
+        
+        return segments;
+      }).flat() || [];
+      
+      setTranscripts(transformedTranscripts);
     } catch (error) {
       console.error('Error fetching transcripts:', error);
       // Don't show error toast for missing transcripts as it's optional

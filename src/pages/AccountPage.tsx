@@ -26,12 +26,18 @@ interface ProfileData {
   role: string;
 }
 
+interface CreatorStats {
+  courses: number;
+  events: number;
+}
+
 const AccountPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [enablingCreator, setEnablingCreator] = useState(false);
+  const [creatorStats, setCreatorStats] = useState<CreatorStats>({ courses: 0, events: 0 });
   const [profile, setProfile] = useState<ProfileData>({
     id: '',
     username: '',
@@ -71,6 +77,11 @@ const AccountPage = () => {
             is_creator: data.is_creator || false,
             role: data.role || 'user'
           });
+
+          // Fetch creator stats if user is a creator
+          if (data.is_creator) {
+            await fetchCreatorStats(data.id);
+          }
         }
       } catch (error) {
         console.error('Error:', error);
@@ -81,6 +92,29 @@ const AccountPage = () => {
 
     fetchProfile();
   }, [user]);
+
+  const fetchCreatorStats = async (userId: string) => {
+    try {
+      // Fetch courses count
+      const { count: coursesCount } = await supabase
+        .from('courses')
+        .select('*', { count: 'exact', head: true })
+        .eq('creator_id', userId);
+
+      // Fetch events count
+      const { count: eventsCount } = await supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .eq('creator_id', userId);
+
+      setCreatorStats({
+        courses: coursesCount || 0,
+        events: eventsCount || 0
+      });
+    } catch (error) {
+      console.error('Error fetching creator stats:', error);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -342,11 +376,11 @@ const AccountPage = () => {
                       
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-background/50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold">0</div>
+                          <div className="text-2xl font-bold">{creatorStats.courses}</div>
                           <div className="text-xs text-muted-foreground">Courses</div>
                         </div>
                         <div className="bg-background/50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold">0</div>
+                          <div className="text-2xl font-bold">{creatorStats.events}</div>
                           <div className="text-xs text-muted-foreground">Events</div>
                         </div>
                       </div>
