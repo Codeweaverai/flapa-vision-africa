@@ -33,8 +33,7 @@ interface Lesson {
   title: string;
   description?: string;
   video_url?: string;
-  content?: string;
-  duration_minutes?: number;
+  content?: string | null;
   is_completed: boolean;
   last_position_seconds?: number;
 }
@@ -63,12 +62,15 @@ const CourseLearningPage = () => {
   const [showFinalExam, setShowFinalExam] = useState(false);
   const [examResult, setExamResult] = useState<any>(null);
   const [showExamResults, setShowExamResults] = useState(false);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
 
   const navigate = useNavigate();
   const { user } = useAuth();
   const { courseId } = useParams();
-  const videoRef = useRef<HTMLVideoElement>(null);
   const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
+
+  console.log('Extracted courseId:', courseId);
+  console.log('All URL params:', useParams());
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -135,12 +137,21 @@ const CourseLearningPage = () => {
               title: lesson.title,
               description: lesson.description,
               video_url: lesson.video_url,
-              content: lesson.content,
-              duration_minutes: 10, // Default duration
+              content: typeof lesson.content === 'string' ? lesson.content : lesson.content ? JSON.stringify(lesson.content) : null,
               is_completed: progressData?.find(p => p.lesson_id === lesson.id)?.is_completed || false,
               last_position_seconds: progressData?.find(p => p.lesson_id === lesson.id)?.last_position_seconds || 0
             }))
         }));
+
+        // Set initial lesson - first incomplete or first lesson
+        const allLessons = modules.flatMap(m => m.lessons);
+        const firstIncompleteLesson = allLessons.find(lesson => !lesson.is_completed);
+        const lessonToShow = firstIncompleteLesson || allLessons[0];
+        
+        if (lessonToShow) {
+          setCurrentLesson(lessonToShow);
+          setCurrentVideoTime(lessonToShow.last_position_seconds || 0);
+        }
 
         // Check for final exam
         const { data: finalExamData } = await supabase
@@ -158,14 +169,6 @@ const CourseLearningPage = () => {
           final_exam: finalExamData
         });
 
-        // Set initial lesson - first incomplete or first lesson
-        const allLessons = modules.flatMap(m => m.lessons);
-        const firstIncompleteLesson = allLessons.find(lesson => !lesson.is_completed);
-        const lessonToShow = firstIncompleteLesson || allLessons[0];
-        
-        if (lessonToShow) {
-          setCurrentLesson(lessonToShow);
-        }
       } catch (error: any) {
         console.error("Error loading course:", error);
         toast.error(error.message || "Failed to load course data");
@@ -180,6 +183,8 @@ const CourseLearningPage = () => {
 
   const handleVideoTimeUpdate = (currentTime: number, duration: number) => {
     if (!currentLesson || !enrollmentId) return;
+
+    setCurrentVideoTime(currentTime);
 
     // Save progress every 10 seconds
     if (progressSaveInterval.current) {
@@ -270,6 +275,7 @@ const CourseLearningPage = () => {
       const nextLesson = allLessons[currentIndex + 1];
       setCurrentLesson(nextLesson);
       setActiveTab('content');
+      setCurrentVideoTime(nextLesson.last_position_seconds || 0);
     }
   };
 
@@ -283,7 +289,14 @@ const CourseLearningPage = () => {
       const previousLesson = allLessons[currentIndex - 1];
       setCurrentLesson(previousLesson);
       setActiveTab('content');
+      setCurrentVideoTime(previousLesson.last_position_seconds || 0);
     }
+  };
+
+  const handleLessonSelect = (lesson: Lesson) => {
+    setCurrentLesson(lesson);
+    setActiveTab('content');
+    setCurrentVideoTime(lesson.last_position_seconds || 0);
   };
 
   const calculateProgress = () => {
@@ -315,6 +328,12 @@ const CourseLearningPage = () => {
     setShowExamResults(true);
   };
 
+  const handleVideoEnded = async () => {
+    if (currentLesson && !currentLesson.is_completed) {
+      await markLessonAsCompleted(currentLesson.id);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -334,7 +353,7 @@ const CourseLearningPage = () => {
         <div className="container py-16 text-center">
           <h2 className="text-2xl font-bold mb-2">Course not found</h2>
           <p className="mb-6 text-muted-foreground">The course you're looking for doesn't exist or you don't have access to it.</p>
-          <Button onClick={() => navigate('/courses')}>
+          <Button onClick={() => navigate('/learning')}>
             Browse Courses
           </Button>
         </div>
@@ -385,10 +404,7 @@ const CourseLearningPage = () => {
                         {module.lessons.map((lesson, lessonIndex) => (
                           <button
                             key={lesson.id}
-                            onClick={() => {
-                              setCurrentLesson(lesson);
-                              setActiveTab('content');
-                            }}
+                            onClick={() => handleLessonSelect(lesson)}
                             className={`w-full text-left p-3 rounded-md border transition-colors ${
                               currentLesson?.id === lesson.id
                                 ? 'bg-primary text-primary-foreground border-primary'
@@ -404,9 +420,7 @@ const CourseLearningPage = () => {
                                   <p className="font-medium text-sm">{lesson.title}</p>
                                   <div className="flex items-center gap-2 mt-1">
                                     <Clock className="h-3 w-3 opacity-60" />
-                                    <span className="text-xs opacity-60">
-                                      {lesson.duration_minutes || 10} min
-                                    </span>
+                                    <span className="text-xs opacity-60">10 min</span>
                                   </div>
                                 </div>
                               </div>
@@ -509,8 +523,7 @@ const CourseLearningPage = () => {
                         <VideoPlayer
                           src={currentLesson.video_url}
                           onTimeUpdate={handleVideoTimeUpdate}
-                          onEnded={() => markLessonAsCompleted(currentLesson.id)}
-                          startTime={currentLesson.last_position_seconds || 0}
+                          onEnded={handleVideoEnded}
                           controls={true}
                         />
                       </div>
@@ -594,7 +607,6 @@ const CourseLearningPage = () => {
             onClose={() => setShowFinalExam(false)}
             exam={course.final_exam}
             enrollmentId={enrollmentId}
-            onComplete={handleExamComplete}
           />
         )}
 
@@ -603,7 +615,7 @@ const CourseLearningPage = () => {
           <FinalExamResultsModal
             isOpen={showExamResults}
             onClose={() => setShowExamResults(false)}
-            result={examResult}
+            examResult={examResult}
             courseTitle={course.title}
           />
         )}
