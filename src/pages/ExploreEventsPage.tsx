@@ -232,7 +232,7 @@ const ExploreEventsPage = () => {
                 className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-md"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/events/${event.id}`);
+                  navigate(`/event-detail/${event.id}`);
                 }}
               >
                 View Details
