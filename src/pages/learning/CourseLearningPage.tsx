@@ -615,8 +615,17 @@ const CourseLearningPage = () => {
           <FinalExamResultsModal
             isOpen={showExamResults}
             onClose={() => setShowExamResults(false)}
-            examResult={examResult}
-            courseTitle={course.title}
+            examScore={examResult.score}
+            quizScores={examResult.quizScores || []}
+            finalGrade={examResult.finalGrade}
+            passed={examResult.passed}
+            courseName={course.title}
+            studentName={user?.user_metadata?.full_name || user?.email || 'Student'}
+            enrollmentId={enrollmentId || ''}
+            onRetake={() => {
+              setShowExamResults(false);
+              setShowFinalExam(true);
+            }}
           />
         )}
       </div>
