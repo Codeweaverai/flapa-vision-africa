@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -80,8 +81,7 @@ const CourseLearningPage = () => {
           .select(`
             id,
             title,
-            description,
-            final_exam
+            description
           `)
           .eq('id', courseId)
           .single();
@@ -91,14 +91,16 @@ const CourseLearningPage = () => {
         const { data: modulesData, error: modulesError } = await supabase
           .from('course_modules')
           .select('id, title, description')
-          .eq('course_id', courseId);
+          .eq('course_id', courseId)
+          .order('order_index');
 
         if (modulesError) throw modulesError;
 
         const { data: lessonsData, error: lessonsError } = await supabase
           .from('lessons')
-          .select('id, title, description, video_url, content, duration_minutes')
-          .in('module_id', modulesData.map(m => m.id));
+          .select('id, title, description, video_url, content, module_id')
+          .in('module_id', modulesData.map(m => m.id))
+          .order('order_index');
 
         if (lessonsError) throw lessonsError;
 
@@ -134,23 +136,35 @@ const CourseLearningPage = () => {
               description: lesson.description,
               video_url: lesson.video_url,
               content: lesson.content,
-              duration_minutes: lesson.duration_minutes,
+              duration_minutes: 10, // Default duration
               is_completed: progressData?.find(p => p.lesson_id === lesson.id)?.is_completed || false,
               last_position_seconds: progressData?.find(p => p.lesson_id === lesson.id)?.last_position_seconds || 0
             }))
         }));
+
+        // Check for final exam
+        const { data: finalExamData } = await supabase
+          .from('final_exams')
+          .select('*')
+          .eq('course_id', courseId)
+          .eq('is_published', true)
+          .single();
 
         setCourse({
           id: courseData.id,
           title: courseData.title,
           description: courseData.description,
           modules: modules,
-          final_exam: courseData.final_exam
+          final_exam: finalExamData
         });
 
-        // Set initial lesson
-        if (modules.length > 0 && modules[0].lessons.length > 0) {
-          setCurrentLesson(modules[0].lessons[0]);
+        // Set initial lesson - first incomplete or first lesson
+        const allLessons = modules.flatMap(m => m.lessons);
+        const firstIncompleteLesson = allLessons.find(lesson => !lesson.is_completed);
+        const lessonToShow = firstIncompleteLesson || allLessons[0];
+        
+        if (lessonToShow) {
+          setCurrentLesson(lessonToShow);
         }
       } catch (error: any) {
         console.error("Error loading course:", error);
@@ -174,7 +188,7 @@ const CourseLearningPage = () => {
 
     progressSaveInterval.current = setTimeout(() => {
       saveVideoProgress(currentLesson.id, enrollmentId, currentTime, duration);
-    }, 1000);
+    }, 10000);
 
     // Check if lesson should be marked as completed (95% watched)
     const completionThreshold = duration * 0.95;
@@ -295,6 +309,12 @@ const CourseLearningPage = () => {
     setShowFinalExam(true);
   };
 
+  const handleExamComplete = (result: any) => {
+    setShowFinalExam(false);
+    setExamResult(result);
+    setShowExamResults(true);
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -401,33 +421,48 @@ const CourseLearningPage = () => {
                   ))}
 
                   {/* Final Exam Section */}
-                  <div className="pt-4 border-t">
-                    <button
-                      onClick={handleTakeFinalExam}
-                      disabled={!allLessonsCompleted}
-                      className={`w-full text-left p-3 rounded-md border transition-colors ${
-                        allLessonsCompleted
-                          ? 'hover:bg-muted border-border'
-                          : 'opacity-50 cursor-not-allowed border-border'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {allLessonsCompleted ? (
-                            <Award className="h-4 w-4 text-yellow-500" />
-                          ) : (
-                            <Lock className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <div>
-                            <p className="font-medium text-sm">Final Exam</p>
-                            <p className="text-xs text-muted-foreground">
-                              {allLessonsCompleted ? 'Ready to take' : 'Complete all lessons first'}
-                            </p>
+                  {course.final_exam && (
+                    <div className="pt-4 border-t">
+                      <button
+                        onClick={handleTakeFinalExam}
+                        disabled={!allLessonsCompleted}
+                        className={`w-full text-left p-3 rounded-md border transition-colors ${
+                          allLessonsCompleted
+                            ? 'hover:bg-muted border-border'
+                            : 'opacity-50 cursor-not-allowed border-border'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {allLessonsCompleted ? (
+                              <Award className="h-4 w-4 text-yellow-500" />
+                            ) : (
+                              <Lock className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <div>
+                              <p className="font-medium text-sm">Final Exam</p>
+                              <p className="text-xs text-muted-foreground">
+                                {allLessonsCompleted ? 'Ready to take' : 'Complete all lessons first'}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  </div>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Show Take Final Exam button when all lessons completed */}
+                  {allLessonsCompleted && course.final_exam && (
+                    <div className="pt-4">
+                      <Button 
+                        onClick={handleTakeFinalExam}
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                      >
+                        <Award className="mr-2 h-4 w-4" />
+                        Take Final Exam
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Lesson Navigation */}
                   <div className="flex gap-2 pt-4 border-t">
@@ -443,7 +478,13 @@ const CourseLearningPage = () => {
                     </Button>
                     <Button
                       size="sm"
-                      onClick={goToNextLesson}
+                      onClick={() => {
+                        if (currentLesson && !currentLesson.is_completed) {
+                          markLessonAsCompleted(currentLesson.id);
+                        } else {
+                          goToNextLesson();
+                        }
+                      }}
                       disabled={!currentLesson || course.modules.flatMap(m => m.lessons).findIndex(l => l.id === currentLesson.id) >= course.modules.flatMap(m => m.lessons).length - 1}
                       className="flex-1"
                     >
@@ -466,7 +507,6 @@ const CourseLearningPage = () => {
                     <CardContent className="p-0">
                       <div className="aspect-video bg-black rounded-lg overflow-hidden">
                         <VideoPlayer
-                          ref={videoRef}
                           src={currentLesson.video_url}
                           onTimeUpdate={handleVideoTimeUpdate}
                           onEnded={() => markLessonAsCompleted(currentLesson.id)}
@@ -527,7 +567,6 @@ const CourseLearningPage = () => {
                       <TabsContent value="transcripts" className="p-6">
                         <VideoTranscripts 
                           lessonId={currentLesson.id}
-                          videoRef={videoRef}
                         />
                       </TabsContent>
                     )}
@@ -549,25 +588,23 @@ const CourseLearningPage = () => {
         </div>
 
         {/* Final Exam Modal */}
-        {showFinalExam && course.final_exam && (
+        {showFinalExam && course.final_exam && enrollmentId && (
           <FinalExamModal
-            exam={course.final_exam}
-            courseId={courseId!}
+            isOpen={showFinalExam}
             onClose={() => setShowFinalExam(false)}
-            onComplete={(examResult) => {
-              setShowFinalExam(false);
-              setExamResult(examResult);
-              setShowExamResults(true);
-            }}
+            exam={course.final_exam}
+            enrollmentId={enrollmentId}
+            onComplete={handleExamComplete}
           />
         )}
 
         {/* Exam Results Modal */}
         {showExamResults && examResult && (
           <FinalExamResultsModal
-            examResult={examResult}
-            courseTitle={course.title}
+            isOpen={showExamResults}
             onClose={() => setShowExamResults(false)}
+            result={examResult}
+            courseTitle={course.title}
           />
         )}
       </div>
