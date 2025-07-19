@@ -195,7 +195,7 @@ const CreatorEvents = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/creator/events/edit/${event.id}`)}
+                    onClick={() => navigate(`/creator/events/${event.id}/edit`)}
                   >
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
@@ -203,7 +203,7 @@ const CreatorEvents = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/event/${event.id}`)}
+                    onClick={() => navigate(`/event-detail/${event.id}`)}
                   >
                     <Eye className="h-4 w-4 mr-1" />
                     View
@@ -211,7 +211,7 @@ const CreatorEvents = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/creator/events/registrations/${event.id}`)}
+                    onClick={() => navigate(`/creator/events/${event.id}/registrations`)}
                   >
                     <UserCheck className="h-4 w-4 mr-1" />
                     Registrations
