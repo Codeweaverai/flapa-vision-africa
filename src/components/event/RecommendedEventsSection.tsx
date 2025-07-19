@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -203,78 +204,98 @@ const RecommendedEventsSection: React.FC<RecommendedEventsSectionProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {recommendedEvents.map((event) => (
-            <Card key={event.id} className="h-full bg-white/80 backdrop-blur-sm border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <div className="relative">
+            <Card key={event.id} className="group overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 border-0 hover:scale-[1.02]">
+              <div className="relative overflow-hidden">
                 {event.image_url ? (
                   <img
                     src={event.image_url}
                     alt={event.title}
-                    className="w-full h-48 object-cover rounded-t-lg"
+                    className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 ) : (
-                  <div className="w-full h-48 bg-gradient-to-br from-orange-400 to-purple-600 rounded-t-lg flex items-center justify-center">
-                    <Calendar className="h-16 w-16 text-white" />
+                  <div className="w-full h-56 bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center">
+                    <Calendar className="h-20 w-20 text-white opacity-80" />
                   </div>
                 )}
-                <Badge className={`absolute top-3 left-3 ${
-                  event.is_free 
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600' 
-                    : 'bg-gradient-to-r from-orange-500 to-purple-600'
-                }`}>
-                  {event.is_free ? "Free" : (
-                    <PriceDisplay 
-                      amount={event.price || 0} 
-                      originalCurrency={getCurrencyCode(event.currency)} 
-                    />
-                  )}
-                </Badge>
+                
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                
+                {/* Price badge */}
+                <div className="absolute top-4 left-4">
+                  <Badge className={`px-3 py-1 text-sm font-semibold shadow-lg ${
+                    event.is_free 
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-0' 
+                      : 'bg-orange-500 hover:bg-orange-600 text-white border-0'
+                  }`}>
+                    {event.is_free ? "Free" : (
+                      <PriceDisplay 
+                        amount={event.price || 0} 
+                        originalCurrency={getCurrencyCode(event.currency)} 
+                      />
+                    )}
+                  </Badge>
+                </div>
+
+                {/* Event type badge */}
+                <div className="absolute top-4 right-4">
+                  <Badge variant="secondary" className="bg-white/20 backdrop-blur-sm text-white border-white/20 hover:bg-white/30">
+                    {event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1)}
+                  </Badge>
+                </div>
+
+                {/* Bottom overlay content */}
+                <div className="absolute bottom-4 left-4 right-4 text-white">
+                  <div className="flex items-center gap-2 text-sm mb-2">
+                    <Calendar className="h-4 w-4" />
+                    <span className="font-medium">{format(parseISO(event.start_time), 'MMM d, yyyy')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4" />
+                    <span>{format(parseISO(event.start_time), 'h:mm a')}</span>
+                  </div>
+                </div>
               </div>
               
               <CardContent className="p-6">
-                <div className="mb-3">
-                  <Badge variant="outline" className="text-xs mb-2">
-                    {event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1)}
-                  </Badge>
-                  <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-800">
+                <div className="mb-4">
+                  <h3 className="font-bold text-xl mb-3 text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
                     {event.title}
                   </h3>
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                  <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed mb-3">
                     {event.description}
                   </p>
-                  <p className="text-xs text-purple-600 mb-3">
-                    by {event.creator_name}
-                  </p>
+                  <div className="flex items-center gap-2 text-sm text-purple-600 mb-4">
+                    <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                    <span className="font-medium">by {event.creator_name}</span>
+                  </div>
                 </div>
                 
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar className="h-4 w-4 text-orange-500" />
-                    <span>{format(parseISO(event.start_time), 'MMM d, yyyy')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Clock className="h-4 w-4 text-purple-500" />
-                    <span>{format(parseISO(event.start_time), 'h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}</span>
-                  </div>
+                <div className="space-y-3 mb-6">
                   {event.location && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MapPin className="h-4 w-4 text-blue-500" />
-                      <span className="line-clamp-1">{event.location}</span>
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm line-clamp-1 flex-1">{event.location}</span>
                     </div>
                   )}
                   {event.capacity && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Users className="h-4 w-4 text-green-500" />
-                      <span>{event.capacity} max attendees</span>
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
+                        <Users className="h-4 w-4 text-green-600" />
+                      </div>
+                      <span className="text-sm">{event.capacity} max attendees</span>
                     </div>
                   )}
                 </div>
                 
-                <Button asChild className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                <Button asChild className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group">
                   <Link to={`/event-detail/${event.id}`} className="flex items-center justify-center gap-2">
-                    View Event
-                    <ArrowRight className="h-4 w-4" />
+                    View Event Details
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </Button>
               </CardContent>
@@ -282,10 +303,11 @@ const RecommendedEventsSection: React.FC<RecommendedEventsSectionProps> = ({
           ))}
         </div>
 
-        <div className="text-center mt-8">
-          <Button asChild variant="outline" className="border-purple-200 text-purple-600 hover:bg-purple-50">
-            <Link to="/events">
-              View All Events
+        <div className="text-center mt-12">
+          <Button asChild size="lg" className="bg-white text-purple-600 border-2 border-purple-200 hover:bg-purple-50 hover:border-purple-300 font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
+            <Link to="/events" className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Explore All Events
             </Link>
           </Button>
         </div>
