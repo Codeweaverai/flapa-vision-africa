@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +29,8 @@ import {
   Linkedin,
   MessageSquare,
   ExternalLink,
-  Twitter
+  Twitter,
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -612,30 +612,97 @@ const EventDetailPage = () => {
                 </Card>
               )}
 
-              {/* Recommended Events */}
+              {/* Recommended Events - Updated Design */}
               {recommendedEvents.length > 0 && (
                 <Card className="shadow-lg">
                   <CardHeader>
-                    <CardTitle>Recommended Events</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-orange-500" />
+                      You might also like
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {recommendedEvents.map((recEvent) => (
-                        <div key={recEvent.id} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
-                             onClick={() => navigate(`/event-detail/${event.id}`)}>
-                          {recEvent.image_url && (
-                            <img
-                              src={recEvent.image_url}
-                              alt={recEvent.title}
-                              className="w-full h-32 object-cover rounded mb-2"
-                            />
-                          )}
-                          <h5 className="font-medium text-sm mb-1">{recEvent.title}</h5>
-                          <p className="text-xs text-gray-600">
-                            {format(new Date(recEvent.start_time), 'MMM d, yyyy')}
-                          </p>
-                        </div>
+                        <Card key={recEvent.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-purple-200 hover:border-purple-300 overflow-hidden cursor-pointer"
+                              onClick={() => navigate(`/event-detail/${recEvent.id}`)}>
+                          <div className="relative h-48 overflow-hidden">
+                            {recEvent.image_url ? (
+                              <img
+                                src={recEvent.image_url}
+                                alt={recEvent.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center">
+                                <Calendar className="h-16 w-16 text-white opacity-80" />
+                              </div>
+                            )}
+                            <div className="absolute top-3 left-3">
+                              <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                                {recEvent.event_type}
+                              </Badge>
+                            </div>
+                            <div className="absolute top-3 right-3">
+                              {recEvent.is_free ? (
+                                <Badge className="bg-green-100 text-green-800 border-green-200">
+                                  Free
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                  <PriceDisplay amount={recEvent.price} originalCurrency={getCurrencyCode(recEvent.currency)} />
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <CardContent className="p-4">
+                            <h3 className="font-semibold text-lg mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
+                              {recEvent.title}
+                            </h3>
+                            <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                              {recEvent.description}
+                            </p>
+                            
+                            <div className="space-y-2 mb-4">
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Calendar className="h-4 w-4 text-orange-500" />
+                                <span>{format(new Date(recEvent.start_time), 'MMM d, yyyy')}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Clock className="h-4 w-4 text-purple-500" />
+                                <span>{format(new Date(recEvent.start_time), 'h:mm a')}</span>
+                              </div>
+                              {recEvent.location && (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <MapPin className="h-4 w-4 text-blue-500" />
+                                  <span className="line-clamp-1">{recEvent.location}</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {recEvent.is_free ? (
+                                  <span className="text-green-600 font-semibold">Free Event</span>
+                                ) : (
+                                  <span className="text-orange-600 font-semibold">
+                                    <PriceDisplay amount={recEvent.price} originalCurrency={getCurrencyCode(recEvent.currency)} />
+                                  </span>
+                                )}
+                              </div>
+                              <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+                            </div>
+                          </CardContent>
+                        </Card>
                       ))}
+                    </div>
+                    
+                    <div className="text-center mt-6">
+                      <Button variant="outline" className="border-purple-200 text-purple-600 hover:bg-purple-50" onClick={() => navigate('/events')}>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        View All Events
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
