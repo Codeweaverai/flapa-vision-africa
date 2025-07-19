@@ -7,35 +7,64 @@ import { toast } from 'sonner';
 import { Book, Play } from 'lucide-react';
 
 interface TranscriptSegment {
-  start: number;
-  end: number;
+  id: string;
+  start_time: number;
+  end_time: number;
   text: string;
+  lesson_id: string;
 }
 
 interface VideoTranscriptsProps {
   lessonId: string;
   onSeekTo?: (time: number) => void;
+  currentTime?: number;
 }
 
-const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({ lessonId, onSeekTo }) => {
-  const [transcript, setTranscript] = useState<TranscriptSegment[]>([]);
+const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({ 
+  lessonId, 
+  onSeekTo, 
+  currentTime = 0 
+}) => {
+  const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (lessonId) {
-      fetchTranscript();
+      fetchTranscripts();
     }
   }, [lessonId]);
 
-  const fetchTranscript = async () => {
+  useEffect(() => {
+    // Find active segment based on current video time
+    const activeSegment = transcripts.find(segment => 
+      currentTime >= segment.start_time && currentTime <= segment.end_time
+    );
+    setActiveSegmentId(activeSegment?.id || null);
+  }, [currentTime, transcripts]);
+
+  const fetchTranscripts = async () => {
     try {
-      // Since we don't have lesson_transcripts table, we'll use placeholder data
-      setTranscript([]);
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('lesson_transcripts')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+      setTranscripts(data || []);
     } catch (error) {
-      console.error('Error fetching transcript:', error);
-      toast.error('Failed to load transcript');
+      console.error('Error fetching transcripts:', error);
+      // Don't show error toast for missing transcripts as it's optional
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSeekTo = (time: number) => {
+    if (onSeekTo) {
+      onSeekTo(time);
     }
   };
 
@@ -56,6 +85,25 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({ lessonId, onSeekTo 
     );
   }
 
+  if (!transcripts.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Book className="h-5 w-5 text-orange-500" />
+            Video Transcript
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <Book className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">No transcript available for this lesson</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -64,10 +112,37 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({ lessonId, onSeekTo 
           Video Transcript
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="text-center py-8">
-          <Book className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-500">No transcript available for this lesson</p>
+      <CardContent className="max-h-96 overflow-y-auto">
+        <div className="space-y-2">
+          {transcripts.map((segment) => (
+            <div
+              key={segment.id}
+              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                activeSegmentId === segment.id
+                  ? 'bg-orange-50 border-orange-200 text-orange-900'
+                  : 'hover:bg-gray-50 border-gray-200'
+              }`}
+              onClick={() => handleSeekTo(segment.start_time)}
+            >
+              <div className="flex items-start gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs font-mono"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSeekTo(segment.start_time);
+                  }}
+                >
+                  <Play className="h-3 w-3 mr-1" />
+                  {formatTime(segment.start_time)}
+                </Button>
+                <p className="text-sm leading-relaxed flex-1">
+                  {segment.text}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

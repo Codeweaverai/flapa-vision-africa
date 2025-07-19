@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,8 @@ import CourseReviews from '@/components/course/CourseReviews';
 import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
 import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
+import VideoPlayer from '@/components/video/VideoPlayer';
+import VideoTranscripts from '@/components/course/VideoTranscripts';
 
 interface Course {
   id?: string;
@@ -142,6 +144,8 @@ interface Profile {
 const CourseLearningPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [enrollment, setEnrollment] = useState<CourseEnrollment | null>(null);
@@ -157,6 +161,9 @@ const CourseLearningPage = () => {
   const [showExamModal, setShowExamModal] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('content');
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [videoPlayerRef, setVideoPlayerRef] = useState<any>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -206,6 +213,19 @@ const CourseLearningPage = () => {
       // Update local state
       if (isCompleted) {
         setCompletedLessons(prev => [...new Set([...prev, lessonId])]);
+        
+        // Auto-transition to next lesson
+        const allLessons = modules.flatMap(m => m.lessons);
+        const currentIndex = allLessons.findIndex(l => l.id === lessonId);
+        if (currentIndex >= 0 && currentIndex < allLessons.length - 1) {
+          const nextLesson = allLessons[currentIndex + 1];
+          setTimeout(() => {
+            handleLessonSelect(nextLesson);
+            toast.success('Moving to next lesson!');
+          }, 1500);
+        } else {
+          toast.success('Course completed! 🎉');
+        }
       }
 
       // Update course progress
@@ -270,8 +290,7 @@ const CourseLearningPage = () => {
     }
     
     setCurrentLessonId(lesson.id);
-    // Navigate to lesson player
-    window.location.href = `/course/${courseId}/lesson/${lesson.id}`;
+    setActiveTab('content'); // Switch to content tab when selecting lesson
   };
 
   const handleNextLesson = () => {
@@ -283,10 +302,11 @@ const CourseLearningPage = () => {
     if (currentIndex < allLessons.length - 1) {
       // Mark current lesson as complete
       updateLessonProgress(currentLessonId, true);
-      
-      // Move to next lesson
-      const nextLesson = allLessons[currentIndex + 1];
-      handleLessonSelect(nextLesson);
+    } else {
+      // All lessons completed, show final exam if available
+      if (finalExam && progressPercentage >= 100) {
+        setShowExamModal(true);
+      }
     }
   };
 
@@ -301,6 +321,31 @@ const CourseLearningPage = () => {
       handleLessonSelect(previousLesson);
     }
   };
+
+  const handleVideoTimeUpdate = (currentTime: number, duration: number, percent: number) => {
+    setCurrentVideoTime(currentTime);
+    
+    // Auto-mark lesson as complete when video reaches 95%
+    if (percent >= 0.95 && currentLessonId && !completedLessons.includes(currentLessonId)) {
+      updateLessonProgress(currentLessonId, true);
+    }
+  };
+
+  const handleVideoSeek = (time: number) => {
+    if (videoPlayerRef && videoPlayerRef.currentTime) {
+      videoPlayerRef.currentTime(time);
+    }
+  };
+
+  // Set first lesson as current when course loads
+  useEffect(() => {
+    if (modules.length > 0 && !currentLessonId) {
+      const firstLesson = modules[0]?.lessons[0];
+      if (firstLesson) {
+        setCurrentLessonId(firstLesson.id);
+      }
+    }
+  }, [modules, currentLessonId]);
 
   const fetchCourseData = async () => {
     setLoading(true);
@@ -569,6 +614,11 @@ const CourseLearningPage = () => {
     );
   }
 
+  const isAllLessonsCompleted = modules.length > 0 && 
+    modules.every(module => 
+      module.lessons.every(lesson => completedLessons.includes(lesson.id))
+    );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <div className="container mx-auto px-4 py-8">
@@ -683,7 +733,7 @@ const CourseLearningPage = () => {
                               disabled={!isUnlocked}
                               className={`w-full text-left p-3 rounded-md border transition-colors ${
                                 isCurrent
-                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  ? 'bg-primary text-primary-foreground border-primary shadow-md'
                                   : isUnlocked
                                   ? 'hover:bg-muted border-border'
                                   : 'opacity-50 cursor-not-allowed border-border bg-muted'
@@ -703,7 +753,7 @@ const CourseLearningPage = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {isCompleted && (
-                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                    <CheckCircle className="h-5 w-5 text-green-500" />
                                   )}
                                   {!isUnlocked && (
                                     <Lock className="h-4 w-4 text-gray-400" />
@@ -728,6 +778,11 @@ const CourseLearningPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={handlePreviousLesson}
+                      disabled={(() => {
+                        const allLessons = modules.flatMap(m => m.lessons);
+                        const currentIndex = allLessons.findIndex(l => l.id === currentLessonId);
+                        return !(currentIndex > 0);
+                      })()}
                       className="flex-1 max-w-[120px]"
                     >
                       <ChevronLeft className="h-4 w-4 mr-1" />
@@ -737,6 +792,11 @@ const CourseLearningPage = () => {
                     <Button
                       onClick={handleNextLesson}
                       size="sm"
+                      disabled={(() => {
+                        const allLessons = modules.flatMap(m => m.lessons);
+                        const currentIndex = allLessons.findIndex(l => l.id === currentLessonId);
+                        return !(currentIndex < allLessons.length - 1 || !completedLessons.includes(currentLessonId));
+                      })()}
                       className="flex-1 max-w-[120px] bg-gradient-to-r from-orange-500 to-purple-600"
                     >
                       Next
@@ -745,8 +805,8 @@ const CourseLearningPage = () => {
                   </div>
                 )}
                 
-                {/* Final Exam */}
-                {finalExam && (
+                {/* Final Exam - Only show when all lessons are completed */}
+                {finalExam && isAllLessonsCompleted && (
                   <div className="mt-4 p-4 border border-orange-200 rounded-lg bg-orange-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -767,99 +827,131 @@ const CourseLearningPage = () => {
                     </Button>
                   </div>
                 )}
+
+                {/* Locked Final Exam Message */}
+                {finalExam && !isAllLessonsCompleted && (
+                  <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50 opacity-60">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-5 w-5 text-gray-500" />
+                        <span className="font-semibold text-gray-600">Final Exam</span>
+                      </div>
+                      <Badge variant="outline" className="text-gray-600">
+                        Locked
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Complete all lessons to unlock the final exam
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
           {/* Main Content */}
           <div className="lg:col-span-8">
-            <Tabs defaultValue="lesson-notes" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="content" className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
+                  Content
+                </TabsTrigger>
                 <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
                   <StickyNote className="h-4 w-4" />
-                  Lesson Notes
+                  Notes
                 </TabsTrigger>
-                <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
                 <TabsTrigger value="reviews">Reviews</TabsTrigger>
                 <TabsTrigger value="discussion">Discussion</TabsTrigger>
               </TabsList>
               
+              <TabsContent value="content" className="space-y-6">
+                {currentLessonId && (() => {
+                  const allLessons = modules.flatMap(m => m.lessons);
+                  const currentLesson = allLessons.find(l => l.id === currentLessonId);
+                  return currentLesson ? (
+                    <div className="space-y-6">
+                      {/* Video Player */}
+                      {currentLesson.video_url ? (
+                        <div className="bg-black rounded-md overflow-hidden">
+                          <VideoPlayer
+                            src={currentLesson.video_url}
+                            onTimeUpdate={handleVideoTimeUpdate}
+                            onReady={(player) => setVideoPlayerRef(player)}
+                            controls={true}
+                          />
+                        </div>
+                      ) : (
+                        <div className="aspect-video flex items-center justify-center bg-muted rounded-md">
+                          <div className="text-center p-8">
+                            <BookOpen className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                            <h3 className="text-lg font-medium">No video content available</h3>
+                            <p className="text-muted-foreground">This lesson contains text content only.</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Lesson Details */}
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-xl font-bold">{currentLesson.title}</h2>
+                          {completedLessons.includes(currentLesson.id) && (
+                            <Badge variant="secondary" className="flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              <span>Completed</span>
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {currentLesson.description && (
+                          <p className="text-muted-foreground mt-2">{currentLesson.description}</p>
+                        )}
+                      </div>
+
+                      {/* Video Transcripts */}
+                      {currentLesson.video_url && (
+                        <VideoTranscripts
+                          lessonId={currentLesson.id}
+                          onSeekTo={handleVideoSeek}
+                          currentTime={currentVideoTime}
+                        />
+                      )}
+
+                      {/* Lesson Content */}
+                      {currentLesson.content && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Lesson Content</CardTitle>
+                          </CardHeader>
+                          <CardContent className="prose max-w-none">
+                            <div dangerouslySetInnerHTML={{ 
+                              __html: typeof currentLesson.content === 'string' 
+                                ? currentLesson.content 
+                                : JSON.stringify(currentLesson.content) 
+                            }} />
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  ) : (
+                    <Card>
+                      <CardContent className="text-center py-12">
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+                        <h3 className="font-medium text-lg mb-2">Select a lesson to start learning</h3>
+                        <p className="text-muted-foreground">
+                          Choose a lesson from the curriculum to begin your learning journey.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+              </TabsContent>
+              
               <TabsContent value="lesson-notes" className="space-y-6">
                 <LessonNotesTab 
                   lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                  currentVideoTime={0}
+                  currentVideoTime={currentVideoTime}
                 />
-              </TabsContent>
-              
-              <TabsContent value="curriculum">
-                {/* Mobile-friendly curriculum view */}
-                <div className="lg:hidden">
-                  <div className="space-y-4">
-                    {modules.map((module, moduleIndex) => (
-                      <div key={module.id} className="bg-card rounded-lg border">
-                        <div className="p-4 border-b">
-                          <h4 className="font-medium text-sm text-muted-foreground">
-                            Module {moduleIndex + 1}
-                          </h4>
-                          <h3 className="font-semibold">{module.title}</h3>
-                          {module.description && (
-                            <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
-                          )}
-                        </div>
-                        <div className="p-4 space-y-2">
-                          {module.lessons.map((lesson, lessonIndex) => {
-                            const isUnlocked = isLessonUnlocked(lesson, moduleIndex, lessonIndex);
-                            const isCompleted = completedLessons.includes(lesson.id);
-                            const isCurrent = currentLessonId === lesson.id;
-                            
-                            return (
-                              <button
-                                key={lesson.id}
-                                onClick={() => handleLessonSelect(lesson)}
-                                disabled={!isUnlocked}
-                                className={`w-full text-left p-3 rounded-md border transition-colors ${
-                                  isCurrent
-                                    ? 'bg-primary text-primary-foreground border-primary'
-                                    : isUnlocked
-                                    ? 'hover:bg-muted border-border'
-                                    : 'opacity-50 cursor-not-allowed border-border bg-muted'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-xs font-medium opacity-60">
-                                      {moduleIndex + 1}.{lessonIndex + 1}
-                                    </span>
-                                    <div>
-                                      <p className="font-medium text-sm">{lesson.title}</p>
-                                      {lesson.description && (
-                                        <p className="text-xs opacity-60 mt-1">{lesson.description}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {isCompleted && (
-                                      <CheckCircle className="h-4 w-4 text-green-500" />
-                                    )}
-                                    {!isUnlocked && (
-                                      <Lock className="h-4 w-4 text-gray-400" />
-                                    )}
-                                    {lesson.content_type === 'video' && (
-                                      <Clock className="h-4 w-4 opacity-60" />
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="hidden lg:block">
-                  <p className="text-muted-foreground">View curriculum in the sidebar</p>
-                </div>
               </TabsContent>
               
               <TabsContent value="reviews">
