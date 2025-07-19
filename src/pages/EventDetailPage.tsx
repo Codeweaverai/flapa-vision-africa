@@ -622,7 +622,7 @@ const EventDetailPage = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {recommendedEvents.map((recEvent) => (
                         <div key={recEvent.id} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
-                             onClick={() => navigate(`/event-detail/${recEvent.id}`)}>
+                             onClick={() => navigate(`/event-detail/${event.id}`)}>
                           {recEvent.image_url && (
                             <img
                               src={recEvent.image_url}
