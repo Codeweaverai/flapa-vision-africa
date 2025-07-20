@@ -78,7 +78,6 @@ const CourseLearningPage: React.FC = () => {
   const [courseCompleted, setCourseCompleted] = useState(false);
   const [hasPassedExam, setHasPassedExam] = useState(false);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
-  const [videoPlayerRef, setVideoPlayerRef] = useState<any>(null);
   const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -286,13 +285,6 @@ const CourseLearningPage: React.FC = () => {
         saveVideoProgress(currentLesson.id, currentTime, isCompleted);
       }
     }, 10000);
-  };
-
-  const handleSeekTo = (time: number) => {
-    if (videoPlayerRef && videoPlayerRef.seekTo) {
-      videoPlayerRef.seekTo(time);
-      setCurrentVideoTime(time);
-    }
   };
 
   const handleVideoEnded = () => {
@@ -552,13 +544,11 @@ const CourseLearningPage: React.FC = () => {
                 {currentLesson.video_url ? (
                   <div className="bg-black rounded-md overflow-hidden">
                     <VideoPlayer
-                      ref={setVideoPlayerRef}
                       src={currentLesson.video_url}
                       onTimeUpdate={handleVideoTimeUpdate}
                       onEnded={handleVideoEnded}
                       autoplay={false}
                       controls={true}
-                      startTime={currentVideoTime}
                     />
                   </div>
                 ) : (
@@ -621,7 +611,7 @@ const CourseLearningPage: React.FC = () => {
                     <VideoTranscripts
                       lessonId={currentLesson.id}
                       currentTime={currentVideoTime}
-                      onSeekTo={handleSeekTo}
+                      onSeekTo={(time) => setCurrentVideoTime(time)}
                     />
                   </TabsContent>
                 </Tabs>
