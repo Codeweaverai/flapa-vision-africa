@@ -55,34 +55,48 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({
       if (error) throw error;
       
       // Transform the database data to match our interface
-      const transformedTranscripts: TranscriptSegment[] = data?.map((item: any) => {
-        // Parse transcript_data if it's JSON, otherwise create segments from text
-        let segments: TranscriptSegment[] = [];
-        
-        if (item.transcript_data && typeof item.transcript_data === 'object') {
-          // If transcript_data contains segments
-          if (Array.isArray(item.transcript_data.segments)) {
-            segments = item.transcript_data.segments.map((seg: any, index: number) => ({
-              id: `${item.id}-${index}`,
-              start_time: seg.start_time || seg.start || 0,
-              end_time: seg.end_time || seg.end || 30,
-              text: seg.text || seg.content || '',
-              lesson_id: lessonId
-            }));
-          } else if (item.transcript_data.text) {
-            // Single text block - create one segment
-            segments = [{
-              id: item.id,
-              start_time: 0,
-              end_time: 300, // Default 5 minutes
-              text: item.transcript_data.text,
-              lesson_id: lessonId
-            }];
+      const transformedTranscripts: TranscriptSegment[] = [];
+      
+      if (data && data.length > 0) {
+        data.forEach((item: any) => {
+          if (item.transcript_data) {
+            let segments: TranscriptSegment[] = [];
+            
+            if (typeof item.transcript_data === 'object') {
+              // If transcript_data contains segments array
+              if (Array.isArray(item.transcript_data.segments)) {
+                segments = item.transcript_data.segments.map((seg: any, index: number) => ({
+                  id: `${item.id}-${index}`,
+                  start_time: seg.start_time || seg.start || 0,
+                  end_time: seg.end_time || seg.end || (seg.start_time || seg.start || 0) + 30,
+                  text: seg.text || seg.content || '',
+                  lesson_id: lessonId
+                }));
+              } else if (item.transcript_data.text) {
+                // Single text block - create one segment
+                segments = [{
+                  id: item.id,
+                  start_time: 0,
+                  end_time: 300, // Default 5 minutes
+                  text: item.transcript_data.text,
+                  lesson_id: lessonId
+                }];
+              }
+            } else if (typeof item.transcript_data === 'string') {
+              // Handle string transcript data
+              segments = [{
+                id: item.id,
+                start_time: 0,
+                end_time: 300,
+                text: item.transcript_data,
+                lesson_id: lessonId
+              }];
+            }
+            
+            transformedTranscripts.push(...segments);
           }
-        }
-        
-        return segments;
-      }).flat() || [];
+        });
+      }
       
       setTranscripts(transformedTranscripts);
     } catch (error) {
