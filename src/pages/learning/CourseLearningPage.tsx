@@ -175,6 +175,7 @@ const CourseLearningPage = () => {
   const [quizScore, setQuizScore] = useState(0);
   const [quizPassed, setQuizPassed] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
 
   useEffect(() => {
     console.log("courseId:", courseId, "user:", user);
@@ -544,6 +545,9 @@ const CourseLearningPage = () => {
   };
 
   const handleVideoProgress = (progress: { played: number, playedSeconds: number, loaded: number, loadedSeconds: number }) => {
+    // Update current video time for notes and transcripts
+    setCurrentVideoTime(progress.playedSeconds);
+    
     if (progress.playedSeconds > 0 && selectedLesson && enrollment) {
       const watchPercentage = progress.played * 100;
       if (watchPercentage > 80) {
@@ -568,6 +572,14 @@ const CourseLearningPage = () => {
           });
       }
     }
+  };
+
+  const handleSeekTo = (time: number) => {
+    // Since we're using ReactPlayer, we can't directly seek
+    // This would need to be implemented with a ref to the ReactPlayer
+    console.log('Seek to:', time);
+    // For now, just update the current time
+    setCurrentVideoTime(time);
   };
 
   const navigateToCourseResults = () => {
@@ -756,7 +768,7 @@ const CourseLearningPage = () => {
                         }
                       }}
                       onProgress={handleVideoProgress}
-                      progressInterval={5000}
+                      progressInterval={1000}
                       light={course.thumbnail_url}
                     />
                   </div>
@@ -826,7 +838,7 @@ const CourseLearningPage = () => {
                 {enrollment && enrollment.payment_status === 'completed' ? (
                   <LessonNotesTab 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                    currentVideoTime={0}
+                    currentVideoTime={currentVideoTime}
                   />
                 ) : (
                   <Card>
@@ -848,7 +860,8 @@ const CourseLearningPage = () => {
                 {enrollment && enrollment.payment_status === 'completed' ? (
                   <VideoTranscripts 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                    onSeekTo={(time) => console.log('Seek to:', time)}
+                    currentTime={currentVideoTime}
+                    onSeekTo={handleSeekTo}
                   />
                 ) : (
                   <Card>

@@ -44,45 +44,25 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({
   }, [currentTime, transcripts]);
 
   const fetchTranscripts = async () => {
+    if (!lessonId) return;
+    
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('lesson_transcripts')
         .select('*')
         .eq('lesson_id', lessonId)
-        .order('created_at', { ascending: true });
+        .order('start_time', { ascending: true });
 
       if (error) throw error;
       
-      // Transform the database data to match our interface
-      const transformedTranscripts: TranscriptSegment[] = data?.map((item: any) => {
-        // Parse transcript_data if it's JSON, otherwise create segments from text
-        let segments: TranscriptSegment[] = [];
-        
-        if (item.transcript_data && typeof item.transcript_data === 'object') {
-          // If transcript_data contains segments
-          if (Array.isArray(item.transcript_data.segments)) {
-            segments = item.transcript_data.segments.map((seg: any, index: number) => ({
-              id: `${item.id}-${index}`,
-              start_time: seg.start_time || seg.start || 0,
-              end_time: seg.end_time || seg.end || 30,
-              text: seg.text || seg.content || '',
-              lesson_id: lessonId
-            }));
-          } else if (item.transcript_data.text) {
-            // Single text block - create one segment
-            segments = [{
-              id: item.id,
-              start_time: 0,
-              end_time: 300, // Default 5 minutes
-              text: item.transcript_data.text,
-              lesson_id: lessonId
-            }];
-          }
-        }
-        
-        return segments;
-      }).flat() || [];
+      const transformedTranscripts: TranscriptSegment[] = data?.map((item: any) => ({
+        id: item.id,
+        start_time: item.start_time,
+        end_time: item.end_time,
+        text: item.text,
+        lesson_id: lessonId
+      })) || [];
       
       setTranscripts(transformedTranscripts);
     } catch (error) {

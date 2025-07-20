@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { StickyNote, Save, Clock } from 'lucide-react';
+import { StickyNote, Save, Clock, Trash2 } from 'lucide-react';
 
 interface LessonNote {
   id: string;
@@ -34,10 +35,18 @@ const LessonNotesTab: React.FC<LessonNotesTabProps> = ({ lessonId, currentVideoT
   }, [lessonId, user]);
 
   const fetchNotes = async () => {
+    if (!user || !lessonId) return;
+    
     try {
-      // Since we don't have lesson_notes table, we'll use a placeholder for now
-      // In a real implementation, you would fetch from the actual notes table
-      setNotes([]);
+      const { data, error } = await supabase
+        .from('lesson_notes')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotes(data || []);
     } catch (error) {
       console.error('Error fetching notes:', error);
       toast.error('Failed to load notes');
@@ -47,12 +56,23 @@ const LessonNotesTab: React.FC<LessonNotesTabProps> = ({ lessonId, currentVideoT
   };
 
   const saveNote = async () => {
-    if (!newNote.trim() || !user) return;
+    if (!newNote.trim() || !user || !lessonId) return;
 
     setSaving(true);
     try {
-      // Placeholder for saving notes - would use actual notes table
+      const { error } = await supabase
+        .from('lesson_notes')
+        .insert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          content: newNote.trim(),
+          video_timestamp: currentVideoTime
+        });
+
+      if (error) throw error;
+
       setNewNote('');
+      await fetchNotes();
       toast.success('Note saved successfully');
     } catch (error) {
       console.error('Error saving note:', error);
@@ -62,10 +82,37 @@ const LessonNotesTab: React.FC<LessonNotesTabProps> = ({ lessonId, currentVideoT
     }
   };
 
+  const deleteNote = async (noteId: string) => {
+    try {
+      const { error } = await supabase
+        .from('lesson_notes')
+        .delete()
+        .eq('id', noteId);
+
+      if (error) throw error;
+
+      await fetchNotes();
+      toast.success('Note deleted successfully');
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast.error('Failed to delete note');
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (!user) {
@@ -124,12 +171,42 @@ const LessonNotesTab: React.FC<LessonNotesTabProps> = ({ lessonId, currentVideoT
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Your Notes</h3>
         
-        <Card>
-          <CardContent className="text-center py-8">
-            <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">No notes yet. Start taking notes!</p>
-          </CardContent>
-        </Card>
+        {notes.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-500">No notes yet. Start taking notes!</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {notes.map((note) => (
+              <Card key={note.id} className="border-l-4 border-l-orange-500">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Clock className="h-4 w-4" />
+                      <span>{formatTime(note.video_timestamp)}</span>
+                      <span>•</span>
+                      <span>{formatDate(note.created_at)}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteNote(note.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                    {note.content}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
