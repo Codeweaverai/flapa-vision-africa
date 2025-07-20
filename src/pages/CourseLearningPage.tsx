@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -79,6 +78,7 @@ const CourseLearningPage: React.FC = () => {
   const [courseCompleted, setCourseCompleted] = useState(false);
   const [hasPassedExam, setHasPassedExam] = useState(false);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [lastAccessedLessonId, setLastAccessedLessonId] = useState<string | null>(null);
   const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -95,6 +95,51 @@ const CourseLearningPage: React.FC = () => {
       setCourseCompleted(allCompleted);
     }
   }, [completedLessons, course]);
+
+  // Load the appropriate lesson when course data is available
+  useEffect(() => {
+    if (course && course.modules.length > 0) {
+      loadAppropriateLesson();
+    }
+  }, [course, lastAccessedLessonId, completedLessons]);
+
+  const loadAppropriateLesson = () => {
+    if (!course || !course.modules.length) return;
+
+    const allLessons = course.modules.flatMap(m => m.lessons).sort((a, b) => {
+      // Sort by module order first, then lesson order
+      const moduleA = course.modules.find(m => m.id === a.module_id);
+      const moduleB = course.modules.find(m => m.id === b.module_id);
+      if (moduleA && moduleB && moduleA.order_index !== moduleB.order_index) {
+        return moduleA.order_index - moduleB.order_index;
+      }
+      return a.order_index - b.order_index;
+    });
+
+    let lessonToSelect: Lesson | null = null;
+
+    // If we have a last accessed lesson, try to load it
+    if (lastAccessedLessonId) {
+      lessonToSelect = allLessons.find(lesson => lesson.id === lastAccessedLessonId) || null;
+    }
+
+    // If no last accessed lesson or it's not found, find the first incomplete lesson
+    if (!lessonToSelect) {
+      lessonToSelect = allLessons.find(lesson => !completedLessons.includes(lesson.id)) || null;
+    }
+
+    // If all lessons are completed or no incomplete found, load the first lesson
+    if (!lessonToSelect && allLessons.length > 0) {
+      lessonToSelect = allLessons[0];
+    }
+
+    if (lessonToSelect && (!currentLesson || currentLesson.id !== lessonToSelect.id)) {
+      setCurrentLesson(lessonToSelect);
+      if (enrollmentId) {
+        loadVideoPosition(lessonToSelect.id, enrollmentId);
+      }
+    }
+  };
 
   const loadCourseData = async () => {
     if (!courseId || !user) return;
@@ -185,15 +230,16 @@ const CourseLearningPage: React.FC = () => {
       const completed = progressData?.filter(p => p.is_completed).map(p => p.lesson_id) || [];
       setCompletedLessons(completed);
 
-      // Set current lesson (first incomplete or first lesson)
-      const allLessons = transformedCourse.modules.flatMap(m => m.lessons);
-      const firstIncompleteLesson = allLessons.find(lesson => !completed.includes(lesson.id));
-      const lessonToShow = firstIncompleteLesson || allLessons[0];
-      
-      if (lessonToShow) {
-        setCurrentLesson(lessonToShow);
-        // Load saved video position
-        loadVideoPosition(lessonToShow.id, enrollment.id);
+      // Fetch course progress to get last accessed lesson
+      const { data: courseProgress } = await supabase
+        .from('course_progress')
+        .select('last_accessed_lesson_id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (courseProgress?.last_accessed_lesson_id) {
+        setLastAccessedLessonId(courseProgress.last_accessed_lesson_id);
       }
 
       // Fetch final exam
@@ -239,9 +285,12 @@ const CourseLearningPage: React.FC = () => {
         
       if (data?.last_position_seconds) {
         setCurrentVideoTime(data.last_position_seconds);
+      } else {
+        setCurrentVideoTime(0);
       }
     } catch (error) {
       console.error('Error loading video position:', error);
+      setCurrentVideoTime(0);
     }
   };
 
@@ -266,8 +315,30 @@ const CourseLearningPage: React.FC = () => {
       if (completed && !completedLessons.includes(lessonId)) {
         setCompletedLessons(prev => [...prev, lessonId]);
       }
+
+      // Update course progress with last accessed lesson
+      await updateCourseProgress(lessonId);
     } catch (error) {
       console.error('Error saving video progress:', error);
+    }
+  };
+
+  const updateCourseProgress = async (lastAccessedLessonId: string) => {
+    if (!user || !courseId) return;
+
+    try {
+      await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          last_accessed_lesson_id: lastAccessedLessonId,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+    } catch (error) {
+      console.error('Error updating course progress:', error);
     }
   };
 
@@ -312,6 +383,9 @@ const CourseLearningPage: React.FC = () => {
     if (enrollmentId) {
       loadVideoPosition(lesson.id, enrollmentId);
     }
+
+    // Update course progress
+    updateCourseProgress(lesson.id);
   };
 
   const handleNextLesson = () => {
@@ -612,6 +686,10 @@ const CourseLearningPage: React.FC = () => {
                     <VideoTranscripts
                       lessonId={currentLesson.id}
                       currentTime={currentVideoTime}
+                      onSeekTo={(time) => {
+                        console.log('Seeking to time:', time);
+                        // Note: VideoPlayer component would need to implement seeking functionality
+                      }}
                     />
                   </TabsContent>
                 </Tabs>

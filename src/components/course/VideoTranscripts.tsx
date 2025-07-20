@@ -44,27 +44,36 @@ const VideoTranscripts: React.FC<VideoTranscriptsProps> = ({
   }, [currentTime, transcripts]);
 
   const fetchTranscripts = async () => {
-    if (!lessonId) return;
+    if (!lessonId) {
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
+      console.log('Fetching transcripts for lesson:', lessonId);
+      
       const { data, error } = await supabase
         .from('lesson_transcripts')
         .select('*')
         .eq('lesson_id', lessonId)
         .order('start_time', { ascending: true });
 
-      if (error) throw error;
-      
-      const transformedTranscripts: TranscriptSegment[] = data?.map((item: any) => ({
-        id: item.id,
-        start_time: item.start_time,
-        end_time: item.end_time,
-        text: item.text,
-        lesson_id: lessonId
-      })) || [];
-      
-      setTranscripts(transformedTranscripts);
+      if (error) {
+        console.error('Error fetching transcripts:', error);
+        // Don't show error toast for missing transcripts as it's optional
+      } else {
+        console.log('Transcripts fetched:', data);
+        const transformedTranscripts: TranscriptSegment[] = data?.map((item: any) => ({
+          id: item.id,
+          start_time: item.start_time,
+          end_time: item.end_time,
+          text: item.text,
+          lesson_id: lessonId
+        })) || [];
+        
+        setTranscripts(transformedTranscripts);
+      }
     } catch (error) {
       console.error('Error fetching transcripts:', error);
       // Don't show error toast for missing transcripts as it's optional
