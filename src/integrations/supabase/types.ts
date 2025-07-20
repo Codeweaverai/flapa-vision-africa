@@ -1966,37 +1966,32 @@ export type Database = {
       lesson_transcripts: {
         Row: {
           created_at: string
+          end_time: number
           id: string
-          language: string
           lesson_id: string
-          transcript_data: Json
+          start_time: number
+          text: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          end_time: number
           id?: string
-          language?: string
           lesson_id: string
-          transcript_data?: Json
+          start_time: number
+          text: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          end_time?: number
           id?: string
-          language?: string
           lesson_id?: string
-          transcript_data?: Json
+          start_time?: number
+          text?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "lesson_transcripts_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       lessons: {
         Row: {
