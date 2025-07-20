@@ -545,7 +545,7 @@ const CourseLearningPage = () => {
   };
 
   const handleVideoProgress = (progress: { played: number, playedSeconds: number, loaded: number, loadedSeconds: number }) => {
-    // Update current video time for notes and transcripts
+    // Update current video time for transcripts
     setCurrentVideoTime(progress.playedSeconds);
     
     if (progress.playedSeconds > 0 && selectedLesson && enrollment) {
@@ -838,8 +838,6 @@ const CourseLearningPage = () => {
                 {enrollment && enrollment.payment_status === 'completed' ? (
                   <LessonNotesTab 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                    currentTime={currentVideoTime}
-                    onSeekTo={handleSeekTo}
                   />
                 ) : (
                   <Card>

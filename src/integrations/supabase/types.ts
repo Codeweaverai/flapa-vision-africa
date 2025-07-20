@@ -1844,7 +1844,6 @@ export type Database = {
           created_at: string
           id: string
           lesson_id: string
-          timestamp_seconds: number | null
           updated_at: string
           user_id: string
         }
@@ -1853,7 +1852,6 @@ export type Database = {
           created_at?: string
           id?: string
           lesson_id: string
-          timestamp_seconds?: number | null
           updated_at?: string
           user_id: string
         }
@@ -1862,7 +1860,6 @@ export type Database = {
           created_at?: string
           id?: string
           lesson_id?: string
-          timestamp_seconds?: number | null
           updated_at?: string
           user_id?: string
         }
