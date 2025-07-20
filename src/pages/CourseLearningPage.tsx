@@ -63,6 +63,16 @@ interface FinalExam {
   is_published: boolean;
 }
 
+interface CourseProgress {
+  id: string;
+  user_id: string;
+  course_id: string;
+  progress_percentage: number;
+  last_accessed_lesson_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const CourseLearningPage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
@@ -231,14 +241,14 @@ const CourseLearningPage: React.FC = () => {
       setCompletedLessons(completed);
 
       // Fetch course progress to get last accessed lesson
-      const { data: courseProgress } = await supabase
+      const { data: courseProgress, error: progressError } = await supabase
         .from('course_progress')
         .select('last_accessed_lesson_id')
         .eq('user_id', user.id)
         .eq('course_id', courseId)
         .maybeSingle();
 
-      if (courseProgress?.last_accessed_lesson_id) {
+      if (!progressError && courseProgress?.last_accessed_lesson_id) {
         setLastAccessedLessonId(courseProgress.last_accessed_lesson_id);
       }
 

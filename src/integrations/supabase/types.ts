@@ -635,6 +635,7 @@ export type Database = {
           course_id: string
           created_at: string
           id: string
+          last_accessed_lesson_id: string | null
           last_lesson_completed: string | null
           progress_percentage: number
           updated_at: string
@@ -644,6 +645,7 @@ export type Database = {
           course_id: string
           created_at?: string
           id?: string
+          last_accessed_lesson_id?: string | null
           last_lesson_completed?: string | null
           progress_percentage?: number
           updated_at?: string
@@ -653,6 +655,7 @@ export type Database = {
           course_id?: string
           created_at?: string
           id?: string
+          last_accessed_lesson_id?: string | null
           last_lesson_completed?: string | null
           progress_percentage?: number
           updated_at?: string
@@ -664,6 +667,13 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_progress_last_accessed_lesson_id_fkey"
+            columns: ["last_accessed_lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
           {
