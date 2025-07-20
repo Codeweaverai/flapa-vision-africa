@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,10 +10,11 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 
 interface TranscriptSegment {
-  id: string;
+  id?: string;
   start_time: number;
   end_time: number;
   text: string;
+  lesson_id: string;
 }
 
 interface LessonTranscriptDialogProps {
@@ -46,18 +46,16 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
         .from('lesson_transcripts')
         .select('*')
         .eq('lesson_id', lessonId)
-        .single();
+        .order('start_time', { ascending: true });
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (data && data.transcript_data) {
-        // Type-safe conversion from Json to TranscriptSegment[]
-        const segments = data.transcript_data as unknown as TranscriptSegment[];
-        setTranscriptSegments(Array.isArray(segments) ? segments : []);
+      if (error) {
+        console.error('Error loading transcript:', error);
+        if (error.code !== 'PGRST116') {
+          toast.error('Failed to load transcript');
+        }
       } else {
-        setTranscriptSegments([]);
+        console.log('Transcripts loaded:', data);
+        setTranscriptSegments(data || []);
       }
     } catch (error) {
       console.error('Error loading transcript:', error);
@@ -70,38 +68,34 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
   const saveTranscript = async () => {
     setSaving(true);
     try {
-      // Convert TranscriptSegment[] to Json-compatible format
-      const transcriptData = transcriptSegments as unknown as any;
-
-      // Check if transcript exists
-      const { data: existing } = await supabase
+      // Delete existing segments for this lesson
+      const { error: deleteError } = await supabase
         .from('lesson_transcripts')
-        .select('id')
-        .eq('lesson_id', lessonId)
-        .single();
+        .delete()
+        .eq('lesson_id', lessonId);
 
-      if (existing) {
-        // Update existing
-        const { error } = await supabase
+      if (deleteError) {
+        console.error('Error deleting existing transcripts:', deleteError);
+        throw deleteError;
+      }
+
+      // Insert new segments
+      if (transcriptSegments.length > 0) {
+        const segmentsToInsert = transcriptSegments.map(segment => ({
+          lesson_id: lessonId,
+          start_time: segment.start_time,
+          end_time: segment.end_time,
+          text: segment.text
+        }));
+
+        const { error: insertError } = await supabase
           .from('lesson_transcripts')
-          .update({
-            transcript_data: transcriptData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('lesson_id', lessonId);
+          .insert(segmentsToInsert);
 
-        if (error) throw error;
-      } else {
-        // Create new
-        const { error } = await supabase
-          .from('lesson_transcripts')
-          .insert({
-            lesson_id: lessonId,
-            transcript_data: transcriptData,
-            language: 'en'
-          });
-
-        if (error) throw error;
+        if (insertError) {
+          console.error('Error inserting transcripts:', insertError);
+          throw insertError;
+        }
       }
 
       toast.success('Transcript saved successfully');
@@ -124,7 +118,7 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
     const endTime = parseFloat(newSegment.end_time) || startTime + 10;
 
     const segment: TranscriptSegment = {
-      id: Math.random().toString(36).substr(2, 9),
+      lesson_id: lessonId,
       start_time: startTime,
       end_time: endTime,
       text: newSegment.text.trim()
@@ -134,8 +128,8 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
     setNewSegment({ start_time: '', end_time: '', text: '' });
   };
 
-  const removeSegment = (id: string) => {
-    setTranscriptSegments(transcriptSegments.filter(segment => segment.id !== id));
+  const removeSegment = (index: number) => {
+    setTranscriptSegments(transcriptSegments.filter((_, i) => i !== index));
   };
 
   const formatTime = (seconds: number) => {
@@ -224,8 +218,8 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {transcriptSegments
                   .sort((a, b) => a.start_time - b.start_time)
-                  .map((segment) => (
-                  <div key={segment.id} className="border rounded-lg p-3 bg-white">
+                  .map((segment, index) => (
+                  <div key={index} className="border rounded-lg p-3 bg-white">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex gap-2">
                         <Badge variant="outline">
@@ -235,7 +229,7 @@ const LessonTranscriptDialog = ({ lessonId, lessonTitle }: LessonTranscriptDialo
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeSegment(segment.id)}
+                        onClick={() => removeSegment(index)}
                         className="text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="h-4 w-4" />
