@@ -838,7 +838,8 @@ const CourseLearningPage = () => {
                 {enrollment && enrollment.payment_status === 'completed' ? (
                   <LessonNotesTab 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                    currentVideoTime={currentVideoTime}
+                    currentTime={currentVideoTime}
+                    onSeekTo={handleSeekTo}
                   />
                 ) : (
                   <Card>
