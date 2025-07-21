@@ -15,8 +15,7 @@ import EventsPage from '@/pages/EventsPage';
 import EventDetailPage from '@/pages/EventDetailPage';
 import BlogPage from '@/pages/BlogPage';
 import BlogPostPage from '@/pages/BlogPostPage';
-import LoginPage from '@/pages/LoginPage';
-import RegisterPage from '@/pages/RegisterPage';
+import AuthPage from '@/pages/AuthPage';
 import AccountPage from '@/pages/AccountPage';
 import CreatorDashboard from '@/pages/creator/CreatorDashboard';
 import CreatorCourses from '@/pages/creator/CreatorCourses';
@@ -75,8 +74,9 @@ function App() {
               <Route path="/events/:id" element={<EventDetailPage />} />
               <Route path="/blog" element={<BlogPage />} />
               <Route path="/blog/:id" element={<BlogPostPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/login" element={<AuthPage />} />
+              <Route path="/register" element={<AuthPage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="/terms-of-service" element={<TermsOfServicePage />} />
               <Route path="/help" element={<HelpCenterPage />} />
