@@ -21,7 +21,7 @@ import YouTubeModal from '@/components/video/YouTubeModal';
 
 const BecomeCreatorPage = () => {
   const [showDemoVideo, setShowDemoVideo] = useState(false);
-  const demoVideoUrl = "https://youtu.be/bJCb8e-Z-u8?si=wYigVFkbEhKy7w5D"; // Replace with actual demo video URL
+  const demoVideoUrl = "https://youtu.be/B8ay-17oP_0?si=4qFRvqzRSLq_gfTH"; // Replace with actual demo video URL
 
   const benefits = [
     {
