@@ -1,3 +1,4 @@
+
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -9,11 +10,11 @@ import HomePage from '@/pages/HomePage';
 import AboutPage from '@/pages/AboutPage';
 import ContactPage from '@/pages/ContactPage';
 import CoursesPage from '@/pages/CoursesPage';
-import CourseDetailsPage from '@/pages/CourseDetailsPage';
+import CourseDetailPage from '@/pages/CourseDetailPage';
 import EventsPage from '@/pages/EventsPage';
-import EventDetailsPage from '@/pages/EventDetailsPage';
+import EventDetailPage from '@/pages/EventDetailPage';
 import BlogPage from '@/pages/BlogPage';
-import BlogDetailsPage from '@/pages/BlogDetailsPage';
+import BlogPostPage from '@/pages/BlogPostPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import AccountPage from '@/pages/AccountPage';
@@ -43,7 +44,7 @@ import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
 import HelpCenterPage from '@/pages/HelpCenterPage';
 import MediaPage from '@/pages/MediaPage';
-import MediaDetailsPage from '@/pages/MediaDetailsPage';
+import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
 import AdminMedia from '@/pages/admin/AdminMedia';
 import AdminMediaForm from '@/pages/admin/AdminMediaForm';
 import AdminNewsletters from '@/pages/admin/AdminNewsletters';
@@ -69,18 +70,18 @@ function App() {
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/courses" element={<CoursesPage />} />
-              <Route path="/courses/:id" element={<CourseDetailsPage />} />
+              <Route path="/courses/:id" element={<CourseDetailPage />} />
               <Route path="/events" element={<EventsPage />} />
-              <Route path="/events/:id" element={<EventDetailsPage />} />
+              <Route path="/events/:id" element={<EventDetailPage />} />
               <Route path="/blog" element={<BlogPage />} />
-              <Route path="/blog/:id" element={<BlogDetailsPage />} />
+              <Route path="/blog/:id" element={<BlogPostPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="/terms-of-service" element={<TermsOfServicePage />} />
               <Route path="/help" element={<HelpCenterPage />} />
               <Route path="/media" element={<MediaPage />} />
-              <Route path="/media/:id" element={<MediaDetailsPage />} />
+              <Route path="/media/:id" element={<MediaPostDetailPage />} />
               <Route path="/creators/:creatorId" element={<CreatorPublicProfile />} />
 
               {/* Protected Routes */}

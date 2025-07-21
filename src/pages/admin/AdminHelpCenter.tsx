@@ -209,7 +209,7 @@ const AdminHelpCenter = () => {
             </Select>
           </div>
 
-          <Button onClick={() => setIsCreating(true)} disabled={isCreating || editingFaq}>
+          <Button onClick={() => setIsCreating(true)} disabled={isCreating || editingFaq !== null}>
             <Plus className="h-4 w-4 mr-2" />
             Add FAQ
           </Button>
