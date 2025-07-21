@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -85,140 +86,101 @@ const CreatorPublicProfile: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch all data in parallel for better performance
-      const [profileResult, coursesResult, eventsResult] = await Promise.allSettled([
-        // Fetch creator profile
-        supabase
-          .from('profiles')
-          .select('id, full_name, bio, avatar_url, username, is_creator, role')
-          .eq('id', creatorId)
-          .single(),
+      console.log('Fetching creator profile...');
+      
+      // First fetch creator profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, bio, avatar_url, username, is_creator, role')
+        .eq('id', creatorId)
+        .single();
 
-        // Fetch creator courses with basic info
-        supabase
-          .from('courses')
-          .select('*')
-          .eq('creator_id', creatorId)
-          .eq('is_published', true),
-
-        // Fetch creator events
-        supabase
-          .from('events')
-          .select('*')
-          .eq('creator_id', creatorId)
-      ]);
-
-      // Handle profile data
-      if (profileResult.status === 'fulfilled' && !profileResult.value.error) {
-        setCreator(profileResult.value.data);
-      } else {
+      if (profileError) {
+        console.error('Profile error:', profileError);
         throw new Error('Creator profile not found');
       }
 
-      // Handle courses data
-      const coursesData = coursesResult.status === 'fulfilled' && !coursesResult.value.error 
-        ? coursesResult.value.data || [] 
-        : [];
+      console.log('Profile loaded:', profile);
+      setCreator(profile);
 
-      // Handle events data  
-      const eventsData = eventsResult.status === 'fulfilled' && !eventsResult.value.error
-        ? eventsResult.value.data || []
-        : [];
+      // Fetch courses with simplified query
+      console.log('Fetching courses...');
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select(`
+          id,
+          title,
+          description,
+          thumbnail_url,
+          price,
+          is_free,
+          duration_minutes,
+          difficulty_level
+        `)
+        .eq('creator_id', creatorId)
+        .eq('is_published', true);
 
-      // Fetch additional stats in parallel if we have courses
-      if (coursesData.length > 0) {
-        const courseIds = coursesData.map(course => course.id);
-        
-        const [enrollmentsResult, reviewsResult] = await Promise.allSettled([
-          // Get all enrollments for all courses at once
-          supabase
-            .from('course_enrollments')
-            .select('course_id, user_id')
-            .in('course_id', courseIds),
-
-          // Get all reviews for all courses at once
-          supabase
-            .from('course_reviews')
-            .select('course_id, rating')
-            .in('course_id', courseIds)
-        ]);
-
-        const enrollments = enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error
-          ? enrollmentsResult.value.data || []
-          : [];
-
-        const reviews = reviewsResult.status === 'fulfilled' && !reviewsResult.value.error
-          ? reviewsResult.value.data || []
-          : [];
-
-        // Process courses with stats
-        const coursesWithStats = coursesData.map(course => {
-          const courseEnrollments = enrollments.filter(e => e.course_id === course.id);
-          const courseReviews = reviews.filter(r => r.course_id === course.id);
-          
-          const enrollmentsCount = courseEnrollments.length;
-          const totalReviews = courseReviews.length;
-          const averageRating = totalReviews > 0 
-            ? courseReviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
-            : 0;
-
-          return {
-            ...course,
-            enrollments_count: enrollmentsCount,
-            average_rating: averageRating,
-            total_reviews: totalReviews
-          };
-        });
-
-        setCourses(coursesWithStats);
-
-        // Calculate overall stats efficiently
-        const uniqueStudents = new Set(enrollments.map(e => e.user_id));
-        const totalStudents = uniqueStudents.size;
-        const allRatings = reviews.map(r => r.rating);
-        const overallAverageRating = allRatings.length > 0 
-          ? allRatings.reduce((sum, rating) => sum + rating, 0) / allRatings.length 
-          : 0;
-
-        setStats({
-          totalCourses: coursesWithStats.length,
-          totalStudents,
-          averageRating: overallAverageRating,
-          totalReviews: reviews.length,
-          totalEvents: eventsData.length
-        });
-      } else {
-        setCourses([]);
-        setStats({
-          totalCourses: 0,
-          totalStudents: 0,
-          averageRating: 0,
-          totalReviews: 0,
-          totalEvents: eventsData.length
-        });
+      if (coursesError) {
+        console.error('Courses error:', coursesError);
       }
 
-      // Handle events with registrations count if we have events
-      if (eventsData.length > 0) {
-        const eventIds = eventsData.map(event => event.id);
-        
-        const { data: registrations } = await supabase
-          .from('registrations')
-          .select('event_id')
-          .in('event_id', eventIds);
+      const courses = coursesData || [];
+      console.log('Courses loaded:', courses.length);
 
-        const eventsWithStats = eventsData.map(event => {
-          const eventRegistrations = registrations?.filter(r => r.event_id === event.id) || [];
-          return {
-            ...event,
-            registrations_count: eventRegistrations.length
-          };
-        });
+      // Fetch events with simplified query
+      console.log('Fetching events...');
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select(`
+          id,
+          title,
+          description,
+          image_url,
+          price,
+          is_free,
+          start_time,
+          end_time,
+          location,
+          event_type
+        `)
+        .eq('creator_id', creatorId);
 
-        setEvents(eventsWithStats);
-      } else {
-        setEvents([]);
+      if (eventsError) {
+        console.error('Events error:', eventsError);
       }
+
+      const events = eventsData || [];
+      console.log('Events loaded:', events.length);
+
+      // Calculate basic stats without complex joins
+      const totalCourses = courses.length;
+      const totalEvents = events.length;
+
+      // Add default values for missing stats
+      const coursesWithDefaults = courses.map(course => ({
+        ...course,
+        enrollments_count: 0,
+        average_rating: 0,
+        total_reviews: 0
+      }));
+
+      const eventsWithDefaults = events.map(event => ({
+        ...event,
+        registrations_count: 0
+      }));
+
+      setCourses(coursesWithDefaults);
+      setEvents(eventsWithDefaults);
+      
+      setStats({
+        totalCourses,
+        totalStudents: 0,
+        averageRating: 0,
+        totalReviews: 0,
+        totalEvents
+      });
+
+      console.log('All data loaded successfully');
 
     } catch (error) {
       console.error('Error fetching creator data:', error);
@@ -300,11 +262,17 @@ const CreatorPublicProfile: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100">
           <div className="container mx-auto px-4 py-8">
             <div className="animate-pulse space-y-6">
-              <div className="h-8 bg-gray-300 rounded w-1/4 mb-4"></div>
-              <div className="h-64 bg-gray-300 rounded mb-6"></div>
+              <div className="flex items-center space-x-4 mb-8">
+                <div className="w-32 h-32 bg-gray-300 rounded-full"></div>
+                <div className="space-y-4 flex-1">
+                  <div className="h-8 bg-gray-300 rounded w-1/3"></div>
+                  <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                  <div className="h-4 bg-gray-300 rounded w-2/3"></div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-48 bg-gray-300 rounded"></div>
+                  <div key={i} className="h-64 bg-gray-300 rounded"></div>
                 ))}
               </div>
             </div>
@@ -393,14 +361,6 @@ const CreatorPublicProfile: React.FC = () => {
                       <Users className="w-4 h-4 text-purple-500" />
                       <span>{stats.totalStudents} Students</span>
                     </div>
-                    {stats.totalReviews > 0 && (
-                      <div className="flex items-center gap-1">
-                        {renderStars(Math.round(stats.averageRating))}
-                        <span className="ml-1">
-                          {stats.averageRating.toFixed(1)} ({stats.totalReviews} reviews)
-                        </span>
-                      </div>
-                    )}
                   </div>
                   
                   {creator?.bio && (
@@ -490,21 +450,6 @@ const CreatorPublicProfile: React.FC = () => {
                         </Badge>
                       </div>
                       
-                      <div className="flex items-center justify-between mb-4">
-                        {course.total_reviews > 0 && (
-                          <div className="flex items-center gap-1">
-                            {renderStars(Math.round(course.average_rating))}
-                            <span className="text-sm text-muted-foreground ml-1">
-                              {course.average_rating.toFixed(1)} ({course.total_reviews})
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground ml-auto">
-                          <Users className="w-4 h-4" />
-                          <span>{course.enrollments_count}</span>
-                        </div>
-                      </div>
-                      
                       <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
                         <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
                           <Play className="h-4 w-4 mr-2" />
@@ -583,10 +528,6 @@ const CreatorPublicProfile: React.FC = () => {
                             <span className="line-clamp-1">{event.location}</span>
                           </div>
                         )}
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4 text-purple-500" />
-                          <span>{event.registrations_count} registered</span>
-                        </div>
                       </div>
                       
                       <Button className="w-full bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700" asChild>
