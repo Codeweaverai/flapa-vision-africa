@@ -76,7 +76,7 @@ const CallToAction = () => {
               size="lg" 
               className="bg-white text-purple-700 hover:bg-gray-100 px-8 py-6 text-lg font-semibold rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 group"
             >
-              <Link to="/explore/courses" className="flex items-center gap-2">
+              <Link to="/explore-courses" className="flex items-center gap-2">
                 Start Learning Now
                 <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-200" />
               </Link>
@@ -88,7 +88,7 @@ const CallToAction = () => {
               size="lg" 
                className="bg-white text-purple-700 hover:bg-gray-100 px-8 py-6 text-lg font-semibold rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 group"
                >
-              <Link to="/explore/events">Explore Events</Link>
+              <Link to="/explore-events">Explore Events</Link>
             </Button>   
           </div>
 
