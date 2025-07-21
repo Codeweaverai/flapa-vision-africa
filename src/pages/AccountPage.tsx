@@ -473,13 +473,6 @@ const AccountPage = () => {
                       <ChevronRight className="h-4 w-4 ml-auto" />
                     </a>
                   </Button>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/verify">
-                      Verify Certificate
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </a>
-                  </Button>
                   <Button variant="outline" className="w-full justify-start" asChild>
                     <a href="/community">
                       Community
