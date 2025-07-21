@@ -17,7 +17,6 @@ const HomePage = () => {
   return (
     <Layout>
       <HeroSection />
-      <AboutSection />
       <BrowseCategoriesSection />
       <CoursesSection />
       <CommunityAISection />
@@ -26,6 +25,7 @@ const HomePage = () => {
       <LearningSection />
       <TrendingNowSection />
       <EventsSection />
+      <AboutSection />
       <CreatorsSection />
       <CallToAction />
     </Layout>
