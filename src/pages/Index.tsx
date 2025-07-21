@@ -17,7 +17,6 @@ const Index = () => {
   return (
     <Layout>
       <HeroSection />
-      <AboutSection />
       <BrowseCategoriesSection />
       <CoursesSection />
       <CommunityAISection />
@@ -26,6 +25,7 @@ const Index = () => {
       <LearningSection />
       <TrendingNowSection />
       <EventsSection />
+       <AboutSection />
       <CreatorsSection />
       <CallToAction />
     </Layout>
