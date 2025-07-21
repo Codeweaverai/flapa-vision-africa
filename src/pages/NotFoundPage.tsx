@@ -59,7 +59,7 @@ const NotFoundPage = () => {
                 size="lg"
                 className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-purple-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                <Link to="/courses">
+                <Link to="/Explore-courses">
                   <BookOpen className="mr-2 h-5 w-5" />
                   Explore Courses
                 </Link>
