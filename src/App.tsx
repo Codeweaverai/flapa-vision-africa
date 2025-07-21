@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -139,6 +138,9 @@ import UserOrders from './pages/account/UserOrders';
 import UserProfile from './pages/account/UserProfile';
 import UserSettings from './pages/account/UserSettings';
 
+// Admin help center
+import AdminHelpCenter from './pages/admin/AdminHelpCenter';
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -250,6 +252,7 @@ function App() {
                   <Route path="/admin/events/create" element={<AdminEventCreate />} />
                   <Route path="/admin/events/:id/edit" element={<AdminEventEdit />} />
                   <Route path="/admin/events/:id/registrations" element={<AdminEventRegistrations />} />
+                  <Route path="/admin/help-center" element={<AdminHelpCenter />} />
                   <Route path="/admin/media" element={<AdminMedia />} />
                   <Route path="/admin/newsletters" element={<AdminNewsletters />} />
                   <Route path="/admin/orders" element={<AdminOrders />} />

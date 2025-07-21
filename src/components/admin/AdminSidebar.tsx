@@ -18,7 +18,8 @@ import {
   Mic, 
   Briefcase, 
   HeadphonesIcon,
-  DollarSign
+  DollarSign,
+  HelpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,6 +41,7 @@ const sidebarItems = [
   { name: 'Speaking', href: '/admin/speaking', icon: Mic },
   { name: 'Careers', href: '/admin/careers', icon: Briefcase },
   { name: 'Support Inbox', href: '/admin/support-inbox', icon: HeadphonesIcon },
+  { name: 'Help Center', href: '/admin/help-center', icon: HelpCircle },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
