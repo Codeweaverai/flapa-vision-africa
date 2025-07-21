@@ -28,33 +28,15 @@ const AuthPage = () => {
   const [username, setUsername] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isPageLoading, setIsPageLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Add error boundary for initial load
-    try {
-      // Load from localStorage if available (for convenience)
-      const savedEmail = localStorage.getItem('lastAuthEmail');
-      if (savedEmail) {
-        setEmail(savedEmail);
-      }
-      setIsPageLoading(false);
-    } catch (error) {
-      console.error('Error loading auth page:', error);
-      setErrorMessage('Failed to load authentication page. Please refresh and try again.');
-      setIsPageLoading(false);
+    // Load from localStorage if available (for convenience)
+    const savedEmail = localStorage.getItem('lastAuthEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
     }
   }, []);
-
-  // Show loading state during initial page load
-  if (isPageLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-      </div>
-    );
-  }
 
   // Redirect if already authenticated
   if (!loading && user) {
@@ -66,12 +48,12 @@ const AuthPage = () => {
     setIsSubmitting(true);
     setErrorMessage(null);
     
+    // Save email for convenience
+    if (email) {
+      localStorage.setItem('lastAuthEmail', email);
+    }
+    
     try {
-      // Save email for convenience
-      if (email) {
-        localStorage.setItem('lastAuthEmail', email);
-      }
-      
       await signIn(email, password);
       // Success handling is done in AuthContext
     } catch (error: any) {
@@ -87,36 +69,36 @@ const AuthPage = () => {
     setIsSubmitting(true);
     setErrorMessage(null);
     
-    try {
-      // Validate inputs
-      if (!fullName || !username || !email || !password) {
-        setErrorMessage('All fields are required');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (password.length < 6) {
-        setErrorMessage('Password must be at least 6 characters');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Additional username validation
-      if (username.length < 3) {
-        setErrorMessage('Username must be at least 3 characters');
-        setIsSubmitting(false);
-        return;
-      }
+    // Validate inputs
+    if (!fullName || !username || !email || !password) {
+      setErrorMessage('All fields are required');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Additional username validation
+    if (username.length < 3) {
+      setErrorMessage('Username must be at least 3 characters');
+      setIsSubmitting(false);
+      return;
+    }
 
-      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        setErrorMessage('Username can only contain letters, numbers, and underscores');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Save email for convenience
-      localStorage.setItem('lastAuthEmail', email);
-      
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setErrorMessage('Username can only contain letters, numbers, and underscores');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Save email for convenience
+    localStorage.setItem('lastAuthEmail', email);
+    
+    try {
       await signUp(email, password, { full_name: fullName, username });
       // Success handling is done in AuthContext
     } catch (error: any) {
@@ -163,11 +145,6 @@ const AuthPage = () => {
           src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//2330.jpg"
           alt="Learning illustration"
           className="w-full h-full object-cover rounded-r-3xl shadow-2xl"
-          onError={(e) => {
-            console.log('Image failed to load, using fallback');
-            // Fallback if image fails to load
-            e.currentTarget.style.display = 'none';
-          }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-purple-600/20 rounded-r-3xl"></div>
       </div>

@@ -1509,42 +1509,6 @@ export type Database = {
           },
         ]
       }
-      help_center_faqs: {
-        Row: {
-          answer: string
-          category: string
-          created_at: string
-          created_by: string
-          id: string
-          is_published: boolean
-          order_index: number
-          question: string
-          updated_at: string
-        }
-        Insert: {
-          answer: string
-          category: string
-          created_at?: string
-          created_by: string
-          id?: string
-          is_published?: boolean
-          order_index?: number
-          question: string
-          updated_at?: string
-        }
-        Update: {
-          answer?: string
-          category?: string
-          created_at?: string
-          created_by?: string
-          id?: string
-          is_published?: boolean
-          order_index?: number
-          question?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       inbox_messages: {
         Row: {
           content: string

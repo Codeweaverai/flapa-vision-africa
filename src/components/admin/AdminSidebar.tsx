@@ -1,90 +1,91 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, 
   Users, 
   BookOpen, 
   Calendar, 
+  ClipboardList, 
   ShoppingCart, 
   Star, 
+  PlayCircle, 
+  Mail, 
   BarChart3, 
-  Settings,
-  FileText,
-  Mail,
-  UserCheck,
-  MessageSquare,
-  Phone,
-  Briefcase,
-  MessageCircle,
-  DollarSign,
-  Headphones,
-  HelpCircle
+  Settings, 
+  MessageSquare, 
+  Phone, 
+  Mic, 
+  Briefcase, 
+  HeadphonesIcon,
+  DollarSign
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+const sidebarItems = [
+  { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+  { name: 'Users', href: '/admin/users', icon: Users },
+  { name: 'Courses', href: '/admin/courses', icon: BookOpen },
+  { name: 'Events', href: '/admin/events', icon: Calendar },
+  { name: 'Registrations', href: '/admin/registrations', icon: ClipboardList },
+  { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
+  { name: 'Payouts', href: '/admin/payouts', icon: DollarSign },
+  { name: 'Reviews', href: '/admin/reviews', icon: Star },
+  { name: 'Media', href: '/admin/media', icon: PlayCircle },
+  { name: 'Newsletters', href: '/admin/newsletters', icon: Mail },
+  { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+  { name: 'Contact', href: '/admin/contact-submissions', icon: MessageSquare },
+  { name: 'Consultations', href: '/admin/consultations', icon: Phone },
+  { name: 'Speaking', href: '/admin/speaking', icon: Mic },
+  { name: 'Careers', href: '/admin/careers', icon: Briefcase },
+  { name: 'Support Inbox', href: '/admin/support-inbox', icon: HeadphonesIcon },
+  { name: 'Settings', href: '/admin/settings', icon: Settings },
+];
 
 const AdminSidebar = () => {
   const location = useLocation();
 
-  const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/admin/dashboard' },
-    { icon: Users, label: 'Users', href: '/admin/users' },
-    { icon: BookOpen, label: 'Courses', href: '/admin/courses' },
-    { icon: Calendar, label: 'Events', href: '/admin/events' },
-    { icon: ShoppingCart, label: 'Orders', href: '/admin/orders' },
-    { icon: Star, label: 'Reviews', href: '/admin/reviews' },
-    { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
-    { icon: FileText, label: 'Media', href: '/admin/media' },
-    { icon: Mail, label: 'Newsletters', href: '/admin/newsletters' },
-    { icon: UserCheck, label: 'Registrations', href: '/admin/registrations' },
-    { icon: MessageSquare, label: 'Consultations', href: '/admin/consultations' },
-    { icon: Phone, label: 'Speaking', href: '/admin/speaking' },
-    { icon: Briefcase, label: 'Careers', href: '/admin/careers' },
-    { icon: MessageCircle, label: 'Contact', href: '/admin/contact-submissions' },
-    { icon: DollarSign, label: 'Payouts', href: '/admin/payouts' },
-    { icon: Headphones, label: 'Support Inbox', href: '/admin/support-inbox' },
-    { icon: HelpCircle, label: 'Help Center', href: '/admin/help-center' },
-    { icon: Settings, label: 'Settings', href: '/admin/settings' },
-  ];
-
   return (
-    <div className="w-64 bg-white/90 backdrop-blur-sm shadow-xl border-r border-gray-200/50 h-screen overflow-y-auto">
-      <div className="p-6">
-        <Link to="/admin/dashboard" className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <LayoutDashboard className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-              Admin Panel
-            </h1>
-          </div>
-        </Link>
+    <div className="w-64 bg-gradient-to-b from-orange-50 via-purple-50 to-pink-50 shadow-lg border-r border-orange-200/50">
+      <div className="p-6 border-b border-orange-200/30">
+        <h2 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+          SkillPulse
+        </h2>
       </div>
       
-      <nav className="px-4 pb-4">
-        <ul className="space-y-1">
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <li key={item.href}>
+      <ScrollArea className="h-[calc(100vh-100px)]">
+        <nav className="mt-6 pb-6">
+          <div className="px-3 space-y-1">
+            {sidebarItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.href;
+              
+              return (
                 <Link
+                  key={item.name}
                   to={item.href}
                   className={cn(
-                    "flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+                    'flex items-center px-3 py-3 mb-2 text-sm font-medium rounded-lg transition-all duration-200 group',
                     isActive
-                      ? "bg-gradient-to-r from-orange-500/10 to-purple-600/10 text-orange-600 border-l-4 border-orange-500"
-                      : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900"
+                      ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg transform scale-105'
+                      : 'text-gray-700 hover:bg-gradient-to-r hover:from-orange-100 hover:to-purple-100 hover:text-orange-700 hover:shadow-md hover:transform hover:scale-102'
                   )}
                 >
-                  <item.icon className={cn("h-5 w-5", isActive ? "text-orange-500" : "text-gray-400")} />
-                  <span>{item.label}</span>
+                  <Icon className={cn(
+                    "mr-3 h-5 w-5 transition-transform duration-200",
+                    isActive ? "text-white" : "text-orange-600 group-hover:text-orange-700"
+                  )} />
+                  <span className="font-medium">{item.name}</span>
+                  {isActive && (
+                    <div className="ml-auto w-2 h-2 rounded-full bg-white opacity-80"></div>
+                  )}
                 </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+              );
+            })}
+          </div>
+        </nav>
+      </ScrollArea>
     </div>
   );
 };

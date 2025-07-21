@@ -17,26 +17,15 @@ interface MediaPost {
   published_at: string;
 }
 
-interface FAQ {
-  id: string;
-  category: string;
-  question: string;
-  answer: string;
-  order_index: number;
-}
-
 const HelpCenterPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
   const [filteredMediaPosts, setFilteredMediaPosts] = useState<MediaPost[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
-  const [faqs, setFaqs] = useState<FAQ[]>([]);
-  const [faqsLoading, setFaqsLoading] = useState(true);
 
   useEffect(() => {
     fetchMediaPosts();
-    fetchFAQs();
   }, []);
 
   useEffect(() => {
@@ -51,25 +40,6 @@ const HelpCenterPage = () => {
     }
   }, [searchTerm, mediaPosts]);
 
-  const fetchFAQs = async () => {
-    try {
-      setFaqsLoading(true);
-      const { data, error } = await supabase
-        .from('help_center_faqs')
-        .select('id, category, question, answer, order_index')
-        .eq('is_published', true)
-        .order('category', { ascending: true })
-        .order('order_index', { ascending: true });
-
-      if (error) throw error;
-      setFaqs(data || []);
-    } catch (error) {
-      console.error('Error fetching FAQs:', error);
-    } finally {
-      setFaqsLoading(false);
-    }
-  };
-
   const fetchMediaPosts = async () => {
     try {
       setMediaLoading(true);
@@ -82,6 +52,7 @@ const HelpCenterPage = () => {
 
       if (error) throw error;
       
+      // Properly type the post_type field
       const typedPosts: MediaPost[] = (data || []).map(post => ({
         ...post,
         post_type: post.post_type as 'article' | 'video' | 'podcast'
@@ -110,37 +81,117 @@ const HelpCenterPage = () => {
     {
       icon: BookOpen,
       title: "Getting Started",
-      description: "Learn the basics of using our platform"
+      description: "Learn the basics of using our platform",
+      faqs: [
+        {
+          question: "How do I create an account?",
+          answer: "Click the 'Sign Up' button in the top right corner and fill out the registration form with your email and password."
+        },
+        {
+          question: "How do I enroll in a course?",
+          answer: "Browse our course catalog, select the course you're interested in, and click the 'Enroll Now' button. For paid courses, you'll need to complete the payment process."
+        },
+        {
+          question: "How do I navigate the platform?",
+          answer: "Use the main navigation menu to access different sections like Courses, Events, Community, and your account dashboard."
+        }
+      ]
     },
     {
       icon: Settings,
       title: "Account Settings",
-      description: "Manage your profile and preferences"
+      description: "Manage your profile and preferences",
+      faqs: [
+        {
+          question: "How do I update my profile?",
+          answer: "Go to your account settings page and click on 'Profile' to update your personal information, bio, and profile picture."
+        },
+        {
+          question: "How do I change my password?",
+          answer: "In your account settings, click on 'Security' and then 'Change Password' to update your login credentials."
+        },
+        {
+          question: "How do I enable creator mode?",
+          answer: "Visit your account settings and look for the 'Creator Mode' option to start creating and selling courses."
+        }
+      ]
     },
     {
       icon: CreditCard,
       title: "Billing & Payments",
-      description: "Questions about payments and payouts"
+      description: "Questions about payments and payouts",
+      faqs: [
+        {
+          question: "What payment methods do you accept?",
+          answer: "We accept major credit cards, PayPal, and mobile money payments for supported regions."
+        },
+        {
+          question: "How do refunds work?",
+          answer: "We offer refunds within 30 days of purchase if you're not satisfied with the course. Contact our support team for assistance."
+        },
+        {
+          question: "How do I get paid as a creator?",
+          answer: "Creator earnings are processed through Stripe or mobile money based on your preference. Payouts are made according to our payout schedule."
+        }
+      ]
     },
     {
       icon: Shield,
       title: "Privacy & Security",
-      description: "Information about data protection"
+      description: "Information about data protection",
+      faqs: [
+        {
+          question: "How is my data protected?",
+          answer: "We use industry-standard encryption and security measures to protect your personal information and payment data."
+        },
+        {
+          question: "Can I delete my account?",
+          answer: "Yes, you can request account deletion through your account settings or by contacting our support team."
+        },
+        {
+          question: "Who can see my information?",
+          answer: "Your profile information visibility can be controlled in your privacy settings. We never share personal data with third parties without consent."
+        }
+      ]
     }
   ];
 
-  // Get FAQs for selected category or all FAQs
-  const selectedCategoryFaqs = selectedCategory 
-    ? faqs.filter(faq => faq.category === selectedCategory)
-    : faqs;
+  const generalFaqs = [
+    {
+      question: "Can I access courses offline?",
+      answer: "Currently, courses require an internet connection to access. We're working on offline capabilities for future updates."
+    },
+    {
+      question: "How do I track my learning progress?",
+      answer: "Your progress is automatically tracked as you complete lessons. You can view your progress in your account dashboard under 'My Courses'."
+    },
+    {
+      question: "How do I get a certificate?",
+      answer: "Certificates are available for courses that offer them. Complete all course requirements and pass any required assessments to receive your certificate."
+    },
+    {
+      question: "How do I join community discussions?",
+      answer: "Navigate to the Community section to participate in course discussions, ask questions, and connect with other learners."
+    },
+    {
+      question: "Can I create my own courses?",
+      answer: "Yes! Enable creator mode in your account settings to start creating and publishing your own courses and events."
+    },
+    {
+      question: "How do I contact support?",
+      answer: "You can contact our support team through the contact form at the bottom of this page or by emailing help@skillpulse.com."
+    }
+  ];
 
-  // Filter FAQs by search term
+  const selectedCategoryData = helpCategories.find(cat => cat.title === selectedCategory);
+  const displayFaqs = selectedCategoryData ? selectedCategoryData.faqs : generalFaqs;
+
   const filteredFaqs = searchTerm 
-    ? selectedCategoryFaqs.filter(faq => 
+    ? displayFaqs.filter(faq => 
         faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
         faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    : selectedCategoryFaqs;
+    : displayFaqs;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
@@ -232,11 +283,6 @@ const HelpCenterPage = () => {
                   <p className="text-sm text-muted-foreground text-center">
                     {category.description}
                   </p>
-                  <div className="text-center mt-2">
-                    <span className="text-xs text-muted-foreground">
-                      {faqs.filter(faq => faq.category === category.title).length} FAQs
-                    </span>
-                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -260,23 +306,16 @@ const HelpCenterPage = () => {
             <h2 className="text-3xl font-bold text-center mb-8">
               {selectedCategory ? `${selectedCategory} FAQ` : 'Frequently Asked Questions'}
             </h2>
-            
-            {faqsLoading ? (
+            {filteredFaqs.length === 0 ? (
               <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-              </div>
-            ) : filteredFaqs.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  {searchTerm ? 'No FAQs found matching your search.' : 'No FAQs available for this category.'}
-                </p>
+                <p className="text-muted-foreground">No FAQs found matching your search.</p>
               </div>
             ) : (
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                 <CardContent className="p-6">
                   <Accordion type="single" collapsible className="w-full">
-                    {filteredFaqs.map((faq) => (
-                      <AccordionItem key={faq.id} value={faq.id}>
+                    {filteredFaqs.map((faq, index) => (
+                      <AccordionItem key={index} value={`item-${index}`}>
                         <AccordionTrigger className="text-left">
                           {faq.question}
                         </AccordionTrigger>
