@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FAQ {
   id: string;
@@ -29,6 +30,7 @@ const CATEGORIES = [
 ];
 
 const AdminHelpCenter = () => {
+  const { user } = useAuth();
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingFaq, setEditingFaq] = useState<FAQ | null>(null);
@@ -63,10 +65,18 @@ const AdminHelpCenter = () => {
   };
 
   const handleAddFaq = async () => {
+    if (!user) {
+      toast.error('You must be logged in to add FAQs');
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('help_center_faqs')
-        .insert([newFaq])
+        .insert([{
+          ...newFaq,
+          created_by: user.id
+        }])
         .select()
         .single();
 
