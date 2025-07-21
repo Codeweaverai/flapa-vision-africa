@@ -239,19 +239,19 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
         // Calculate the equivalent USD amount to deduct from balance
-        const usdAmountToDeduct = withdrawAmount / exchangeRate;
+        const AmountToDeduct = withdrawAmount;
 
         console.log('Mobile Money Withdrawal:', {
           withdrawAmount,
           localCurrency,
           exchangeRate,
-          usdAmountToDeduct,
+          AmountToDeduct,
           availableBalance
         });
 
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
-            amount: usdAmountToDeduct,          // USD amount to deduct from creator balance
+            amount: AmountToDeduct,          // USD amount to deduct from creator balance
             targetAmount: withdrawAmount,       // Local currency amount to send to user
             targetCurrency: localCurrency,      // Local currency code (e.g., ZMW, KES)
             phone_number: profileData.mobile_money_number,
