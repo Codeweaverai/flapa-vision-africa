@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -91,7 +92,7 @@ const BecomeCreatorPage = () => {
     const fetchCreators = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, profile_picture, bio')
+        .select('id, full_name, avatar_url, bio')
         .eq('is_creator', true)
         .not('full_name', 'is', null)
         .limit(3);
@@ -102,7 +103,7 @@ const BecomeCreatorPage = () => {
           .map((creator, index) => ({
             id: creator.id,
             full_name: creator.full_name,
-            profile_picture: creator.profile_picture,
+            profile_picture: creator.avatar_url,
             bio: creator.bio,
             earnings: [45000, 32000, 28000][index] || 15000,
             students: [2500, 1800, 1200][index] || 500,
