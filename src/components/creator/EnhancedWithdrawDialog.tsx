@@ -252,7 +252,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
             amount: AmountToDeduct,          // USD amount to deduct from creator balance
-            targetAmount: withdrawAmount,       // Local currency amount to send to user
+            targetAmount: AmountToDeduct,       // Local currency amount to send to user
             targetCurrency: localCurrency,      // Local currency code (e.g., ZMW, KES)
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
