@@ -96,14 +96,19 @@ const BecomeCreatorPage = () => {
         .not('full_name', 'is', null)
         .limit(3);
       
-      if (data) {
-        const creatorsWithEarnings = data.map((creator, index) => ({
-          ...creator,
-          earnings: [45000, 32000, 28000][index] || 15000,
-          students: [2500, 1800, 1200][index] || 500,
-          courses: [12, 8, 6][index] || 3,
-          rating: [4.9, 4.8, 4.7][index] || 4.5
-        }));
+      if (data && data.length > 0) {
+        const creatorsWithEarnings = data
+          .filter(creator => creator && creator.id) // Filter out any null/undefined creators
+          .map((creator, index) => ({
+            id: creator.id,
+            full_name: creator.full_name,
+            profile_picture: creator.profile_picture,
+            bio: creator.bio,
+            earnings: [45000, 32000, 28000][index] || 15000,
+            students: [2500, 1800, 1200][index] || 500,
+            courses: [12, 8, 6][index] || 3,
+            rating: [4.9, 4.8, 4.7][index] || 4.5
+          }));
         setCreators(creatorsWithEarnings);
       }
     };
