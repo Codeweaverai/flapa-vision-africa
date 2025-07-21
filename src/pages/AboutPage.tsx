@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail } from 'lucide-react';
+import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail, Play } from 'lucide-react';
+import YouTubeModal from '@/components/video/YouTubeModal';
 
 const AboutPage = () => {
+  const [showVideo, setShowVideo] = useState(false);
+  const videoUrl = "https://youtu.be/B8ay-17oP_0?si=4qFRvqzRSLq_gfTH";
+
   const values = [
     {
       icon: Users,
@@ -239,6 +243,43 @@ const AboutPage = () => {
           </div>
         </section>
 
+        {/* Video Section */}
+        <section className="py-20 bg-white/50">
+          <div className="container mx-auto max-w-4xl px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                See SkillPulse in Action
+              </h2>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                Discover how SkillPulse is transforming education and empowering creators worldwide.
+              </p>
+            </div>
+            
+            <div className="relative group cursor-pointer" onClick={() => setShowVideo(true)}>
+              <div className="relative overflow-hidden rounded-2xl shadow-2xl bg-gradient-to-br from-orange-500 to-purple-600 p-1">
+                <div className="bg-black rounded-xl overflow-hidden">
+                  <div className="aspect-video bg-gradient-to-br from-orange-900/20 to-purple-900/20 flex items-center justify-center relative">
+                    <img 
+                      src="https://img.youtube.com/vi/B8ay-17oP_0/maxresdefault.jpg" 
+                      alt="SkillPulse Demo Video"
+                      className="w-full h-full object-cover opacity-80"
+                    />
+                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-6 rounded-full shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                        <Play className="h-12 w-12 text-white ml-1" fill="white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute -bottom-6 -right-6 bg-gradient-to-r from-orange-500 to-purple-600 text-white p-4 rounded-2xl shadow-xl">
+                <div className="font-bold text-lg">Watch Demo</div>
+                <div className="text-sm opacity-90">2:30 minutes</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Vision Section */}
         <section className="py-20 px-4">
           <div className="container mx-auto max-w-4xl">
@@ -282,6 +323,14 @@ const AboutPage = () => {
           </div>
         </section>
       </div>
+
+      {/* YouTube Video Modal */}
+      <YouTubeModal
+        isOpen={showVideo}
+        onClose={() => setShowVideo(false)}
+        videoUrl={videoUrl}
+        title="SkillPulse Platform Demo"
+      />
     </Layout>
   );
 };

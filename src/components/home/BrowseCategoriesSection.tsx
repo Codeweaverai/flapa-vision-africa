@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BookOpen, Code, Briefcase, Camera, Music, Heart, Search } from 'lucide-react';
+import { BookOpen, Code, Briefcase, Camera, Music, Heart, Search, TrendingUp } from 'lucide-react';
 
 const categories = [
   {
-    icon: BookOpen,
+    icon: Briefcase,
     title: 'Business',
     description: 'Leadership, entrepreneurship, and business skills',
     count: '150+ courses',
@@ -23,7 +23,7 @@ const categories = [
     searchParam: 'Technology'
   },
   {
-    icon: Briefcase,
+    icon: TrendingUp,
     title: 'Professional',
     description: 'Career development and workplace skills',
     count: '120+ courses',
@@ -139,12 +139,13 @@ const BrowseCategoriesSection = () => {
                 <Card className="h-full hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm group-hover:bg-white group-hover:-translate-y-2">
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-4">
-                      <div className="p-3 bg-gradient-to-r from-orange-100 to-purple-100 rounded-xl group-hover:from-orange-200 group-hover:to-purple-200 transition-all duration-300">
+                      <div className="p-4 bg-gradient-to-r from-orange-100 to-purple-100 rounded-xl group-hover:from-orange-200 group-hover:to-purple-200 transition-all duration-300 flex items-center justify-center">
                         <IconComponent className="h-8 w-8 text-transparent bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text" style={{
-                          WebkitBackgroundClip: 'text',
+                          filter: 'drop-shadow(0 0 0 #f97316) drop-shadow(0 0 0 #9333ea)',
+                          WebkitTextStroke: '1px transparent',
                           WebkitTextFillColor: 'transparent',
                           backgroundImage: 'linear-gradient(to right, #f97316, #9333ea)',
-                          color: 'transparent'
+                          WebkitBackgroundClip: 'text'
                         }} />
                       </div>
                       <div>
