@@ -61,7 +61,7 @@ const AboutSection = () => {
           </div>
           <div className="relative">
             <img
-              src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=400&fit=crop&crop=faces"
+              src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//african-american-blogger-reviewing-studio-light-camera%20(1).jpg?w=600&h=400&fit=crop&crop=faces"
               alt="Students learning together"
               className="rounded-2xl shadow-2xl"
             />
