@@ -98,9 +98,6 @@ const Footer = () => {
               <Link to="/terms" className="hover:text-primary transition-colors">
                 Terms of Service
               </Link>
-              <Link to="/verify" className="hover:text-primary transition-colors">
-                Verify SkillPulse Certificate
-              </Link>
             </div>
           </div>
         </div>
