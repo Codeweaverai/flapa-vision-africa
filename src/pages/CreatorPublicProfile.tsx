@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, BookOpen, Users, Award, Clock, Globe, Play, MessageCircle, Calendar, MapPin } from 'lucide-react';
+import { Star, BookOpen, Users, Award, Clock, Play, MessageCircle, Calendar, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,9 +30,6 @@ interface Course {
   is_free: boolean;
   duration_minutes: number;
   difficulty_level: string;
-  enrollments_count: number;
-  average_rating: number;
-  total_reviews: number;
 }
 
 interface Event {
@@ -46,15 +43,6 @@ interface Event {
   end_time: string;
   location: string;
   event_type: string;
-  registrations_count: number;
-}
-
-interface CreatorStats {
-  totalCourses: number;
-  totalStudents: number;
-  averageRating: number;
-  totalReviews: number;
-  totalEvents: number;
 }
 
 const CreatorPublicProfile: React.FC = () => {
@@ -63,19 +51,15 @@ const CreatorPublicProfile: React.FC = () => {
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [stats, setStats] = useState<CreatorStats>({
-    totalCourses: 0,
-    totalStudents: 0,
-    averageRating: 0,
-    totalReviews: 0,
-    totalEvents: 0
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (creatorId) {
       fetchCreatorData();
+    } else {
+      setError('No creator ID provided');
+      setLoading(false);
     }
   }, [creatorId]);
 
@@ -86,105 +70,71 @@ const CreatorPublicProfile: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      console.log('Fetching creator profile...');
+      console.log('Fetching creator profile for ID:', creatorId);
       
-      // First fetch creator profile
-      const { data: profile, error: profileError } = await supabase
+      // Fetch creator profile with timeout
+      const profilePromise = supabase
         .from('profiles')
         .select('id, full_name, bio, avatar_url, username, is_creator, role')
         .eq('id', creatorId)
         .single();
+
+      const { data: profile, error: profileError } = await Promise.race([
+        profilePromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        )
+      ]) as any;
 
       if (profileError) {
         console.error('Profile error:', profileError);
         throw new Error('Creator profile not found');
       }
 
+      if (!profile) {
+        throw new Error('Creator profile not found');
+      }
+
       console.log('Profile loaded:', profile);
       setCreator(profile);
 
-      // Fetch courses with simplified query
-      console.log('Fetching courses...');
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
-        .select(`
-          id,
-          title,
-          description,
-          thumbnail_url,
-          price,
-          is_free,
-          duration_minutes,
-          difficulty_level
-        `)
-        .eq('creator_id', creatorId)
-        .eq('is_published', true);
+      // Fetch courses and events in parallel with simplified queries
+      const [coursesResult, eventsResult] = await Promise.allSettled([
+        supabase
+          .from('courses')
+          .select('id, title, description, thumbnail_url, price, is_free, duration_minutes, difficulty_level')
+          .eq('creator_id', creatorId)
+          .eq('is_published', true)
+          .limit(10),
+        
+        supabase
+          .from('events')
+          .select('id, title, description, image_url, price, is_free, start_time, end_time, location, event_type')
+          .eq('creator_id', creatorId)
+          .limit(10)
+      ]);
 
-      if (coursesError) {
-        console.error('Courses error:', coursesError);
+      // Handle courses result
+      if (coursesResult.status === 'fulfilled' && !coursesResult.value.error) {
+        setCourses(coursesResult.value.data || []);
+        console.log('Courses loaded:', coursesResult.value.data?.length || 0);
+      } else {
+        console.error('Courses error:', coursesResult.status === 'rejected' ? coursesResult.reason : coursesResult.value.error);
+        setCourses([]);
       }
 
-      const courses = coursesData || [];
-      console.log('Courses loaded:', courses.length);
-
-      // Fetch events with simplified query
-      console.log('Fetching events...');
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('events')
-        .select(`
-          id,
-          title,
-          description,
-          image_url,
-          price,
-          is_free,
-          start_time,
-          end_time,
-          location,
-          event_type
-        `)
-        .eq('creator_id', creatorId);
-
-      if (eventsError) {
-        console.error('Events error:', eventsError);
+      // Handle events result
+      if (eventsResult.status === 'fulfilled' && !eventsResult.value.error) {
+        setEvents(eventsResult.value.data || []);
+        console.log('Events loaded:', eventsResult.value.data?.length || 0);
+      } else {
+        console.error('Events error:', eventsResult.status === 'rejected' ? eventsResult.reason : eventsResult.value.error);
+        setEvents([]);
       }
-
-      const events = eventsData || [];
-      console.log('Events loaded:', events.length);
-
-      // Calculate basic stats without complex joins
-      const totalCourses = courses.length;
-      const totalEvents = events.length;
-
-      // Add default values for missing stats
-      const coursesWithDefaults = courses.map(course => ({
-        ...course,
-        enrollments_count: 0,
-        average_rating: 0,
-        total_reviews: 0
-      }));
-
-      const eventsWithDefaults = events.map(event => ({
-        ...event,
-        registrations_count: 0
-      }));
-
-      setCourses(coursesWithDefaults);
-      setEvents(eventsWithDefaults);
-      
-      setStats({
-        totalCourses,
-        totalStudents: 0,
-        averageRating: 0,
-        totalReviews: 0,
-        totalEvents
-      });
-
-      console.log('All data loaded successfully');
 
     } catch (error) {
       console.error('Error fetching creator data:', error);
-      setError('Failed to load creator profile');
+      setError(error instanceof Error ? error.message : 'Failed to load creator profile');
       toast.error('Failed to load creator profile');
     } finally {
       setLoading(false);
@@ -225,21 +175,6 @@ const CreatorPublicProfile: React.FC = () => {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
     }
-  };
-
-  const renderStars = (rating: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <Star
-          key={i}
-          className={`w-4 h-4 ${
-            i <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-          }`}
-        />
-      );
-    }
-    return <div className="flex">{stars}</div>;
   };
 
   const formatEventDate = (dateString: string) => {
@@ -291,10 +226,10 @@ const CreatorPublicProfile: React.FC = () => {
               <h2 className="text-xl font-semibold mb-2">
                 {error || 'Creator Not Found'}
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mb-4">
                 {error || "The creator profile you're looking for doesn't exist."}
               </p>
-              <Button asChild className="mt-4">
+              <Button asChild>
                 <Link to="/courses">Browse Courses</Link>
               </Button>
             </CardContent>
@@ -351,15 +286,11 @@ const CreatorPublicProfile: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground mb-4">
                     <div className="flex items-center gap-1">
                       <BookOpen className="w-4 h-4 text-orange-500" />
-                      <span>{stats.totalCourses} Courses</span>
+                      <span>{courses.length} Courses</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4 text-purple-500" />
-                      <span>{stats.totalEvents} Events</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4 text-purple-500" />
-                      <span>{stats.totalStudents} Students</span>
+                      <span>{events.length} Events</span>
                     </div>
                   </div>
                   
