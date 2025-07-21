@@ -23,6 +23,10 @@ interface MediaPost {
   content_type: string;
   is_published: boolean;
   created_at: string;
+  content: string;
+  post_type: string;
+  category?: string;
+  media_url?: string;
 }
 
 const HelpCenterPage = () => {
@@ -49,7 +53,7 @@ const HelpCenterPage = () => {
       if (faqError) throw faqError;
       setFaqs(faqData || []);
 
-      // Fetch media posts
+      // Fetch media posts with proper mapping
       const { data: mediaData, error: mediaError } = await supabase
         .from('media_posts')
         .select('*')
@@ -59,7 +63,23 @@ const HelpCenterPage = () => {
       if (mediaError) {
         console.error('Error fetching media posts:', mediaError);
       }
-      setMediaPosts(mediaData || []);
+      
+      // Transform the data to match MediaPost interface
+      const transformedMediaData = (mediaData || []).map(post => ({
+        id: post.id,
+        title: post.title,
+        description: post.summary || post.content?.substring(0, 150) + '...' || '',
+        image_url: post.image_url || '',
+        content_type: post.post_type || 'article',
+        is_published: post.is_published,
+        created_at: post.created_at,
+        content: post.content || '',
+        post_type: post.post_type || 'article',
+        category: post.category,
+        media_url: post.media_url
+      }));
+      
+      setMediaPosts(transformedMediaData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
