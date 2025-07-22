@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown, ChevronUp, BookOpen, Settings, CreditCard, Shield, Play, Calendar, Eye, MessageCircle } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, BookOpen, Settings, CreditCard, Shield, Play, Calendar, Eye, MessageCircle, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
 import HelpCenterChatbot from '@/components/helpcenter/HelpCenterChatbot';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FAQ {
   id: string;
@@ -39,6 +40,7 @@ const HelpCenterPage = () => {
   const [loading, setLoading] = useState(true);
   const [showChatbot, setShowChatbot] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchData();
@@ -156,6 +158,34 @@ const HelpCenterPage = () => {
 
   const handleViewPost = (postId: string) => {
     navigate(`/media/${postId}`);
+  };
+
+  const handleContactSupport = async () => {
+    if (!user) {
+      toast.error('Please sign in to contact support');
+      return;
+    }
+
+    try {
+      // Create a support message in the inbox
+      const { error } = await supabase
+        .from('inbox_messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: null, // System/Admin message
+          subject: 'Support Request',
+          content: 'Hello, I need assistance with the platform. Please help me.',
+          message_type: 'support'
+        });
+
+      if (error) throw error;
+
+      toast.success('Support request created successfully');
+      navigate('/inbox');
+    } catch (error) {
+      console.error('Error creating support request:', error);
+      toast.error('Failed to create support request');
+    }
   };
 
   if (loading) {
@@ -376,9 +406,13 @@ const HelpCenterPage = () => {
                     <MessageCircle className="w-4 h-4 mr-2" />
                     AI Support Chat
                   </Button>
-                  <button className="border-2 border-gray-200 px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200">
-                    Browse Tutorials
-                  </button>
+                  <Button
+                    onClick={handleContactSupport}
+                    className="border-2 border-gray-200 px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200 bg-gradient-to-r from-orange-100 to-purple-100 text-gray-800"
+                  >
+                    <HelpCircle className="w-4 h-4 mr-2" />
+                    Contact Support
+                  </Button>
                 </div>
               </div>
             </CardContent>
