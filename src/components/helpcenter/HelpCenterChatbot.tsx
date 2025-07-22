@@ -1,34 +1,43 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { X, Send, MessageCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { toast } from 'sonner';
 
-interface Message {
+interface ChatMessage {
   id: string;
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
 }
 
-const HelpCenterChatbot: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+interface HelpCenterChatbotProps {
+  onClose: () => void;
+}
+
+const HelpCenterChatbot: React.FC<HelpCenterChatbotProps> = ({ onClose }) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Initialize with welcome message
-    setMessages([{
-      id: 'welcome',
-      type: 'assistant',
-      content: 'Hello! I\'m here to help you with any questions about our platform. How can I assist you today?',
-      timestamp: new Date()
-    }]);
+    loadChatHistory();
+    // Add welcome message if no history
+    if (messages.length === 0) {
+      setMessages([{
+        id: 'welcome',
+        type: 'assistant',
+        content: 'Hello! I\'m your Help Center AI assistant. I can help you with questions about our platform, courses, events, orders, and more. How can I assist you today?',
+        timestamp: new Date()
+      }]);
+    }
   }, []);
 
   useEffect(() => {
@@ -39,10 +48,61 @@ const HelpCenterChatbot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const loadChatHistory = async () => {
+    if (!user) {
+      setIsLoadingHistory(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('ai_chat_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('lesson_id', null)
+        .is('course_id', null)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const chatMessages = data.map(msg => ({
+          id: msg.id,
+          type: msg.message_type as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at)
+        }));
+        setMessages(chatMessages);
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const saveChatMessage = async (type: 'user' | 'assistant', content: string) => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('ai_chat_history')
+        .insert({
+          user_id: user.id,
+          message_type: type,
+          content,
+          context_data: {}
+        });
+    } catch (error) {
+      console.error('Error saving chat message:', error);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
       content: inputMessage.trim(),
@@ -53,33 +113,37 @@ const HelpCenterChatbot: React.FC = () => {
     setInputMessage('');
     setIsLoading(true);
 
+    // Save user message
+    await saveChatMessage('user', userMessage.content);
+
     try {
       const { data, error } = await supabase.functions.invoke('help-center-support', {
         body: {
           message: userMessage.content,
-          context: 'help_center'
+          userId: user?.id
         }
       });
 
       if (error) throw error;
 
-      const assistantMessage: Message = {
+      const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: data.response || 'I apologize, but I encountered an error. Please try again or contact our support team.',
+        content: data.response || 'I apologize, but I encountered an error processing your request. Please try again.',
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Save assistant message
+      await saveChatMessage('assistant', assistantMessage.content);
 
     } catch (error) {
-      console.error('Error getting help center response:', error);
-      toast.error('Failed to get response. Please try again.');
-      
-      const errorMessage: Message = {
+      console.error('Error getting AI response:', error);
+      const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again or contact our support team directly.",
+        content: 'I apologize, but I\'m having trouble connecting to the support system right now. Please try again in a moment or contact our support team directly.',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -95,91 +159,100 @@ const HelpCenterChatbot: React.FC = () => {
     }
   };
 
+  if (isLoadingHistory) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <p>Loading chat...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <Card className="h-[600px] flex flex-col">
-      <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          Help Center Assistant
-        </CardTitle>
-      </CardHeader>
-      
-      <CardContent className="flex flex-col flex-1 p-0">
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex items-start gap-3 ${
-                  message.type === 'user' ? 'flex-row-reverse' : ''
-                }`}
-              >
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.type === 'user' 
-                    ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white' 
-                    : 'bg-blue-100 text-blue-600'
-                }`}>
-                  {message.type === 'user' ? (
-                    <User className="h-4 w-4" />
-                  ) : (
-                    <Bot className="h-4 w-4" />
-                  )}
-                </div>
-                
-                <div className={`flex-1 ${message.type === 'user' ? 'text-right' : ''}`}>
-                  <div className={`inline-block max-w-[85%] p-3 rounded-lg text-sm ${
-                    message.type === 'user'
-                      ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {message.content}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {message.timestamp.toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {isLoading && (
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div className="bg-gray-100 p-3 rounded-lg text-sm">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
-        
-        <div className="p-4 border-t">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Type your message here..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="flex-1"
-              disabled={isLoading}
-            />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl h-[600px] flex flex-col bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5" />
+              Help Center AI Support
+            </div>
             <Button
-              onClick={handleSendMessage}
-              disabled={isLoading || !inputMessage.trim()}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 px-4"
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="text-white hover:bg-white/20"
             >
-              <Send className="h-4 w-4" />
+              <X className="w-4 h-4" />
             </Button>
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="flex-1 flex flex-col p-0">
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[80%] p-3 rounded-lg ${
+                      message.type === 'user'
+                        ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {message.timestamp.toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 p-3 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">Thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+
+          <div className="p-4 border-t">
+            <div className="flex gap-2">
+              <Input
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask me anything about our platform..."
+                className="flex-1"
+                disabled={isLoading}
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isLoading}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

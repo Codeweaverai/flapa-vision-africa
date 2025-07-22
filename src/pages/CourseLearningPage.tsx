@@ -24,7 +24,6 @@ import {
 import VideoPlayer from '@/components/video/VideoPlayer';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import FinalExamModal from '@/components/course/FinalExamModal';
-import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
 
 interface Course {
   id: string;
@@ -748,14 +747,6 @@ const CourseLearningPage: React.FC = () => {
           enrollmentId={enrollmentId}
         />
       )}
-
-      {/* Floating AI Learning Assistant */}
-      <FloatingAILearningAssistant
-        courseId={courseId}
-        lessonId={currentLesson?.id}
-        lessonTitle={currentLesson?.title}
-        lessonContent={currentLesson?.content}
-      />
     </Layout>
   );
 };
