@@ -338,7 +338,7 @@ const CourseLearningPage: React.FC = () => {
           is_completed: completed,
           completion_date: completed ? new Date().toISOString() : null
         }, {
-          onConflict: 'lesson_id,enrollment_id'
+          onConflict: 'enrollment_id,lesson_id'
         });
 
       if (error) throw error;
@@ -479,12 +479,20 @@ const CourseLearningPage: React.FC = () => {
   };
 
   const handleTakeFinalExam = () => {
-    if (finalExam && (courseCompleted || canRetakeExam)) {
+    console.log('Final exam data:', finalExam);
+    console.log('Course completed:', courseCompleted);
+    console.log('Can retake exam:', canRetakeExam);
+    console.log('Has passed exam:', hasPassedExam);
+    
+    if (finalExam) {
       setShowFinalExamModal(true);
+    } else {
+      toast.error('Final exam not available');
     }
   };
 
   const handleExamComplete = (result: any) => {
+    console.log('Exam completed with result:', result);
     setShowFinalExamModal(false);
     
     // Convert result to match ExamResult interface
@@ -507,6 +515,7 @@ const CourseLearningPage: React.FC = () => {
   };
 
   const handleRetakeExam = () => {
+    setShowExamResultsModal(false);
     setShowFinalExamModal(true);
   };
 
@@ -521,7 +530,7 @@ const CourseLearningPage: React.FC = () => {
   };
 
   const shouldShowFinalExamButton = () => {
-    return finalExam && courseCompleted && !hasPassedExam;
+    return finalExam && (courseCompleted || canRetakeExam);
   };
 
   const shouldShowRetakeButton = () => {
