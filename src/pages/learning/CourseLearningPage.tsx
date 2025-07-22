@@ -36,6 +36,7 @@ import FinalExamModal from '@/components/course/FinalExamModal';
 import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
+import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
 
 interface Course {
   id?: string;
@@ -888,6 +889,14 @@ const CourseLearningPage = () => {
             </Tabs>
           </div>
         </div>
+
+        {/* Floating AI Learning Assistant */}
+        <FloatingAILearningAssistant 
+          courseId={courseId!}
+          lessonId={selectedLesson?.id}
+          lessonTitle={selectedLesson?.title}
+          lessonContent={typeof selectedLesson?.content === 'string' ? selectedLesson.content : JSON.stringify(selectedLesson?.content)}
+        />
 
         {/* Enrollment Actions */}
         {(!enrollment || enrollment.payment_status !== 'completed') && (

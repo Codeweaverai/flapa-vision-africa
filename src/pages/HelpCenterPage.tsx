@@ -376,9 +376,12 @@ const HelpCenterPage = () => {
                     <MessageCircle className="w-4 h-4 mr-2" />
                     AI Support Chat
                   </Button>
-                  <button className="border-2 border-gray-200 px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200">
-                    Browse Tutorials
-                  </button>
+                  <Button
+                    onClick={() => navigate('/contact')}
+                    className="border-2 border-gray-200 px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200"
+                  >
+                    Contact Support
+                  </Button>
                 </div>
               </div>
             </CardContent>
