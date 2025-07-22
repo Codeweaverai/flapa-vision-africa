@@ -26,6 +26,7 @@ const HelpCenterChatbot: React.FC<HelpCenterChatbotProps> = ({ onClose }) => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadChatHistory();
@@ -45,7 +46,9 @@ const HelpCenterChatbot: React.FC<HelpCenterChatbotProps> = ({ onClose }) => {
   }, [messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const loadChatHistory = async () => {
@@ -192,9 +195,12 @@ const HelpCenterChatbot: React.FC<HelpCenterChatbotProps> = ({ onClose }) => {
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
+        <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+          <ScrollArea 
+            ref={scrollAreaRef}
+            className="flex-1 h-full"
+          >
+            <div className="p-4 space-y-4">
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -231,7 +237,7 @@ const HelpCenterChatbot: React.FC<HelpCenterChatbotProps> = ({ onClose }) => {
             </div>
           </ScrollArea>
 
-          <div className="p-4 border-t">
+          <div className="p-4 border-t bg-white">
             <div className="flex gap-2">
               <Input
                 value={inputMessage}

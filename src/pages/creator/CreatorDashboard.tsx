@@ -17,7 +17,7 @@ import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog'
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { supabase } from '@/lib/supabaseClient';
-import CreatorAIAssistant from '@/components/creator/CreatorAIAssistant';
+import CreatorFloatingAI from '@/components/creator/CreatorFloatingAI';
 
 interface DashboardStats {
   totalCourses: number;
@@ -203,6 +203,7 @@ const CreatorDashboard = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         </div>
+        <CreatorFloatingAI />
       </CreatorLayout>
     );
   }
@@ -461,7 +462,7 @@ const CreatorDashboard = () => {
       </div>
       
       {/* Add Creator AI Assistant */}
-      <CreatorAIAssistant />
+      <CreatorFloatingAI />
     </CreatorLayout>
   );
 };
