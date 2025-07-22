@@ -145,13 +145,19 @@ interface Profile {
   bio?: string;
 }
 
+interface ExamResult {
+  id: string;
+  passed: boolean;
+  score: number;
+  final_grade: number;
+  quiz_scores: number[];
+  attempt_number: number;
+}
+
 const CourseLearningPage = () => {
   const params = useParams();
   const navigate = useNavigate();
   const courseId = params.courseId || params.id;
-  
-  console.log("All URL params:", params);
-  console.log("Extracted courseId:", courseId);
   
   const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
@@ -177,161 +183,114 @@ const CourseLearningPage = () => {
   const [quizPassed, setQuizPassed] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [examResult, setExamResult] = useState<ExamResult | null>(null);
+  const [hasPassedExam, setHasPassedExam] = useState(false);
+  const [canRetakeExam, setCanRetakeExam] = useState(false);
+  const [showFinalExamModal, setShowFinalExamModal] = useState(false);
 
   useEffect(() => {
-    console.log("courseId:", courseId, "user:", user);
-    
-    // Only proceed if we have courseId (user can be null for public access)
     if (courseId) {
-      console.log("courseId available, fetching data...");
       fetchCourseData();
-      
-      // Only fetch user-specific data if user is available
       if (user?.id) {
-        console.log("User available, fetching enrollment and progress...");
         fetchEnrollmentData();
         fetchProgress();
         fetchCompletedLessons();
       }
     } else {
-      console.log("No courseId found in URL params");
       setLoading(false);
     }
   }, [courseId, user]);
 
   const fetchCourseData = async () => {
     if (!courseId) {
-      console.error("No courseId provided");
       setLoading(false);
       return;
     }
 
-    console.log("Fetching course data for courseId:", courseId);
     setLoading(true);
     
     try {
-      // Fetch course details with maybeSingle() for better error handling
-      console.log("Fetching course with ID:", courseId);
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select('*')
         .eq('id', courseId)
         .maybeSingle();
 
-      if (courseError) {
-        console.error('Error fetching course:', courseError);
-        throw courseError;
-      }
+      if (courseError) throw courseError;
 
       if (!courseData) {
-        console.log("No course found with ID:", courseId);
         setCourse(null);
         setLoading(false);
         return;
       }
 
-      console.log("Course data fetched successfully:", courseData);
       setCourse(courseData as Course);
 
-      // Fetch modules
-      console.log("Fetching modules for course:", courseId);
       const { data: modulesData, error: modulesError } = await supabase
         .from('course_modules')
         .select('*')
         .eq('course_id', courseId)
         .order('order_index', { ascending: true });
 
-      if (modulesError) {
-        console.error('Error fetching modules:', modulesError);
-        throw modulesError;
-      }
+      if (modulesError) throw modulesError;
 
-      console.log("Modules data fetched:", modulesData);
-
-      // Fetch lessons for each module separately
       const modulesWithLessons = await Promise.all(
         (modulesData as CourseModule[]).map(async (module) => {
-          try {
-            console.log("Fetching lessons for module:", module.id);
-            const { data: lessonsData, error: lessonsError } = await supabase
-              .from('lessons')
-              .select('*')
-              .eq('module_id', module.id)
-              .order('order_index', { ascending: true });
+          const { data: lessonsData, error: lessonsError } = await supabase
+            .from('lessons')
+            .select('*')
+            .eq('module_id', module.id)
+            .order('order_index', { ascending: true });
 
-            if (lessonsError) {
-              console.error('Error fetching lessons for module:', module.id, lessonsError);
-              return { ...module, lessons: [] };
-            }
+          if (lessonsError) return { ...module, lessons: [] };
 
-            console.log(`Lessons for module ${module.id}:`, lessonsData);
-            return {
-              ...module,
-              lessons: lessonsData as CourseLesson[],
-            };
-          } catch (error) {
-            console.error('Error in lesson fetch for module:', module.id, error);
-            return { ...module, lessons: [] };
-          }
+          return {
+            ...module,
+            lessons: lessonsData as CourseLesson[],
+          };
         })
       );
       
       setModules(modulesWithLessons);
 
-      // Fetch enrollment count
       const { count: enrolledCount, error: enrollCountError } = await supabase
         .from('course_enrollments')
         .select('*', { count: 'exact' })
         .eq('course_id', courseId);
 
-      if (enrollCountError) {
-        console.error('Error fetching enrollment count:', enrollCountError);
-      } else {
-        setEnrollmentCount(enrolledCount || 0);
-      }
+      if (enrollCountError) throw enrollCountError;
+      setEnrollmentCount(enrolledCount || 0);
 
-      // Fetch average rating and review count
       const { data: ratingData, error: ratingError } = await supabase
         .from('course_reviews')
         .select('rating')
         .eq('course_id', courseId);
 
-      if (ratingError) {
-        console.error('Error fetching ratings:', ratingError);
-      } else {
-        const ratings = ratingData?.map((review) => review.rating) || [];
-        const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
-        const avgRating = ratings.length > 0 ? totalRating / ratings.length : 0;
-        setAverageRating(avgRating);
-        setReviewCount(ratings.length);
-      }
+      if (ratingError) throw ratingError;
 
-      // Fetch learning outcomes
+      const ratings = ratingData?.map((review) => review.rating) || [];
+      const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
+      const avgRating = ratings.length > 0 ? totalRating / ratings.length : 0;
+      setAverageRating(avgRating);
+      setReviewCount(ratings.length);
+
       const { data: outcomesData, error: outcomesError } = await supabase
         .from('course_learning_outcomes')
         .select('*')
         .eq('course_id', courseId);
 
-      if (outcomesError) {
-        console.error('Error fetching learning outcomes:', outcomesError);
-      } else {
-        setLearningOutcomes(outcomesData as LearningOutcome[]);
-      }
+      if (outcomesError) throw outcomesError;
+      setLearningOutcomes(outcomesData as LearningOutcome[]);
 
-      // Fetch final exam
       const { data: examData, error: examError } = await supabase
         .from('final_exams')
         .select('*')
         .eq('course_id', courseId)
         .maybeSingle();
 
-      if (examError) {
-        console.error('Error fetching final exam:', examError);
-      } else if (examData) {
-        setFinalExam(examData as FinalExam);
-      }
+      if (examError) throw examError;
+      if (examData) setFinalExam(examData as FinalExam);
 
-      // Fetch instructor profile
       if (courseData?.creator_id) {
         const { data: instructorData, error: instructorError } = await supabase
           .from('profiles')
@@ -339,14 +298,10 @@ const CourseLearningPage = () => {
           .eq('id', courseData.creator_id)
           .maybeSingle();
 
-        if (instructorError) {
-          console.error('Error fetching instructor profile:', instructorError);
-        } else if (instructorData) {
-          setInstructor(instructorData as Profile);
-        }
+        if (instructorError) throw instructorError;
+        if (instructorData) setInstructor(instructorData as Profile);
       }
     } catch (error) {
-      console.error('Error fetching course data:', error);
       toast.error('Failed to load course data');
     } finally {
       setLoading(false);
@@ -354,20 +309,15 @@ const CourseLearningPage = () => {
   };
 
   const fetchEnrollmentData = async () => {
-    // Get current user if context user is not available
     let currentUser = user;
     if (!currentUser) {
       const { data: { user: sessionUser } } = await supabase.auth.getUser();
       currentUser = sessionUser;
     }
 
-    if (!currentUser?.id || !courseId) {
-      console.log("No user or courseId for enrollment fetch");
-      return;
-    }
+    if (!currentUser?.id || !courseId) return;
     
     try {
-      console.log("Fetching enrollment data for user:", currentUser.id, "course:", courseId);
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select('*')
@@ -375,32 +325,23 @@ const CourseLearningPage = () => {
         .eq('course_id', courseId)
         .maybeSingle();
 
-      if (enrollmentError && enrollmentError.code !== 'PGRST116') {
-        console.error('Error fetching enrollment data:', enrollmentError);
-      } else {
-        console.log("Enrollment data:", enrollmentData);
-        setEnrollment(enrollmentData as CourseEnrollment);
-      }
+      if (enrollmentError) throw enrollmentError;
+      setEnrollment(enrollmentData as CourseEnrollment);
     } catch (error) {
       console.error('Error fetching enrollment data:', error);
     }
   };
 
   const fetchProgress = async () => {
-    // Get current user if context user is not available
     let currentUser = user;
     if (!currentUser) {
       const { data: { user: sessionUser } } = await supabase.auth.getUser();
       currentUser = sessionUser;
     }
 
-    if (!currentUser?.id || !courseId) {
-      console.log("No user or courseId for progress fetch");
-      return;
-    }
+    if (!currentUser?.id || !courseId) return;
     
     try {
-      console.log("Fetching progress for user:", currentUser.id, "course:", courseId);
       const { data: progressData, error: progressError } = await supabase
         .from('course_progress')
         .select('*')
@@ -408,38 +349,26 @@ const CourseLearningPage = () => {
         .eq('course_id', courseId)
         .maybeSingle();
 
-      if (progressError && progressError.code !== 'PGRST116') {
-        console.error('Error fetching progress data:', progressError);
-      } else if (progressData) {
-        console.log("Progress data:", progressData);
-        setProgress(progressData as ProgressData);
-      }
+      if (progressError) throw progressError;
+      if (progressData) setProgress(progressData as ProgressData);
     } catch (error) {
       console.error('Error fetching progress data:', error);
     }
   };
 
   const fetchCompletedLessons = async () => {
-    if (!user || !enrollment) {
-      console.log("No user or enrollment for completed lessons fetch");
-      return;
-    }
+    if (!user || !enrollment) return;
     
     try {
-      console.log("Fetching completed lessons for enrollment:", enrollment.id);
       const { data: completedData, error } = await supabase
         .from('lesson_progress')
         .select('lesson_id')
         .eq('enrollment_id', enrollment.id)
         .eq('is_completed', true);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching completed lessons:', error);
-      } else {
-        const completedIds = completedData?.map(item => item.lesson_id) || [];
-        console.log("Completed lessons:", completedIds);
-        setCompletedLessons(completedIds);
-      }
+      if (error) throw error;
+      const completedIds = completedData?.map(item => item.lesson_id) || [];
+      setCompletedLessons(completedIds);
     } catch (error) {
       console.error('Error fetching completed lessons:', error);
     }
@@ -460,11 +389,8 @@ const CourseLearningPage = () => {
           onConflict: 'user_id,course_id'
         });
 
-      if (progressError) {
-        console.error('Error updating course progress:', progressError);
-      } else {
-        await fetchProgress();
-      }
+      if (progressError) throw progressError;
+      await fetchProgress();
     } catch (error) {
       console.error('Error updating course progress:', error);
     }
@@ -546,13 +472,11 @@ const CourseLearningPage = () => {
   };
 
   const handleVideoProgress = (progress: { played: number, playedSeconds: number, loaded: number, loadedSeconds: number }) => {
-    // Update current video time for transcripts
     setCurrentVideoTime(progress.playedSeconds);
     
     if (progress.playedSeconds > 0 && selectedLesson && enrollment) {
       const watchPercentage = progress.played * 100;
       if (watchPercentage > 80) {
-        // Mark lesson as complete if 80% watched
         supabase
           .from('lesson_progress')
           .upsert({
@@ -565,7 +489,6 @@ const CourseLearningPage = () => {
           })
           .then(() => {
             fetchCompletedLessons();
-            // Update overall course progress
             const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
             const completedCount = completedLessons.length + 1;
             const progressPercentage = Math.round((completedCount / totalLessons) * 100);
@@ -576,10 +499,6 @@ const CourseLearningPage = () => {
   };
 
   const handleSeekTo = (time: number) => {
-    // Since we're using ReactPlayer, we can't directly seek
-    // This would need to be implemented with a ref to the ReactPlayer
-    console.log('Seek to:', time);
-    // For now, just update the current time
     setCurrentVideoTime(time);
   };
 
@@ -630,7 +549,6 @@ const CourseLearningPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <div className="container mx-auto px-4 py-8">
-        {/* Course Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Badge variant="secondary">{course.category}</Badge>
@@ -661,7 +579,6 @@ const CourseLearningPage = () => {
           </div>
         </div>
 
-        {/* Progress Bar for Enrolled Users */}
         {enrollment && enrollment.payment_status === 'completed' && (
           <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
             <CardContent className="p-6">
@@ -719,7 +636,6 @@ const CourseLearningPage = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Course Curriculum Sidebar */}
           <div className="lg:col-span-5">
             <Card className="sticky top-4">
               <CardHeader>
@@ -743,9 +659,7 @@ const CourseLearningPage = () => {
             </Card>
           </div>
 
-          {/* Main Content */}
           <div className="lg:col-span-7">
-            {/* Video Player Section */}
             {enrollment && enrollment.payment_status === 'completed' && selectedLesson && selectedLesson.video_url && (
               <Card className="mb-6">
                 <CardHeader>
@@ -890,7 +804,6 @@ const CourseLearningPage = () => {
           </div>
         </div>
 
-        {/* Floating AI Learning Assistant */}
         <FloatingAILearningAssistant 
           courseId={courseId!}
           lessonId={selectedLesson?.id}
@@ -898,7 +811,6 @@ const CourseLearningPage = () => {
           lessonContent={typeof selectedLesson?.content === 'string' ? selectedLesson.content : JSON.stringify(selectedLesson?.content)}
         />
 
-        {/* Enrollment Actions */}
         {(!enrollment || enrollment.payment_status !== 'completed') && (
           <Card className="mt-8 sticky bottom-4">
             <CardContent className="p-6">
@@ -941,7 +853,6 @@ const CourseLearningPage = () => {
           </Card>
         )}
 
-        {/* Instructor Card */}
         {instructor && (
           <Card className="mt-8">
             <CardHeader>
@@ -985,17 +896,16 @@ const CourseLearningPage = () => {
           </Card>
         )}
 
-        {/* Final Exam Modal */}
         {finalExam && (
           <FinalExamModal
             isOpen={showExamModal}
             onClose={() => setShowExamModal(false)}
             exam={finalExam}
             enrollmentId={enrollment?.id || ''}
+            onComplete={handleExamComplete}
           />
         )}
 
-        {/* Quiz Modal */}
         <QuizModal
           isOpen={showQuizModal}
           onClose={() => setShowQuizModal(false)}
@@ -1004,7 +914,6 @@ const CourseLearningPage = () => {
           onComplete={handleQuizComplete}
         />
 
-        {/* Quiz Results Modal */}
         {currentQuiz && (
           <QuizResultsModal
             isOpen={showQuizResultsModal}

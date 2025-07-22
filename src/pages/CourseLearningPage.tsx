@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -280,7 +279,20 @@ const CourseLearningPage: React.FC = () => {
           const latestResult = examResults[0];
           setHasPassedExam(latestResult.passed);
           setCanRetakeExam(!latestResult.passed);
-          setExamResult(latestResult);
+          
+          // Convert quiz_scores from Json to number[]
+          const quizScores = Array.isArray(latestResult.quiz_scores) 
+            ? latestResult.quiz_scores as number[]
+            : [];
+            
+          setExamResult({
+            id: latestResult.id,
+            passed: latestResult.passed,
+            score: latestResult.score,
+            final_grade: latestResult.final_grade,
+            quiz_scores: quizScores,
+            attempt_number: latestResult.attempt_number
+          });
         }
       }
 
@@ -474,7 +486,18 @@ const CourseLearningPage: React.FC = () => {
 
   const handleExamComplete = (result: any) => {
     setShowFinalExamModal(false);
-    setExamResult(result);
+    
+    // Convert result to match ExamResult interface
+    const examResult: ExamResult = {
+      id: result.id || '',
+      passed: result.passed,
+      score: result.score,
+      final_grade: result.final_grade,
+      quiz_scores: Array.isArray(result.quiz_scores) ? result.quiz_scores : [],
+      attempt_number: result.attempt_number
+    };
+    
+    setExamResult(examResult);
     setHasPassedExam(result.passed);
     setCanRetakeExam(!result.passed);
     setShowExamResultsModal(true);
@@ -795,7 +818,7 @@ const CourseLearningPage: React.FC = () => {
           quizScores={examResult.quiz_scores}
           finalGrade={examResult.final_grade}
           passed={examResult.passed}
-          courseName={course.title}
+          courseName={course?.title || 'Course'}
           studentName={user?.email || 'Student'}
           enrollmentId={enrollmentId || ''}
           onRetake={handleRetakeExam}
