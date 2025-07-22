@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,7 @@ import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog'
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { supabase } from '@/lib/supabaseClient';
+import CreatorAIAssistant from '@/components/creator/CreatorAIAssistant';
 
 interface DashboardStats {
   totalCourses: number;
@@ -459,6 +459,9 @@ const CreatorDashboard = () => {
           />
         </div>
       </div>
+      
+      {/* Add Creator AI Assistant */}
+      <CreatorAIAssistant />
     </CreatorLayout>
   );
 };

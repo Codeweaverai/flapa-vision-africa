@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
+import LearningAIAssistant from '@/components/learning/LearningAIAssistant';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -594,6 +594,9 @@ const LearningPage = () => {
           )}
         </div>
       </div>
+
+      {/* Add Learning AI Assistant */}
+      <LearningAIAssistant />
     </Layout>
   );
 };
