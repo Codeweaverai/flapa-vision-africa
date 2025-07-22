@@ -18,8 +18,12 @@ import { Clock, CheckCircle, XCircle, Award } from 'lucide-react';
 interface Question {
   id: string;
   question: string;
-  options: string[];
-  correct_answer: number;
+  answers: Array<{
+    id: string;
+    answer: string;
+    is_correct: boolean;
+    order_index: number;
+  }>;
 }
 
 interface FinalExam {
@@ -33,7 +37,7 @@ interface FinalExam {
 
 interface Answer {
   questionId: string;
-  selectedOption: number;
+  selectedAnswerId: string;
 }
 
 interface FinalExamModalProps {
@@ -41,13 +45,15 @@ interface FinalExamModalProps {
   onClose: () => void;
   exam: FinalExam;
   enrollmentId: string;
+  onComplete: (result: any) => void;
 }
 
 const FinalExamModal: React.FC<FinalExamModalProps> = ({ 
   isOpen, 
   onClose, 
   exam, 
-  enrollmentId 
+  enrollmentId,
+  onComplete
 }) => {
   const { user } = useAuth();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -55,9 +61,6 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [score, setScore] = useState(0);
-  const [passed, setPassed] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,31 +71,74 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   }, [isOpen, exam]);
 
   useEffect(() => {
-    if (timeLeft > 0 && !showResults) {
+    if (timeLeft > 0 && isOpen) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && exam && !showResults) {
+    } else if (timeLeft === 0 && exam && isOpen) {
       handleSubmitExam();
     }
-  }, [timeLeft, showResults, exam]);
+  }, [timeLeft, isOpen, exam]);
 
   const fetchExamQuestions = async () => {
     setLoading(true);
     try {
-      // Since we don't have exam questions table, we'll create a mock exam
-      const mockQuestions: Question[] = [
-        {
-          id: "eq1",
-          question: "This is a sample question for the final exam.",
-          options: ["Option A", "Option B", "Option C", "Option D"],
-          correct_answer: 0
-        }
-      ];
+      // Fetch questions with their answers
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('final_exam_questions')
+        .select(`
+          id,
+          question,
+          order_index,
+          final_exam_answers (
+            id,
+            answer,
+            is_correct,
+            order_index
+          )
+        `)
+        .eq('exam_id', exam.id)
+        .order('order_index');
 
-      setQuestions(mockQuestions);
+      if (questionsError) throw questionsError;
+
+      if (!questionsData || questionsData.length === 0) {
+        toast.error('No questions found for this exam');
+        onClose();
+        return;
+      }
+
+      // Transform data and shuffle questions for retakes
+      const transformedQuestions: Question[] = questionsData.map(q => ({
+        id: q.id,
+        question: q.question,
+        answers: q.final_exam_answers
+          .sort((a: any, b: any) => a.order_index - b.order_index)
+          .map((a: any) => ({
+            id: a.id,
+            answer: a.answer,
+            is_correct: a.is_correct,
+            order_index: a.order_index
+          }))
+      }));
+
+      // Shuffle questions for retakes (check if user has previous attempts)
+      const { data: attemptData } = await supabase
+        .from('final_exam_attempts')
+        .select('attempt_number')
+        .eq('user_id', user?.id)
+        .eq('exam_id', exam.id)
+        .order('attempt_number', { ascending: false })
+        .limit(1);
+
+      let finalQuestions = transformedQuestions;
+      if (attemptData && attemptData.length > 0) {
+        // Shuffle questions for retakes
+        finalQuestions = [...transformedQuestions].sort(() => Math.random() - 0.5);
+      }
+
+      setQuestions(finalQuestions);
       setCurrentQuestionIndex(0);
       setAnswers([]);
-      setShowResults(false);
     } catch (error) {
       console.error('Error fetching exam questions:', error);
       toast.error('Failed to load exam questions');
@@ -107,29 +153,26 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Calculate score properly
+      // Calculate score
       let correctAnswers = 0;
       questions.forEach(question => {
         const userAnswer = answers.find(a => a.questionId === question.id);
-        if (userAnswer && userAnswer.selectedOption === question.correct_answer) {
-          correctAnswers++;
+        if (userAnswer) {
+          const correctAnswer = question.answers.find(a => a.is_correct);
+          if (correctAnswer && userAnswer.selectedAnswerId === correctAnswer.id) {
+            correctAnswers++;
+          }
         }
       });
 
-      // Ensure we have valid numeric score
       const finalScore = questions.length > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
       const examPassed = finalScore >= exam.passing_score;
 
       console.log('Calculated score:', finalScore, 'Questions:', questions.length, 'Correct:', correctAnswers);
 
-      // Validate score before submission
-      if (typeof finalScore !== 'number' || isNaN(finalScore)) {
-        throw new Error('Invalid score calculated');
-      }
-
       // Get current attempt number
       const { data: existingAttempts, error: attemptError } = await supabase
-        .from('final_exam_results')
+        .from('final_exam_attempts')
         .select('attempt_number')
         .eq('user_id', user.id)
         .eq('exam_id', exam.id)
@@ -144,13 +187,35 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         ? existingAttempts[0].attempt_number + 1 
         : 1;
 
-      // Prepare exam result data with all required fields
+      // Create exam attempt record
+      const attemptData = {
+        user_id: user.id,
+        exam_id: exam.id,
+        enrollment_id: enrollmentId,
+        score: finalScore,
+        passed: examPassed,
+        attempt_number: nextAttemptNumber,
+        answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedAnswerId])),
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString()
+      };
+
+      const { error: attemptInsertError } = await supabase
+        .from('final_exam_attempts')
+        .insert(attemptData);
+
+      if (attemptInsertError) {
+        console.error('Error saving exam attempt:', attemptInsertError);
+        throw attemptInsertError;
+      }
+
+      // Prepare exam result data
       const examResultData = {
         user_id: user.id,
         exam_id: exam.id,
         course_id: exam.course_id,
         enrollment_id: enrollmentId,
-        score: finalScore, // Ensure this is a valid number
+        score: finalScore,
         percentage_score: finalScore,
         passed: examPassed,
         attempt_number: nextAttemptNumber,
@@ -172,33 +237,6 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         console.error('Error saving exam result:', resultError);
         throw resultError;
       }
-
-      // Create exam attempt record
-      const examAttemptData = {
-        user_id: user.id,
-        exam_id: exam.id,
-        enrollment_id: enrollmentId,
-        score: finalScore,
-        passed: examPassed,
-        attempt_number: nextAttemptNumber,
-        answers: Object.fromEntries(answers.map(a => [a.questionId, a.selectedOption])),
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString()
-      };
-
-      const { error: attemptInsertError } = await supabase
-        .from('final_exam_attempts')
-        .upsert(examAttemptData, {
-          onConflict: 'user_id,exam_id,attempt_number'
-        });
-
-      if (attemptInsertError) {
-        console.error('Error saving exam attempt:', attemptInsertError);
-      }
-
-      setScore(finalScore);
-      setPassed(examPassed);
-      setShowResults(true);
 
       if (examPassed) {
         toast.success(`Congratulations! You passed the final exam with ${finalScore}%`);
@@ -228,6 +266,16 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
       } else {
         toast.error(`You scored ${finalScore}%. You need ${exam.passing_score}% to pass.`);
       }
+
+      // Call onComplete with result data
+      onComplete({
+        passed: examPassed,
+        score: finalScore,
+        final_grade: finalScore,
+        quiz_scores: [],
+        attempt_number: nextAttemptNumber
+      });
+
     } catch (error) {
       console.error('Error submitting exam:', error);
       toast.error('Failed to submit exam');
@@ -236,17 +284,17 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     }
   };
 
-  const handleAnswerSelect = (questionId: string, selectedOption: number) => {
+  const handleAnswerSelect = (questionId: string, selectedAnswerId: string) => {
     setAnswers(prev => {
       const existing = prev.find(a => a.questionId === questionId);
       if (existing) {
         return prev.map(a => 
           a.questionId === questionId 
-            ? { ...a, selectedOption }
+            ? { ...a, selectedAnswerId }
             : a
         );
       }
-      return [...prev, { questionId, selectedOption }];
+      return [...prev, { questionId, selectedAnswerId }];
     });
   };
 
@@ -254,6 +302,10 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getCurrentAnswer = (questionId: string) => {
+    return answers.find(a => a.questionId === questionId)?.selectedAnswerId;
   };
 
   if (loading) {
@@ -272,6 +324,8 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     );
   }
 
+  const currentQuestion = questions[currentQuestionIndex];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -281,148 +335,87 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
               <Award className="h-5 w-5 text-orange-500" />
               <span>{exam.title}</span>
             </div>
-            {!showResults && (
-              <div className="flex items-center gap-4">
-                <div className="flex items-center text-orange-600">
-                  <Clock className="h-4 w-4 mr-1" />
-                  {formatTime(timeLeft)}
-                </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center text-orange-600">
+                <Clock className="h-4 w-4 mr-1" />
+                {formatTime(timeLeft)}
               </div>
-            )}
+            </div>
           </DialogTitle>
           <DialogDescription>
-            {showResults 
-              ? "Your exam results are ready" 
-              : `Complete this ${exam.time_limit_minutes}-minute exam to test your knowledge`
-            }
+            Complete this {exam.time_limit_minutes}-minute exam to test your knowledge
           </DialogDescription>
         </DialogHeader>
 
-        {showResults ? (
-          <div className="text-center py-6">
-            {passed ? (
-              <div>
-                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold mb-2 text-green-800">
-                  Congratulations! 🎉
-                </h3>
-                <p className="text-lg mb-4">
-                  Your Score: <span className="font-bold text-green-600">{score}%</span>
-                </p>
-                <p className="text-gray-600 mb-6">
-                  You have successfully passed the final exam!
-                </p>
-                <div className="bg-green-50 p-4 rounded-lg mb-6">
-                  <p className="text-green-800 font-medium">
-                    🏆 Your certificate has been generated and is available in your course results.
-                  </p>
+        <div className="space-y-6">
+          {/* Progress */}
+          <div>
+            <div className="flex justify-between text-sm mb-2">
+              <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
+              <span>{Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}% Complete</span>
+            </div>
+            <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} />
+          </div>
+
+          {/* Question */}
+          {currentQuestion && (
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">{currentQuestion.question}</h3>
+                <div className="space-y-3">
+                  {currentQuestion.answers.map((answer, index) => (
+                    <button
+                      key={answer.id}
+                      onClick={() => handleAnswerSelect(currentQuestion.id, answer.id)}
+                      className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                        getCurrentAnswer(currentQuestion.id) === answer.id
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <span className="w-6 h-6 rounded-full border-2 border-gray-300 mr-3 flex items-center justify-center text-sm">
+                          {String.fromCharCode(65 + index)}
+                        </span>
+                        {answer.answer}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </div>
-            ) : (
-              <div>
-                <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold mb-2 text-red-800">
-                  Try Again
-                </h3>
-                <p className="text-lg mb-4">
-                  Your Score: <span className="font-bold text-red-600">{score}%</span>
-                </p>
-                <p className="text-gray-600 mb-6">
-                  Passing Score: {exam.passing_score}%
-                </p>
-                <div className="bg-red-50 p-4 rounded-lg mb-6">
-                  <p className="text-red-800">
-                    Review the course material and try again when you're ready.
-                  </p>
-                </div>
-                <Button 
-                  onClick={() => {
-                    setShowResults(false);
-                    setCurrentQuestionIndex(0);
-                    setAnswers([]);
-                    setTimeLeft(exam.time_limit_minutes * 60);
-                  }}
-                  className="bg-orange-600 hover:bg-orange-700 mr-4"
-                >
-                  Retake Exam
-                </Button>
-              </div>
-            )}
-            <Button onClick={onClose} variant="outline">
-              Close
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Navigation */}
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+              disabled={currentQuestionIndex === 0}
+            >
+              Previous
             </Button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Progress */}
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
-                <span>{Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}% Complete</span>
-              </div>
-              <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} />
-            </div>
-
-            {/* Question */}
-            {questions[currentQuestionIndex] && (
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">{questions[currentQuestionIndex].question}</h3>
-                  <div className="space-y-3">
-                    {questions[currentQuestionIndex].options.map((option, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleAnswerSelect(questions[currentQuestionIndex].id, index)}
-                        className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                          answers.find(a => a.questionId === questions[currentQuestionIndex].id)?.selectedOption === index
-                            ? 'border-orange-500 bg-orange-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center">
-                          <span className="w-6 h-6 rounded-full border-2 border-gray-300 mr-3 flex items-center justify-center text-sm">
-                            {String.fromCharCode(65 + index)}
-                          </span>
-                          {option}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Navigation */}
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
-                disabled={currentQuestionIndex === 0}
-              >
-                Previous
-              </Button>
-              
-              <div className="flex gap-2">
-                {currentQuestionIndex < questions.length - 1 ? (
-                  <Button
-                    onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
-                    className="bg-gradient-to-r from-orange-500 to-purple-600"
-                  >
-                    Next
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleSubmitExam}
-                    disabled={isSubmitting || answers.length !== questions.length}
-                    className="bg-gradient-to-r from-green-500 to-blue-600"
-                  >
-                    {isSubmitting ? 'Submitting...' : 'Submit Exam'}
-                  </Button>
-                )}
-              </div>
+            
+            <div className="flex gap-2">
+              {currentQuestionIndex < questions.length - 1 ? (
+                <Button
+                  onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600"
+                >
+                  Next
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmitExam}
+                  disabled={isSubmitting || answers.length !== questions.length}
+                  className="bg-gradient-to-r from-green-500 to-blue-600"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Exam'}
+                </Button>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </DialogContent>
     </Dialog>
   );

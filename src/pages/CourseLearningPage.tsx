@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -24,6 +25,7 @@ import {
 import VideoPlayer from '@/components/video/VideoPlayer';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import FinalExamModal from '@/components/course/FinalExamModal';
+import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
 
 interface Course {
   id: string;
@@ -63,14 +65,13 @@ interface FinalExam {
   is_published: boolean;
 }
 
-interface CourseProgress {
+interface ExamResult {
   id: string;
-  user_id: string;
-  course_id: string;
-  progress_percentage: number;
-  last_accessed_lesson_id: string | null;
-  created_at: string;
-  updated_at: string;
+  passed: boolean;
+  score: number;
+  final_grade: number;
+  quiz_scores: number[];
+  attempt_number: number;
 }
 
 const CourseLearningPage: React.FC = () => {
@@ -85,8 +86,11 @@ const CourseLearningPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('content');
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
   const [showFinalExamModal, setShowFinalExamModal] = useState(false);
+  const [showExamResultsModal, setShowExamResultsModal] = useState(false);
+  const [examResult, setExamResult] = useState<ExamResult | null>(null);
   const [courseCompleted, setCourseCompleted] = useState(false);
   const [hasPassedExam, setHasPassedExam] = useState(false);
+  const [canRetakeExam, setCanRetakeExam] = useState(false);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [lastAccessedLessonId, setLastAccessedLessonId] = useState<string | null>(null);
   const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
@@ -252,27 +256,32 @@ const CourseLearningPage: React.FC = () => {
         setLastAccessedLessonId(courseProgress.last_accessed_lesson_id);
       }
 
-      // Fetch final exam
+      // Fetch final exam if exists
       const { data: examData } = await supabase
         .from('final_exams')
         .select('*')
         .eq('course_id', courseId)
         .eq('is_published', true)
-        .single();
+        .maybeSingle();
 
       if (examData) {
         setFinalExam(examData);
         
-        // Check if user has passed the exam
+        // Check if user has exam results
         const { data: examResults } = await supabase
           .from('final_exam_results')
-          .select('passed')
+          .select('*')
           .eq('user_id', user.id)
           .eq('exam_id', examData.id)
-          .eq('passed', true)
+          .order('attempt_number', { ascending: false })
           .limit(1);
           
-        setHasPassedExam(examResults && examResults.length > 0);
+        if (examResults && examResults.length > 0) {
+          const latestResult = examResults[0];
+          setHasPassedExam(latestResult.passed);
+          setCanRetakeExam(!latestResult.passed);
+          setExamResult(latestResult);
+        }
       }
 
     } catch (error: any) {
@@ -291,7 +300,7 @@ const CourseLearningPage: React.FC = () => {
         .select('last_position_seconds')
         .eq('lesson_id', lessonId)
         .eq('enrollment_id', enrollmentId)
-        .single();
+        .maybeSingle();
         
       if (data?.last_position_seconds) {
         setCurrentVideoTime(data.last_position_seconds);
@@ -324,6 +333,7 @@ const CourseLearningPage: React.FC = () => {
 
       if (completed && !completedLessons.includes(lessonId)) {
         setCompletedLessons(prev => [...prev, lessonId]);
+        toast.success('Lesson completed!');
       }
 
       // Update course progress with last accessed lesson
@@ -337,18 +347,32 @@ const CourseLearningPage: React.FC = () => {
     if (!user || !courseId) return;
 
     try {
+      const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
+      const progressPercentage = totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
+
       await supabase
         .from('course_progress')
         .upsert({
           user_id: user.id,
           course_id: courseId,
           last_accessed_lesson_id: lastAccessedLessonId,
+          progress_percentage: progressPercentage,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,course_id'
         });
     } catch (error) {
       console.error('Error updating course progress:', error);
+    }
+  };
+
+  const markLessonComplete = async (lessonId: string) => {
+    if (!enrollmentId) return;
+    
+    try {
+      await saveVideoProgress(lessonId, 0, true);
+    } catch (error) {
+      console.error('Error marking lesson complete:', error);
     }
   };
 
@@ -372,7 +396,6 @@ const CourseLearningPage: React.FC = () => {
   const handleVideoEnded = () => {
     if (currentLesson && enrollmentId) {
       saveVideoProgress(currentLesson.id, 0, true);
-      toast.success('Lesson completed!');
       
       // Auto-transition to next lesson
       setTimeout(() => {
@@ -401,17 +424,24 @@ const CourseLearningPage: React.FC = () => {
   const handleNextLesson = () => {
     if (!course || !currentLesson) return;
 
-    const allLessons = course.modules.flatMap(m => m.lessons);
+    const allLessons = course.modules.flatMap(m => m.lessons).sort((a, b) => {
+      const moduleA = course.modules.find(m => m.id === a.module_id);
+      const moduleB = course.modules.find(m => m.id === b.module_id);
+      if (moduleA && moduleB && moduleA.order_index !== moduleB.order_index) {
+        return moduleA.order_index - moduleB.order_index;
+      }
+      return a.order_index - b.order_index;
+    });
+    
     const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
     
     if (currentIndex < allLessons.length - 1) {
-      const nextLesson = allLessons[currentIndex + 1];
-      
       // Mark current lesson as completed if not already
       if (!completedLessons.includes(currentLesson.id)) {
-        saveVideoProgress(currentLesson.id, 0, true);
+        markLessonComplete(currentLesson.id);
       }
       
+      const nextLesson = allLessons[currentIndex + 1];
       handleLessonSelect(nextLesson);
     }
   };
@@ -419,7 +449,15 @@ const CourseLearningPage: React.FC = () => {
   const handlePreviousLesson = () => {
     if (!course || !currentLesson) return;
 
-    const allLessons = course.modules.flatMap(m => m.lessons);
+    const allLessons = course.modules.flatMap(m => m.lessons).sort((a, b) => {
+      const moduleA = course.modules.find(m => m.id === a.module_id);
+      const moduleB = course.modules.find(m => m.id === b.module_id);
+      if (moduleA && moduleB && moduleA.order_index !== moduleB.order_index) {
+        return moduleA.order_index - moduleB.order_index;
+      }
+      return a.order_index - b.order_index;
+    });
+    
     const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
     
     if (currentIndex > 0) {
@@ -429,21 +467,42 @@ const CourseLearningPage: React.FC = () => {
   };
 
   const handleTakeFinalExam = () => {
-    if (courseCompleted && finalExam) {
+    if (finalExam && (courseCompleted || canRetakeExam)) {
       setShowFinalExamModal(true);
     }
   };
 
-  const handleExamComplete = () => {
+  const handleExamComplete = (result: any) => {
     setShowFinalExamModal(false);
-    // Refresh exam status
+    setExamResult(result);
+    setHasPassedExam(result.passed);
+    setCanRetakeExam(!result.passed);
+    setShowExamResultsModal(true);
+    
+    // Refresh course data to get updated exam status
     loadCourseData();
+  };
+
+  const handleRetakeExam = () => {
+    setShowFinalExamModal(true);
   };
 
   const calculateProgress = () => {
     if (!course) return 0;
     const totalLessons = course.modules.reduce((acc, module) => acc + module.lessons.length, 0);
     return totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
+  };
+
+  const shouldShowViewResults = () => {
+    return finalExam && (hasPassedExam || canRetakeExam);
+  };
+
+  const shouldShowFinalExamButton = () => {
+    return finalExam && courseCompleted && !hasPassedExam;
+  };
+
+  const shouldShowRetakeButton = () => {
+    return finalExam && canRetakeExam && !hasPassedExam;
   };
 
   if (loading) {
@@ -555,69 +614,47 @@ const CourseLearningPage: React.FC = () => {
                   ))}
                   
                   {/* Final Exam Section */}
-                  {finalExam && (
+                  {shouldShowFinalExamButton() && (
                     <div className="space-y-2 pt-4 border-t">
                       <h4 className="font-medium text-sm text-muted-foreground">Final Assessment</h4>
-                      <button
+                      <Button
                         onClick={handleTakeFinalExam}
-                        disabled={!courseCompleted}
-                        className={`w-full text-left p-3 rounded-md transition-colors ${
-                          courseCompleted
-                            ? 'hover:bg-muted border-orange-200 bg-orange-50'
-                            : 'opacity-50 cursor-not-allowed bg-gray-100'
-                        }`}
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              {hasPassedExam ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              ) : courseCompleted ? (
-                                <Award className="h-4 w-4 text-orange-500" />
-                              ) : (
-                                <Lock className="h-4 w-4 text-gray-400" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">{finalExam.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {finalExam.time_limit_minutes} minutes • {finalExam.passing_score}% to pass
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
+                        <Award className="mr-2 h-4 w-4" />
+                        Take Final Exam
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Retake Exam Button */}
+                  {shouldShowRetakeButton() && (
+                    <div className="pt-2">
+                      <Button
+                        onClick={handleRetakeExam}
+                        variant="outline"
+                        className="w-full border-orange-300 text-orange-600 hover:bg-orange-100"
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Retake Exam
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* View Course Results Button */}
+                  {shouldShowViewResults() && (
+                    <div className="pt-2">
+                      <Button 
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => navigate(`/course/${courseId}/results`)}
+                      >
+                        View Course Results
+                      </Button>
                     </div>
                   )}
                 </CardContent>
               </Card>
-              
-              {/* Show exam button when course is completed */}
-              {courseCompleted && finalExam && (
-                <div className="mt-4">
-                  <Button 
-                    onClick={handleTakeFinalExam}
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                    disabled={hasPassedExam}
-                  >
-                    <Award className="mr-2 h-4 w-4" />
-                    {hasPassedExam ? 'Exam Completed' : 'Take Final Exam'}
-                  </Button>
-                </div>
-              )}
-              
-              {/* View Results Button */}
-              {hasPassedExam && (
-                <div className="mt-2">
-                  <Button 
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => navigate(`/course/${courseId}/results`)}
-                  >
-                    View Course Results
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
           
@@ -727,7 +764,7 @@ const CourseLearningPage: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Welcome to the Course</CardTitle>
-                  <CardDescription>Select a lesson from the curriculum to begin</CardDescription>
+                  <CardDescription>Loading your course content...</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p>{course.description}</p>
@@ -745,6 +782,23 @@ const CourseLearningPage: React.FC = () => {
           onClose={() => setShowFinalExamModal(false)}
           exam={finalExam}
           enrollmentId={enrollmentId}
+          onComplete={handleExamComplete}
+        />
+      )}
+
+      {/* Final Exam Results Modal */}
+      {examResult && (
+        <FinalExamResultsModal
+          isOpen={showExamResultsModal}
+          onClose={() => setShowExamResultsModal(false)}
+          examScore={examResult.score}
+          quizScores={examResult.quiz_scores}
+          finalGrade={examResult.final_grade}
+          passed={examResult.passed}
+          courseName={course.title}
+          studentName={user?.email || 'Student'}
+          enrollmentId={enrollmentId || ''}
+          onRetake={handleRetakeExam}
         />
       )}
     </Layout>

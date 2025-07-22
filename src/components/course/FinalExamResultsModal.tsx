@@ -330,11 +330,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
   };
 
   const handleClose = () => {
-    if (passed) {
-      navigate('/course-results');
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   const breakdown = calculateGradeBreakdown();
@@ -527,7 +523,7 @@ const FinalExamResultsModal: React.FC<FinalExamResultsModalProps> = ({
               </Button>
             )}
             <Button onClick={handleClose}>
-              {passed ? 'View All Results' : 'Close'}
+              Close
             </Button>
           </div>
         </div>
