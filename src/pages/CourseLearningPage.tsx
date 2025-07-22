@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -156,10 +155,17 @@ const CourseLearningPage = () => {
             (module.lessons[lessonIndex - 1] && completedLessonIds.includes(module.lessons[lessonIndex - 1].id));
           const isLocked = !isFirstLesson && !previousLessonCompleted;
 
+          // Ensure quizzes have the correct structure
+          const quizzes = lesson.quizzes?.map((quiz: any) => ({
+            ...quiz,
+            time_limit_minutes: quiz.time_limit_minutes || null
+          })) || [];
+
           return {
             ...lesson,
             isCompleted,
-            isLocked
+            isLocked,
+            quizzes
           };
         }) || [];
 
@@ -270,7 +276,7 @@ const CourseLearningPage = () => {
     setSelectedQuiz(null);
   };
 
-  const handleQuizInstructionsConfirm = () => {
+  const handleQuizInstructionsStart = () => {
     setShowQuizInstructions(false);
     setShowQuiz(true);
   };
@@ -572,7 +578,7 @@ const CourseLearningPage = () => {
           onClose={() => setShowFinalExam(false)}
           exam={finalExam}
           onComplete={handleFinalExamComplete}
-          enrollment={enrollment}
+          enrollmentId={enrollment?.id}
         />
       )}
 
@@ -595,25 +601,29 @@ const CourseLearningPage = () => {
           <QuizInstructionsModal
             isOpen={showQuizInstructions}
             onClose={handleQuizInstructionsClose}
-            onConfirm={handleQuizInstructionsConfirm}
             quiz={selectedQuiz}
+            onStartQuiz={handleQuizInstructionsStart}
           />
           
           <QuizModal
             isOpen={showQuiz}
             onClose={() => setShowQuiz(false)}
-            quiz={selectedQuiz}
+            quizId={selectedQuiz.id}
             onComplete={handleQuizComplete}
           />
           
           <QuizResultsModal
             isOpen={showQuizResults}
             onClose={handleQuizResultsClose}
-            result={quizResult}
+            quiz={selectedQuiz}
+            score={quizResult?.score || 0}
+            passed={quizResult?.passed || false}
             onRetake={() => {
               setShowQuizResults(false);
               setShowQuiz(true);
             }}
+            onProceed={handleQuizResultsClose}
+            hasNextContent={true}
           />
         </>
       )}

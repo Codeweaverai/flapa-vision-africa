@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabaseClient";
 
 // Type definitions
@@ -55,7 +56,7 @@ export interface Quiz {
   title: string;
   description: string | null;
   passing_score: number;
-  time_limit_minutes: number | null;
+  time_limit_minutes?: number | null; // Made optional
   created_at: string;
   updated_at: string;
   questions?: QuizQuestion[];

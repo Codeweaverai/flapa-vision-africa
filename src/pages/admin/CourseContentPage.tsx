@@ -45,8 +45,39 @@ const CourseContentPage = () => {
       const courseData = await fetchCourseWithModulesAndLessons(courseId);
       
       if (courseData) {
-        setCourse(courseData);
-        setModules(courseData.modules || []);
+        // Type-safe conversion
+        const typedCourse: Course = {
+          ...courseData,
+          modules: courseData.modules?.map((module: any): CourseModule => ({
+            id: module.id,
+            course_id: module.course_id,
+            title: module.title,
+            description: module.description,
+            order_index: module.order_index,
+            created_at: module.created_at,
+            updated_at: module.updated_at,
+            lessons: module.lessons?.map((lesson: any): Lesson => ({
+              id: lesson.id,
+              module_id: lesson.module_id,
+              title: lesson.title,
+              description: lesson.description,
+              content_type: lesson.content_type,
+              video_url: lesson.video_url,
+              content: lesson.content,
+              materials_urls: lesson.materials_urls,
+              order_index: lesson.order_index,
+              created_at: lesson.created_at,
+              updated_at: lesson.updated_at,
+              quizzes: lesson.quizzes?.map((quiz: any) => ({
+                ...quiz,
+                time_limit_minutes: quiz.time_limit_minutes || null
+              })) || []
+            })) || []
+          })) || []
+        };
+
+        setCourse(typedCourse);
+        setModules(typedCourse.modules || []);
       } else {
         toast({
           title: "Error",
@@ -178,8 +209,39 @@ const CourseContentPage = () => {
     const courseData = await fetchCourseWithModulesAndLessons(courseId);
     
     if (courseData) {
-      setCourse(courseData);
-      setModules(courseData.modules || []);
+      // Type-safe conversion
+      const typedCourse: Course = {
+        ...courseData,
+        modules: courseData.modules?.map((module: any): CourseModule => ({
+          id: module.id,
+          course_id: module.course_id,
+          title: module.title,
+          description: module.description,
+          order_index: module.order_index,
+          created_at: module.created_at,
+          updated_at: module.updated_at,
+          lessons: module.lessons?.map((lesson: any): Lesson => ({
+            id: lesson.id,
+            module_id: lesson.module_id,
+            title: lesson.title,
+            description: lesson.description,
+            content_type: lesson.content_type,
+            video_url: lesson.video_url,
+            content: lesson.content,
+            materials_urls: lesson.materials_urls,
+            order_index: lesson.order_index,
+            created_at: lesson.created_at,
+            updated_at: lesson.updated_at,
+            quizzes: lesson.quizzes?.map((quiz: any) => ({
+              ...quiz,
+              time_limit_minutes: quiz.time_limit_minutes || null
+            })) || []
+          })) || []
+        })) || []
+      };
+
+      setCourse(typedCourse);
+      setModules(typedCourse.modules || []);
     } else {
       toast({
         title: "Error",
