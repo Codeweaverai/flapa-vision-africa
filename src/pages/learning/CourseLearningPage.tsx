@@ -511,6 +511,28 @@ const CourseLearningPage = () => {
   const isNotComplete = progressPercentage < 100;
   const hasLessons = modules.some(module => module.lessons.length > 0);
 
+  const handleExamComplete = (result: any) => {
+    setShowExamModal(false);
+    
+    // Convert result to match ExamResult interface
+    const examResult: ExamResult = {
+      id: result.id || '',
+      passed: result.passed,
+      score: result.score,
+      final_grade: result.final_grade,
+      quiz_scores: Array.isArray(result.quiz_scores) ? result.quiz_scores : [],
+      attempt_number: result.attempt_number
+    };
+    
+    setExamResult(examResult);
+    setHasPassedExam(result.passed);
+    setCanRetakeExam(!result.passed);
+    setShowFinalExamModal(true);
+    
+    // Refresh course data to get updated exam status
+    fetchCourseData();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
