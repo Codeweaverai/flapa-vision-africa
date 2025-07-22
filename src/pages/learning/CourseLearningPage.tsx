@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -107,7 +108,7 @@ const CourseLearningPage = () => {
         .from('courses')
         .select(`
           *,
-          modules (
+          course_modules (
             id,
             course_id,
             title,
@@ -117,20 +118,19 @@ const CourseLearningPage = () => {
           lessons (
             id,
             module_id,
-            course_id,
             title,
             description,
             video_url,
-            transcript,
+            content,
             order_index,
-            is_preview
+            duration_minutes
           ),
-          reviews (
+          course_reviews (
             id,
             course_id,
             user_id,
             rating,
-            comment,
+            review_text,
             created_at
           )
         `)
@@ -147,7 +147,7 @@ const CourseLearningPage = () => {
 
       // Fetch user's enrollment
       const { data: enrollmentData, error: enrollmentError } = await supabase
-        .from('enrollments')
+        .from('course_enrollments')
         .select('*')
         .eq('course_id', courseId)
         .eq('user_id', userId)
@@ -157,31 +157,36 @@ const CourseLearningPage = () => {
         console.error('Error fetching enrollment:', enrollmentError);
       }
 
-      // Fetch completed lessons
+      // Fetch completed lessons using lesson_progress table
       const { data: completedLessonsData, error: completedLessonsError } = await supabase
-        .from('user_lessons')
+        .from('lesson_progress')
         .select('lesson_id')
-        .eq('user_id', userId)
-        .eq('course_id', courseId);
+        .eq('enrollment_id', enrollmentData?.id)
+        .eq('is_completed', true);
 
       if (completedLessonsError) {
         console.error('Error fetching completed lessons:', completedLessonsError);
       }
 
       // Calculate average rating and total reviews
-      const reviews = courseData.reviews || [];
-      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      const reviews = courseData.course_reviews || [];
+      const totalRating = reviews.reduce((sum: number, review: any) => sum + review.rating, 0);
       const averageRating = reviews.length > 0 ? totalRating / reviews.length : 0;
 
       // Transform the data to match Course interface
       const transformedCourseData = {
         ...courseData,
-        modules: courseData.modules?.map(module => ({
+        image_url: courseData.thumbnail_url || '',
+        instructor_id: courseData.creator_id || '',
+        modules: courseData.course_modules?.map((module: any) => ({
           ...module,
-          lessons: courseData.lessons?.filter(lesson => lesson.module_id === module.id)
-        })),
+          lessons: courseData.lessons?.filter((lesson: any) => lesson.module_id === module.id) || []
+        })) || [],
         lessons: courseData.lessons || [],
-        reviews: reviews,
+        reviews: reviews.map((review: any) => ({
+          ...review,
+          comment: review.review_text || ''
+        })),
         averageRating: averageRating,
         totalReviews: reviews.length
       };
@@ -213,21 +218,22 @@ const CourseLearningPage = () => {
   };
 
   const markLessonComplete = async (lessonId: string) => {
-    if (!user) {
+    if (!user || !enrollment) {
       toast.error('Please sign in to mark lesson as complete');
       return;
     }
 
     try {
       const { error } = await supabase
-        .from('user_lessons')
+        .from('lesson_progress')
         .upsert(
           {
-            user_id: user.id,
-            course_id: courseId,
-            lesson_id: lessonId
+            enrollment_id: enrollment.id,
+            lesson_id: lessonId,
+            is_completed: true,
+            completion_date: new Date().toISOString()
           },
-          { onConflict: 'user_id, course_id, lesson_id', ignoreDuplicates: false }
+          { onConflict: 'enrollment_id, lesson_id', ignoreDuplicates: false }
         );
 
       if (error) throw error;
@@ -434,7 +440,7 @@ const CourseLearningPage = () => {
         </div>
         
         {/* Learning AI Assistant */}
-        {course && <LearningAIAssistant courseId={course.id} />}
+        {course && <LearningAIAssistant courseId={course.id} courseName={course.title} />}
       </div>
     </Layout>
   );

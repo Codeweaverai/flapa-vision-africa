@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
 import HelpCenterChatbot from '@/components/helpcenter/HelpCenterChatbot';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface FAQ {
   id: string;
