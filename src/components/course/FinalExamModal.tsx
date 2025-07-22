@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -268,13 +267,18 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
       }
 
       // Call onComplete with result data
-      onComplete({
+      const resultForCallback = {
+        id: `${user.id}-${exam.id}-${nextAttemptNumber}`,
         passed: examPassed,
         score: finalScore,
         final_grade: finalScore,
         quiz_scores: [],
         attempt_number: nextAttemptNumber
-      });
+      };
+
+      if (onComplete && typeof onComplete === 'function') {
+        onComplete(resultForCallback);
+      }
 
     } catch (error) {
       console.error('Error submitting exam:', error);
