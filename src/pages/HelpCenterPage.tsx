@@ -1,11 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown, ChevronUp, BookOpen, Settings, CreditCard, Shield, Play, Calendar, Eye } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, BookOpen, Settings, CreditCard, Shield, Play, Calendar, Eye, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
+import HelpCenterChatbot from '@/components/helpcenter/HelpCenterChatbot';
 
 interface FAQ {
   id: string;
@@ -35,6 +37,8 @@ const HelpCenterPage = () => {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showChatbot, setShowChatbot] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchData();
@@ -148,6 +152,10 @@ const HelpCenterPage = () => {
     } catch {
       return 'Unknown date';
     }
+  };
+
+  const handleViewPost = (postId: string) => {
+    navigate(`/media/${postId}`);
   };
 
   if (loading) {
@@ -327,16 +335,20 @@ const HelpCenterPage = () => {
                           {post.description}
                         </p>
                         
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
                             <Calendar className="w-3 h-3" />
                             <span>{formatDate(post.created_at)}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-3 h-3" />
-                            <span>View Post</span>
-                          </div>
                         </div>
+
+                        <Button
+                          onClick={() => handleViewPost(post.id)}
+                          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Post
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -346,7 +358,7 @@ const HelpCenterPage = () => {
           )}
 
           {/* Contact Support Section */}
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
+          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden mb-8">
             <div className="h-2 bg-gradient-to-r from-orange-400 to-purple-500"></div>
             <CardContent className="text-center py-12">
               <div className="max-w-md mx-auto">
@@ -357,9 +369,13 @@ const HelpCenterPage = () => {
                   Can't find what you're looking for? Our support team is here to help you succeed.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <button className="bg-gradient-to-r from-orange-500 to-purple-600 text-white px-8 py-3 rounded-lg hover:from-orange-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
-                    Contact Support
-                  </button>
+                  <Button
+                    onClick={() => setShowChatbot(true)}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 text-white px-8 py-3 rounded-lg hover:from-orange-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    AI Support Chat
+                  </Button>
                   <button className="border-2 border-gray-200 px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200">
                     Browse Tutorials
                   </button>
@@ -368,6 +384,11 @@ const HelpCenterPage = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Help Center Chatbot */}
+        {showChatbot && (
+          <HelpCenterChatbot onClose={() => setShowChatbot(false)} />
+        )}
       </div>
     </Layout>
   );
