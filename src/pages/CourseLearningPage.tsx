@@ -1,66 +1,98 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { 
-  Play, 
-  Lock, 
-  CheckCircle, 
+  ArrowLeft, 
   BookOpen, 
+  CheckCircle, 
+  Clock, 
+  FileText, 
+  Play,
   Award,
-  HelpCircle,
-  FileText,
-  Video
+  Lock,
+  RotateCcw
 } from 'lucide-react';
+import VideoPlayer from '@/components/video/VideoPlayer';
+import VideoTranscripts from '@/components/course/VideoTranscripts';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
-import QuizInstructionsModal from '@/components/course/QuizInstructionsModal';
-import QuizModal from '@/components/course/QuizModal';
-import QuizResultsModal from '@/components/course/QuizResultsModal';
-import { Course, CourseModule, Lesson, Quiz } from '@/services/courseService';
 
-interface EnhancedLesson extends Lesson {
-  isCompleted: boolean;
-  isLocked: boolean;
-  quizzes?: Quiz[];
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  creator_id: string;
+  modules: CourseModule[];
 }
 
-interface EnhancedModule extends CourseModule {
-  lessons: EnhancedLesson[];
+interface CourseModule {
+  id: string;
+  title: string;
+  description: string;
+  order_index: number;
+  lessons: Lesson[];
 }
 
-interface EnhancedCourse extends Course {
-  modules: EnhancedModule[];
+interface Lesson {
+  id: string;
+  title: string;
+  description: string;
+  video_url: string | null;
+  content: string | null;
+  module_id: string;
+  order_index: number;
+  duration_minutes?: number;
+  is_completed?: boolean;
 }
 
-const CourseLearningPage = () => {
+interface FinalExam {
+  id: string;
+  course_id: string;
+  title: string;
+  description: string;
+  passing_score: number;
+  time_limit_minutes: number;
+  is_published: boolean;
+}
+
+interface ExamResult {
+  id: string;
+  passed: boolean;
+  score: number;
+  final_grade: number;
+  quiz_scores: number[];
+  attempt_number: number;
+}
+
+const CourseLearningPage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
-  const [course, setCourse] = useState<EnhancedCourse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentLesson, setCurrentLesson] = useState<EnhancedLesson | null>(null);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
-  const [progress, setProgress] = useState(0);
-  const [finalExam, setFinalExam] = useState<any>(null);
-  const [finalExamResult, setFinalExamResult] = useState<any>(null);
-  const [showFinalExam, setShowFinalExam] = useState(false);
-  const [showFinalExamResults, setShowFinalExamResults] = useState(false);
-  const [enrollment, setEnrollment] = useState<any>(null);
-  
-  // Quiz states
-  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
-  const [showQuizInstructions, setShowQuizInstructions] = useState(false);
-  const [showQuiz, setShowQuiz] = useState(false);
-  const [showQuizResults, setShowQuizResults] = useState(false);
-  const [quizResult, setQuizResult] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('content');
+  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
+  const [showFinalExamModal, setShowFinalExamModal] = useState(false);
+  const [showExamResultsModal, setShowExamResultsModal] = useState(false);
+  const [examResult, setExamResult] = useState<ExamResult | null>(null);
+  const [courseCompleted, setCourseCompleted] = useState(false);
+  const [hasPassedExam, setHasPassedExam] = useState(false);
+  const [canRetakeExam, setCanRetakeExam] = useState(false);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [lastAccessedLessonId, setLastAccessedLessonId] = useState<string | null>(null);
+  const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (courseId && user) {
@@ -68,42 +100,102 @@ const CourseLearningPage = () => {
     }
   }, [courseId, user]);
 
+  useEffect(() => {
+    // Check if all lessons are completed
+    if (course && completedLessons.length > 0) {
+      const totalLessons = course.modules.reduce((acc, module) => acc + module.lessons.length, 0);
+      const allCompleted = totalLessons > 0 && completedLessons.length >= totalLessons;
+      setCourseCompleted(allCompleted);
+    }
+  }, [completedLessons, course]);
+
+  // Load the appropriate lesson when course data is available
+  useEffect(() => {
+    if (course && course.modules.length > 0) {
+      loadAppropriateLesson();
+    }
+  }, [course, lastAccessedLessonId, completedLessons]);
+
+  const loadAppropriateLesson = () => {
+    if (!course || !course.modules.length) return;
+
+    const allLessons = course.modules.flatMap(m => m.lessons).sort((a, b) => {
+      // Sort by module order first, then lesson order
+      const moduleA = course.modules.find(m => m.id === a.module_id);
+      const moduleB = course.modules.find(m => m.id === b.module_id);
+      if (moduleA && moduleB && moduleA.order_index !== moduleB.order_index) {
+        return moduleA.order_index - moduleB.order_index;
+      }
+      return a.order_index - b.order_index;
+    });
+
+    let lessonToSelect: Lesson | null = null;
+
+    // If we have a last accessed lesson, try to load it
+    if (lastAccessedLessonId) {
+      lessonToSelect = allLessons.find(lesson => lesson.id === lastAccessedLessonId) || null;
+    }
+
+    // If no last accessed lesson or it's not found, find the first incomplete lesson
+    if (!lessonToSelect) {
+      lessonToSelect = allLessons.find(lesson => !completedLessons.includes(lesson.id)) || null;
+    }
+
+    // If all lessons are completed or no incomplete found, load the first lesson
+    if (!lessonToSelect && allLessons.length > 0) {
+      lessonToSelect = allLessons[0];
+    }
+
+    if (lessonToSelect && (!currentLesson || currentLesson.id !== lessonToSelect.id)) {
+      setCurrentLesson(lessonToSelect);
+      if (enrollmentId) {
+        loadVideoPosition(lessonToSelect.id, enrollmentId);
+      }
+    }
+  };
+
   const loadCourseData = async () => {
     if (!courseId || !user) return;
     
     try {
       setLoading(true);
       
-      // Check enrollment
-      const { data: enrollmentData, error: enrollmentError } = await supabase
+      // Fetch course enrollment
+      const { data: enrollment, error: enrollmentError } = await supabase
         .from('course_enrollments')
-        .select('*')
+        .select('id')
         .eq('course_id', courseId)
         .eq('user_id', user.id)
         .single();
 
-      if (enrollmentError && enrollmentError.code !== 'PGRST116') {
-        throw enrollmentError;
+      if (enrollmentError) {
+        throw new Error('You are not enrolled in this course');
       }
+      
+      setEnrollmentId(enrollment.id);
 
-      if (!enrollmentData) {
-        toast.error('You are not enrolled in this course');
-        navigate('/courses');
-        return;
-      }
-
-      setEnrollment(enrollmentData);
-
-      // Load course with modules and lessons
+      // Fetch course with modules and lessons
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select(`
-          *,
-          course_modules (
-            *,
-            lessons (
-              *,
-              quizzes (*)
+          id,
+          title,
+          description,
+          creator_id,
+          course_modules!inner (
+            id,
+            title,
+            description,
+            order_index,
+            lessons!inner (
+              id,
+              title,
+              description,
+              video_url,
+              content,
+              module_id,
+              order_index,
+              duration_minutes
             )
           )
         `)
@@ -112,255 +204,337 @@ const CourseLearningPage = () => {
 
       if (courseError) throw courseError;
 
-      // Load completed lessons
-      const { data: progressData, error: progressError } = await supabase
+      // Transform the data structure
+      const transformedCourse: Course = {
+        id: courseData.id,
+        title: courseData.title,
+        description: courseData.description,
+        creator_id: courseData.creator_id,
+        modules: courseData.course_modules
+          .sort((a: any, b: any) => a.order_index - b.order_index)
+          .map((module: any) => ({
+            id: module.id,
+            title: module.title,
+            description: module.description,
+            order_index: module.order_index,
+            lessons: module.lessons
+              .sort((a: any, b: any) => a.order_index - b.order_index)
+              .map((lesson: any) => ({
+                id: lesson.id,
+                title: lesson.title,
+                description: lesson.description,
+                video_url: lesson.video_url,
+                content: lesson.content,
+                module_id: lesson.module_id,
+                order_index: lesson.order_index,
+                duration_minutes: lesson.duration_minutes
+              }))
+          }))
+      };
+
+      setCourse(transformedCourse);
+
+      // Fetch lesson progress
+      const { data: progressData } = await supabase
         .from('lesson_progress')
-        .select('lesson_id')
-        .eq('enrollment_id', enrollmentData.id);
+        .select('lesson_id, is_completed')
+        .eq('enrollment_id', enrollment.id);
 
-      if (progressError) throw progressError;
+      const completed = progressData?.filter(p => p.is_completed).map(p => p.lesson_id) || [];
+      setCompletedLessons(completed);
 
-      const completedLessonIds = progressData?.map(p => p.lesson_id) || [];
-      setCompletedLessons(completedLessonIds);
+      // Fetch course progress to get last accessed lesson
+      const { data: courseProgress, error: progressError } = await supabase
+        .from('course_progress')
+        .select('last_accessed_lesson_id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
 
-      // Load final exam
+      if (!progressError && courseProgress?.last_accessed_lesson_id) {
+        setLastAccessedLessonId(courseProgress.last_accessed_lesson_id);
+      }
+
+      // Fetch final exam if exists
       const { data: examData } = await supabase
         .from('final_exams')
         .select('*')
         .eq('course_id', courseId)
-        .single();
+        .eq('is_published', true)
+        .maybeSingle();
 
       if (examData) {
         setFinalExam(examData);
         
-        // Check for existing exam results
-        const { data: resultData } = await supabase
+        // Check if user has exam results
+        const { data: examResults } = await supabase
           .from('final_exam_results')
           .select('*')
-          .eq('exam_id', examData.id)
           .eq('user_id', user.id)
-          .single();
-
-        if (resultData) {
-          setFinalExamResult(resultData);
+          .eq('exam_id', examData.id)
+          .order('attempt_number', { ascending: false })
+          .limit(1);
+          
+        if (examResults && examResults.length > 0) {
+          const latestResult = examResults[0];
+          setHasPassedExam(latestResult.passed);
+          setCanRetakeExam(!latestResult.passed);
+          
+          // Convert quiz_scores from Json to number[]
+          const quizScores = Array.isArray(latestResult.quiz_scores) 
+            ? latestResult.quiz_scores as number[]
+            : [];
+            
+          setExamResult({
+            id: latestResult.id,
+            passed: latestResult.passed,
+            score: latestResult.score,
+            final_grade: latestResult.final_grade,
+            quiz_scores: quizScores,
+            attempt_number: latestResult.attempt_number
+          });
         }
       }
 
-      // Process course data with completion status
-      const enhancedModules = courseData.course_modules?.map((module: any, moduleIndex: number) => {
-        const enhancedLessons = module.lessons?.map((lesson: any, lessonIndex: number) => {
-          const isCompleted = completedLessonIds.includes(lesson.id);
-          const isFirstLesson = moduleIndex === 0 && lessonIndex === 0;
-          const previousLessonCompleted = lessonIndex === 0 || 
-            (module.lessons[lessonIndex - 1] && completedLessonIds.includes(module.lessons[lessonIndex - 1].id));
-          const isLocked = !isFirstLesson && !previousLessonCompleted;
-
-          // Ensure quizzes have the correct structure
-          const quizzes = lesson.quizzes?.map((quiz: any) => ({
-            ...quiz,
-            time_limit_minutes: quiz.time_limit_minutes || null
-          })) || [];
-
-          return {
-            ...lesson,
-            isCompleted,
-            isLocked,
-            quizzes
-          };
-        }) || [];
-
-        return {
-          ...module,
-          lessons: enhancedLessons
-        };
-      }) || [];
-
-      const enhancedCourse = {
-        ...courseData,
-        modules: enhancedModules
-      };
-
-      setCourse(enhancedCourse);
-      
-      // Calculate progress
-      const totalLessons = enhancedModules.reduce((acc, module) => acc + module.lessons.length, 0);
-      const completedCount = completedLessonIds.length;
-      const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
-      setProgress(progressPercentage);
-
-      // Set current lesson (first incomplete lesson)
-      for (const module of enhancedModules) {
-        for (const lesson of module.lessons) {
-          if (!lesson.isCompleted && !lesson.isLocked) {
-            setCurrentLesson(lesson);
-            return;
-          }
-        }
-      }
-
-    } catch (error) {
-      console.error('Error loading course data:', error);
-      toast.error('Failed to load course data');
+    } catch (error: any) {
+      console.error('Error loading course:', error);
+      toast.error(error.message || 'Failed to load course');
+      navigate('/learning');
     } finally {
       setLoading(false);
     }
   };
 
-  const markLessonComplete = async (lessonId: string) => {
-    if (!user || !enrollment) return;
+  const loadVideoPosition = async (lessonId: string, enrollmentId: string) => {
+    try {
+      const { data } = await supabase
+        .from('lesson_progress')
+        .select('last_position_seconds')
+        .eq('lesson_id', lessonId)
+        .eq('enrollment_id', enrollmentId)
+        .maybeSingle();
+        
+      if (data?.last_position_seconds) {
+        setCurrentVideoTime(data.last_position_seconds);
+      } else {
+        setCurrentVideoTime(0);
+      }
+    } catch (error) {
+      console.error('Error loading video position:', error);
+      setCurrentVideoTime(0);
+    }
+  };
+
+  const saveVideoProgress = async (lessonId: string, position: number, completed: boolean = false) => {
+    if (!enrollmentId) return;
 
     try {
-      // Check if already completed
-      if (completedLessons.includes(lessonId)) return;
-
       const { error } = await supabase
         .from('lesson_progress')
         .upsert({
           lesson_id: lessonId,
-          enrollment_id: enrollment.id,
-          is_completed: true,
-          completion_date: new Date().toISOString()
+          enrollment_id: enrollmentId,
+          last_position_seconds: position,
+          is_completed: completed,
+          completion_date: completed ? new Date().toISOString() : null
         }, {
           onConflict: 'lesson_id,enrollment_id'
         });
 
       if (error) throw error;
 
-      // Update local state
-      const newCompletedLessons = [...completedLessons, lessonId];
-      setCompletedLessons(newCompletedLessons);
+      if (completed && !completedLessons.includes(lessonId)) {
+        setCompletedLessons(prev => [...prev, lessonId]);
+        toast.success('Lesson completed!');
+      }
 
-      // Update course progress
-      const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
-      const newProgress = Math.round((newCompletedLessons.length / totalLessons) * 100);
-      setProgress(newProgress);
-
-      // Update enrollment completion
-      const { error: enrollmentError } = await supabase
-        .from('course_enrollments')
-        .update({
-          is_completed: newProgress === 100,
-          completion_date: newProgress === 100 ? new Date().toISOString() : null
-        })
-        .eq('id', enrollment.id);
-
-      if (enrollmentError) throw enrollmentError;
-
-      toast.success('Lesson completed!');
-      
-      // Reload course data to update lesson states
-      loadCourseData();
-
+      // Update course progress with last accessed lesson
+      await updateCourseProgress(lessonId);
     } catch (error) {
-      console.error('Error marking lesson complete:', error);
-      toast.error('Failed to mark lesson as complete');
+      console.error('Error saving video progress:', error);
     }
   };
 
-  const startLesson = (lesson: EnhancedLesson) => {
-    if (lesson.isLocked) {
-      toast.error('Complete previous lessons to unlock this one');
-      return;
+  const updateCourseProgress = async (lastAccessedLessonId: string) => {
+    if (!user || !courseId) return;
+
+    try {
+      const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
+      const progressPercentage = totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
+
+      await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          last_accessed_lesson_id: lastAccessedLessonId,
+          progress_percentage: progressPercentage,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+    } catch (error) {
+      console.error('Error updating course progress:', error);
+    }
+  };
+
+  const markLessonComplete = async (lessonId: string) => {
+    if (!enrollmentId) return;
+    
+    try {
+      await saveVideoProgress(lessonId, 0, true);
+    } catch (error) {
+      console.error('Error marking lesson complete:', error);
+    }
+  };
+
+  const handleVideoTimeUpdate = (currentTime: number, duration: number, percent: number) => {
+    setCurrentVideoTime(currentTime);
+    
+    // Clear existing interval
+    if (progressSaveInterval.current) {
+      clearInterval(progressSaveInterval.current);
+    }
+    
+    // Save progress every 10 seconds
+    progressSaveInterval.current = setInterval(() => {
+      if (currentLesson) {
+        const isCompleted = percent >= 95; // Consider completed at 95%
+        saveVideoProgress(currentLesson.id, currentTime, isCompleted);
+      }
+    }, 10000);
+  };
+
+  const handleVideoEnded = () => {
+    if (currentLesson && enrollmentId) {
+      saveVideoProgress(currentLesson.id, 0, true);
+      
+      // Auto-transition to next lesson
+      setTimeout(() => {
+        handleNextLesson();
+      }, 1500);
+    }
+  };
+
+  const handleLessonSelect = (lesson: Lesson) => {
+    // Clear progress interval when switching lessons
+    if (progressSaveInterval.current) {
+      clearInterval(progressSaveInterval.current);
     }
     
     setCurrentLesson(lesson);
-  };
-
-  const handleQuizStart = (quiz: Quiz) => {
-    setSelectedQuiz(quiz);
-    setShowQuizInstructions(true);
-  };
-
-  const handleQuizInstructionsClose = () => {
-    setShowQuizInstructions(false);
-    setSelectedQuiz(null);
-  };
-
-  const handleQuizInstructionsStart = () => {
-    setShowQuizInstructions(false);
-    setShowQuiz(true);
-  };
-
-  const handleQuizComplete = (result: any) => {
-    setShowQuiz(false);
-    setQuizResult(result);
-    setShowQuizResults(true);
-  };
-
-  const handleQuizResultsClose = () => {
-    setShowQuizResults(false);
-    setQuizResult(null);
-    setSelectedQuiz(null);
-  };
-
-  const handleFinalExamStart = async () => {
-    if (!finalExam || !user) return;
-
-    console.log('Starting final exam...', finalExam);
+    setCurrentVideoTime(0);
     
-    try {
-      // Check if user has completed all lessons
-      const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
-      const completedCount = completedLessons.length;
+    if (enrollmentId) {
+      loadVideoPosition(lesson.id, enrollmentId);
+    }
+
+    // Update course progress
+    updateCourseProgress(lesson.id);
+  };
+
+  const handleNextLesson = () => {
+    if (!course || !currentLesson) return;
+
+    const allLessons = course.modules.flatMap(m => m.lessons).sort((a, b) => {
+      const moduleA = course.modules.find(m => m.id === a.module_id);
+      const moduleB = course.modules.find(m => m.id === b.module_id);
+      if (moduleA && moduleB && moduleA.order_index !== moduleB.order_index) {
+        return moduleA.order_index - moduleB.order_index;
+      }
+      return a.order_index - b.order_index;
+    });
+    
+    const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
+    
+    if (currentIndex < allLessons.length - 1) {
+      // Mark current lesson as completed if not already
+      if (!completedLessons.includes(currentLesson.id)) {
+        markLessonComplete(currentLesson.id);
+      }
       
-      if (completedCount < totalLessons) {
-        toast.error('You must complete all lessons before taking the final exam');
-        return;
-      }
-
-      // Check if user has already passed
-      if (finalExamResult && finalExamResult.passed) {
-        const retakeAllowed = finalExamResult.attempt_number < 3; // Allow up to 3 attempts
-        if (!retakeAllowed) {
-          toast.error('You have reached the maximum number of attempts');
-          return;
-        }
-      }
-
-      console.log('Opening final exam modal...');
-      setShowFinalExam(true);
-    } catch (error) {
-      console.error('Error starting final exam:', error);
-      toast.error('Failed to start final exam');
+      const nextLesson = allLessons[currentIndex + 1];
+      handleLessonSelect(nextLesson);
     }
   };
 
-  const handleFinalExamComplete = (examResult: any) => {
-    console.log('Final exam completed:', examResult);
-    setShowFinalExam(false);
-    setFinalExamResult(examResult);
-    setShowFinalExamResults(true);
+  const handlePreviousLesson = () => {
+    if (!course || !currentLesson) return;
+
+    const allLessons = course.modules.flatMap(m => m.lessons).sort((a, b) => {
+      const moduleA = course.modules.find(m => m.id === a.module_id);
+      const moduleB = course.modules.find(m => m.id === b.module_id);
+      if (moduleA && moduleB && moduleA.order_index !== moduleB.order_index) {
+        return moduleA.order_index - moduleB.order_index;
+      }
+      return a.order_index - b.order_index;
+    });
     
-    if (examResult.passed) {
-      toast.success('Congratulations! You passed the final exam!');
-    } else {
-      toast.error('You did not pass the final exam. You can retake it.');
+    const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
+    
+    if (currentIndex > 0) {
+      const previousLesson = allLessons[currentIndex - 1];
+      handleLessonSelect(previousLesson);
     }
   };
 
-  const handleFinalExamResultsClose = () => {
-    setShowFinalExamResults(false);
-    loadCourseData(); // Reload to get updated results
+  const handleTakeFinalExam = () => {
+    if (finalExam && (courseCompleted || canRetakeExam)) {
+      setShowFinalExamModal(true);
+    }
   };
 
-  const canTakeFinalExam = () => {
-    if (!finalExam) return false;
+  const handleExamComplete = (result: any) => {
+    setShowFinalExamModal(false);
     
-    const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
-    const allLessonsCompleted = completedLessons.length >= totalLessons && totalLessons > 0;
+    // Convert result to match ExamResult interface
+    const examResult: ExamResult = {
+      id: result.id || '',
+      passed: result.passed,
+      score: result.score,
+      final_grade: result.final_grade,
+      quiz_scores: Array.isArray(result.quiz_scores) ? result.quiz_scores : [],
+      attempt_number: result.attempt_number
+    };
     
-    // Allow retake if not passed or if allowed retakes remain
-    const canRetake = !finalExamResult || !finalExamResult.passed || (finalExamResult.attempt_number < 3);
+    setExamResult(examResult);
+    setHasPassedExam(result.passed);
+    setCanRetakeExam(!result.passed);
+    setShowExamResultsModal(true);
     
-    return allLessonsCompleted && canRetake;
+    // Refresh course data to get updated exam status
+    loadCourseData();
+  };
+
+  const handleRetakeExam = () => {
+    setShowFinalExamModal(true);
+  };
+
+  const calculateProgress = () => {
+    if (!course) return 0;
+    const totalLessons = course.modules.reduce((acc, module) => acc + module.lessons.length, 0);
+    return totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
+  };
+
+  const shouldShowViewResults = () => {
+    return finalExam && (hasPassedExam || canRetakeExam);
+  };
+
+  const shouldShowFinalExamButton = () => {
+    return finalExam && courseCompleted && !hasPassedExam;
+  };
+
+  const shouldShowRetakeButton = () => {
+    return finalExam && canRetakeExam && !hasPassedExam;
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="flex justify-center items-center h-64">
+        <div className="container flex justify-center items-center py-16">
+          <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading course content...</p>
           </div>
         </div>
       </Layout>
@@ -370,13 +544,12 @@ const CourseLearningPage = () => {
   if (!course) {
     return (
       <Layout>
-        <div className="section-container">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Course not found</h1>
-            <Button onClick={() => navigate('/courses')}>
-              Back to Courses
-            </Button>
-          </div>
+        <div className="container py-16 text-center">
+          <h2 className="text-2xl font-bold mb-2">Course not found</h2>
+          <p className="mb-6 text-muted-foreground">The course you're looking for doesn't exist or you don't have access to it.</p>
+          <Button asChild>
+            <Link to="/learning">Back to Learning</Link>
+          </Button>
         </div>
       </Layout>
     );
@@ -384,248 +557,272 @@ const CourseLearningPage = () => {
 
   return (
     <Layout>
-      <div className="section-container">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Course Curriculum */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle>{course.title}</CardTitle>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progress</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <Progress value={progress} className="w-full" />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {course.modules?.map((module) => (
-                  <div key={module.id} className="space-y-2">
-                    <h3 className="font-semibold text-sm">{module.title}</h3>
-                    <div className="space-y-1">
-                      {module.lessons?.map((lesson) => (
-                        <div key={lesson.id} className="space-y-1">
-                          <div
-                            className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
-                              currentLesson?.id === lesson.id
-                                ? 'bg-primary/10 border border-primary/20'
-                                : lesson.isLocked
-                                ? 'bg-muted/50 cursor-not-allowed'
-                                : 'hover:bg-muted/50'
-                            }`}
-                            onClick={() => startLesson(lesson)}
-                          >
-                            <div className="flex items-center space-x-2">
-                              {lesson.isCompleted ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              ) : lesson.isLocked ? (
-                                <Lock className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <div className="flex items-center space-x-1">
-                                  {lesson.content_type === 'video' ? (
-                                    <Video className="h-4 w-4 text-blue-500" />
-                                  ) : (
-                                    <FileText className="h-4 w-4 text-green-500" />
-                                  )}
-                                  <Play className="h-3 w-3" />
-                                </div>
-                              )}
-                              <span className={`text-sm ${lesson.isLocked ? 'text-muted-foreground' : ''}`}>
-                                {lesson.title}
-                              </span>
-                            </div>
-                            {lesson.quizzes && lesson.quizzes.length > 0 && (
-                              <Badge variant="outline" className="text-xs">
-                                {lesson.quizzes.length} Quiz{lesson.quizzes.length > 1 ? 'es' : ''}
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          {/* Quiz buttons for this lesson */}
-                          {lesson.quizzes && lesson.quizzes.length > 0 && !lesson.isLocked && (
-                            <div className="ml-6 space-y-1">
-                              {lesson.quizzes.map((quiz) => (
-                                <Button
-                                  key={quiz.id}
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full justify-start text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleQuizStart(quiz);
-                                  }}
-                                >
-                                  <HelpCircle className="h-3 w-3 mr-2" />
-                                  {quiz.title}
-                                </Button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Final Exam Section */}
-                {finalExam && (
-                  <div className="pt-4 border-t">
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Award className="h-5 w-5 text-yellow-500" />
-                        <h3 className="font-semibold">Final Exam</h3>
-                      </div>
-                      {finalExamResult?.passed ? (
-                        <div className="text-sm text-green-600">
-                          ✓ Passed with {finalExamResult.percentage_score}%
-                        </div>
-                      ) : (
-                        <Button
-                          className="w-full"
-                          onClick={handleFinalExamStart}
-                          disabled={!canTakeFinalExam()}
-                        >
-                          {finalExamResult ? 'Retake Final Exam' : 'Take Final Exam'}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+      <div className="container py-8">
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" asChild className="mb-4">
+            <Link to="/learning">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Learning
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold">{course.title}</h1>
+          <div className="flex items-center gap-4 mt-2">
+            <div className="flex-1">
+              <Progress value={calculateProgress()} className="h-2" />
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {calculateProgress()}% Complete
+            </span>
           </div>
-
-          {/* Lesson Content */}
-          <div className="lg:col-span-2">
-            {currentLesson ? (
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Course curriculum sidebar */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-24">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    {currentLesson.title}
-                    {!currentLesson.isCompleted && (
-                      <Button onClick={() => markLessonComplete(currentLesson.id)}>
-                        Mark Complete
-                      </Button>
-                    )}
-                  </CardTitle>
-                  {currentLesson.description && (
-                    <p className="text-muted-foreground">{currentLesson.description}</p>
-                  )}
+                  <CardTitle className="text-lg">Course Curriculum</CardTitle>
+                  <CardDescription>
+                    {completedLessons.length} of {course.modules.reduce((acc, m) => acc + m.lessons.length, 0)} lessons completed
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {currentLesson.content_type === 'video' && currentLesson.video_url && (
-                    <div className="aspect-video bg-black rounded-lg mb-4">
-                      <video
-                        controls
-                        className="w-full h-full rounded-lg"
-                        src={currentLesson.video_url}
-                      >
-                        Your browser does not support the video tag.
-                      </video>
+                <CardContent className="space-y-4 max-h-96 overflow-y-auto">
+                  {course.modules.map((module) => (
+                    <div key={module.id} className="space-y-2">
+                      <h4 className="font-medium text-sm text-muted-foreground border-b pb-2">
+                        {module.title}
+                      </h4>
+                      {module.lessons.map((lesson) => {
+                        const isCompleted = completedLessons.includes(lesson.id);
+                        const isCurrent = currentLesson?.id === lesson.id;
+                        
+                        return (
+                          <button
+                            key={lesson.id}
+                            onClick={() => handleLessonSelect(lesson)}
+                            className={`w-full text-left p-3 rounded-md transition-colors ${
+                              isCurrent
+                                ? 'bg-primary text-primary-foreground'
+                                : 'hover:bg-muted'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  {isCompleted ? (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                                  )}
+                                  {lesson.video_url ? (
+                                    <Play className="h-4 w-4" />
+                                  ) : (
+                                    <FileText className="h-4 w-4" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">{lesson.title}</p>
+                                  {lesson.duration_minutes && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {lesson.duration_minutes} min
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+                  ))}
                   
-                  {currentLesson.content && (
-                    <div className="prose max-w-none">
-                      {typeof currentLesson.content === 'string' 
-                        ? currentLesson.content 
-                        : JSON.stringify(currentLesson.content)
-                      }
+                  {/* Final Exam Section */}
+                  {shouldShowFinalExamButton() && (
+                    <div className="space-y-2 pt-4 border-t">
+                      <h4 className="font-medium text-sm text-muted-foreground">Final Assessment</h4>
+                      <Button
+                        onClick={handleTakeFinalExam}
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                      >
+                        <Award className="mr-2 h-4 w-4" />
+                        Take Final Exam
+                      </Button>
                     </div>
                   )}
 
-                  {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="font-semibold mb-2">Course Materials</h3>
-                      <div className="space-y-2">
-                        {currentLesson.materials_urls.map((url, index) => (
-                          <a
-                            key={index}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
-                          >
-                            <FileText className="h-4 w-4" />
-                            <span>Material {index + 1}</span>
-                          </a>
-                        ))}
-                      </div>
+                  {/* Retake Exam Button */}
+                  {shouldShowRetakeButton() && (
+                    <div className="pt-2">
+                      <Button
+                        onClick={handleRetakeExam}
+                        variant="outline"
+                        className="w-full border-orange-300 text-orange-600 hover:bg-orange-100"
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Retake Exam
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* View Course Results Button */}
+                  {shouldShowViewResults() && (
+                    <div className="pt-2">
+                      <Button 
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => navigate(`/course/${courseId}/results`)}
+                      >
+                        View Course Results
+                      </Button>
                     </div>
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </div>
+          
+          {/* Main content area */}
+          <div className="lg:col-span-3">
+            {currentLesson ? (
+              <div className="space-y-6">
+                {/* Video Player */}
+                {currentLesson.video_url ? (
+                  <div className="bg-black rounded-md overflow-hidden">
+                    <VideoPlayer
+                      src={currentLesson.video_url}
+                      onTimeUpdate={handleVideoTimeUpdate}
+                      onEnded={handleVideoEnded}
+                      autoplay={false}
+                      controls={true}
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-video flex items-center justify-center bg-muted rounded-md">
+                    <div className="text-center p-8">
+                      <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                      <h3 className="text-lg font-medium">No video content</h3>
+                      <p className="text-muted-foreground">This lesson contains text content only.</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Lesson details */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold">{currentLesson.title}</h2>
+                    {completedLessons.includes(currentLesson.id) && (
+                      <Badge variant="secondary" className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        <span>Completed</span>
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {currentLesson.description && (
+                    <p className="text-muted-foreground mt-2">{currentLesson.description}</p>
+                  )}
+                </div>
+                
+                {/* Tabs for different content types */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="content">Lesson Content</TabsTrigger>
+                    <TabsTrigger value="transcript">Transcript</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="content" className="min-h-[300px]">
+                    <Card>
+                      <CardContent className="p-6">
+                        {currentLesson.content ? (
+                          <div 
+                            className="prose max-w-none" 
+                            dangerouslySetInnerHTML={{ __html: currentLesson.content }} 
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-full py-12">
+                            <BookOpen className="h-12 w-12 mb-4 text-muted-foreground/40" />
+                            <h3 className="font-medium text-lg mb-2">No additional content</h3>
+                            <p className="text-muted-foreground text-center">
+                              This lesson doesn't have any additional text content.
+                              <br />Watch the video above to learn about this topic.
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="transcript">
+                    <VideoTranscripts
+                      lessonId={currentLesson.id}
+                      currentTime={currentVideoTime}
+                      onSeekTo={(time) => {
+                        console.log('Seeking to time:', time);
+                        // Note: VideoPlayer component would need to implement seeking functionality
+                      }}
+                    />
+                  </TabsContent>
+                </Tabs>
+                
+                {/* Lesson navigation */}
+                <div className="flex justify-between pt-4 mt-8 border-t">
+                  <Button 
+                    variant="outline"
+                    onClick={handlePreviousLesson}
+                    disabled={!course || course.modules.flatMap(m => m.lessons).findIndex(l => l.id === currentLesson.id) === 0}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleNextLesson}
+                    disabled={!course || course.modules.flatMap(m => m.lessons).findIndex(l => l.id === currentLesson.id) === course.modules.flatMap(m => m.lessons).length - 1}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                  >
+                    Next <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                  </Button>
+                </div>
+              </div>
             ) : (
               <Card>
-                <CardContent className="p-8 text-center">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h2 className="text-xl font-semibold mb-2">Welcome to the Course</h2>
-                  <p className="text-muted-foreground mb-4">
-                    Select a lesson from the curriculum to get started.
-                  </p>
+                <CardHeader>
+                  <CardTitle>Welcome to the Course</CardTitle>
+                  <CardDescription>Loading your course content...</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>{course.description}</p>
                 </CardContent>
               </Card>
             )}
           </div>
         </div>
       </div>
-
+      
       {/* Final Exam Modal */}
-      {finalExam && (
+      {finalExam && enrollmentId && (
         <FinalExamModal
-          isOpen={showFinalExam}
-          onClose={() => setShowFinalExam(false)}
+          isOpen={showFinalExamModal}
+          onClose={() => setShowFinalExamModal(false)}
           exam={finalExam}
-          onComplete={handleFinalExamComplete}
-          enrollmentId={enrollment?.id}
+          enrollmentId={enrollmentId}
+          onComplete={handleExamComplete}
         />
       )}
 
       {/* Final Exam Results Modal */}
-      {finalExamResult && (
+      {examResult && (
         <FinalExamResultsModal
-          isOpen={showFinalExamResults}
-          onClose={handleFinalExamResultsClose}
-          examResult={finalExamResult}
-          onRetake={() => {
-            setShowFinalExamResults(false);
-            handleFinalExamStart();
-          }}
+          isOpen={showExamResultsModal}
+          onClose={() => setShowExamResultsModal(false)}
+          examScore={examResult.score}
+          quizScores={examResult.quiz_scores}
+          finalGrade={examResult.final_grade}
+          passed={examResult.passed}
+          courseName={course?.title || 'Course'}
+          studentName={user?.email || 'Student'}
+          enrollmentId={enrollmentId || ''}
+          onRetake={handleRetakeExam}
         />
-      )}
-
-      {/* Quiz Modals */}
-      {selectedQuiz && (
-        <>
-          <QuizInstructionsModal
-            isOpen={showQuizInstructions}
-            onClose={handleQuizInstructionsClose}
-            quiz={selectedQuiz}
-            onStartQuiz={handleQuizInstructionsStart}
-          />
-          
-          <QuizModal
-            isOpen={showQuiz}
-            onClose={() => setShowQuiz(false)}
-            quizId={selectedQuiz.id}
-            onComplete={handleQuizComplete}
-          />
-          
-          <QuizResultsModal
-            isOpen={showQuizResults}
-            onClose={handleQuizResultsClose}
-            quiz={selectedQuiz}
-            score={quizResult?.score || 0}
-            passed={quizResult?.passed || false}
-            onRetake={() => {
-              setShowQuizResults(false);
-              setShowQuiz(true);
-            }}
-            onProceed={handleQuizResultsClose}
-            hasNextContent={true}
-          />
-        </>
       )}
     </Layout>
   );
