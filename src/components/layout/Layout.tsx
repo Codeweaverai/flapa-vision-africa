@@ -18,7 +18,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </main>
       <Footer />
       <MobileBottomNav />
-      <SmartAdvisorFloatingButton />
     </div>
   );
 };
