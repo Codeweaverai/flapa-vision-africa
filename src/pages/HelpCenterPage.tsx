@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -15,7 +16,8 @@ import { toast } from 'sonner';
 const HelpCenterPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [contactForm, setContactForm] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     subject: '',
     message: ''
@@ -63,7 +65,8 @@ const HelpCenterPage = () => {
       const { error } = await supabase
         .from('contact_submissions')
         .insert([{
-          name: contactForm.name,
+          first_name: contactForm.firstName,
+          last_name: contactForm.lastName,
           email: contactForm.email,
           subject: contactForm.subject,
           message: contactForm.message,
@@ -73,7 +76,7 @@ const HelpCenterPage = () => {
       if (error) throw error;
 
       toast.success('Your message has been sent successfully!');
-      setContactForm({ name: '', email: '', subject: '', message: '' });
+      setContactForm({ firstName: '', lastName: '', email: '', subject: '', message: '' });
     } catch (error) {
       console.error('Error submitting contact form:', error);
       toast.error('Failed to send message. Please try again.');
@@ -192,14 +195,25 @@ const HelpCenterPage = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleContactSubmit} className="space-y-4">
-                <div>
-                  <Input
-                    type="text"
-                    placeholder="Your Name"
-                    value={contactForm.name}
-                    onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Input
+                      type="text"
+                      placeholder="First Name"
+                      value={contactForm.firstName}
+                      onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Input
+                      type="text"
+                      placeholder="Last Name"
+                      value={contactForm.lastName}
+                      onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
                   <Input
