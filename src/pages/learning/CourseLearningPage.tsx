@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -76,10 +75,10 @@ interface Enrollment {
   id: string;
   user_id: string;
   course_id: string;
-  start_date: string;
-  end_date: string | null;
-  progress: number;
+  enrollment_date: string;
+  completion_date: string | null;
   is_completed: boolean;
+  payment_status: string;
 }
 
 const CourseLearningPage = () => {
@@ -122,8 +121,7 @@ const CourseLearningPage = () => {
             description,
             video_url,
             content,
-            order_index,
-            duration_minutes
+            order_index
           ),
           course_reviews (
             id,
@@ -182,7 +180,13 @@ const CourseLearningPage = () => {
           ...module,
           lessons: courseData.lessons?.filter((lesson: any) => lesson.module_id === module.id) || []
         })) || [],
-        lessons: courseData.lessons || [],
+        lessons: courseData.lessons?.map((lesson: any) => ({
+          ...lesson,
+          transcript: lesson.content || '',
+          is_preview: false,
+          course_id: courseId,
+          completion_status: completedLessonsData?.some(cl => cl.lesson_id === lesson.id) ? 'complete' : 'incomplete'
+        })) || [],
         reviews: reviews.map((review: any) => ({
           ...review,
           comment: review.review_text || ''
@@ -192,11 +196,23 @@ const CourseLearningPage = () => {
       };
 
       setCourse(transformedCourseData as Course);
-      setEnrollment(enrollmentData as Enrollment || null);
+      
+      // Transform enrollment data
+      if (enrollmentData) {
+        const transformedEnrollment = {
+          ...enrollmentData,
+          enrollment_date: enrollmentData.enrollment_date || enrollmentData.created_at,
+          completion_date: enrollmentData.completion_date,
+          is_completed: enrollmentData.is_completed || false,
+          payment_status: enrollmentData.payment_status || 'completed'
+        };
+        setEnrollment(transformedEnrollment as Enrollment);
+      }
+      
       setCompletedLessons((completedLessonsData || []).map(item => item.lesson_id));
 
       // Set initial current lesson
-      const firstLesson = (transformedCourseData as Course).modules[0]?.lessons[0];
+      const firstLesson = transformedCourseData.modules[0]?.lessons[0];
       setCurrentLesson(firstLesson || null);
 
       // Calculate and set progress
