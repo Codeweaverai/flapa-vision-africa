@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import TicketDisplay from '@/components/tickets/TicketDisplay';
 import { QRCodeSVG } from 'qrcode.react';
+import html2pdf from 'html2pdf.js';
 
 // Extend the Window interface to include QRCode
 declare global {
@@ -340,27 +341,187 @@ const MyOrdersPage = () => {
           <head>
             <title>Event Tickets</title>
             <style>
-              body { 
-                font-family: Arial, sans-serif; 
-                margin: 0; 
-                padding: 20px; 
-                background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
-                min-height: 100vh;
+              @page {
+                size: A4;
+                margin: 15mm;
               }
+              
+              body { 
+                font-family: 'Arial', sans-serif; 
+                margin: 0; 
+                padding: 0; 
+                background: white;
+                color: #1f2937;
+                line-height: 1.4;
+              }
+              
               .ticket-container { 
                 page-break-after: always; 
-                margin-bottom: 40px; 
+                margin-bottom: 20px;
+                background: white;
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                max-width: 180mm;
+                margin: 0 auto 20px auto;
               }
+              
               .ticket-container:last-child { 
                 page-break-after: avoid; 
               }
-              @media print { 
+              
+              .ticket-header {
+                background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+                padding: 30px;
+                text-align: center;
+                color: white;
+                position: relative;
+              }
+              
+              .ticket-header h1 {
+                margin: 0 0 10px 0;
+                font-size: 28px;
+                font-weight: bold;
+              }
+              
+              .ticket-code-badge {
+                background: rgba(255,255,255,0.2);
+                padding: 8px 16px;
+                border-radius: 20px;
+                display: inline-block;
+                font-size: 14px;
+                font-weight: 500;
+              }
+              
+              .ticket-content {
+                padding: 30px;
+              }
+              
+              .event-image {
+                width: 120px;
+                height: 120px;
+                border-radius: 15px;
+                object-fit: cover;
+                float: left;
+                margin-right: 20px;
+                margin-bottom: 15px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+              }
+              
+              .event-title {
+                font-size: 24px;
+                font-weight: bold;
+                color: #1f2937;
+                margin: 0 0 15px 0;
+                clear: both;
+              }
+              
+              .ticket-info-badge {
+                background: linear-gradient(135deg, #fef7ed, #faf5ff);
+                padding: 12px 16px;
+                border-radius: 10px;
+                border-left: 4px solid #f97316;
+                margin-bottom: 25px;
+                clear: both;
+              }
+              
+              .details-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 25px;
+                margin-bottom: 30px;
+              }
+              
+              .detail-item {
+                margin-bottom: 20px;
+              }
+              
+              .detail-label {
+                font-weight: bold;
+                color: #374151;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              }
+              
+              .detail-value {
+                color: #6b7280;
+                font-size: 16px;
+                line-height: 1.4;
+              }
+              
+              .qr-section {
+                text-align: center;
+                padding: 25px;
+                background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+                border-radius: 15px;
+                margin-bottom: 20px;
+              }
+              
+              .qr-container {
+                width: 140px;
+                height: 140px;
+                margin: 0 auto 15px;
+                padding: 15px;
+                background: white;
+                border-radius: 15px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              
+              .ticket-code {
+                font-family: 'Courier New', monospace;
+                font-size: 18px;
+                font-weight: bold;
+                color: #f97316;
+                letter-spacing: 2px;
+                margin-top: 10px;
+              }
+              
+              .footer-notes {
+                text-align: center;
+                padding: 20px;
+                border-top: 2px dashed #e5e7eb;
+                color: #6b7280;
+                font-size: 14px;
+                line-height: 1.6;
+              }
+              
+              .status-badge {
+                background: #dcfce7;
+                color: #166534;
+                padding: 6px 12px;
+                border-radius: 20px;
+                font-size: 14px;
+                font-weight: 500;
+                display: inline-block;
+              }
+              
+              @media print {
                 body { 
-                  margin: 0; 
-                  background: white;
+                  background: white !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
                 }
-                .ticket-container { 
-                  margin-bottom: 0; 
+                
+                .ticket-container {
+                  box-shadow: none;
+                  border: 1px solid #e5e7eb;
+                }
+                
+                .ticket-header {
+                  background: linear-gradient(135deg, #f97316 0%, #a855f7 100%) !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                
+                .ticket-info-badge {
+                  background: linear-gradient(135deg, #fef7ed, #faf5ff) !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
                 }
               }
             </style>
@@ -371,8 +532,49 @@ const MyOrdersPage = () => {
           </html>
         `);
         printWindow.document.close();
-        printWindow.print();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
       }
+    }
+  };
+
+  const handleDownloadTicketsPDF = async () => {
+    const element = document.getElementById('tickets-print-content');
+    if (!element) {
+      toast.error('Tickets content not found');
+      return;
+    }
+
+    toast.info('Generating PDF... This may take a moment');
+
+    const opt = {
+      margin: 10,
+      filename: `event-tickets-${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait' 
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    try {
+      await html2pdf().set(opt).from(element).save();
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -832,89 +1034,97 @@ const MyOrdersPage = () => {
           onClose={() => setShowTicketModal(false)}
           title="Event Tickets"
           actions={
-            <Button 
-              onClick={handlePrintTickets} 
-              size="sm"
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Print All Tickets
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                onClick={handleDownloadTicketsPDF}
+                size="sm"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button 
+                onClick={handlePrintTickets} 
+                size="sm"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print All Tickets
+              </Button>
+            </div>
           }
         >
           <div id="tickets-print-content" className="space-y-8 max-h-[70vh] overflow-y-auto">
             {selectedBookings.filter(ticket => ticket.event).map((ticket, index) => (
-              <div key={ticket.id || index} className="max-w-800px mx-auto mb-8 bg-white rounded-2xl overflow-hidden shadow-xl">
+              <div key={ticket.id || index} className="ticket-container">
                 {/* Header with gradient */}
-                <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-8 text-center text-white">
-                  <h1 className="text-3xl font-bold mb-2">🎫 EVENT TICKET</h1>
-                  <div className="bg-white/20 px-4 py-2 rounded-full inline-block">
-                    <span className="text-sm font-medium">#{ticket.ticket_code || ticket.booking_code}</span>
+                <div className="ticket-header">
+                  <h1>🎫 EVENT TICKET</h1>
+                  <div className="ticket-code-badge">
+                    #{ticket.ticket_code || ticket.booking_code}
                   </div>
                 </div>
 
-                <div className="p-8">
+                <div className="ticket-content">
                   {/* Event Image and Title */}
-                  <div className="flex gap-6 mb-8 items-center">
+                  <div style={{ marginBottom: '25px', overflow: 'hidden' }}>
                     {ticket.event?.image_url && (
-                      <div className="w-32 h-32 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg">
-                        <img src={ticket.event.image_url} alt={ticket.event?.title || 'Event'} className="w-full h-full object-cover" />
-                      </div>
+                      <img 
+                        src={ticket.event.image_url} 
+                        alt={ticket.event?.title || 'Event'} 
+                        className="event-image"
+                      />
                     )}
-                    <div className="flex-1">
-                      <h2 className="text-2xl font-bold text-gray-900 mb-3">{ticket.event?.title || 'Event Title'}</h2>
-                      <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-xl border-l-4 border-orange-500">
-                        <div className="font-semibold text-orange-700 mb-1">{ticket.event_ticket?.name || 'Standard Ticket'}</div>
-                        <div className="text-sm text-orange-600">{ticket.event_ticket?.ticket_type || 'Regular'}</div>
+                    <div>
+                      <h2 className="event-title">{ticket.event?.title || 'Event Title'}</h2>
+                      <div className="ticket-info-badge">
+                        <div style={{ fontWeight: '600', color: '#ea580c', marginBottom: '5px' }}>
+                          {ticket.event_ticket?.name || 'Standard Ticket'}
+                        </div>
+                        <div style={{ fontSize: '14px', color: '#7c2d12' }}>
+                          {ticket.event_ticket?.ticket_type || 'Regular'}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Event Details Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <div className="details-grid">
                     <div>
-                      <div className="mb-5">
-                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
-                          📅 Date & Time
-                        </div>
-                        <div className="text-gray-600 text-base leading-relaxed">
+                      <div className="detail-item">
+                        <div className="detail-label">📅 Date & Time</div>
+                        <div className="detail-value">
                           {ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br/>
                           {ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'h:mm a') : ''} {ticket.event?.end_time ? '- ' + format(new Date(ticket.event.end_time), 'h:mm a') : ''}
                         </div>
                       </div>
                       
-                      <div className="mb-5">
-                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
-                          📍 Location
-                        </div>
-                        <div className="text-gray-600 text-base leading-relaxed">
+                      <div className="detail-item">
+                        <div className="detail-label">📍 Location</div>
+                        <div className="detail-value">
                           {ticket.event?.location || 'TBD'}
                         </div>
                       </div>
                     </div>
 
                     <div>
-                      <div className="mb-5">
-                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
-                          👤 Ticket Holder
-                        </div>
-                        <div className="text-gray-600 text-base leading-relaxed">
+                      <div className="detail-item">
+                        <div className="detail-label">👤 Ticket Holder</div>
+                        <div className="detail-value">
                           {ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
                           {ticket.ticket_holder_email && (
                             <>
                               <br/>
-                              <span className="text-sm">{ticket.ticket_holder_email}</span>
+                              <span style={{ fontSize: '14px' }}>{ticket.ticket_holder_email}</span>
                             </>
                           )}
                         </div>
                       </div>
                       
-                      <div className="mb-5">
-                        <div className="font-bold text-gray-700 mb-2 flex items-center gap-2">
-                          ✅ Status
-                        </div>
+                      <div className="detail-item">
+                        <div className="detail-label">✅ Status</div>
                         <div>
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                          <span className="status-badge">
                             {(ticket.status || 'confirmed').toUpperCase()}
                           </span>
                         </div>
@@ -923,29 +1133,29 @@ const MyOrdersPage = () => {
                   </div>
 
                   {/* QR Code Section */}
-                  <div className="text-center p-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl mb-6">
-                    <div className="mb-4">
-                      <div className="w-40 h-40 mx-auto p-4 bg-white rounded-2xl shadow-md">
-                        <div 
-                          id={`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`} 
-                          className="w-full h-full flex items-center justify-center"
-                        >
-                          <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500">
-                            Loading QR...
-                          </div>
+                  <div className="qr-section">
+                    <div className="qr-container">
+                      <div 
+                        id={`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`} 
+                        style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500">
+                          Loading QR...
                         </div>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600 mb-3">Scan this code at the event entrance</div>
-                    <div className="font-mono text-lg font-bold text-orange-600 tracking-wider">
+                    <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '10px' }}>
+                      Scan this code at the event entrance
+                    </div>
+                    <div className="ticket-code">
                       {ticket.ticket_code || ticket.booking_code}
                     </div>
                   </div>
 
                   {/* Footer */}
-                  <div className="text-center pt-6 border-t-2 border-dashed border-gray-200 text-gray-600 text-sm leading-relaxed">
-                    <div className="mb-3">
-                      <strong className="text-gray-700">Important:</strong> Please bring this ticket (digital or printed) to the event.
+                  <div className="footer-notes">
+                    <div style={{ marginBottom: '10px' }}>
+                      <strong style={{ color: '#374151' }}>Important:</strong> Please bring this ticket (digital or printed) to the event.
                     </div>
                     <div>
                       For questions, contact us at support@skillpulse.com
