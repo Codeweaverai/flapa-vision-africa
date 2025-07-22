@@ -201,7 +201,7 @@ const CourseLearningPage = () => {
       if (enrollmentData) {
         const transformedEnrollment = {
           ...enrollmentData,
-          enrollment_date: enrollmentData.enrollment_date || enrollmentData.created_at,
+          enrollment_date: enrollmentData.enrollment_date,
           completion_date: enrollmentData.completion_date,
           is_completed: enrollmentData.is_completed || false,
           payment_status: enrollmentData.payment_status || 'completed'
