@@ -1,128 +1,81 @@
+
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useAuth } from '@/contexts/AuthContext';
-import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import { toast } from 'sonner';
-import {
-  CheckCircle,
-  Circle,
-  PlayCircle,
-  BookOpen,
-  Award,
-  RotateCcw,
-} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import VideoPlayer from '@/components/VideoPlayer';
+import { toast } from 'sonner';
+import { 
+  Play, 
+  Lock, 
+  CheckCircle, 
+  BookOpen, 
+  Award,
+  HelpCircle,
+  FileText,
+  Video
+} from 'lucide-react';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
 import QuizInstructionsModal from '@/components/course/QuizInstructionsModal';
 import QuizModal from '@/components/course/QuizModal';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
+import { Course, CourseModule, Lesson, Quiz } from '@/services/courseService';
+
+interface EnhancedLesson extends Lesson {
+  isCompleted: boolean;
+  isLocked: boolean;
+  quizzes?: Quiz[];
+}
+
+interface EnhancedModule extends CourseModule {
+  lessons: EnhancedLesson[];
+}
+
+interface EnhancedCourse extends Course {
+  modules: EnhancedModule[];
+}
 
 const CourseLearningPage = () => {
-  const { courseId, lessonId } = useParams();
-  const router = useRouter();
+  const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
-
-  const [course, setCourse] = useState<any>(null);
-  const [modules, setModules] = useState<any[]>([]);
-  const [lessons, setLessons] = useState<any[]>([]);
-  const [currentLesson, setCurrentLesson] = useState<any>(null);
-  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
-  const [enrollment, setEnrollment] = useState<any>(null);
+  const navigate = useNavigate();
+  
+  const [course, setCourse] = useState<EnhancedCourse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [progressPercentage, setProgressPercentage] = useState(0);
+  const [currentLesson, setCurrentLesson] = useState<EnhancedLesson | null>(null);
+  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [progress, setProgress] = useState(0);
   const [finalExam, setFinalExam] = useState<any>(null);
-  const [showFinalExamModal, setShowFinalExamModal] = useState(false);
-  const [examResult, setExamResult] = useState<any>(null);
-  const [showExamResultsModal, setShowExamResultsModal] = useState(false);
-  const [hasPassedExam, setHasPassedExam] = useState(false);
-  const [canRetakeExam, setCanRetakeExam] = useState(false);
-  const [courseCompleted, setCourseCompleted] = useState(false);
-  const [showQuizInstructionsModal, setShowQuizInstructionsModal] = useState(false);
-  const [showQuizModal, setShowQuizModal] = useState(false);
-  const [showQuizResultsModal, setShowQuizResultsModal] = useState(false);
-  const [currentLessonQuiz, setCurrentLessonQuiz] = useState<any>(null);
+  const [finalExamResult, setFinalExamResult] = useState<any>(null);
+  const [showFinalExam, setShowFinalExam] = useState(false);
+  const [showFinalExamResults, setShowFinalExamResults] = useState(false);
+  const [enrollment, setEnrollment] = useState<any>(null);
+  
+  // Quiz states
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+  const [showQuizInstructions, setShowQuizInstructions] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [showQuizResults, setShowQuizResults] = useState(false);
   const [quizResult, setQuizResult] = useState<any>(null);
 
   useEffect(() => {
     if (courseId && user) {
-      fetchCourseData();
-      fetchEnrollment();
-      fetchCompletedLessons();
-      fetchFinalExam();
-      fetchExamResult();
+      loadCourseData();
     }
   }, [courseId, user]);
 
-  useEffect(() => {
-    if (lessons.length > 0 && lessonId) {
-      const lesson = lessons.find(lesson => lesson.id === lessonId);
-      setCurrentLesson(lesson || lessons[0]);
-    } else if (lessons.length > 0 && !lessonId) {
-      setCurrentLesson(lessons[0]);
-    }
-  }, [lessons, lessonId]);
-
-  useEffect(() => {
-    if (lessons.length > 0 && completedLessons.size > 0) {
-      const completedCount = lessons.filter(lesson => completedLessons.has(lesson.id)).length;
-      const percentage = (completedCount / lessons.length) * 100;
-      setProgressPercentage(percentage);
-      setCourseCompleted(percentage >= 95); // Consider course complete at 95%
-    } else {
-      setProgressPercentage(0);
-      setCourseCompleted(false);
-    }
-  }, [completedLessons, lessons]);
-
-  const fetchCourseData = async () => {
-    setLoading(true);
+  const loadCourseData = async () => {
+    if (!courseId || !user) return;
+    
     try {
-      const { data: courseData, error: courseError } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('id', courseId)
-        .single();
-
-      if (courseError) throw courseError;
-      setCourse(courseData);
-
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('course_modules')
-        .select('*')
-        .eq('course_id', courseId)
-        .order('order_index');
-
-      if (modulesError) throw modulesError;
-      setModules(modulesData);
-
-      const { data: lessonsData, error: lessonsError } = await supabase
-        .from('lessons')
-        .select('*, quizzes(count)')
-        .eq('course_id', courseId)
-        .order('order_index');
-
-      if (lessonsError) throw lessonsError;
-
-      const lessonsWithQuizCount = lessonsData.map(lesson => ({
-        ...lesson,
-        quiz_count: lesson.quizzes ? lesson.quizzes.length : 0,
-      }));
-      setLessons(lessonsWithQuizCount);
-    } catch (error) {
-      console.error('Error fetching course data:', error);
-      toast.error('Failed to load course data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchEnrollment = async () => {
-    try {
+      setLoading(true);
+      
+      // Check enrollment
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select('*')
@@ -130,365 +83,481 @@ const CourseLearningPage = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (enrollmentError) throw enrollmentError;
-      setEnrollment(enrollmentData);
-    } catch (error) {
-      console.error('Error fetching enrollment:', error);
-    }
-  };
+      if (enrollmentError && enrollmentError.code !== 'PGRST116') {
+        throw enrollmentError;
+      }
 
-  const fetchCompletedLessons = async () => {
-    try {
+      if (!enrollmentData) {
+        toast.error('You are not enrolled in this course');
+        navigate('/courses');
+        return;
+      }
+
+      setEnrollment(enrollmentData);
+
+      // Load course with modules and lessons
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          course_modules (
+            *,
+            lessons (
+              *,
+              quizzes (*)
+            )
+          )
+        `)
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw courseError;
+
+      // Load completed lessons
       const { data: progressData, error: progressError } = await supabase
         .from('lesson_progress')
         .select('lesson_id')
-        .eq('user_id', user.id)
-        .eq('course_id', courseId);
+        .eq('enrollment_id', enrollmentData.id);
 
       if (progressError) throw progressError;
 
-      const completed = new Set(progressData.map(item => item.lesson_id));
-      setCompletedLessons(completed);
-    } catch (error) {
-      console.error('Error fetching lesson progress:', error);
-    }
-  };
+      const completedLessonIds = progressData?.map(p => p.lesson_id) || [];
+      setCompletedLessons(completedLessonIds);
 
-  const fetchFinalExam = async () => {
-    try {
-      const { data: examData, error: examError } = await supabase
+      // Load final exam
+      const { data: examData } = await supabase
         .from('final_exams')
         .select('*')
         .eq('course_id', courseId)
         .single();
 
-      if (examError) {
-        console.error('Error fetching final exam:', examError);
-      }
-      setFinalExam(examData);
-    } catch (error) {
-      console.error('Error fetching final exam:', error);
-    }
-  };
+      if (examData) {
+        setFinalExam(examData);
+        
+        // Check for existing exam results
+        const { data: resultData } = await supabase
+          .from('final_exam_results')
+          .select('*')
+          .eq('exam_id', examData.id)
+          .eq('user_id', user.id)
+          .single();
 
-  const fetchExamResult = async () => {
-    if (!finalExam) return;
-
-    try {
-      const { data: resultData, error: resultError } = await supabase
-        .from('final_exam_results')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('exam_id', finalExam.id)
-        .order('attempt_number', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (resultError && resultError.code !== 'PGRST116') {
-        console.error('Error fetching exam result:', resultError);
+        if (resultData) {
+          setFinalExamResult(resultData);
+        }
       }
 
-      if (resultData) {
-        setExamResult(resultData);
-        setHasPassedExam(resultData.passed);
-        setCanRetakeExam(!resultData.passed);
-      } else {
-        setExamResult(null);
-        setHasPassedExam(false);
-        setCanRetakeExam(false);
+      // Process course data with completion status
+      const enhancedModules = courseData.course_modules?.map((module: any, moduleIndex: number) => {
+        const enhancedLessons = module.lessons?.map((lesson: any, lessonIndex: number) => {
+          const isCompleted = completedLessonIds.includes(lesson.id);
+          const isFirstLesson = moduleIndex === 0 && lessonIndex === 0;
+          const previousLessonCompleted = lessonIndex === 0 || 
+            (module.lessons[lessonIndex - 1] && completedLessonIds.includes(module.lessons[lessonIndex - 1].id));
+          const isLocked = !isFirstLesson && !previousLessonCompleted;
+
+          return {
+            ...lesson,
+            isCompleted,
+            isLocked
+          };
+        }) || [];
+
+        return {
+          ...module,
+          lessons: enhancedLessons
+        };
+      }) || [];
+
+      const enhancedCourse = {
+        ...courseData,
+        modules: enhancedModules
+      };
+
+      setCourse(enhancedCourse);
+      
+      // Calculate progress
+      const totalLessons = enhancedModules.reduce((acc, module) => acc + module.lessons.length, 0);
+      const completedCount = completedLessonIds.length;
+      const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+      setProgress(progressPercentage);
+
+      // Set current lesson (first incomplete lesson)
+      for (const module of enhancedModules) {
+        for (const lesson of module.lessons) {
+          if (!lesson.isCompleted && !lesson.isLocked) {
+            setCurrentLesson(lesson);
+            return;
+          }
+        }
       }
-    } catch (error) {
-      console.error('Error fetching exam result:', error);
-    }
-  };
 
-  const handleLessonClick = async (lesson: any) => {
-    setCurrentLesson(lesson);
-    router.push(`/courses/${courseId}/learn/${lesson.id}`);
-
-    // Update course progress with last accessed lesson
-    try {
-      await supabase
-        .from('course_progress')
-        .upsert(
-          {
-            user_id: user.id,
-            course_id: courseId,
-            last_accessed_lesson_id: lesson.id,
-          },
-          { onConflict: 'user_id, course_id' }
-        );
     } catch (error) {
-      console.error('Error updating course progress:', error);
+      console.error('Error loading course data:', error);
+      toast.error('Failed to load course data');
+    } finally {
+      setLoading(false);
     }
   };
 
   const markLessonComplete = async (lessonId: string) => {
+    if (!user || !enrollment) return;
+
     try {
+      // Check if already completed
+      if (completedLessons.includes(lessonId)) return;
+
       const { error } = await supabase
         .from('lesson_progress')
-        .upsert(
-          {
-            user_id: user.id,
-            course_id: courseId,
-            lesson_id: lessonId,
-          },
-          { onConflict: 'user_id, course_id, lesson_id' }
-        );
+        .upsert({
+          lesson_id: lessonId,
+          enrollment_id: enrollment.id,
+          is_completed: true,
+          completion_date: new Date().toISOString()
+        }, {
+          onConflict: 'lesson_id,enrollment_id'
+        });
 
       if (error) throw error;
 
-      setCompletedLessons(prev => new Set(prev.add(lessonId)));
-      toast.success('Lesson marked as complete!');
+      // Update local state
+      const newCompletedLessons = [...completedLessons, lessonId];
+      setCompletedLessons(newCompletedLessons);
+
+      // Update course progress
+      const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
+      const newProgress = Math.round((newCompletedLessons.length / totalLessons) * 100);
+      setProgress(newProgress);
+
+      // Update enrollment completion
+      const { error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .update({
+          is_completed: newProgress === 100,
+          completion_date: newProgress === 100 ? new Date().toISOString() : null
+        })
+        .eq('id', enrollment.id);
+
+      if (enrollmentError) throw enrollmentError;
+
+      toast.success('Lesson completed!');
+      
+      // Reload course data to update lesson states
+      loadCourseData();
+
     } catch (error) {
       console.error('Error marking lesson complete:', error);
       toast.error('Failed to mark lesson as complete');
     }
   };
 
-  const handleTakeFinalExam = () => {
-    setShowFinalExamModal(true);
+  const startLesson = (lesson: EnhancedLesson) => {
+    if (lesson.isLocked) {
+      toast.error('Complete previous lessons to unlock this one');
+      return;
+    }
+    
+    setCurrentLesson(lesson);
   };
 
-  const handleExamComplete = (result: any) => {
-    setShowFinalExamModal(false);
-    setExamResult(result);
-    setHasPassedExam(result.passed);
-    setCanRetakeExam(!result.passed);
-    setShowExamResultsModal(true);
+  const handleQuizStart = (quiz: Quiz) => {
+    setSelectedQuiz(quiz);
+    setShowQuizInstructions(true);
   };
 
-  const handleRetakeExam = () => {
-    setShowExamResultsModal(false);
-    setCanRetakeExam(false);
-    handleTakeFinalExam();
+  const handleQuizInstructionsClose = () => {
+    setShowQuizInstructions(false);
+    setSelectedQuiz(null);
   };
 
-  const shouldShowFinalExamButton = () => {
-    return courseCompleted || hasPassedExam;
+  const handleQuizInstructionsConfirm = () => {
+    setShowQuizInstructions(false);
+    setShowQuiz(true);
   };
 
-  const shouldShowRetakeButton = () => {
-    return examResult && !examResult.passed;
+  const handleQuizComplete = (result: any) => {
+    setShowQuiz(false);
+    setQuizResult(result);
+    setShowQuizResults(true);
   };
 
-  const handleTakeQuiz = async (lessonId: string) => {
+  const handleQuizResultsClose = () => {
+    setShowQuizResults(false);
+    setQuizResult(null);
+    setSelectedQuiz(null);
+  };
+
+  const handleFinalExamStart = async () => {
+    if (!finalExam || !user) return;
+
+    console.log('Starting final exam...', finalExam);
+    
     try {
-      // Fetch quiz for this lesson
-      const { data: quizData, error } = await supabase
-        .from('quizzes')
-        .select(`
-          *,
-          quiz_questions (
-            *,
-            quiz_answers (*)
-          )
-        `)
-        .eq('lesson_id', lessonId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching quiz:', error);
-        toast.error('Failed to load quiz');
+      // Check if user has completed all lessons
+      const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
+      const completedCount = completedLessons.length;
+      
+      if (completedCount < totalLessons) {
+        toast.error('You must complete all lessons before taking the final exam');
         return;
       }
 
-      if (quizData) {
-        setCurrentLessonQuiz(quizData);
-        setShowQuizInstructionsModal(true);
-      } else {
-        toast.error('No quiz available for this lesson');
+      // Check if user has already passed
+      if (finalExamResult && finalExamResult.passed) {
+        const retakeAllowed = finalExamResult.attempt_number < 3; // Allow up to 3 attempts
+        if (!retakeAllowed) {
+          toast.error('You have reached the maximum number of attempts');
+          return;
+        }
       }
+
+      console.log('Opening final exam modal...');
+      setShowFinalExam(true);
     } catch (error) {
-      console.error('Error loading quiz:', error);
-      toast.error('Failed to load quiz');
+      console.error('Error starting final exam:', error);
+      toast.error('Failed to start final exam');
     }
   };
 
-  const handleStartQuiz = () => {
-    setShowQuizInstructionsModal(false);
-    setShowQuizModal(true);
-  };
-
-  const handleQuizComplete = (quiz: any, score: number, passed: boolean) => {
-    setShowQuizModal(false);
-    setQuizResult({ quiz, score, passed });
-    setShowQuizResultsModal(true);
-  };
-
-  const handleRetakeQuiz = () => {
-    setShowQuizResultsModal(false);
-    setShowQuizModal(true);
-  };
-
-  const handleQuizProceed = () => {
-    setShowQuizResultsModal(false);
-    // Continue to next lesson if quiz passed
-    if (quizResult?.passed) {
-      const currentLessonIndex = lessons.findIndex(l => l.id === currentLesson?.id);
-      if (currentLessonIndex < lessons.length - 1) {
-        const nextLesson = lessons[currentLessonIndex + 1];
-        handleLessonClick(nextLesson);
-      }
+  const handleFinalExamComplete = (examResult: any) => {
+    console.log('Final exam completed:', examResult);
+    setShowFinalExam(false);
+    setFinalExamResult(examResult);
+    setShowFinalExamResults(true);
+    
+    if (examResult.passed) {
+      toast.success('Congratulations! You passed the final exam!');
+    } else {
+      toast.error('You did not pass the final exam. You can retake it.');
     }
+  };
+
+  const handleFinalExamResultsClose = () => {
+    setShowFinalExamResults(false);
+    loadCourseData(); // Reload to get updated results
+  };
+
+  const canTakeFinalExam = () => {
+    if (!finalExam) return false;
+    
+    const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
+    const allLessonsCompleted = completedLessons.length >= totalLessons && totalLessons > 0;
+    
+    // Allow retake if not passed or if allowed retakes remain
+    const canRetake = !finalExamResult || !finalExamResult.passed || (finalExamResult.attempt_number < 3);
+    
+    return allLessonsCompleted && canRetake;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-      </div>
+      <Layout>
+        <div className="section-container">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!course) {
+    return (
+      <Layout>
+        <div className="section-container">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Course not found</h1>
+            <Button onClick={() => navigate('/courses')}>
+              Back to Courses
+            </Button>
+          </div>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
+    <Layout>
+      <div className="section-container">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Course Curriculum */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-8">
-              <CardContent className="p-6">
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Course Content</h2>
-                    <Progress value={progressPercentage} className="mb-2" />
-                    <p className="text-sm text-gray-600">{progressPercentage}% Complete</p>
+            <Card>
+              <CardHeader>
+                <CardTitle>{course.title}</CardTitle>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span>{progress}%</span>
                   </div>
-
-                  <div className="space-y-4">
-                    {modules.map((module) => (
-                      <div key={module.id} className="space-y-2">
-                        <h3 className="font-semibold text-gray-800">{module.title}</h3>
-                        <div className="space-y-1">
-                          {lessons
-                            .filter(lesson => lesson.module_id === module.id)
-                            .map((lesson) => {
-                              const isCompleted = completedLessons.has(lesson.id);
-                              const isCurrent = currentLesson?.id === lesson.id;
-                              const hasQuiz = lesson.quiz_count > 0; // Assuming quiz_count is available
-                              
-                              return (
-                                <div key={lesson.id} className="space-y-1">
-                                  <button
-                                    onClick={() => handleLessonClick(lesson)}
-                                    className={`w-full text-left p-3 rounded-lg transition-colors flex items-center gap-3 ${
-                                      isCurrent
-                                        ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                                        : isCompleted
-                                        ? 'bg-green-50 text-green-800 hover:bg-green-100'
-                                        : 'text-gray-700 hover:bg-gray-100'
-                                    }`}
-                                  >
-                                    <div className="flex-shrink-0">
-                                      {isCompleted ? (
-                                        <CheckCircle className="h-4 w-4 text-green-600" />
-                                      ) : isCurrent ? (
-                                        <PlayCircle className="h-4 w-4 text-orange-600" />
-                                      ) : (
-                                        <Circle className="h-4 w-4 text-gray-400" />
-                                      )}
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="text-sm font-medium">{lesson.title}</div>
-                                      <div className="text-xs text-gray-500">{lesson.duration} mins</div>
-                                    </div>
-                                    {hasQuiz && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Quiz
-                                      </Badge>
-                                    )}
-                                  </button>
-
-                                  {/* Quiz button for completed lessons */}
-                                  {hasQuiz && isCompleted && (
-                                    <button
-                                      onClick={() => handleTakeQuiz(lesson.id)}
-                                      className="w-full ml-6 p-2 text-left text-sm text-purple-700 hover:text-purple-900 hover:bg-purple-50 rounded"
-                                    >
-                                      <Award className="h-4 w-4 inline mr-2" />
-                                      Take Lesson Quiz
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Final Exam Section */}
-                    {shouldShowFinalExamButton() && (
-                      <div className="pt-4 border-t">
-                        <Button
-                          onClick={handleTakeFinalExam}
-                          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white"
-                          disabled={!courseCompleted && !canRetakeExam}
-                        >
-                          <Award className="h-4 w-4 mr-2" />
-                          {hasPassedExam ? 'Retake Final Exam' : 'Take Final Exam'}
-                        </Button>
-                      </div>
-                    )}
-
-                    {shouldShowRetakeButton() && (
-                      <div className="pt-2">
-                        <Button
-                          onClick={handleRetakeExam}
-                          variant="outline"
-                          className="w-full"
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Retake Exam
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  <Progress value={progress} className="w-full" />
                 </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {course.modules?.map((module) => (
+                  <div key={module.id} className="space-y-2">
+                    <h3 className="font-semibold text-sm">{module.title}</h3>
+                    <div className="space-y-1">
+                      {module.lessons?.map((lesson) => (
+                        <div key={lesson.id} className="space-y-1">
+                          <div
+                            className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                              currentLesson?.id === lesson.id
+                                ? 'bg-primary/10 border border-primary/20'
+                                : lesson.isLocked
+                                ? 'bg-muted/50 cursor-not-allowed'
+                                : 'hover:bg-muted/50'
+                            }`}
+                            onClick={() => startLesson(lesson)}
+                          >
+                            <div className="flex items-center space-x-2">
+                              {lesson.isCompleted ? (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              ) : lesson.isLocked ? (
+                                <Lock className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <div className="flex items-center space-x-1">
+                                  {lesson.content_type === 'video' ? (
+                                    <Video className="h-4 w-4 text-blue-500" />
+                                  ) : (
+                                    <FileText className="h-4 w-4 text-green-500" />
+                                  )}
+                                  <Play className="h-3 w-3" />
+                                </div>
+                              )}
+                              <span className={`text-sm ${lesson.isLocked ? 'text-muted-foreground' : ''}`}>
+                                {lesson.title}
+                              </span>
+                            </div>
+                            {lesson.quizzes && lesson.quizzes.length > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                {lesson.quizzes.length} Quiz{lesson.quizzes.length > 1 ? 'es' : ''}
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          {/* Quiz buttons for this lesson */}
+                          {lesson.quizzes && lesson.quizzes.length > 0 && !lesson.isLocked && (
+                            <div className="ml-6 space-y-1">
+                              {lesson.quizzes.map((quiz) => (
+                                <Button
+                                  key={quiz.id}
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full justify-start text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuizStart(quiz);
+                                  }}
+                                >
+                                  <HelpCircle className="h-3 w-3 mr-2" />
+                                  {quiz.title}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Final Exam Section */}
+                {finalExam && (
+                  <div className="pt-4 border-t">
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Award className="h-5 w-5 text-yellow-500" />
+                        <h3 className="font-semibold">Final Exam</h3>
+                      </div>
+                      {finalExamResult?.passed ? (
+                        <div className="text-sm text-green-600">
+                          ✓ Passed with {finalExamResult.percentage_score}%
+                        </div>
+                      ) : (
+                        <Button
+                          className="w-full"
+                          onClick={handleFinalExamStart}
+                          disabled={!canTakeFinalExam()}
+                        >
+                          {finalExamResult ? 'Retake Final Exam' : 'Take Final Exam'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
+          {/* Lesson Content */}
+          <div className="lg:col-span-2">
             {currentLesson ? (
               <Card>
-                <CardContent className="p-6 space-y-6">
-                  <h2 className="text-2xl font-bold text-gray-900">{currentLesson.title}</h2>
-                  <VideoPlayer videoUrl={currentLesson.video_url} />
-                  <p className="text-gray-700">{currentLesson.description}</p>
-                  <div className="flex justify-between items-center">
-                    <Button variant="outline" onClick={() => markLessonComplete(currentLesson.id)}>
-                      Mark as Complete
-                    </Button>
-                    {lessons.length > 1 && (
-                      <div className="flex gap-2">
-                        {lessons[lessons.findIndex(l => l.id === currentLesson.id) - 1] && (
-                          <Button onClick={() => handleLessonClick(lessons[lessons.findIndex(l => l.id === currentLesson.id) - 1])}>
-                            Previous Lesson
-                          </Button>
-                        )}
-                        {lessons[lessons.findIndex(l => l.id === currentLesson.id) + 1] && (
-                          <Button onClick={() => handleLessonClick(lessons[lessons.findIndex(l => l.id === currentLesson.id) + 1])}>
-                            Next Lesson
-                          </Button>
-                        )}
-                      </div>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    {currentLesson.title}
+                    {!currentLesson.isCompleted && (
+                      <Button onClick={() => markLessonComplete(currentLesson.id)}>
+                        Mark Complete
+                      </Button>
                     )}
-                  </div>
+                  </CardTitle>
+                  {currentLesson.description && (
+                    <p className="text-muted-foreground">{currentLesson.description}</p>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {currentLesson.content_type === 'video' && currentLesson.video_url && (
+                    <div className="aspect-video bg-black rounded-lg mb-4">
+                      <video
+                        controls
+                        className="w-full h-full rounded-lg"
+                        src={currentLesson.video_url}
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  )}
+                  
+                  {currentLesson.content && (
+                    <div className="prose max-w-none">
+                      {typeof currentLesson.content === 'string' 
+                        ? currentLesson.content 
+                        : JSON.stringify(currentLesson.content)
+                      }
+                    </div>
+                  )}
+
+                  {currentLesson.materials_urls && currentLesson.materials_urls.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="font-semibold mb-2">Course Materials</h3>
+                      <div className="space-y-2">
+                        {currentLesson.materials_urls.map((url, index) => (
+                          <a
+                            key={index}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
+                          >
+                            <FileText className="h-4 w-4" />
+                            <span>Material {index + 1}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (
               <Card>
-                <CardContent className="p-12 text-center">
-                  <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to the Course</h3>
-                  <p className="text-gray-600 mb-6">Select a lesson from the sidebar to begin your learning journey.</p>
-                  {lessons.length > 0 && (
-                    <Button onClick={() => handleLessonClick(lessons[0])}>
-                      Start First Lesson
-                    </Button>
-                  )}
+                <CardContent className="p-8 text-center">
+                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h2 className="text-xl font-semibold mb-2">Welcome to the Course</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Select a lesson from the curriculum to get started.
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -496,59 +565,59 @@ const CourseLearningPage = () => {
         </div>
       </div>
 
-      {/* Modals */}
-      {showFinalExamModal && finalExam && enrollment && (
+      {/* Final Exam Modal */}
+      {finalExam && (
         <FinalExamModal
-          isOpen={showFinalExamModal}
-          onClose={() => setShowFinalExamModal(false)}
+          isOpen={showFinalExam}
+          onClose={() => setShowFinalExam(false)}
           exam={finalExam}
-          enrollmentId={enrollment.id}
-          onComplete={handleExamComplete}
+          onComplete={handleFinalExamComplete}
+          enrollment={enrollment}
         />
       )}
 
-      {showExamResultsModal && examResult && (
+      {/* Final Exam Results Modal */}
+      {finalExamResult && (
         <FinalExamResultsModal
-          isOpen={showExamResultsModal}
-          onClose={() => setShowExamResultsModal(false)}
-          result={examResult}
-          onRetake={handleRetakeExam}
+          isOpen={showFinalExamResults}
+          onClose={handleFinalExamResultsClose}
+          examResult={finalExamResult}
+          onRetake={() => {
+            setShowFinalExamResults(false);
+            handleFinalExamStart();
+          }}
         />
       )}
 
       {/* Quiz Modals */}
-      {showQuizInstructionsModal && currentLessonQuiz && (
-        <QuizInstructionsModal
-          isOpen={showQuizInstructionsModal}
-          onClose={() => setShowQuizInstructionsModal(false)}
-          quiz={currentLessonQuiz}
-          onStartQuiz={handleStartQuiz}
-        />
+      {selectedQuiz && (
+        <>
+          <QuizInstructionsModal
+            isOpen={showQuizInstructions}
+            onClose={handleQuizInstructionsClose}
+            onConfirm={handleQuizInstructionsConfirm}
+            quiz={selectedQuiz}
+          />
+          
+          <QuizModal
+            isOpen={showQuiz}
+            onClose={() => setShowQuiz(false)}
+            quiz={selectedQuiz}
+            onComplete={handleQuizComplete}
+          />
+          
+          <QuizResultsModal
+            isOpen={showQuizResults}
+            onClose={handleQuizResultsClose}
+            result={quizResult}
+            onRetake={() => {
+              setShowQuizResults(false);
+              setShowQuiz(true);
+            }}
+          />
+        </>
       )}
-
-      {showQuizModal && currentLessonQuiz && (
-        <QuizModal
-          isOpen={showQuizModal}
-          onClose={() => setShowQuizModal(false)}
-          quizId={currentLessonQuiz.id}
-          lessonId={currentLessonQuiz.lesson_id}
-          onComplete={handleQuizComplete}
-        />
-      )}
-
-      {showQuizResultsModal && quizResult && (
-        <QuizResultsModal
-          isOpen={showQuizResultsModal}
-          onClose={() => setShowQuizResultsModal(false)}
-          quiz={quizResult.quiz}
-          score={quizResult.score}
-          passed={quizResult.passed}
-          onRetake={handleRetakeQuiz}
-          onProceed={handleQuizProceed}
-          hasNextContent={true}
-        />
-      )}
-    </div>
+    </Layout>
   );
 };
 
