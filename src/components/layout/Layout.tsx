@@ -3,7 +3,7 @@ import React from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import MobileBottomNav from '@/components/navigation/MobileBottomNav';
-
+import SmartAdvisorFloatingButton from '@/components/ai/SmartAdvisorFloatingButton';
 
 interface LayoutProps {
   children: React.ReactNode;
