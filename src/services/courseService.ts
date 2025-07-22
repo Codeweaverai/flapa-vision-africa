@@ -1,366 +1,130 @@
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from "@/lib/supabaseClient";
 
-export interface Course {
-  id: string;
-  title: string;
-  description: string;
-  summary: string;
-  category: string;
-  difficulty_level: string;
-  duration_minutes: number;
-  price: number;
-  currency?: string;
-  is_free: boolean;
-  is_published: boolean;
-  certificate_enabled: boolean;
-  thumbnail_url?: string;
-  creator_id: string;
-  created_at: string;
-  updated_at: string;
-  tags?: string[];
-  modules?: CourseModule[];
-  course_preview?: CoursePreview;
-  course_learning_outcomes?: LearningOutcome[];
-}
-
-export interface CourseModule {
-  id: string;
-  course_id: string;
-  title: string;
-  description?: string;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-  lessons: Lesson[];
-}
-
-export interface Lesson {
-  id: string;
-  module_id: string;
-  title: string;
-  description?: string;
-  content_type: string;
-  video_url?: string;
-  content?: any;
-  materials_urls?: string[];
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-  quizzes?: Quiz[];
-  is_completed?: boolean;
-}
-
-export interface Quiz {
-  id: string;
-  title: string;
-  description?: string;
-  lesson_id?: string;
-  module_id?: string;
-  passing_score: number;
-  created_at: string;
-  updated_at: string;
-  questions?: QuizQuestion[];
-}
-
-export interface QuizQuestion {
-  id: string;
-  quiz_id: string;
-  question: string;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-  answers?: QuizAnswer[];
-}
-
-export interface QuizAnswer {
-  id: string;
-  question_id: string;
-  answer: string;
-  is_correct: boolean;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CoursePreview {
-  id: string;
-  course_id: string;
-  preview_video_url?: string;
-  preview_video_path?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface LearningOutcome {
-  id: string;
-  course_id: string;
-  outcome: string;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CourseReview {
-  id: string;
-  course_id: string;
-  user_id: string;
-  rating: number;
-  review_text?: string;
-  created_at: string;
-  updated_at: string;
-  profiles?: {
-    full_name: string;
-    avatar_url: string;
-    username: string;
-  };
-}
-
-// Constants
-export const VALID_CATEGORIES = [
-  'Technology',
-  'Business',
-  'Design',
-  'Marketing',
-  'Health',
-  'Fitness',
-  'Music',
-  'Education',
-  'Language',
-  'Other'
-];
-
-export const VALID_DIFFICULTY_LEVELS = [
-  'Beginner',
-  'Intermediate',
-  'Advanced'
-];
-
-// Course operations
-export async function fetchCourses(): Promise<Course[]> {
+export const getCourses = async () => {
   const { data, error } = await supabase
     .from('courses')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .select('*');
 
-  if (error) throw error;
-  return data || [];
-}
-
-export async function fetchPublishedCourses(): Promise<Course[]> {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('is_published', true)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data || [];
-}
-
-export async function fetchAllCourses(): Promise<Course[]> {
-  return fetchCourses();
-}
-
-export async function fetchCreatorCourses(creatorId?: string): Promise<Course[]> {
-  let query = supabase
-    .from('courses')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (creatorId) {
-    query = query.eq('creator_id', creatorId);
-  } else {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      query = query.eq('creator_id', user.id);
-    }
+  if (error) {
+    throw error;
   }
 
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data || [];
-}
-
-export async function fetchCourseById(id: string): Promise<Course | null> {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) throw error;
   return data;
-}
+};
 
-export async function fetchCourseDetails(id: string): Promise<Course | null> {
+export const getCourse = async (id: string) => {
   const { data, error } = await supabase
     .from('courses')
-    .select(`
-      *,
-      course_previews (*),
-      course_learning_outcomes (*)
-    `)
+    .select('*')
     .eq('id', id)
     .single();
 
-  if (error) throw error;
-  
-  // Transform the result to match our interface
-  if (data) {
-    return {
-      ...data,
-      course_preview: data.course_previews?.[0] || null,
-      course_previews: undefined // Remove the array version
-    } as Course;
+  if (error) {
+    throw error;
   }
-  
-  return null;
-}
 
-export async function fetchCourseWithModulesAndLessons(courseId: string): Promise<Course | null> {
-  const { data: courseData, error: courseError } = await supabase
-    .from('courses')
-    .select(`
-      *,
-      course_previews (*),
-      course_learning_outcomes (*)
-    `)
-    .eq('id', courseId)
-    .single();
+  return data;
+};
 
-  if (courseError) throw courseError;
-  if (!courseData) return null;
-
-  const { data: modulesData, error: modulesError } = await supabase
+export const getCourseModules = async (courseId: string) => {
+  const { data, error } = await supabase
     .from('course_modules')
-    .select(`
-      *,
-      lessons (
-        *,
-        quizzes (
-          id,
-          title,
-          description,
-          passing_score,
-          created_at,
-          updated_at
-        )
-      )
-    `)
+    .select('*')
     .eq('course_id', courseId)
     .order('order_index', { ascending: true });
 
-  if (modulesError) throw modulesError;
-
-  // Sort lessons within each module
-  const sortedModules = (modulesData || []).map(module => ({
-    ...module,
-    lessons: (module.lessons || []).sort((a: any, b: any) => a.order_index - b.order_index)
-  }));
-
-  return {
-    ...courseData,
-    modules: sortedModules,
-    course_preview: courseData.course_previews?.[0] || null,
-    course_previews: undefined // Remove the array version
-  } as Course;
-}
-
-// Add new functions for creator data and course statistics
-export async function fetchCreatorData(creatorId: string): Promise<any> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('full_name, bio, avatar_url, username')
-    .eq('id', creatorId)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function fetchCreatorCourseStats(creatorId: string): Promise<any> {
-  // Get all published courses by creator
-  const { data: courses, error: coursesError } = await supabase
-    .from('courses')
-    .select('id')
-    .eq('creator_id', creatorId)
-    .eq('is_published', true);
-
-  if (coursesError) throw coursesError;
-
-  if (!courses || courses.length === 0) {
-    return {
-      totalCourses: 0,
-      totalStudents: 0,
-      averageRating: 0,
-      totalReviews: 0
-    };
+  if (error) {
+    throw error;
   }
 
-  const courseIds = courses.map(c => c.id);
+  return data;
+};
 
-  // Get total enrollments (students)
-  const { data: enrollments, error: enrollmentsError } = await supabase
-    .from('course_enrollments')
-    .select('id')
-    .in('course_id', courseIds);
+export const getLessonsByModuleId = async (moduleId: string) => {
+  const { data, error } = await supabase
+    .from('lessons')
+    .select('*')
+    .eq('module_id', moduleId)
+    .order('order_index', { ascending: true });
 
-  if (enrollmentsError) throw enrollmentsError;
+  if (error) {
+    throw error;
+  }
 
-  // Get all reviews for creator's courses
-  const { data: reviews, error: reviewsError } = await supabase
-    .from('course_reviews')
-    .select('rating')
-    .in('course_id', courseIds);
+  return data;
+};
 
-  if (reviewsError) throw reviewsError;
+export const getLesson = async (id: string) => {
+  const { data, error } = await supabase
+    .from('lessons')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-  const totalStudents = enrollments?.length || 0;
-  const totalReviews = reviews?.length || 0;
-  const averageRating = totalReviews > 0 
-    ? (reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews)
-    : 0;
+  if (error) {
+    throw error;
+  }
 
-  return {
-    totalCourses: courses.length,
-    totalStudents,
-    averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
-    totalReviews
-  };
-}
+  return data;
+};
 
-export async function fetchCourseStats(courseId: string): Promise<any> {
-  // Get enrollments count
-  const { data: enrollments, error: enrollmentsError } = await supabase
-    .from('course_enrollments')
-    .select('id')
-    .eq('course_id', courseId);
+export const getLessonNotes = async (lessonId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('lesson_notes')
+    .select('*')
+    .eq('lesson_id', lessonId)
+    .eq('user_id', userId);
 
-  if (enrollmentsError) throw enrollmentsError;
+  if (error) {
+    throw error;
+  }
 
-  // Get reviews for this course
-  const { data: reviews, error: reviewsError } = await supabase
-    .from('course_reviews')
-    .select('rating')
-    .eq('course_id', courseId);
+  return data;
+};
 
-  if (reviewsError) throw reviewsError;
+export const createLessonNote = async (lessonId: string, userId: string, content: string) => {
+  const { data, error } = await supabase
+    .from('lesson_notes')
+    .insert([{ lesson_id: lessonId, user_id: userId, content: content }])
+    .select('*')
+    .single();
 
-  const totalStudents = enrollments?.length || 0;
-  const totalReviews = reviews?.length || 0;
-  const averageRating = totalReviews > 0 
-    ? (reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews)
-    : 0;
+  if (error) {
+    throw error;
+  }
 
-  return {
-    totalStudents,
-    averageRating: Math.round(averageRating * 10) / 10,
-    totalReviews
-  };
-}
+  return data;
+};
 
-export async function fetchCourseEnrollment(courseId: string, userId: string): Promise<any> {
+export const updateLessonNote = async (id: string, content: string) => {
+  const { data, error } = await supabase
+    .from('lesson_notes')
+    .update({ content: content })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};
+
+export const deleteLessonNote = async (id: string) => {
+  const { data, error } = await supabase
+    .from('lesson_notes')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};
+
+export const getCourseEnrollment = async (courseId: string, userId: string) => {
   const { data, error } = await supabase
     .from('course_enrollments')
     .select('*')
@@ -368,221 +132,121 @@ export async function fetchCourseEnrollment(courseId: string, userId: string): P
     .eq('user_id', userId)
     .single();
 
-  if (error && error.code !== 'PGRST116') throw error;
+  if (error) {
+    // Check if the error is because no record was found
+    if (error.code === 'PGRST116') {
+      return null; // Return null to indicate no enrollment found
+    }
+    throw error; // Throw other errors
+  }
+
   return data;
-}
+};
 
-export async function fetchModuleLessons(courseId: string, userId: string): Promise<CourseModule[]> {
-  const { data: modulesData, error: modulesError } = await supabase
-    .from('course_modules')
-    .select(`
-      *,
-      lessons (*)
-    `)
-    .eq('course_id', courseId)
-    .order('order_index', { ascending: true });
-
-  if (modulesError) throw modulesError;
-
-  // Sort lessons within each module and add completion status
-  const sortedModules = (modulesData || []).map(module => ({
-    ...module,
-    lessons: (module.lessons || []).sort((a: any, b: any) => a.order_index - b.order_index).map((lesson: any) => ({
-      ...lesson,
-      is_completed: false // This would be fetched from lesson_progress table in real implementation
-    }))
-  }));
-
-  return sortedModules;
-}
-
-export async function checkEnrollmentStatus(courseId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
+export const enrollInCourse = async (courseId: string, userId: string) => {
   const { data, error } = await supabase
     .from('course_enrollments')
-    .select('id')
+    .insert([{ course_id: courseId, user_id: userId }])
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};
+
+export const getCompletedLessons = async (courseId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('lesson_progress')
+    .select('lesson_id')
     .eq('course_id', courseId)
-    .eq('user_id', user.id)
-    .single();
+    .eq('user_id', userId);
 
-  if (error && error.code !== 'PGRST116') throw error;
-  return !!data;
-}
+  if (error) {
+    throw error;
+  }
 
-export async function enrollInCourse(courseId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
+  return data ? data.map(item => item.lesson_id) : [];
+};
 
+export const markLessonComplete = async (courseId: string, lessonId: string, userId: string) => {
+  // First, check if the lesson is already marked as complete
+  const { data: existingProgress, error: selectError } = await supabase
+    .from('lesson_progress')
+    .select('*')
+    .eq('course_id', courseId)
+    .eq('lesson_id', lessonId)
+    .eq('user_id', userId);
+
+  if (selectError) {
+    throw selectError;
+  }
+
+  if (existingProgress && existingProgress.length > 0) {
+    // Lesson already marked as complete, return existing record
+    return existingProgress[0];
+  } else {
+    // Lesson not yet marked as complete, insert new record
+    const { data, error } = await supabase
+      .from('lesson_progress')
+      .insert([{ course_id: courseId, lesson_id: lessonId, user_id: userId }])
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+};
+
+export const getFinalExam = async (courseId: string) => {
   const { data, error } = await supabase
-    .from('course_enrollments')
-    .insert({
-      course_id: courseId,
-      user_id: user.id,
-      payment_status: 'completed',
-      enrollment_date: new Date().toISOString()
-    })
-    .select()
+    .from('final_exams')
+    .select('*')
+    .eq('course_id', courseId)
     .single();
 
-  if (error) throw error;
-  return !!data;
-}
+  if (error) {
+    // Check if the error is because no record was found
+    if (error.code === 'PGRST116') {
+      return null; // Return null to indicate no exam found
+    }
+    throw error; // Throw other errors
+  }
 
-export async function createCourse(courseData: {
-  title: string;
-  description: string;
-  summary: string;
-  category: string;
-  difficulty_level: string;
-  duration_minutes: number;
-  price: number;
-  currency?: string;
-  is_free: boolean;
-  is_published: boolean;
-  certificate_enabled: boolean;
-  thumbnail_url?: string;
-  tags?: string[];
-}): Promise<Course> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('courses')
-    .insert({
-      ...courseData,
-      creator_id: user.id
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
   return data;
-}
+};
 
-export async function updateCourse(id: string, courseData: Partial<Course>): Promise<Course> {
+export const getFinalExamResult = async (examId: string, userId: string) => {
   const { data, error } = await supabase
-    .from('courses')
-    .update(courseData as any)
-    .eq('id', id)
-    .select()
+    .from('final_exam_results')
+    .select('*')
+    .eq('exam_id', examId)
+    .eq('user_id', userId)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Check if the error is because no record was found
+    if (error.code === 'PGRST116') {
+      return null; // Return null to indicate no result found
+    }
+    throw error; // Throw other errors
+  }
+
   return data;
-}
+};
 
-export async function deleteCourse(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('courses')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
-  return true;
-}
-
-// Module operations
-export async function createModule(moduleData: {
-  course_id: string;
+export const createQuiz = async (quizData: {
   title: string;
   description?: string;
-  order_index: number;
-}): Promise<CourseModule> {
-  const { data, error } = await supabase
-    .from('course_modules')
-    .insert(moduleData)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return { ...data, lessons: [] };
-}
-
-export async function updateModule(id: string, moduleData: Partial<CourseModule>): Promise<CourseModule> {
-  const { data, error } = await supabase
-    .from('course_modules')
-    .update(moduleData as any)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return { ...data, lessons: [] };
-}
-
-export async function deleteModule(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('course_modules')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
-  return true;
-}
-
-export async function updateModuleOrder(id: string, orderIndex: number): Promise<boolean> {
-  const { error } = await supabase
-    .from('course_modules')
-    .update({ order_index: orderIndex })
-    .eq('id', id);
-
-  if (error) throw error;
-  return true;
-}
-
-// Lesson operations
-export async function createLesson(lessonData: {
+  lesson_id: string;
   module_id: string;
-  title: string;
-  description?: string;
-  content_type?: string;
-  video_url?: string;
-  content?: any;
-  materials_urls?: string[];
-  order_index: number;
-}): Promise<Lesson> {
-  const { data, error } = await supabase
-    .from('lessons')
-    .insert(lessonData)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function updateLesson(id: string, lessonData: Partial<Lesson>): Promise<Lesson> {
-  const { data, error } = await supabase
-    .from('lessons')
-    .update(lessonData as any)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function deleteLesson(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('lessons')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
-  return true;
-}
-
-// Quiz operations
-export async function createQuiz(quizData: {
-  title: string;
-  description?: string;
-  lesson_id?: string;
-  module_id?: string;
-  passing_score?: number;
-}): Promise<Quiz> {
+  passing_score: number;
+}) => {
   const { data, error } = await supabase
     .from('quizzes')
     .insert(quizData)
@@ -591,13 +255,13 @@ export async function createQuiz(quizData: {
 
   if (error) throw error;
   return data;
-}
+};
 
-export async function createQuizQuestion(questionData: {
+export const createQuizQuestion = async (questionData: {
   quiz_id: string;
   question: string;
   order_index: number;
-}): Promise<QuizQuestion> {
+}) => {
   const { data, error } = await supabase
     .from('quiz_questions')
     .insert(questionData)
@@ -606,14 +270,14 @@ export async function createQuizQuestion(questionData: {
 
   if (error) throw error;
   return data;
-}
+};
 
-export async function createQuizAnswer(answerData: {
+export const createQuizAnswer = async (answerData: {
   question_id: string;
   answer: string;
   is_correct: boolean;
   order_index: number;
-}): Promise<QuizAnswer> {
+}) => {
   const { data, error } = await supabase
     .from('quiz_answers')
     .insert(answerData)
@@ -622,80 +286,4 @@ export async function createQuizAnswer(answerData: {
 
   if (error) throw error;
   return data;
-}
-
-export async function fetchQuizWithQuestions(quizId: string): Promise<Quiz | null> {
-  const { data, error } = await supabase
-    .from('quizzes')
-    .select(`
-      *,
-      quiz_questions (
-        *,
-        quiz_answers (*)
-      )
-    `)
-    .eq('id', quizId)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function fetchCourseReviews(courseId: string): Promise<CourseReview[]> {
-  const { data, error } = await supabase
-    .from('course_reviews')
-    .select(`
-      *,
-      profiles (
-        full_name,
-        avatar_url,
-        username
-      )
-    `)
-    .eq('course_id', courseId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return (data || []) as unknown as CourseReview[];
-}
-
-export async function createCourseReview(reviewData: {
-  course_id: string;
-  user_id: string;
-  rating: number;
-  review_text?: string;
-}): Promise<CourseReview> {
-  const { data, error } = await supabase
-    .from('course_reviews')
-    .insert(reviewData)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function updateCourseReview(reviewId: string, reviewData: {
-  rating: number;
-  review_text?: string;
-}): Promise<CourseReview> {
-  const { data, error } = await supabase
-    .from('course_reviews')
-    .update(reviewData)
-    .eq('id', reviewId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function deleteCourseReview(reviewId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('course_reviews')
-    .delete()
-    .eq('id', reviewId);
-
-  if (error) throw error;
-  return true;
-}
+};

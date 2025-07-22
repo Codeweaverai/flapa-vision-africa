@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -61,26 +62,32 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [examStarted, setExamStarted] = useState(false);
 
   useEffect(() => {
     if (isOpen && exam) {
+      console.log('Final exam modal opened with exam:', exam);
       fetchExamQuestions();
       setTimeLeft(exam.time_limit_minutes * 60);
+      setExamStarted(false);
     }
   }, [isOpen, exam]);
 
   useEffect(() => {
-    if (timeLeft > 0 && isOpen) {
+    if (timeLeft > 0 && isOpen && examStarted) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && exam && isOpen) {
+    } else if (timeLeft === 0 && exam && isOpen && examStarted && questions.length > 0) {
+      console.log('Time expired, auto-submitting exam');
       handleSubmitExam();
     }
-  }, [timeLeft, isOpen, exam]);
+  }, [timeLeft, isOpen, exam, examStarted, questions.length]);
 
   const fetchExamQuestions = async () => {
     setLoading(true);
     try {
+      console.log('Fetching questions for exam:', exam.id);
+      
       // Fetch questions with their answers
       const { data: questionsData, error: questionsError } = await supabase
         .from('final_exam_questions')
@@ -98,7 +105,12 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         .eq('exam_id', exam.id)
         .order('order_index');
 
-      if (questionsError) throw questionsError;
+      if (questionsError) {
+        console.error('Error fetching questions:', questionsError);
+        throw questionsError;
+      }
+
+      console.log('Fetched questions data:', questionsData);
 
       if (!questionsData || questionsData.length === 0) {
         toast.error('No questions found for this exam');
@@ -120,7 +132,9 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           }))
       }));
 
-      // Shuffle questions for retakes (check if user has previous attempts)
+      console.log('Transformed questions:', transformedQuestions);
+
+      // Check if user has previous attempts for shuffling
       const { data: attemptData } = await supabase
         .from('final_exam_attempts')
         .select('attempt_number')
@@ -147,11 +161,31 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     }
   };
 
+  const handleStartExam = () => {
+    if (questions.length === 0) {
+      toast.error('No questions available to start the exam');
+      return;
+    }
+    console.log('Starting exam with', questions.length, 'questions');
+    setExamStarted(true);
+  };
+
   const handleSubmitExam = async () => {
-    if (!user || !exam || !enrollmentId) return;
+    if (!user || !exam || !enrollmentId || questions.length === 0) {
+      console.error('Missing required data for exam submission');
+      return;
+    }
+
+    // Prevent submission if exam hasn't started or no questions answered
+    if (!examStarted) {
+      toast.error('Please start the exam first');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      console.log('Submitting exam with answers:', answers);
+      
       // Calculate score
       let correctAnswers = 0;
       questions.forEach(question => {
@@ -164,7 +198,7 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         }
       });
 
-      const finalScore = questions.length > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
+      const finalScore = Math.round((correctAnswers / questions.length) * 100);
       const examPassed = finalScore >= exam.passing_score;
 
       console.log('Calculated score:', finalScore, 'Questions:', questions.length, 'Correct:', correctAnswers);
@@ -328,6 +362,49 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     );
   }
 
+  if (!examStarted) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-orange-500" />
+              {exam.title}
+            </DialogTitle>
+            <DialogDescription>
+              {exam.description || 'Complete this final exam to test your knowledge'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <h3 className="font-semibold mb-2">Exam Instructions</h3>
+              <ul className="space-y-2 text-sm">
+                <li>• You have {exam.time_limit_minutes} minutes to complete this exam</li>
+                <li>• You need {exam.passing_score}% to pass</li>
+                <li>• There are {questions.length} questions in total</li>
+                <li>• Once you start, the timer will begin automatically</li>
+                <li>• Make sure you have a stable internet connection</li>
+              </ul>
+            </div>
+            
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleStartExam}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white"
+              >
+                Start Exam
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
@@ -347,7 +424,7 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
             </div>
           </DialogTitle>
           <DialogDescription>
-            Complete this {exam.time_limit_minutes}-minute exam to test your knowledge
+            Question {currentQuestionIndex + 1} of {questions.length}
           </DialogDescription>
         </DialogHeader>
 
@@ -411,7 +488,7 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
               ) : (
                 <Button
                   onClick={handleSubmitExam}
-                  disabled={isSubmitting || answers.length !== questions.length}
+                  disabled={isSubmitting || answers.length === 0}
                   className="bg-gradient-to-r from-green-500 to-blue-600"
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Exam'}
