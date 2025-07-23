@@ -54,7 +54,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/verify-certificate" className="hover:text-primary transition-colors">
+                <Link to="/verify" className="hover:text-primary transition-colors">
                   Verify Certificate
                 </Link>
               </li>
