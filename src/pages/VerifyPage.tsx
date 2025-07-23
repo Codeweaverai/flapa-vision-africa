@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
 import { Search, CheckCircle, XCircle, Award, Calendar, User, BookOpen, AlertCircle, Copy } from 'lucide-react';
 
 interface CertificateDetails {
