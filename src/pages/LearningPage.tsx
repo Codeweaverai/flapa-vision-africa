@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -58,6 +59,11 @@ const LearningPage: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchEnrollments();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && enrollments.length > 0) {
       fetchWeeklyStats();
       
       // Set up real-time subscription for lesson progress
@@ -151,7 +157,6 @@ const LearningPage: React.FC = () => {
           lessons!inner (
             id,
             title,
-            duration_minutes,
             module_id,
             course_modules!inner (
               course_id
@@ -169,12 +174,9 @@ const LearningPage: React.FC = () => {
       }
 
       // Calculate total hours learned this week
-      const totalMinutes = completedLessons?.reduce((total, lesson) => {
-        // Default to 30 minutes if duration is not available
-        const duration = lesson.lessons?.duration_minutes || 30;
-        return total + duration;
-      }, 0) || 0;
-
+      // Since duration_minutes doesn't exist, we'll estimate based on number of lessons
+      // Assume each lesson is approximately 30 minutes on average
+      const totalMinutes = (completedLessons?.length || 0) * 30;
       const hoursLearned = Math.round((totalMinutes / 60) * 10) / 10;
 
       setWeeklyStats({
