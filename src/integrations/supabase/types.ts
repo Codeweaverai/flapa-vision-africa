@@ -191,6 +191,47 @@ export type Database = {
           },
         ]
       }
+      check_ins: {
+        Row: {
+          booking_id: string
+          check_in_time: string
+          checked_in_by: string | null
+          created_at: string
+          event_id: string
+          id: string
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          check_in_time?: string
+          checked_in_by?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          check_in_time?: string
+          checked_in_by?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_ins_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "generated_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comment_likes: {
         Row: {
           comment_id: string
@@ -1426,6 +1467,7 @@ export type Database = {
       generated_tickets: {
         Row: {
           booking_id: string | null
+          checked_in: boolean | null
           created_at: string
           event_id: string | null
           event_ticket_id: string | null
@@ -1444,6 +1486,7 @@ export type Database = {
         }
         Insert: {
           booking_id?: string | null
+          checked_in?: boolean | null
           created_at?: string
           event_id?: string | null
           event_ticket_id?: string | null
@@ -1462,6 +1505,7 @@ export type Database = {
         }
         Update: {
           booking_id?: string | null
+          checked_in?: boolean | null
           created_at?: string
           event_id?: string | null
           event_ticket_id?: string | null
