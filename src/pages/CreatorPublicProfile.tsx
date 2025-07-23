@@ -55,16 +55,22 @@ const CreatorPublicProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('CreatorPublicProfile - creatorId from params:', creatorId);
     if (creatorId) {
       fetchCreatorData();
     } else {
+      console.error('No creator ID found in URL parameters');
       setError('No creator ID provided');
       setLoading(false);
     }
   }, [creatorId]);
 
   const fetchCreatorData = async () => {
-    if (!creatorId) return;
+    if (!creatorId) {
+      setError('No creator ID provided');
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -72,23 +78,19 @@ const CreatorPublicProfile: React.FC = () => {
 
       console.log('Fetching creator profile for ID:', creatorId);
       
-      // Fetch creator profile with timeout
-      const profilePromise = supabase
+      // Fetch creator profile
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, bio, avatar_url, username, is_creator, role')
         .eq('id', creatorId)
         .single();
 
-      const { data: profile, error: profileError } = await Promise.race([
-        profilePromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 10000)
-        )
-      ]) as any;
-
       if (profileError) {
         console.error('Profile error:', profileError);
-        throw new Error('Creator profile not found');
+        if (profileError.code === 'PGRST116') {
+          throw new Error('Creator profile not found');
+        }
+        throw profileError;
       }
 
       if (!profile) {
@@ -98,19 +100,21 @@ const CreatorPublicProfile: React.FC = () => {
       console.log('Profile loaded:', profile);
       setCreator(profile);
 
-      // Fetch courses and events in parallel with simplified queries
+      // Fetch courses and events in parallel
       const [coursesResult, eventsResult] = await Promise.allSettled([
         supabase
           .from('courses')
           .select('id, title, description, thumbnail_url, price, is_free, duration_minutes, difficulty_level')
           .eq('creator_id', creatorId)
           .eq('is_published', true)
+          .order('created_at', { ascending: false })
           .limit(10),
         
         supabase
           .from('events')
           .select('id, title, description, image_url, price, is_free, start_time, end_time, location, event_type')
           .eq('creator_id', creatorId)
+          .order('created_at', { ascending: false })
           .limit(10)
       ]);
 
