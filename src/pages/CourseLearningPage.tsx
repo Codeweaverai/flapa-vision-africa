@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -20,8 +19,7 @@ import {
   Play,
   Award,
   Lock,
-  RotateCcw,
-  Eye
+  RotateCcw
 } from 'lucide-react';
 import VideoPlayer from '@/components/video/VideoPlayer';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
@@ -75,19 +73,6 @@ interface ExamResult {
   attempt_number: number;
 }
 
-interface LessonProgress {
-  lesson_id: string;
-  is_completed: boolean;
-  last_position_seconds: number;
-  completion_date?: string;
-}
-
-interface CourseProgress {
-  course_id: string;
-  progress_percentage: number;
-  last_accessed_lesson_id?: string;
-}
-
 const CourseLearningPage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuth();
@@ -95,8 +80,6 @@ const CourseLearningPage: React.FC = () => {
   const [course, setCourse] = useState<Course | null>(null);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
-  const [lessonProgress, setLessonProgress] = useState<Record<string, LessonProgress>>({});
-  const [courseProgress, setCourseProgress] = useState<CourseProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('content');
@@ -107,7 +90,6 @@ const CourseLearningPage: React.FC = () => {
   const [courseCompleted, setCourseCompleted] = useState(false);
   const [hasPassedExam, setHasPassedExam] = useState(false);
   const [canRetakeExam, setCanRetakeExam] = useState(false);
-  const [hasTakenExam, setHasTakenExam] = useState(false);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [lastAccessedLessonId, setLastAccessedLessonId] = useState<string | null>(null);
   const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
@@ -124,10 +106,6 @@ const CourseLearningPage: React.FC = () => {
       const totalLessons = course.modules.reduce((acc, module) => acc + module.lessons.length, 0);
       const allCompleted = totalLessons > 0 && completedLessons.length >= totalLessons;
       setCourseCompleted(allCompleted);
-      
-      // Update course progress percentage
-      const progressPercentage = totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
-      updateCourseProgress(progressPercentage);
     }
   }, [completedLessons, course]);
 
@@ -142,6 +120,7 @@ const CourseLearningPage: React.FC = () => {
     if (!course || !course.modules.length) return;
 
     const allLessons = course.modules.flatMap(m => m.lessons).sort((a, b) => {
+      // Sort by module order first, then lesson order
       const moduleA = course.modules.find(m => m.id === a.module_id);
       const moduleB = course.modules.find(m => m.id === b.module_id);
       if (moduleA && moduleB && moduleA.order_index !== moduleB.order_index) {
@@ -255,11 +234,26 @@ const CourseLearningPage: React.FC = () => {
 
       setCourse(transformedCourse);
 
-      // Fetch lesson progress from Supabase
-      await fetchLessonProgress(enrollment.id);
+      // Fetch lesson progress
+      const { data: progressData } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id, is_completed')
+        .eq('enrollment_id', enrollment.id);
 
-      // Fetch course progress
-      await fetchCourseProgress(courseId);
+      const completed = progressData?.filter(p => p.is_completed).map(p => p.lesson_id) || [];
+      setCompletedLessons(completed);
+
+      // Fetch course progress to get last accessed lesson
+      const { data: courseProgress, error: progressError } = await supabase
+        .from('course_progress')
+        .select('last_accessed_lesson_id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (!progressError && courseProgress?.last_accessed_lesson_id) {
+        setLastAccessedLessonId(courseProgress.last_accessed_lesson_id);
+      }
 
       // Fetch final exam if exists
       const { data: examData } = await supabase
@@ -285,7 +279,6 @@ const CourseLearningPage: React.FC = () => {
           const latestResult = examResults[0];
           setHasPassedExam(latestResult.passed);
           setCanRetakeExam(!latestResult.passed);
-          setHasTakenExam(true);
           
           // Convert quiz_scores from Json to number[]
           const quizScores = Array.isArray(latestResult.quiz_scores) 
@@ -312,67 +305,17 @@ const CourseLearningPage: React.FC = () => {
     }
   };
 
-  const fetchLessonProgress = async (enrollmentId: string) => {
-    try {
-      const { data: progressData, error } = await supabase
-        .from('lesson_progress')
-        .select('lesson_id, is_completed, last_position_seconds, completion_date')
-        .eq('enrollment_id', enrollmentId);
-
-      if (error) throw error;
-
-      const progressMap: Record<string, LessonProgress> = {};
-      const completed: string[] = [];
-
-      progressData?.forEach(progress => {
-        progressMap[progress.lesson_id] = {
-          lesson_id: progress.lesson_id,
-          is_completed: progress.is_completed,
-          last_position_seconds: progress.last_position_seconds || 0,
-          completion_date: progress.completion_date
-        };
-
-        if (progress.is_completed) {
-          completed.push(progress.lesson_id);
-        }
-      });
-
-      setLessonProgress(progressMap);
-      setCompletedLessons(completed);
-    } catch (error) {
-      console.error('Error fetching lesson progress:', error);
-    }
-  };
-
-  const fetchCourseProgress = async (courseId: string) => {
-    try {
-      const { data: progressData, error } = await supabase
-        .from('course_progress')
-        .select('progress_percentage, last_accessed_lesson_id')
-        .eq('user_id', user?.id)
-        .eq('course_id', courseId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (progressData) {
-        setCourseProgress({
-          course_id: courseId,
-          progress_percentage: progressData.progress_percentage,
-          last_accessed_lesson_id: progressData.last_accessed_lesson_id
-        });
-        setLastAccessedLessonId(progressData.last_accessed_lesson_id);
-      }
-    } catch (error) {
-      console.error('Error fetching course progress:', error);
-    }
-  };
-
   const loadVideoPosition = async (lessonId: string, enrollmentId: string) => {
     try {
-      const progress = lessonProgress[lessonId];
-      if (progress && progress.last_position_seconds) {
-        setCurrentVideoTime(progress.last_position_seconds);
+      const { data } = await supabase
+        .from('lesson_progress')
+        .select('last_position_seconds')
+        .eq('lesson_id', lessonId)
+        .eq('enrollment_id', enrollmentId)
+        .maybeSingle();
+        
+      if (data?.last_position_seconds) {
+        setCurrentVideoTime(data.last_position_seconds);
       } else {
         setCurrentVideoTime(0);
       }
@@ -400,62 +343,36 @@ const CourseLearningPage: React.FC = () => {
 
       if (error) throw error;
 
-      // Update local state
-      setLessonProgress(prev => ({
-        ...prev,
-        [lessonId]: {
-          lesson_id: lessonId,
-          is_completed: completed,
-          last_position_seconds: position,
-          completion_date: completed ? new Date().toISOString() : undefined
-        }
-      }));
-
       if (completed && !completedLessons.includes(lessonId)) {
         setCompletedLessons(prev => [...prev, lessonId]);
         toast.success('Lesson completed!');
       }
 
       // Update course progress with last accessed lesson
-      await updateCourseProgress(null, lessonId);
+      await updateCourseProgress(lessonId);
     } catch (error) {
       console.error('Error saving video progress:', error);
     }
   };
 
-  const updateCourseProgress = async (progressPercentage?: number | null, lastAccessedLessonId?: string) => {
+  const updateCourseProgress = async (lastAccessedLessonId: string) => {
     if (!user || !courseId) return;
 
     try {
       const totalLessons = course?.modules.reduce((acc, module) => acc + module.lessons.length, 0) || 0;
-      const currentProgress = progressPercentage !== null ? 
-        progressPercentage || Math.round((completedLessons.length / totalLessons) * 100) : 
-        courseProgress?.progress_percentage || 0;
+      const progressPercentage = totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
 
-      const { error } = await supabase
+      await supabase
         .from('course_progress')
         .upsert({
           user_id: user.id,
           course_id: courseId,
-          progress_percentage: currentProgress,
-          last_accessed_lesson_id: lastAccessedLessonId || courseProgress?.last_accessed_lesson_id,
+          last_accessed_lesson_id: lastAccessedLessonId,
+          progress_percentage: progressPercentage,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,course_id'
         });
-
-      if (error) throw error;
-
-      // Update local state
-      setCourseProgress(prev => ({
-        course_id: courseId,
-        progress_percentage: currentProgress,
-        last_accessed_lesson_id: lastAccessedLessonId || prev?.last_accessed_lesson_id
-      }));
-
-      if (lastAccessedLessonId) {
-        setLastAccessedLessonId(lastAccessedLessonId);
-      }
     } catch (error) {
       console.error('Error updating course progress:', error);
     }
@@ -513,7 +430,7 @@ const CourseLearningPage: React.FC = () => {
     }
 
     // Update course progress
-    updateCourseProgress(null, lesson.id);
+    updateCourseProgress(lesson.id);
   };
 
   const handleNextLesson = () => {
@@ -583,28 +500,24 @@ const CourseLearningPage: React.FC = () => {
     setExamResult(examResult);
     setHasPassedExam(result.passed);
     setCanRetakeExam(!result.passed);
-    setHasTakenExam(true);
-    
-    // Show the results modal
     setShowExamResultsModal(true);
+    
+    // Refresh course data to get updated exam status
+    loadCourseData();
   };
 
   const handleRetakeExam = () => {
-    setShowExamResultsModal(false);
     setShowFinalExamModal(true);
   };
 
   const calculateProgress = () => {
-    if (courseProgress) {
-      return courseProgress.progress_percentage;
-    }
     if (!course) return 0;
     const totalLessons = course.modules.reduce((acc, module) => acc + module.lessons.length, 0);
     return totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
   };
 
   const shouldShowViewResults = () => {
-    return finalExam && hasTakenExam;
+    return finalExam && (hasPassedExam || canRetakeExam);
   };
 
   const shouldShowFinalExamButton = () => {
@@ -759,7 +672,6 @@ const CourseLearningPage: React.FC = () => {
                         className="w-full"
                         onClick={() => navigate(`/course/${courseId}/results`)}
                       >
-                        <Eye className="mr-2 h-4 w-4" />
                         View Course Results
                       </Button>
                     </div>
@@ -782,7 +694,6 @@ const CourseLearningPage: React.FC = () => {
                       onEnded={handleVideoEnded}
                       autoplay={false}
                       controls={true}
-                      startTime={currentVideoTime}
                     />
                   </div>
                 ) : (
@@ -847,6 +758,7 @@ const CourseLearningPage: React.FC = () => {
                       currentTime={currentVideoTime}
                       onSeekTo={(time) => {
                         console.log('Seeking to time:', time);
+                        // Note: VideoPlayer component would need to implement seeking functionality
                       }}
                     />
                   </TabsContent>
