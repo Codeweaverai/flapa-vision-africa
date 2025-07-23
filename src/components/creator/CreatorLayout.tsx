@@ -78,6 +78,11 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
       icon: <BarChart className="h-5 w-5 mr-2" />
     },
     {
+      label: 'Ticket Verification',
+      href: '/ticket-verification',
+      icon: <ScanLine className="h-5 w-5 mr-2" />
+    },
+    {
       label: 'Settings',
       href: '/creator/settings',
       icon: <Settings className="h-5 w-5 mr-2" />
