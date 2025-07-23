@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Clock, CheckCircle, XCircle, Award } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Award, AlertCircle } from 'lucide-react';
 
 interface Question {
   id: string;
@@ -82,14 +82,39 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const fetchExamQuestions = async () => {
     setLoading(true);
     try {
-      // Fetch questions with their answers
+      console.log('Fetching questions for exam:', exam.id);
+
+      // First, let's check if the exam exists
+      const { data: examCheck, error: examError } = await supabase
+        .from('final_exams')
+        .select('id, title, is_published')
+        .eq('id', exam.id)
+        .single();
+
+      if (examError) {
+        console.error('Error checking exam:', examError);
+        toast.error('Failed to verify exam');
+        onClose();
+        return;
+      }
+
+      if (!examCheck) {
+        console.error('Exam not found:', exam.id);
+        toast.error('Exam not found');
+        onClose();
+        return;
+      }
+
+      console.log('Exam found:', examCheck);
+
+      // Fetch questions with their answers using the correct relation name
       const { data: questionsData, error: questionsError } = await supabase
         .from('final_exam_questions')
         .select(`
           id,
           question,
           order_index,
-          final_exam_answers (
+          final_exam_answers!question_id (
             id,
             answer,
             is_correct,
@@ -99,27 +124,55 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         .eq('exam_id', exam.id)
         .order('order_index');
 
-      if (questionsError) throw questionsError;
+      console.log('Questions query result:', { questionsData, questionsError });
 
-      if (!questionsData || questionsData.length === 0) {
-        toast.error('No questions found for this exam');
+      if (questionsError) {
+        console.error('Error fetching questions:', questionsError);
+        toast.error('Failed to load exam questions');
         onClose();
         return;
       }
 
-      // Transform data and shuffle questions for retakes
-      const transformedQuestions: Question[] = questionsData.map(q => ({
-        id: q.id,
-        question: q.question,
-        answers: q.final_exam_answers
-          .sort((a: any, b: any) => a.order_index - b.order_index)
-          .map((a: any) => ({
-            id: a.id,
-            answer: a.answer,
-            is_correct: a.is_correct,
-            order_index: a.order_index
-          }))
-      }));
+      if (!questionsData || questionsData.length === 0) {
+        console.warn('No questions found for exam:', exam.id);
+        toast.error('No questions found for this exam. Please contact support.');
+        onClose();
+        return;
+      }
+
+      // Transform data and validate that each question has answers
+      const transformedQuestions: Question[] = questionsData
+        .map(q => {
+          const answers = q.final_exam_answers || [];
+          
+          if (answers.length === 0) {
+            console.warn('Question has no answers:', q.id);
+            return null;
+          }
+
+          return {
+            id: q.id,
+            question: q.question,
+            answers: answers
+              .sort((a: any, b: any) => a.order_index - b.order_index)
+              .map((a: any) => ({
+                id: a.id,
+                answer: a.answer,
+                is_correct: a.is_correct,
+                order_index: a.order_index
+              }))
+          };
+        })
+        .filter(q => q !== null) as Question[];
+
+      if (transformedQuestions.length === 0) {
+        console.error('No valid questions with answers found');
+        toast.error('No valid questions found for this exam');
+        onClose();
+        return;
+      }
+
+      console.log('Transformed questions:', transformedQuestions);
 
       // Shuffle questions for retakes (check if user has previous attempts)
       const { data: attemptData } = await supabase
@@ -134,11 +187,16 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
       if (attemptData && attemptData.length > 0) {
         // Shuffle questions for retakes
         finalQuestions = [...transformedQuestions].sort(() => Math.random() - 0.5);
+        console.log('Questions shuffled for retake');
       }
 
       setQuestions(finalQuestions);
       setCurrentQuestionIndex(0);
       setAnswers([]);
+      
+      console.log('Final questions set:', finalQuestions.length);
+      toast.success(`Exam loaded with ${finalQuestions.length} questions`);
+      
     } catch (error) {
       console.error('Error fetching exam questions:', error);
       toast.error('Failed to load exam questions');
@@ -149,26 +207,57 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   };
 
   const handleSubmitExam = async () => {
-    if (!user || !exam || !enrollmentId) return;
+    if (!user || !exam || !enrollmentId) {
+      console.error('Missing required data for submission:', { user: !!user, exam: !!exam, enrollmentId });
+      return;
+    }
+
+    console.log('Submitting exam with:', {
+      questionsCount: questions.length,
+      answersCount: answers.length,
+      answers: answers
+    });
 
     setIsSubmitting(true);
     try {
       // Calculate score
       let correctAnswers = 0;
-      questions.forEach(question => {
+      const detailedResults = questions.map(question => {
         const userAnswer = answers.find(a => a.questionId === question.id);
-        if (userAnswer) {
-          const correctAnswer = question.answers.find(a => a.is_correct);
-          if (correctAnswer && userAnswer.selectedAnswerId === correctAnswer.id) {
-            correctAnswers++;
-          }
+        const correctAnswer = question.answers.find(a => a.is_correct);
+        const isCorrect = userAnswer && correctAnswer && userAnswer.selectedAnswerId === correctAnswer.id;
+        
+        if (isCorrect) {
+          correctAnswers++;
         }
+
+        return {
+          questionId: question.id,
+          question: question.question,
+          userAnswerId: userAnswer?.selectedAnswerId,
+          correctAnswerId: correctAnswer?.id,
+          isCorrect: !!isCorrect
+        };
       });
+
+      console.log('Detailed results:', detailedResults);
 
       const finalScore = questions.length > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
       const examPassed = finalScore >= exam.passing_score;
 
-      console.log('Calculated score:', finalScore, 'Questions:', questions.length, 'Correct:', correctAnswers);
+      console.log('Calculated score:', {
+        finalScore,
+        correctAnswers,
+        totalQuestions: questions.length,
+        passingScore: exam.passing_score,
+        examPassed
+      });
+
+      if (questions.length === 0) {
+        console.error('Cannot submit exam with 0 questions');
+        toast.error('Cannot submit exam: No questions loaded');
+        return;
+      }
 
       // Get current attempt number
       const { data: existingAttempts, error: attemptError } = await supabase
@@ -199,6 +288,8 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString()
       };
+
+      console.log('Saving attempt:', attemptData);
 
       const { error: attemptInsertError } = await supabase
         .from('final_exam_attempts')
@@ -273,7 +364,8 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         score: finalScore,
         final_grade: finalScore,
         quiz_scores: [],
-        attempt_number: nextAttemptNumber
+        attempt_number: nextAttemptNumber,
+        detailedResults
       });
 
     } catch (error) {
@@ -318,6 +410,29 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           </DialogHeader>
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Exam Not Available
+            </DialogTitle>
+            <DialogDescription>
+              No questions are available for this exam. Please contact support.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center py-4">
+            <Button onClick={onClose} variant="outline">
+              Close
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -415,6 +530,13 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Debug info in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-gray-500 mt-4">
+              <p>Debug: {questions.length} questions loaded, {answers.length} answers provided</p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
