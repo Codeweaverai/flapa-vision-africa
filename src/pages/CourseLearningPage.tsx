@@ -52,7 +52,6 @@ interface Lesson {
   content: string | null;
   module_id: string;
   order_index: number;
-  duration_minutes?: number;
   is_completed?: boolean;
 }
 
@@ -111,6 +110,7 @@ const CourseLearningPage: React.FC = () => {
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [lastAccessedLessonId, setLastAccessedLessonId] = useState<string | null>(null);
   const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
+  const videoPlayerRef = useRef<any>(null);
 
   useEffect(() => {
     if (courseId && user) {
@@ -215,8 +215,7 @@ const CourseLearningPage: React.FC = () => {
               video_url,
               content,
               module_id,
-              order_index,
-              duration_minutes
+              order_index
             )
           )
         `)
@@ -247,8 +246,7 @@ const CourseLearningPage: React.FC = () => {
                 video_url: lesson.video_url,
                 content: lesson.content,
                 module_id: lesson.module_id,
-                order_index: lesson.order_index,
-                duration_minutes: lesson.duration_minutes
+                order_index: lesson.order_index
               }))
           }))
       };
@@ -373,6 +371,12 @@ const CourseLearningPage: React.FC = () => {
       const progress = lessonProgress[lessonId];
       if (progress && progress.last_position_seconds) {
         setCurrentVideoTime(progress.last_position_seconds);
+        // Seek to the saved position when video is ready
+        if (videoPlayerRef.current && videoPlayerRef.current.seekTo) {
+          setTimeout(() => {
+            videoPlayerRef.current.seekTo(progress.last_position_seconds);
+          }, 1000);
+        }
       } else {
         setCurrentVideoTime(0);
       }
@@ -709,11 +713,6 @@ const CourseLearningPage: React.FC = () => {
                                 </div>
                                 <div>
                                   <p className="font-medium text-sm">{lesson.title}</p>
-                                  {lesson.duration_minutes && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {lesson.duration_minutes} min
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -777,12 +776,12 @@ const CourseLearningPage: React.FC = () => {
                 {currentLesson.video_url ? (
                   <div className="bg-black rounded-md overflow-hidden">
                     <VideoPlayer
+                      ref={videoPlayerRef}
                       src={currentLesson.video_url}
                       onTimeUpdate={handleVideoTimeUpdate}
                       onEnded={handleVideoEnded}
                       autoplay={false}
                       controls={true}
-                      startTime={currentVideoTime}
                     />
                   </div>
                 ) : (
@@ -846,7 +845,9 @@ const CourseLearningPage: React.FC = () => {
                       lessonId={currentLesson.id}
                       currentTime={currentVideoTime}
                       onSeekTo={(time) => {
-                        console.log('Seeking to time:', time);
+                        if (videoPlayerRef.current && videoPlayerRef.current.seekTo) {
+                          videoPlayerRef.current.seekTo(time);
+                        }
                       }}
                     />
                   </TabsContent>
