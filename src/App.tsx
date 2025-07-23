@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
@@ -9,12 +10,12 @@ import CoursesPage from '@/pages/CoursesPage';
 import EventsPage from '@/pages/EventsPage';
 import AccountPage from '@/pages/AccountPage';
 import LoginPage from '@/pages/LoginPage';
-import RegistrationPage from '@/pages/RegistrationPage';
+import RegisterPage from '@/pages/RegisterPage';
 import ContactPage from '@/pages/ContactPage';
 import AboutPage from '@/pages/AboutPage';
 import NotFoundPage from '@/pages/NotFoundPage';
-import CourseDetailsPage from '@/pages/CourseDetailsPage';
-import EventDetailsPage from '@/pages/EventDetailsPage';
+import CourseDetailPage from '@/pages/CourseDetailPage';
+import EventDetailPage from '@/pages/EventDetailPage';
 import CheckoutPage from '@/pages/CheckoutPage';
 import VerifyCertificatePage from '@/pages/VerifyCertificatePage';
 import TicketVerificationPage from '@/pages/TicketVerificationPage';
@@ -29,12 +30,12 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/courses" element={<CoursesPage />} />
-              <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
+              <Route path="/courses/:courseId" element={<CourseDetailPage />} />
               <Route path="/events" element={<EventsPage />} />
-              <Route path="/events/:eventId" element={<EventDetailsPage />} />
+              <Route path="/events/:eventId" element={<EventDetailPage />} />
               <Route path="/account/*" element={<AccountPage />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegistrationPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
