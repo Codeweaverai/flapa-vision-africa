@@ -31,6 +31,7 @@ interface TrendingItem {
   location?: string;
   event_type?: string;
   popularity_score: number;
+  created_at?: string;
 }
 
 const TrendingPage = () => {
@@ -137,7 +138,9 @@ const TrendingPage = () => {
       case 'rating':
         return (b.average_rating || 0) - (a.average_rating || 0);
       case 'newest':
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        const aDate = new Date(a.created_at || 0).getTime();
+        const bDate = new Date(b.created_at || 0).getTime();
+        return bDate - aDate;
       default:
         return b.popularity_score - a.popularity_score;
     }
