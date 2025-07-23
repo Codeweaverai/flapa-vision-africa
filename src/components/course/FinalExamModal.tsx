@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Clock, CheckCircle, XCircle, Award, AlertCircle } from 'lucide-react';
+import FinalExamResultsModal from './FinalExamResultsModal';
 
 interface Question {
   id: string;
@@ -62,6 +63,8 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [examResult, setExamResult] = useState(null);
 
   useEffect(() => {
     if (isOpen && exam) {
@@ -329,36 +332,60 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
         throw resultError;
       }
 
+      // Generate certificate if exam is passed
       if (examPassed) {
-        toast.success(`Congratulations! You passed the final exam with ${finalScore}%`);
-        
-        // Generate certificate if exam is passed
         try {
-          const { error: certError } = await supabase
+          // First check if certificate already exists
+          const { data: existingCert } = await supabase
             .from('certificates')
-            .upsert({
-              user_id: user.id,
-              enrollment_id: enrollmentId,
-              course_id: exam.course_id,
-              issue_date: new Date().toISOString(),
-              verification_code: `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-            }, {
-              onConflict: 'enrollment_id'
-            });
+            .select('*')
+            .eq('enrollment_id', enrollmentId)
+            .maybeSingle();
 
-          if (certError) {
-            console.error('Error generating certificate:', certError);
-          } else {
-            toast.success('Certificate generated successfully!');
+          if (!existingCert) {
+            const { error: certError } = await supabase
+              .from('certificates')
+              .insert({
+                user_id: user.id,
+                enrollment_id: enrollmentId,
+                course_id: exam.course_id,
+                issue_date: new Date().toISOString(),
+                verification_code: `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+              });
+
+            if (certError) {
+              console.error('Error generating certificate:', certError);
+            } else {
+              console.log('Certificate generated successfully!');
+            }
           }
         } catch (certError) {
           console.error('Certificate generation failed:', certError);
         }
-      } else {
-        toast.error(`You scored ${finalScore}%. You need ${exam.passing_score}% to pass.`);
       }
 
-      // Call onComplete with result data
+      // Prepare result data for the modal
+      const resultData = {
+        passed: examPassed,
+        examScore: finalScore,
+        quizScores: [],
+        finalGrade: finalScore,
+        courseName: exam.title,
+        studentName: user.email || 'Student',
+        enrollmentId: enrollmentId,
+        onRetake: () => {
+          setShowResultsModal(false);
+          setCurrentQuestionIndex(0);
+          setAnswers([]);
+          fetchExamQuestions();
+        }
+      };
+
+      // Show results modal
+      setExamResult(resultData);
+      setShowResultsModal(true);
+
+      // Call onComplete callback
       onComplete({
         passed: examPassed,
         score: finalScore,
@@ -398,6 +425,12 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
 
   const getCurrentAnswer = (questionId: string) => {
     return answers.find(a => a.questionId === questionId)?.selectedAnswerId;
+  };
+
+  const handleCloseResults = () => {
+    setShowResultsModal(false);
+    setExamResult(null);
+    onClose();
   };
 
   if (loading) {
@@ -442,104 +475,122 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Award className="h-5 w-5 text-orange-500" />
-              <span>{exam.title}</span>
+    <>
+      <Dialog open={isOpen && !showResultsModal} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-orange-500" />
+                <span>{exam.title}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center text-orange-600">
+                  <Clock className="h-4 w-4 mr-1" />
+                  {formatTime(timeLeft)}
+                </div>
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Complete this {exam.time_limit_minutes}-minute exam to test your knowledge
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Progress */}
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
+                <span>{Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}% Complete</span>
+              </div>
+              <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center text-orange-600">
-                <Clock className="h-4 w-4 mr-1" />
-                {formatTime(timeLeft)}
+
+            {/* Question */}
+            {currentQuestion && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">{currentQuestion.question}</h3>
+                  <div className="space-y-3">
+                    {currentQuestion.answers.map((answer, index) => (
+                      <button
+                        key={answer.id}
+                        onClick={() => handleAnswerSelect(currentQuestion.id, answer.id)}
+                        className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                          getCurrentAnswer(currentQuestion.id) === answer.id
+                            ? 'border-orange-500 bg-orange-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <span className="w-6 h-6 rounded-full border-2 border-gray-300 mr-3 flex items-center justify-center text-sm">
+                            {String.fromCharCode(65 + index)}
+                          </span>
+                          {answer.answer}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Navigation */}
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                disabled={currentQuestionIndex === 0}
+              >
+                Previous
+              </Button>
+              
+              <div className="flex gap-2">
+                {currentQuestionIndex < questions.length - 1 ? (
+                  <Button
+                    onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600"
+                  >
+                    Next
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSubmitExam}
+                    disabled={isSubmitting || answers.length !== questions.length}
+                    className="bg-gradient-to-r from-green-500 to-blue-600"
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Exam'}
+                  </Button>
+                )}
               </div>
             </div>
-          </DialogTitle>
-          <DialogDescription>
-            Complete this {exam.time_limit_minutes}-minute exam to test your knowledge
-          </DialogDescription>
-        </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Progress */}
-          <div>
-            <div className="flex justify-between text-sm mb-2">
-              <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
-              <span>{Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}% Complete</span>
-            </div>
-            <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} />
+            {/* Debug info in development */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 mt-4">
+                <p>Debug: {questions.length} questions loaded, {answers.length} answers provided</p>
+              </div>
+            )}
           </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Question */}
-          {currentQuestion && (
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">{currentQuestion.question}</h3>
-                <div className="space-y-3">
-                  {currentQuestion.answers.map((answer, index) => (
-                    <button
-                      key={answer.id}
-                      onClick={() => handleAnswerSelect(currentQuestion.id, answer.id)}
-                      className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                        getCurrentAnswer(currentQuestion.id) === answer.id
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <span className="w-6 h-6 rounded-full border-2 border-gray-300 mr-3 flex items-center justify-center text-sm">
-                          {String.fromCharCode(65 + index)}
-                        </span>
-                        {answer.answer}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Navigation */}
-          <div className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
-              disabled={currentQuestionIndex === 0}
-            >
-              Previous
-            </Button>
-            
-            <div className="flex gap-2">
-              {currentQuestionIndex < questions.length - 1 ? (
-                <Button
-                  onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600"
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmitExam}
-                  disabled={isSubmitting || answers.length !== questions.length}
-                  className="bg-gradient-to-r from-green-500 to-blue-600"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Exam'}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Debug info in development */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="text-xs text-gray-500 mt-4">
-              <p>Debug: {questions.length} questions loaded, {answers.length} answers provided</p>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Results Modal */}
+      {showResultsModal && examResult && (
+        <FinalExamResultsModal
+          isOpen={showResultsModal}
+          onClose={handleCloseResults}
+          examScore={examResult.examScore}
+          quizScores={examResult.quizScores}
+          finalGrade={examResult.finalGrade}
+          passed={examResult.passed}
+          courseName={examResult.courseName}
+          studentName={examResult.studentName}
+          enrollmentId={examResult.enrollmentId}
+          onRetake={examResult.onRetake}
+        />
+      )}
+    </>
   );
 };
 
