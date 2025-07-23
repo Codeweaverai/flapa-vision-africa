@@ -485,10 +485,11 @@ const CourseLearningPage: React.FC = () => {
   };
 
   const handleExamComplete = (result: any) => {
+    console.log('Exam completed with result:', result);
     setShowFinalExamModal(false);
     
     // Convert result to match ExamResult interface
-    const examResult: ExamResult = {
+    const examResultData: ExamResult = {
       id: result.id || '',
       passed: result.passed,
       score: result.score,
@@ -497,17 +498,27 @@ const CourseLearningPage: React.FC = () => {
       attempt_number: result.attempt_number
     };
     
-    setExamResult(examResult);
+    setExamResult(examResultData);
     setHasPassedExam(result.passed);
     setCanRetakeExam(!result.passed);
-    setShowExamResultsModal(true);
+    
+    // Show results modal immediately after exam completion
+    setTimeout(() => {
+      setShowExamResultsModal(true);
+    }, 100);
     
     // Refresh course data to get updated exam status
     loadCourseData();
   };
 
   const handleRetakeExam = () => {
+    setShowExamResultsModal(false);
     setShowFinalExamModal(true);
+  };
+
+  const handleCloseExamResults = () => {
+    setShowExamResultsModal(false);
+    setExamResult(null);
   };
 
   const calculateProgress = () => {
@@ -813,7 +824,7 @@ const CourseLearningPage: React.FC = () => {
       {examResult && (
         <FinalExamResultsModal
           isOpen={showExamResultsModal}
-          onClose={() => setShowExamResultsModal(false)}
+          onClose={handleCloseExamResults}
           examScore={examResult.score}
           quizScores={examResult.quiz_scores}
           finalGrade={examResult.final_grade}
