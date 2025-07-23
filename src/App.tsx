@@ -64,6 +64,8 @@ import TicketViewPage from './pages/TicketViewPage';
 import VenturesPage from './pages/VenturesPage';
 import VerifyPage from './pages/VerifyPage';
 import CareersPage from './pages/careers';
+import TrendingPage from './pages/TrendingPage';
+import VerifyCertificatePage from './pages/VerifyCertificatePage';
 
 // Learning pages
 import CourseLearningPage from './pages/learning/CourseLearningPage';
@@ -211,6 +213,8 @@ function App() {
                   <Route path="/terms" element={<TermsOfServicePage />} />
                   <Route path="/ticket/:id" element={<TicketPage />} />
                   <Route path="/ticket/view/:id" element={<TicketViewPage />} />
+                  <Route path="/trending" element={<TrendingPage />} />
+                  <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
                   <Route path="/ventures" element={<VenturesPage />} />
                   <Route path="/verify" element={<VerifyPage />} />
                   <Route path="/careers" element={<CareersPage />} />

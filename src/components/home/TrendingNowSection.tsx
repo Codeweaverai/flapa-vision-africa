@@ -294,9 +294,11 @@ const TrendingNowSection = () => {
         </div>
         
         <div className="text-center">
-          <Button size="lg" variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
-            View All Trending
-          </Button>
+          <Link to="/trending">
+            <Button size="lg" variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
+              View All Trending
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
