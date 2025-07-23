@@ -42,21 +42,33 @@ serve(async (req) => {
               ticket_type,
               price
             )
-          ),
-          user:profiles!generated_tickets_user_id_fkey (
-            full_name,
-            avatar_url,
-            email
           )
         `)
         .eq('ticket_code', ticketCode)
         .single();
 
       if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching ticket by code:", error);
         throw error;
       }
 
-      ticketData = data;
+      if (data) {
+        // Get user profile separately
+        const { data: userProfile, error: userError } = await supabaseClient
+          .from('profiles')
+          .select('full_name, avatar_url, email')
+          .eq('id', data.user_id)
+          .single();
+
+        if (userError) {
+          console.error("Error fetching user profile:", userError);
+        }
+
+        ticketData = {
+          ...data,
+          user: userProfile || { full_name: 'Unknown User', avatar_url: null, email: 'N/A' }
+        };
+      }
     }
 
     // Verify by booking code if ticket code didn't work
@@ -78,26 +90,33 @@ serve(async (req) => {
             name,
             ticket_type,
             price
-          ),
-          user:profiles!event_bookings_user_id_fkey (
-            full_name,
-            avatar_url,
-            email
           )
         `)
         .eq('booking_code', bookingCode)
         .single();
 
       if (bookingError && bookingError.code !== 'PGRST116') {
+        console.error("Error fetching booking by code:", bookingError);
         throw bookingError;
       }
 
       if (bookingData && bookingData.generated_tickets?.length > 0) {
+        // Get user profile separately
+        const { data: userProfile, error: userError } = await supabaseClient
+          .from('profiles')
+          .select('full_name, avatar_url, email')
+          .eq('id', bookingData.user_id)
+          .single();
+
+        if (userError) {
+          console.error("Error fetching user profile:", userError);
+        }
+
         // Use the first ticket from the booking
         ticketData = {
           ...bookingData.generated_tickets[0],
           booking: bookingData,
-          user: bookingData.user
+          user: userProfile || { full_name: 'Unknown User', avatar_url: null, email: 'N/A' }
         };
       }
     }
