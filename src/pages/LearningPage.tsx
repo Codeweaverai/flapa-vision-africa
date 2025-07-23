@@ -1,329 +1,351 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import Layout from '@/components/layout/Layout';
-import LearningAIAssistant from '@/components/learning/LearningAIAssistant';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
-import { toast } from 'sonner';
 import { 
   BookOpen, 
-  Clock, 
   Play, 
+  Clock, 
   Award, 
-  Users, 
-  Star, 
-  TrendingUp, 
   Target, 
+  TrendingUp, 
   Calendar,
-  Search,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle,
-  BarChart3
+  BarChart3,
+  User,
+  Star
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface Course {
+interface EnrolledCourse {
   id: string;
   title: string;
-  summary: string;
   description: string;
-  category: string;
-  difficulty_level: string;
-  duration_minutes: number;
-  price: number;
-  is_free: boolean;
-  thumbnail_url?: string;
-  certificate_enabled: boolean;
-  creator_id: string;
-}
-
-interface CourseProgress {
-  id: string;
-  course_id: string;
-  user_id: string;
-  last_lesson_completed: string | null;
+  thumbnail_url: string;
+  creator_name: string;
+  creator_avatar?: string;
   progress_percentage: number;
-  created_at: string;
-  updated_at: string;
+  enrollment_date: string;
+  total_lessons: number;
+  completed_lessons: number;
+  duration_minutes: number;
+  last_accessed_lesson_id?: string;
 }
 
-interface CourseStats {
-  averageRating: number;
-  totalReviews: number;
-  totalStudents: number;
-  actualDurationHours: number;
+interface WeeklyLearningGoal {
+  lessonsCompleted: number;
+  hoursLearned: number;
+  targetLessons: number;
+  targetHours: number;
+  weekStart: string;
+  weekEnd: string;
 }
 
-interface WeeklyGoal {
-  id: string;
-  title: string;
-  target: number;
-  current: number;
-  unit: string;
+interface LearningStats {
+  totalCourses: number;
+  totalLessonsCompleted: number;
+  totalHoursLearned: number;
+  averageProgress: number;
+  coursesCompleted: number;
+  currentStreak: number;
 }
 
-interface Skill {
-  id: string;
-  name: string;
-  level: number;
-  progress: number;
-  category: string;
-  courseTitle: string;
-}
-
-const LearningPage = () => {
+const LearningPage: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
-  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
-  const [courseStats, setCourseStats] = useState<Record<string, CourseStats>>({});
+  const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
+  const [weeklyGoals, setWeeklyGoals] = useState<WeeklyLearningGoal>({
+    lessonsCompleted: 0,
+    hoursLearned: 0,
+    targetLessons: 5,
+    targetHours: 10,
+    weekStart: '',
+    weekEnd: ''
+  });
+  const [learningStats, setLearningStats] = useState<LearningStats>({
+    totalCourses: 0,
+    totalLessonsCompleted: 0,
+    totalHoursLearned: 0,
+    averageProgress: 0,
+    coursesCompleted: 0,
+    currentStreak: 0
+  });
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState('all');
-  const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoal[]>([]);
-  const [skills, setSkills] = useState<Skill[]>([]);
-
-  const coursesPerPage = 5;
+  const [activeTab, setActiveTab] = useState('courses');
 
   useEffect(() => {
-    const fetchEnrolledCourses = async () => {
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
+    if (user) {
+      fetchEnrolledCourses();
+      fetchWeeklyGoals();
+      fetchLearningStats();
+      
+      // Set up real-time subscription for lesson progress
+      const subscription = supabase
+        .channel('lesson-progress-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'lesson_progress'
+        }, () => {
+          // Refresh data when lesson progress changes
+          fetchEnrolledCourses();
+          fetchWeeklyGoals();
+          fetchLearningStats();
+        })
+        .subscribe();
 
-      setLoading(true);
-      try {
-        // Fetch course enrollments for the user
-        const { data: enrollments, error: enrollmentsError } = await supabase
-          .from('course_enrollments')
-          .select('course_id')
-          .eq('user_id', user.id);
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [user]);
 
-        if (enrollmentsError) throw enrollmentsError;
-
-        if (enrollments && enrollments.length > 0) {
-          const courseIds = enrollments.map(enrollment => enrollment.course_id);
-
-          // Fetch the enrolled courses
-          const { data: courses, error: coursesError } = await supabase
-            .from('courses')
-            .select('*')
-            .in('id', courseIds);
-
-          if (coursesError) throw coursesError;
-
-          setEnrolledCourses(courses || []);
-
-          // Fetch course progress for the user
-          const { data: progressData, error: progressError } = await supabase
-            .from('course_progress')
-            .select('*')
-            .eq('user_id', user.id)
-            .in('course_id', courseIds);
-
-          if (!progressError) {
-            setCourseProgress(progressData || []);
-          }
-
-          // Generate dynamic weekly goals and skills
-          await generateDynamicData(courses || [], progressData || []);
-
-          // Fetch real-time course statistics
-          await fetchCourseStats(courseIds);
-        } else {
-          setEnrolledCourses([]);
-          setCourseProgress([]);
-          setWeeklyGoals([]);
-          setSkills([]);
-        }
-      } catch (error) {
-        console.error('Error fetching enrolled courses:', error);
-        toast.error('Failed to load enrolled courses');
-      } finally {
-        setLoading(false);
-      }
+  const getWeekBoundaries = () => {
+    const now = new Date();
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    return {
+      start: startOfWeek.toISOString(),
+      end: endOfWeek.toISOString()
     };
+  };
 
-    fetchEnrolledCourses();
-  }, [user, navigate]);
-
-  const generateDynamicData = async (courses: Course[], progressData: CourseProgress[]) => {
+  const fetchEnrolledCourses = async () => {
     if (!user) return;
-
+    
     try {
-      // Calculate dynamic weekly goals
-      const totalHoursStudied = courses.reduce((sum, course) => {
-        const progress = progressData.find(p => p.course_id === course.id);
-        const completionRate = progress ? progress.progress_percentage / 100 : 0;
-        return sum + (course.duration_minutes / 60) * completionRate;
-      }, 0);
-
-      // Count completed lessons
-      const { data: lessonProgress } = await supabase
-        .from('lesson_progress')
-        .select('lesson_id, is_completed')
-        .eq('enrollment_id', user.id);
-
-      const completedLessons = lessonProgress?.filter(lp => lp.is_completed).length || 0;
-
-      // Count passed exams/quizzes (simplified)
-      const { data: examResults } = await supabase
-        .from('final_exam_results')
-        .select('passed')
+      const { data: enrollments, error } = await supabase
+        .from('course_enrollments')
+        .select(`
+          id,
+          enrollment_date,
+          course_id,
+          courses (
+            id,
+            title,
+            description,
+            thumbnail_url,
+            duration_minutes,
+            creator_id,
+            profiles:creator_id (
+              full_name,
+              avatar_url
+            )
+          )
+        `)
         .eq('user_id', user.id)
-        .eq('passed', true);
+        .eq('payment_status', 'completed')
+        .order('enrollment_date', { ascending: false });
 
-      const passedExams = examResults?.length || 0;
+      if (error) throw error;
 
-      const dynamicWeeklyGoals: WeeklyGoal[] = [
-        { 
-          id: '1', 
-          title: 'Hours Studied', 
-          target: 20, 
-          current: Math.round(totalHoursStudied * 10) / 10, 
-          unit: 'hours' 
-        },
-        { 
-          id: '2', 
-          title: 'Lessons Completed', 
-          target: 25, 
-          current: completedLessons, 
-          unit: 'lessons' 
-        },
-        { 
-          id: '3', 
-          title: 'Exams Passed', 
-          target: 5, 
-          current: passedExams, 
-          unit: 'exams' 
-        }
-      ];
+      const coursesWithProgress = await Promise.all(
+        enrollments.map(async (enrollment: any) => {
+          const course = enrollment.courses;
+          
+          // Get course progress
+          const { data: progress } = await supabase
+            .from('course_progress')
+            .select('progress_percentage, last_accessed_lesson_id')
+            .eq('user_id', user.id)
+            .eq('course_id', course.id)
+            .maybeSingle();
 
-      setWeeklyGoals(dynamicWeeklyGoals);
+          // Get lesson counts
+          const { data: lessons } = await supabase
+            .from('lessons')
+            .select(`
+              id,
+              course_modules!inner (
+                course_id
+              )
+            `)
+            .eq('course_modules.course_id', course.id);
 
-      // Generate dynamic skills based on enrolled courses
-      const dynamicSkills: Skill[] = courses.map((course, index) => {
-        const progress = progressData.find(p => p.course_id === course.id);
-        const progressPercentage = progress ? progress.progress_percentage : 0;
-        
-        return {
-          id: course.id,
-          name: course.category,
-          level: progressPercentage >= 75 ? 3 : progressPercentage >= 50 ? 2 : 1,
-          progress: progressPercentage,
-          category: course.category,
-          courseTitle: course.title
-        };
-      });
+          // Get completed lessons count
+          const { data: completedLessons } = await supabase
+            .from('lesson_progress')
+            .select('lesson_id')
+            .eq('enrollment_id', enrollment.id)
+            .eq('is_completed', true);
 
-      setSkills(dynamicSkills);
+          const totalLessons = lessons?.length || 0;
+          const completed = completedLessons?.length || 0;
+
+          return {
+            id: course.id,
+            title: course.title,
+            description: course.description,
+            thumbnail_url: course.thumbnail_url,
+            creator_name: course.profiles?.full_name || 'Unknown',
+            creator_avatar: course.profiles?.avatar_url,
+            progress_percentage: progress?.progress_percentage || 0,
+            enrollment_date: enrollment.enrollment_date,
+            total_lessons: totalLessons,
+            completed_lessons: completed,
+            duration_minutes: course.duration_minutes || 0,
+            last_accessed_lesson_id: progress?.last_accessed_lesson_id
+          };
+        })
+      );
+
+      setEnrolledCourses(coursesWithProgress);
     } catch (error) {
-      console.error('Error generating dynamic data:', error);
+      console.error('Error fetching enrolled courses:', error);
+      toast.error('Failed to load your courses');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchCourseStats = async (courseIds: string[]) => {
-    const stats: Record<string, CourseStats> = {};
+  const fetchWeeklyGoals = async () => {
+    if (!user) return;
     
-    for (const courseId of courseIds) {
-      try {
-        // Fetch reviews and ratings
-        const { data: reviews } = await supabase
-          .from('course_reviews')
-          .select('rating')
-          .eq('course_id', courseId);
+    try {
+      const { start, end } = getWeekBoundaries();
+      
+      // Get lessons completed this week
+      const { data: weeklyLessons } = await supabase
+        .from('lesson_progress')
+        .select(`
+          lesson_id,
+          completion_date,
+          course_enrollments!inner (
+            user_id,
+            course_id,
+            courses (
+              duration_minutes
+            )
+          ),
+          lessons!inner (
+            duration_minutes
+          )
+        `)
+        .eq('course_enrollments.user_id', user.id)
+        .eq('is_completed', true)
+        .gte('completion_date', start)
+        .lte('completion_date', end);
 
-        // Fetch total enrollments (students)
-        const { data: enrollments } = await supabase
-          .from('course_enrollments')
-          .select('id')
-          .eq('course_id', courseId);
+      const lessonsCompleted = weeklyLessons?.length || 0;
+      
+      // Calculate total hours learned this week
+      const totalMinutes = weeklyLessons?.reduce((total, lesson) => {
+        const lessonMinutes = lesson.lessons?.duration_minutes || 0;
+        return total + lessonMinutes;
+      }, 0) || 0;
+      
+      const hoursLearned = Math.round((totalMinutes / 60) * 10) / 10;
 
-        // Calculate actual duration from lessons
-        const { data: modules } = await supabase
-          .from('course_modules')
-          .select('id')
-          .eq('course_id', courseId);
-
-        let totalDuration = 0;
-        if (modules) {
-          for (const module of modules) {
-            const { data: lessons } = await supabase
-              .from('lessons')
-              .select('id')
-              .eq('module_id', module.id);
-            
-            if (lessons) {
-              totalDuration += lessons.length * 30; // Estimate 30 minutes per lesson
-            }
-          }
-        }
-
-        const averageRating = reviews && reviews.length > 0
-          ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-          : 0;
-
-        stats[courseId] = {
-          averageRating: Math.round(averageRating * 10) / 10,
-          totalReviews: reviews?.length || 0,
-          totalStudents: enrollments?.length || 0,
-          actualDurationHours: Math.round((totalDuration / 60) * 10) / 10
-        };
-      } catch (error) {
-        console.error(`Error fetching stats for course ${courseId}:`, error);
-        stats[courseId] = {
-          averageRating: 0,
-          totalReviews: 0,
-          totalStudents: 0,
-          actualDurationHours: 0
-        };
-      }
+      setWeeklyGoals({
+        lessonsCompleted,
+        hoursLearned,
+        targetLessons: 5,
+        targetHours: 10,
+        weekStart: start,
+        weekEnd: end
+      });
+    } catch (error) {
+      console.error('Error fetching weekly goals:', error);
     }
-    
-    setCourseStats(stats);
   };
 
-  const getCourseProgress = (courseId: string) => {
-    const progress = courseProgress.find(p => p.course_id === courseId);
-    return progress ? progress.progress_percentage : 0;
+  const fetchLearningStats = async () => {
+    if (!user) return;
+    
+    try {
+      // Get total courses enrolled
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('id, course_id')
+        .eq('user_id', user.id)
+        .eq('payment_status', 'completed');
+
+      const totalCourses = enrollments?.length || 0;
+
+      // Get total lessons completed
+      const { data: completedLessons } = await supabase
+        .from('lesson_progress')
+        .select(`
+          lesson_id,
+          course_enrollments!inner (
+            user_id
+          ),
+          lessons!inner (
+            duration_minutes
+          )
+        `)
+        .eq('course_enrollments.user_id', user.id)
+        .eq('is_completed', true);
+
+      const totalLessonsCompleted = completedLessons?.length || 0;
+      
+      // Calculate total hours learned
+      const totalMinutes = completedLessons?.reduce((total, lesson) => {
+        const lessonMinutes = lesson.lessons?.duration_minutes || 0;
+        return total + lessonMinutes;
+      }, 0) || 0;
+      
+      const totalHoursLearned = Math.round((totalMinutes / 60) * 10) / 10;
+
+      // Get average progress
+      const { data: courseProgress } = await supabase
+        .from('course_progress')
+        .select('progress_percentage')
+        .eq('user_id', user.id);
+
+      const averageProgress = courseProgress?.length > 0 
+        ? Math.round(courseProgress.reduce((sum, progress) => sum + progress.progress_percentage, 0) / courseProgress.length)
+        : 0;
+
+      // Count completed courses (100% progress)
+      const coursesCompleted = courseProgress?.filter(p => p.progress_percentage === 100).length || 0;
+
+      setLearningStats({
+        totalCourses,
+        totalLessonsCompleted,
+        totalHoursLearned,
+        averageProgress,
+        coursesCompleted,
+        currentStreak: 0 // Can be calculated based on consecutive learning days
+      });
+    } catch (error) {
+      console.error('Error fetching learning stats:', error);
+    }
   };
 
-  const filteredCourses = enrolledCourses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.summary.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (activeTab === 'in-progress') {
-      const progress = getCourseProgress(course.id);
-      return matchesSearch && progress > 0 && progress < 100;
-    } else if (activeTab === 'completed') {
-      const progress = getCourseProgress(course.id);
-      return matchesSearch && progress === 100;
-    }
-    return matchesSearch;
-  });
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
 
-  const totalPages = Math.ceil(filteredCourses.length / coursesPerPage);
-  const paginatedCourses = filteredCourses.slice(
-    (currentPage - 1) * coursesPerPage,
-    currentPage * coursesPerPage
-  );
+  const getProgressColor = (progress: number) => {
+    if (progress >= 80) return 'bg-green-500';
+    if (progress >= 50) return 'bg-yellow-500';
+    return 'bg-blue-500';
+  };
 
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex justify-center items-center min-h-[400px]">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-            </div>
+        <div className="container flex justify-center items-center py-16">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading your learning dashboard...</p>
           </div>
         </div>
       </Layout>
@@ -332,271 +354,353 @@ const LearningPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center mb-12">
-            <h1 className="text-5xl md:text-6xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">My Learning Hub</span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Continue your learning journey and track your progress across all enrolled courses.
-            </p>
-          </div>
+      <div className="container py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">My Learning</h1>
+          <p className="text-muted-foreground">
+            Track your progress and continue your learning journey
+          </p>
+        </div>
 
-          {/* Dynamic Weekly Goals and Skills Tracking Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-            {/* Weekly Goals */}
-            <Card className="bg-gradient-to-r from-orange-100 to-purple-100 border-0 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-6 w-6" />
-                  Weekly Learning Goals
-                </CardTitle>
-                <p className="text-white/90 text-sm">Track your learning progress this week</p>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                {weeklyGoals.map(goal => (
-                  <div key={goal.id} className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-800">{goal.title}</span>
-                      <span className="text-sm font-bold text-orange-600">
-                        {goal.current} / {goal.target} {goal.unit}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <Progress value={(goal.current / goal.target) * 100} className="h-3 bg-white/50" />
-                      <div 
-                        className="absolute top-0 left-0 h-3 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min((goal.current / goal.target) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      {Math.round((goal.current / goal.target) * 100)}% Complete
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+        {/* Weekly Learning Goals */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-orange-800 flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Weekly Lessons Goal
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-900 mb-2">
+                {weeklyGoals.lessonsCompleted}/{weeklyGoals.targetLessons}
+              </div>
+              <Progress 
+                value={(weeklyGoals.lessonsCompleted / weeklyGoals.targetLessons) * 100} 
+                className="h-2 mb-2"
+              />
+              <p className="text-xs text-orange-700">
+                {weeklyGoals.lessonsCompleted >= weeklyGoals.targetLessons 
+                  ? '🎉 Goal achieved!' 
+                  : `${weeklyGoals.targetLessons - weeklyGoals.lessonsCompleted} more to go`
+                }
+              </p>
+            </CardContent>
+          </Card>
 
-            {/* Skills Tracking */}
-            <Card className="bg-gradient-to-r from-purple-100 to-orange-100 border-0 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-purple-600 to-orange-500 text-white rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-6 w-6" />
-                  Skills Development
-                </CardTitle>
-                <p className="text-white/90 text-sm">Your skill progress from enrolled courses</p>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                {skills.length > 0 ? skills.map(skill => (
-                  <div key={skill.id} className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <span className="font-semibold text-gray-800">{skill.name}</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-xs">
-                            Level {skill.level}
-                          </Badge>
-                          <span className="text-xs text-gray-500">{skill.courseTitle}</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-bold text-purple-600">{skill.progress}%</span>
-                    </div>
-                    <div className="relative">
-                      <Progress value={skill.progress} className="h-3 bg-white/50" />
-                      <div 
-                        className="absolute top-0 left-0 h-3 bg-gradient-to-r from-purple-500 to-orange-500 rounded-full transition-all duration-500"
-                        style={{ width: `${skill.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                )) : (
-                  <div className="text-center py-4">
-                    <p className="text-gray-600">Enroll in courses to start tracking your skills!</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-purple-800 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Weekly Hours Goal
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-900 mb-2">
+                {weeklyGoals.hoursLearned}h/{weeklyGoals.targetHours}h
+              </div>
+              <Progress 
+                value={(weeklyGoals.hoursLearned / weeklyGoals.targetHours) * 100} 
+                className="h-2 mb-2"
+              />
+              <p className="text-xs text-purple-700">
+                {weeklyGoals.hoursLearned >= weeklyGoals.targetHours 
+                  ? '🎉 Goal achieved!' 
+                  : `${(weeklyGoals.targetHours - weeklyGoals.hoursLearned).toFixed(1)}h more to go`
+                }
+              </p>
+            </CardContent>
+          </Card>
 
-          {/* Course Search and Filter */}
-          <Card className="bg-white/90 backdrop-blur-sm mb-8">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search courses..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-blue-800 flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Total Courses
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-900 mb-2">
+                {learningStats.totalCourses}
+              </div>
+              <p className="text-xs text-blue-700">
+                {learningStats.coursesCompleted} completed
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-green-200 bg-gradient-to-br from-green-50 to-green-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Average Progress
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-900 mb-2">
+                {learningStats.averageProgress}%
+              </div>
+              <p className="text-xs text-green-700">
+                {learningStats.totalLessonsCompleted} lessons completed
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Learning Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                This Week's Progress
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Lessons Completed</span>
+                  <span className="font-semibold text-green-600">{weeklyGoals.lessonsCompleted}</span>
                 </div>
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-                  <TabsList className="grid w-full grid-cols-3 md:w-auto">
-                    <TabsTrigger value="all">All Courses</TabsTrigger>
-                    <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-                    <TabsTrigger value="completed">Completed</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <div className="flex justify-between text-sm">
+                  <span>Hours Learned</span>
+                  <span className="font-semibold text-blue-600">{weeklyGoals.hoursLearned}h</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Goal Achievement</span>
+                  <span className="font-semibold text-orange-600">
+                    {Math.round(((weeklyGoals.lessonsCompleted / weeklyGoals.targetLessons) + 
+                    (weeklyGoals.hoursLearned / weeklyGoals.targetHours)) / 2 * 100)}%
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Course Grid */}
-          {paginatedCourses.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mb-8">
-                {paginatedCourses.map(course => {
-                  const progress = getCourseProgress(course.id);
-                  const stats = courseStats[course.id] || {
-                    averageRating: 0,
-                    totalReviews: 0,
-                    totalStudents: 0,
-                    actualDurationHours: 0
-                  };
-                  
-                  return (
-                    <Card key={course.id} className="bg-white/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 border-0 overflow-hidden group h-80 flex flex-col">
-                      <div className="relative h-32">
-                        {course.thumbnail_url ? (
-                          <img
-                            src={course.thumbnail_url}
-                            alt={course.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-r from-orange-200 to-purple-200 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-300">
-                            <BookOpen className="h-12 w-12 text-white/80" />
-                          </div>
-                        )}
-                        <div className="absolute top-2 right-2">
-                          <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
-                            {progress}%
-                          </Badge>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-blue-500" />
+                All Time Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Total Lessons</span>
+                  <span className="font-semibold">{learningStats.totalLessonsCompleted}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Total Hours</span>
+                  <span className="font-semibold">{learningStats.totalHoursLearned}h</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Courses Completed</span>
+                  <span className="font-semibold">{learningStats.coursesCompleted}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-purple-500" />
+                Week Period
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Week Start</span>
+                  <span className="font-semibold">{formatDate(weeklyGoals.weekStart)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Week End</span>
+                  <span className="font-semibold">{formatDate(weeklyGoals.weekEnd)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Days Remaining</span>
+                  <span className="font-semibold text-orange-600">
+                    {Math.ceil((new Date(weeklyGoals.weekEnd).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Course Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="courses">My Courses</TabsTrigger>
+            <TabsTrigger value="progress">Progress Overview</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="courses">
+            {enrolledCourses.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">No courses enrolled yet</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Start your learning journey by enrolling in some courses
+                  </p>
+                  <Button asChild>
+                    <Link to="/explore-courses">
+                      Explore Courses
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {enrolledCourses.map((course) => (
+                  <Card key={course.id} className="group hover:shadow-lg transition-shadow">
+                    <div className="aspect-video bg-muted rounded-t-lg overflow-hidden">
+                      {course.thumbnail_url ? (
+                        <img 
+                          src={course.thumbnail_url} 
+                          alt={course.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BookOpen className="h-12 w-12 text-muted-foreground" />
                         </div>
-                        {progress === 100 && (
-                          <div className="absolute top-2 left-2">
-                            <CheckCircle className="h-6 w-6 text-green-500 bg-white rounded-full" />
-                          </div>
-                        )}
-                        <div className="absolute bottom-2 left-2">
-                          <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm">
-                            {course.category}
-                          </Badge>
+                      )}
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={course.creator_avatar} />
+                          <AvatarFallback className="text-xs">
+                            {course.creator_name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm text-muted-foreground">{course.creator_name}</span>
+                      </div>
+                      
+                      <h3 className="font-semibold mb-2 line-clamp-2">{course.title}</h3>
+                      
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4" />
+                          <span>{course.completed_lessons}/{course.total_lessons}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{Math.round(course.duration_minutes / 60)}h</span>
                         </div>
                       </div>
                       
-                      <CardContent className="p-4 flex-1 flex flex-col justify-between">
-                        <div className="space-y-2">
-                          <CardTitle className="line-clamp-2 text-sm group-hover:text-orange-600 transition-colors">
-                            {course.title}
-                          </CardTitle>
-                          <CardDescription className="line-clamp-2 text-xs text-gray-600">
-                            {course.summary}
-                          </CardDescription>
-                          
-                          {/* Progress Bar */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-600">Progress</span>
-                              <span className="font-medium">{progress}%</span>
-                            </div>
-                            <div className="relative">
-                              <Progress value={progress} className="h-1.5 bg-gray-200" />
-                              <div 
-                                className="absolute top-0 left-0 h-1.5 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full transition-all duration-300"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Stats */}
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-orange-500" />
-                              <span className="text-gray-600">
-                                {stats.actualDurationHours > 0 
-                                  ? `${stats.actualDurationHours}h` 
-                                  : `${Math.ceil(course.duration_minutes / 60)}h`
-                                }
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Star className="h-3 w-3 text-yellow-500" />
-                              <span className="text-gray-600">
-                                {stats.averageRating > 0 ? `${stats.averageRating}` : 'No reviews'}
-                              </span>
-                            </div>
-                          </div>
+                      <div className="mb-4">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm font-medium">Progress</span>
+                          <span className="text-sm font-medium">{course.progress_percentage}%</span>
                         </div>
-                        
-                        <Button asChild className="w-full mt-3 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                          <Link to={`/learning/course/${course.id}`} className="flex items-center justify-center">
-                            <Play className="h-3 w-3 mr-1" />
+                        <Progress 
+                          value={course.progress_percentage} 
+                          className={`h-2 ${getProgressColor(course.progress_percentage)}`}
+                        />
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button asChild className="flex-1" size="sm">
+                          <Link to={`/course/${course.id}/learn`}>
+                            <Play className="h-4 w-4 mr-2" />
                             Continue Learning
                           </Link>
                         </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        
+                        {course.progress_percentage === 100 && (
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`/course/${course.id}/results`}>
+                              <Award className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
+            )}
+          </TabsContent>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
-                  </Button>
-                  
-                  <span className="text-sm text-gray-600">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center">
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-12 shadow-xl max-w-md mx-auto">
-                <BookOpen className="h-16 w-16 mx-auto mb-6 text-gray-400" />
-                <h2 className="text-2xl font-bold mb-4">
-                  {searchTerm || activeTab !== 'all' ? 'No courses found' : 'No courses enrolled yet'}
-                </h2>
-                <p className="text-gray-600 mb-6">
-                  {searchTerm || activeTab !== 'all' 
-                    ? 'Try adjusting your search or filters.' 
-                    : 'Explore our wide range of courses and start your learning journey today.'}
-                </p>
-                {!searchTerm && activeTab === 'all' && (
-                  <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                    <Link to="/explore/courses">Explore Courses</Link>
-                  </Button>
-                )}
-              </div>
+          <TabsContent value="progress">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Course Progress Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {enrolledCourses.map((course) => (
+                      <div key={course.id} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm truncate">{course.title}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Progress value={course.progress_percentage} className="h-2 flex-1" />
+                            <span className="text-xs text-muted-foreground min-w-[40px]">
+                              {course.progress_percentage}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5" />
+                    Learning Achievements
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="font-medium text-sm">Lessons Completed</p>
+                        <p className="text-xs text-muted-foreground">
+                          {learningStats.totalLessonsCompleted} lessons finished
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium text-sm">Hours Learned</p>
+                        <p className="text-xs text-muted-foreground">
+                          {learningStats.totalHoursLearned} hours of content
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
+                      <Star className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium text-sm">Courses Completed</p>
+                        <p className="text-xs text-muted-foreground">
+                          {learningStats.coursesCompleted} courses finished
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Add Learning AI Assistant */}
-      <LearningAIAssistant />
     </Layout>
   );
 };
