@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -110,7 +109,8 @@ const CourseLearningPage: React.FC = () => {
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [lastAccessedLessonId, setLastAccessedLessonId] = useState<string | null>(null);
   const progressSaveInterval = useRef<NodeJS.Timeout | null>(null);
-  const videoPlayerRef = useRef<any>(null);
+  const [videoPlayerKey, setVideoPlayerKey] = useState(0);
+  const [seekTime, setSeekTime] = useState<number | null>(null);
 
   useEffect(() => {
     if (courseId && user) {
@@ -118,8 +118,15 @@ const CourseLearningPage: React.FC = () => {
     }
   }, [courseId, user]);
 
+  // Load progress data on mount and persist it
   useEffect(() => {
-    // Check if all lessons are completed
+    if (courseId && user && enrollmentId) {
+      loadAllProgress();
+    }
+  }, [courseId, user, enrollmentId]);
+
+  // Check if all lessons are completed
+  useEffect(() => {
     if (course && completedLessons.length > 0) {
       const totalLessons = course.modules.reduce((acc, module) => acc + module.lessons.length, 0);
       const allCompleted = totalLessons > 0 && completedLessons.length >= totalLessons;
@@ -137,6 +144,78 @@ const CourseLearningPage: React.FC = () => {
       loadAppropriateLesson();
     }
   }, [course, lastAccessedLessonId, completedLessons]);
+
+  // Handle video seeking when lesson changes
+  useEffect(() => {
+    if (currentLesson && lessonProgress[currentLesson.id]) {
+      const savedPosition = lessonProgress[currentLesson.id].last_position_seconds;
+      if (savedPosition > 0) {
+        setSeekTime(savedPosition);
+      }
+    }
+  }, [currentLesson, lessonProgress]);
+
+  const loadAllProgress = async () => {
+    if (!enrollmentId) return;
+
+    try {
+      // Fetch lesson progress
+      const { data: progressData, error: progressError } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id, is_completed, last_position_seconds, completion_date')
+        .eq('enrollment_id', enrollmentId);
+
+      if (progressError) {
+        console.error('Error fetching lesson progress:', progressError);
+        return;
+      }
+
+      const progressMap: Record<string, LessonProgress> = {};
+      const completed: string[] = [];
+
+      progressData?.forEach(progress => {
+        progressMap[progress.lesson_id] = {
+          lesson_id: progress.lesson_id,
+          is_completed: progress.is_completed,
+          last_position_seconds: progress.last_position_seconds || 0,
+          completion_date: progress.completion_date
+        };
+
+        if (progress.is_completed) {
+          completed.push(progress.lesson_id);
+        }
+      });
+
+      setLessonProgress(progressMap);
+      setCompletedLessons(completed);
+
+      // Fetch course progress
+      const { data: courseProgressData, error: courseProgressError } = await supabase
+        .from('course_progress')
+        .select('progress_percentage, last_accessed_lesson_id')
+        .eq('user_id', user?.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (courseProgressError) {
+        console.error('Error fetching course progress:', courseProgressError);
+        return;
+      }
+
+      if (courseProgressData) {
+        setCourseProgress({
+          course_id: courseId!,
+          progress_percentage: courseProgressData.progress_percentage,
+          last_accessed_lesson_id: courseProgressData.last_accessed_lesson_id
+        });
+        setLastAccessedLessonId(courseProgressData.last_accessed_lesson_id);
+      }
+
+      console.log('Progress loaded:', { progressMap, completed, courseProgressData });
+    } catch (error) {
+      console.error('Error loading progress:', error);
+    }
+  };
 
   const loadAppropriateLesson = () => {
     if (!course || !course.modules.length) return;
@@ -169,9 +248,6 @@ const CourseLearningPage: React.FC = () => {
 
     if (lessonToSelect && (!currentLesson || currentLesson.id !== lessonToSelect.id)) {
       setCurrentLesson(lessonToSelect);
-      if (enrollmentId) {
-        loadVideoPosition(lessonToSelect.id, enrollmentId);
-      }
     }
   };
 
@@ -253,12 +329,6 @@ const CourseLearningPage: React.FC = () => {
 
       setCourse(transformedCourse);
 
-      // Fetch lesson progress from Supabase
-      await fetchLessonProgress(enrollment.id);
-
-      // Fetch course progress
-      await fetchCourseProgress(courseId);
-
       // Fetch final exam if exists
       const { data: examData } = await supabase
         .from('final_exams')
@@ -307,82 +377,6 @@ const CourseLearningPage: React.FC = () => {
       navigate('/learning');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchLessonProgress = async (enrollmentId: string) => {
-    try {
-      const { data: progressData, error } = await supabase
-        .from('lesson_progress')
-        .select('lesson_id, is_completed, last_position_seconds, completion_date')
-        .eq('enrollment_id', enrollmentId);
-
-      if (error) throw error;
-
-      const progressMap: Record<string, LessonProgress> = {};
-      const completed: string[] = [];
-
-      progressData?.forEach(progress => {
-        progressMap[progress.lesson_id] = {
-          lesson_id: progress.lesson_id,
-          is_completed: progress.is_completed,
-          last_position_seconds: progress.last_position_seconds || 0,
-          completion_date: progress.completion_date
-        };
-
-        if (progress.is_completed) {
-          completed.push(progress.lesson_id);
-        }
-      });
-
-      setLessonProgress(progressMap);
-      setCompletedLessons(completed);
-    } catch (error) {
-      console.error('Error fetching lesson progress:', error);
-    }
-  };
-
-  const fetchCourseProgress = async (courseId: string) => {
-    try {
-      const { data: progressData, error } = await supabase
-        .from('course_progress')
-        .select('progress_percentage, last_accessed_lesson_id')
-        .eq('user_id', user?.id)
-        .eq('course_id', courseId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (progressData) {
-        setCourseProgress({
-          course_id: courseId,
-          progress_percentage: progressData.progress_percentage,
-          last_accessed_lesson_id: progressData.last_accessed_lesson_id
-        });
-        setLastAccessedLessonId(progressData.last_accessed_lesson_id);
-      }
-    } catch (error) {
-      console.error('Error fetching course progress:', error);
-    }
-  };
-
-  const loadVideoPosition = async (lessonId: string, enrollmentId: string) => {
-    try {
-      const progress = lessonProgress[lessonId];
-      if (progress && progress.last_position_seconds) {
-        setCurrentVideoTime(progress.last_position_seconds);
-        // Seek to the saved position when video is ready
-        if (videoPlayerRef.current && videoPlayerRef.current.seekTo) {
-          setTimeout(() => {
-            videoPlayerRef.current.seekTo(progress.last_position_seconds);
-          }, 1000);
-        }
-      } else {
-        setCurrentVideoTime(0);
-      }
-    } catch (error) {
-      console.error('Error loading video position:', error);
-      setCurrentVideoTime(0);
     }
   };
 
@@ -503,6 +497,17 @@ const CourseLearningPage: React.FC = () => {
     }
   };
 
+  const handleVideoReady = (player: any) => {
+    if (seekTime !== null) {
+      setTimeout(() => {
+        if (player && player.currentTime) {
+          player.currentTime(seekTime);
+        }
+      }, 1000);
+      setSeekTime(null);
+    }
+  };
+
   const handleLessonSelect = (lesson: Lesson) => {
     // Clear progress interval when switching lessons
     if (progressSaveInterval.current) {
@@ -511,11 +516,8 @@ const CourseLearningPage: React.FC = () => {
     
     setCurrentLesson(lesson);
     setCurrentVideoTime(0);
+    setVideoPlayerKey(prev => prev + 1); // Force video player re-render
     
-    if (enrollmentId) {
-      loadVideoPosition(lesson.id, enrollmentId);
-    }
-
     // Update course progress
     updateCourseProgress(null, lesson.id);
   };
@@ -589,7 +591,7 @@ const CourseLearningPage: React.FC = () => {
     setCanRetakeExam(!result.passed);
     setHasTakenExam(true);
     
-    // Show the results modal
+    // Show the results modal immediately after exam completion
     setShowExamResultsModal(true);
   };
 
@@ -599,16 +601,13 @@ const CourseLearningPage: React.FC = () => {
   };
 
   const calculateProgress = () => {
-    if (courseProgress) {
-      return courseProgress.progress_percentage;
-    }
     if (!course) return 0;
     const totalLessons = course.modules.reduce((acc, module) => acc + module.lessons.length, 0);
     return totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
   };
 
   const shouldShowViewResults = () => {
-    return finalExam && hasTakenExam;
+    return finalExam && hasTakenExam && hasPassedExam;
   };
 
   const shouldShowFinalExamButton = () => {
@@ -776,10 +775,11 @@ const CourseLearningPage: React.FC = () => {
                 {currentLesson.video_url ? (
                   <div className="bg-black rounded-md overflow-hidden">
                     <VideoPlayer
-                      ref={videoPlayerRef}
+                      key={videoPlayerKey}
                       src={currentLesson.video_url}
                       onTimeUpdate={handleVideoTimeUpdate}
                       onEnded={handleVideoEnded}
+                      onReady={handleVideoReady}
                       autoplay={false}
                       controls={true}
                     />
@@ -845,9 +845,8 @@ const CourseLearningPage: React.FC = () => {
                       lessonId={currentLesson.id}
                       currentTime={currentVideoTime}
                       onSeekTo={(time) => {
-                        if (videoPlayerRef.current && videoPlayerRef.current.seekTo) {
-                          videoPlayerRef.current.seekTo(time);
-                        }
+                        setSeekTime(time);
+                        setVideoPlayerKey(prev => prev + 1);
                       }}
                     />
                   </TabsContent>
