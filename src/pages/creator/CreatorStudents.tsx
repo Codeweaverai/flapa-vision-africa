@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -173,7 +174,8 @@ const CreatorStudents = () => {
 
   const fetchCourseEnrollments = async () => {
     try {
-      const { data, error } = await supabase
+      // First get enrollments for creator's courses
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
         .from('course_enrollments')
         .select(`
           id,
@@ -182,58 +184,69 @@ const CreatorStudents = () => {
           enrollment_date,
           completion_date,
           is_completed,
-          course:courses!inner(title, thumbnail_url, creator_id),
-          user:profiles!inner(full_name, email, avatar_url)
+          courses!inner(title, thumbnail_url, creator_id)
         `)
-        .eq('course.creator_id', user?.id)
+        .eq('courses.creator_id', user?.id)
         .order('enrollment_date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching course enrollments:', error);
+      if (enrollmentsError) {
+        console.error('Error fetching course enrollments:', enrollmentsError);
         toast.error('Failed to load course enrollments');
         return;
       }
 
-      // Type guard to check if user object has required properties
-      const isValidUser = (user: any): user is { full_name: string; email: string; avatar_url?: string } => {
-        return user && 
-               typeof user === 'object' && 
-               typeof user.full_name === 'string' && 
-               typeof user.email === 'string' &&
-               !('error' in user);
-      };
+      if (!enrollmentsData || enrollmentsData.length === 0) {
+        setCourseEnrollments([]);
+        return;
+      }
 
-      // Type guard to check if course object has required properties
-      const isValidCourse = (course: any): course is { title: string; thumbnail_url?: string } => {
-        return course && 
-               typeof course === 'object' && 
-               typeof course.title === 'string' &&
-               !('error' in course);
-      };
+      // Get unique user IDs
+      const userIds = [...new Set(enrollmentsData.map(e => e.user_id))];
 
-      // Filter and properly type the enrollments
-      const validEnrollments: CourseEnrollment[] = data?.filter((enrollment: any) => 
-        isValidCourse(enrollment.course) && 
-        isValidUser(enrollment.user)
-      ).map((enrollment: any) => ({
-        id: enrollment.id,
-        user_id: enrollment.user_id,
-        course_id: enrollment.course_id,
-        enrollment_date: enrollment.enrollment_date,
-        completion_date: enrollment.completion_date,
-        is_completed: enrollment.is_completed,
-        course: {
-          title: enrollment.course.title,
-          thumbnail_url: enrollment.course.thumbnail_url
-        },
-        user: {
-          full_name: enrollment.user.full_name,
-          email: enrollment.user.email,
-          avatar_url: enrollment.user.avatar_url
-        }
-      })) || [];
+      // Fetch user profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', userIds);
 
-      setCourseEnrollments(validEnrollments);
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        toast.error('Failed to load user profiles');
+        return;
+      }
+
+      // Create a profile lookup map
+      const profilesMap = new Map(
+        profilesData?.map(profile => [profile.id, profile]) || []
+      );
+
+      // Combine enrollments with user profiles
+      const enrichedEnrollments: CourseEnrollment[] = enrollmentsData
+        .map(enrollment => {
+          const profile = profilesMap.get(enrollment.user_id);
+          if (!profile || !enrollment.courses) return null;
+
+          return {
+            id: enrollment.id,
+            user_id: enrollment.user_id,
+            course_id: enrollment.course_id,
+            enrollment_date: enrollment.enrollment_date,
+            completion_date: enrollment.completion_date,
+            is_completed: enrollment.is_completed,
+            course: {
+              title: enrollment.courses.title,
+              thumbnail_url: enrollment.courses.thumbnail_url
+            },
+            user: {
+              full_name: profile.full_name || 'Unknown User',
+              email: profile.email || '',
+              avatar_url: profile.avatar_url
+            }
+          };
+        })
+        .filter(Boolean) as CourseEnrollment[];
+
+      setCourseEnrollments(enrichedEnrollments);
     } catch (error) {
       console.error('Error fetching course enrollments:', error);
       toast.error('Failed to load course enrollments');
@@ -242,7 +255,7 @@ const CreatorStudents = () => {
 
   const fetchEventBookings = async () => {
     try {
-      // First, get all bookings for creator's events
+      // First get bookings for creator's events
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
@@ -254,10 +267,9 @@ const CreatorStudents = () => {
           payment_status,
           ticket_quantity,
           booking_code,
-          event:events!inner(title, start_time, location, image_url, creator_id),
-          user:profiles!inner(full_name, email, avatar_url)
+          events!inner(title, start_time, location, image_url, creator_id)
         `)
-        .eq('event.creator_id', user?.id)
+        .eq('events.creator_id', user?.id)
         .order('booking_date', { ascending: false });
 
       if (bookingsError) {
@@ -266,40 +278,36 @@ const CreatorStudents = () => {
         return;
       }
 
-      // Type guard to check if user object has required properties
-      const isValidUser = (user: any): user is { full_name: string; email: string; avatar_url?: string } => {
-        return user && 
-               typeof user === 'object' && 
-               typeof user.full_name === 'string' && 
-               typeof user.email === 'string' &&
-               !('error' in user);
-      };
-
-      // Type guard to check if event object has required properties
-      const isValidEvent = (event: any): event is { title: string; start_time: string; location: string; image_url?: string } => {
-        return event && 
-               typeof event === 'object' && 
-               typeof event.title === 'string' &&
-               typeof event.start_time === 'string' &&
-               typeof event.location === 'string' &&
-               !('error' in event);
-      };
-
-      // Filter out any records where the joins failed
-      const validBookings = bookingsData?.filter((booking: any) => 
-        isValidEvent(booking.event) && 
-        isValidUser(booking.user)
-      ) || [];
-
-      // Then get all tickets for these bookings with check-in status
-      const bookingIds = validBookings.map((booking: any) => booking.id);
-      
-      if (bookingIds.length === 0) {
+      if (!bookingsData || bookingsData.length === 0) {
         setEventBookings([]);
         setEventStats({});
         return;
       }
 
+      // Get unique user IDs
+      const userIds = [...new Set(bookingsData.map(b => b.user_id))];
+
+      // Fetch user profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        toast.error('Failed to load user profiles');
+        return;
+      }
+
+      // Create a profile lookup map
+      const profilesMap = new Map(
+        profilesData?.map(profile => [profile.id, profile]) || []
+      );
+
+      // Get booking IDs for fetching tickets
+      const bookingIds = bookingsData.map(booking => booking.id);
+
+      // Fetch tickets with check-in status
       const { data: ticketsData, error: ticketsError } = await supabase
         .from('generated_tickets')
         .select(`
@@ -335,34 +343,41 @@ const CreatorStudents = () => {
         return acc;
       }, {}) || {};
 
-      // Combine bookings with tickets and properly type them
-      const bookingsWithTickets: EventBooking[] = validBookings.map((booking: any) => ({
-        id: booking.id,
-        user_id: booking.user_id,
-        event_id: booking.event_id,
-        booking_date: booking.booking_date,
-        status: booking.status,
-        payment_status: booking.payment_status,
-        ticket_quantity: booking.ticket_quantity,
-        booking_code: booking.booking_code,
-        event: {
-          title: booking.event.title,
-          start_time: booking.event.start_time,
-          location: booking.event.location,
-          image_url: booking.event.image_url
-        },
-        user: {
-          full_name: booking.user.full_name,
-          email: booking.user.email,
-          avatar_url: booking.user.avatar_url
-        },
-        tickets: ticketsByBooking[booking.id] || []
-      }));
+      // Combine bookings with user profiles and tickets
+      const enrichedBookings: EventBooking[] = bookingsData
+        .map(booking => {
+          const profile = profilesMap.get(booking.user_id);
+          if (!profile || !booking.events) return null;
 
-      setEventBookings(bookingsWithTickets);
+          return {
+            id: booking.id,
+            user_id: booking.user_id,
+            event_id: booking.event_id,
+            booking_date: booking.booking_date,
+            status: booking.status,
+            payment_status: booking.payment_status,
+            ticket_quantity: booking.ticket_quantity,
+            booking_code: booking.booking_code,
+            event: {
+              title: booking.events.title,
+              start_time: booking.events.start_time,
+              location: booking.events.location,
+              image_url: booking.events.image_url
+            },
+            user: {
+              full_name: profile.full_name || 'Unknown User',
+              email: profile.email || '',
+              avatar_url: profile.avatar_url
+            },
+            tickets: ticketsByBooking[booking.id] || []
+          };
+        })
+        .filter(Boolean) as EventBooking[];
+
+      setEventBookings(enrichedBookings);
 
       // Calculate stats by event
-      const statsByEvent = bookingsWithTickets.reduce((acc, booking) => {
+      const statsByEvent = enrichedBookings.reduce((acc, booking) => {
         const eventId = booking.event_id;
         if (!acc[eventId]) {
           acc[eventId] = {
