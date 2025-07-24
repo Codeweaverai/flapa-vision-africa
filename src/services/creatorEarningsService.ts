@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabaseClient';
 
 export interface CreatorEarningsData {
@@ -64,6 +65,36 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
     const eventTicketIds = eventTickets?.map(t => t.id) || [];
 
+    if (courseIds.length === 0 && eventTicketIds.length === 0) {
+      return {
+        available_balance: 0,
+        pending_balance: 0,
+        total_earnings: 0,
+        total_platform_fees: 0,
+        course_revenue: 0,
+        event_revenue: 0
+      };
+    }
+
+    // Build the filter condition dynamically
+    let filterCondition = '';
+    if (courseIds.length > 0 && eventTicketIds.length > 0) {
+      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
+    } else if (courseIds.length > 0) {
+      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`;
+    } else if (eventTicketIds.length > 0) {
+      filterCondition = `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
+    } else {
+      return {
+        available_balance: 0,
+        pending_balance: 0,
+        total_earnings: 0,
+        total_platform_fees: 0,
+        course_revenue: 0,
+        event_revenue: 0
+      };
+    }
+
     // Get all completed orders with order items for this creator's content
     const { data: orderItems, error } = await supabase
       .from('order_items')
@@ -81,7 +112,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
         )
       `)
       .eq('orders.payment_status', 'completed')
-      .or(`and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`, { foreignTable: null });
+      .or(filterCondition);
 
     if (error) throw error;
 
@@ -192,12 +223,26 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
     const eventTicketIds = eventTickets?.map(t => t.id) || [];
     const ticketToEventMap = new Map(eventTickets?.map(t => [t.id, t.event_id]) || []);
 
+    if (courseIds.length === 0 && eventTicketIds.length === 0) {
+      return { transactions: [], total: 0 };
+    }
+
+    // Build the filter condition dynamically
+    let filterCondition = '';
+    if (courseIds.length > 0 && eventTicketIds.length > 0) {
+      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
+    } else if (courseIds.length > 0) {
+      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`;
+    } else if (eventTicketIds.length > 0) {
+      filterCondition = `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
+    }
+
     // Get total count for pagination
     const { count: totalCount, error: countError } = await supabase
       .from('order_items')
       .select('*', { count: 'exact', head: true })
       .eq('orders.payment_status', 'completed')
-      .or(`and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`, { foreignTable: 'orders' });
+      .or(filterCondition, { foreignTable: 'orders' });
 
     if (countError) throw countError;
 
@@ -219,7 +264,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         )
       `)
       .eq('orders.payment_status', 'completed')
-      .or(`and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`)
+      .or(filterCondition)
       .order('created_at', { ascending: false, foreignTable: 'orders' })
       .range(offset, offset + limit - 1);
 
