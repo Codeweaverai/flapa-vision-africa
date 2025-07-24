@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +32,7 @@ interface ExamResult {
   course: {
     title: string;
     thumbnail_url?: string;
+    creator_id?: string;
   };
   exam: {
     title: string;
@@ -46,6 +46,7 @@ interface Certificate {
   issue_date: string;
   pdf_url?: string;
   course_title?: string;
+  creator_id?: string;
 }
 
 const CourseResultsPage = () => {
@@ -72,7 +73,7 @@ const CourseResultsPage = () => {
         .from('final_exam_results')
         .select(`
           *,
-          course:courses!final_exam_results_course_id_fkey(title, thumbnail_url),
+          course:courses!final_exam_results_course_id_fkey(title, thumbnail_url, creator_id),
           exam:final_exams!final_exam_results_exam_id_fkey(title, passing_score)
         `)
         .eq('user_id', user!.id)
@@ -102,7 +103,8 @@ const CourseResultsPage = () => {
             completed_at: result.completed_at,
             course: {
               title: result.course?.title || 'Unknown Course',
-              thumbnail_url: result.course?.thumbnail_url
+              thumbnail_url: result.course?.thumbnail_url,
+              creator_id: result.course?.creator_id
             },
             exam: {
               title: result.exam?.title || 'Final Exam',
@@ -117,7 +119,7 @@ const CourseResultsPage = () => {
       // Fetch certificates with better error handling
       const { data: userEnrollments, error: enrollmentError } = await supabase
         .from('course_enrollments')
-        .select('id, course_id, courses!course_enrollments_course_id_fkey(title)')
+        .select('id, course_id, courses!course_enrollments_course_id_fkey(title, creator_id)')
         .eq('user_id', user!.id);
 
       if (enrollmentError) {
@@ -142,7 +144,8 @@ const CourseResultsPage = () => {
               verification_code: cert.verification_code,
               issue_date: cert.issue_date,
               pdf_url: cert.pdf_url || undefined,
-              course_title: enrollment?.courses?.title || 'Course Certificate'
+              course_title: enrollment?.courses?.title || 'Course Certificate',
+              creator_id: enrollment?.courses?.creator_id
             };
           }) || [];
           
@@ -158,12 +161,35 @@ const CourseResultsPage = () => {
     }
   };
 
-  const generateCertificateHTML = (certificate: Certificate) => {
+  const fetchCreatorName = async (creatorId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', creatorId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching creator name:', error);
+        return 'SkillPulse Instructor';
+      }
+      
+      return data?.full_name || 'SkillPulse Instructor';
+    } catch (error) {
+      console.error('Error fetching creator name:', error);
+      return 'SkillPulse Instructor';
+    }
+  };
+
+  const generateCertificateHTML = async (certificate: Certificate) => {
     const currentDate = new Date(certificate.issue_date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
+
+    // Get creator name
+    const creatorName = certificate.creator_id ? await fetchCreatorName(certificate.creator_id) : 'SkillPulse Instructor';
 
     return `
     <!DOCTYPE html>
@@ -171,16 +197,22 @@ const CourseResultsPage = () => {
     <head>
         <title>SkillPulse Certificate</title>
         <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
             body {
                 font-family: 'Georgia', serif;
-                margin: 0;
-                padding: 40px;
                 background: linear-gradient(135deg, #f59e0b 0%, #8b5cf6 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                padding: 20px;
             }
+            
             .certificate {
                 background: white;
                 padding: 60px;
@@ -193,6 +225,7 @@ const CourseResultsPage = () => {
                 position: relative;
                 margin: auto;
             }
+            
             .certificate::before {
                 content: '';
                 position: absolute;
@@ -204,6 +237,7 @@ const CourseResultsPage = () => {
                 border-radius: 12px;
                 pointer-events: none;
             }
+            
             .logo {
                 font-size: 2.5rem;
                 font-weight: bold;
@@ -213,17 +247,20 @@ const CourseResultsPage = () => {
                 background-clip: text;
                 margin-bottom: 20px;
             }
+            
             .title {
                 font-size: 3rem;
                 color: #1f2937;
                 margin: 20px 0;
                 font-weight: normal;
             }
+            
             .subtitle {
                 font-size: 1.2rem;
                 color: #6b7280;
                 margin-bottom: 40px;
             }
+            
             .recipient {
                 font-size: 2.5rem;
                 color: #f59e0b;
@@ -232,17 +269,20 @@ const CourseResultsPage = () => {
                 text-decoration: underline;
                 text-decoration-color: #8b5cf6;
             }
+            
             .course {
                 font-size: 1.8rem;
                 color: #1f2937;
                 margin: 30px 0;
                 font-style: italic;
             }
+            
             .completion {
                 font-size: 1.1rem;
                 color: #6b7280;
                 margin: 20px 0;
             }
+            
             .signature {
                 margin-top: 50px;
                 display: flex;
@@ -251,6 +291,7 @@ const CourseResultsPage = () => {
                 flex-wrap: wrap;
                 gap: 30px;
             }
+            
             .signature-section {
                 flex: 1;
                 min-width: 200px;
@@ -259,6 +300,22 @@ const CourseResultsPage = () => {
                 flex-direction: column;
                 align-items: center;
             }
+            
+            .signature-image {
+                width: 150px;
+                height: 60px;
+                background: linear-gradient(45deg, #f59e0b, #8b5cf6);
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                font-style: italic;
+            }
+            
             .signature-line {
                 border-top: 2px solid #1f2937;
                 width: 100%;
@@ -269,6 +326,7 @@ const CourseResultsPage = () => {
                 color: #6b7280;
                 margin-bottom: 10px;
             }
+            
             .date-section {
                 flex: 1;
                 min-width: 200px;
@@ -278,11 +336,27 @@ const CourseResultsPage = () => {
                 align-items: center;
                 justify-content: flex-end;
             }
+            
             .verification {
                 margin-top: 30px;
                 font-size: 0.8rem;
                 color: #9ca3af;
                 text-align: center;
+            }
+            
+            @media print {
+                body {
+                    background: white !important;
+                    padding: 0 !important;
+                }
+                
+                .certificate {
+                    box-shadow: none !important;
+                    border-radius: 0 !important;
+                    margin: 0 !important;
+                    max-width: none !important;
+                    width: 100% !important;
+                }
             }
         </style>
     </head>
@@ -297,9 +371,12 @@ const CourseResultsPage = () => {
             <div class="completion">demonstrating professional competency and commitment to continuous learning</div>
             <div class="signature">
                 <div class="signature-section">
+                    <div class="signature-image">
+                        ${creatorName.split(' ').map(n => n[0]).join('')}
+                    </div>
                     <div class="signature-line">
-                        <strong>SkillPulse Academy</strong><br>
-                        Authorized Signature
+                        <strong>${creatorName}</strong><br>
+                        Course Instructor
                     </div>
                 </div>
                 <div class="date-section">
@@ -309,7 +386,7 @@ const CourseResultsPage = () => {
             </div>
             <div class="verification">
                 Verification Code: ${certificate.verification_code}<br>
-                This certificate can be verified at skillpulse.com/verify
+                This certificate can be verified at skillpulse.com/verify-certificate
             </div>
         </div>
     </body>
@@ -317,25 +394,43 @@ const CourseResultsPage = () => {
     `;
   };
 
-  const downloadCertificate = (certificate: Certificate) => {
-    const certificateHTML = generateCertificateHTML(certificate);
-    const blob = new Blob([certificateHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${certificate.course_title?.replace(/\s+/g, '_')}_Certificate.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    toast.success('Certificate downloaded successfully!');
+  const printCertificate = async (certificate: Certificate) => {
+    try {
+      const certificateHTML = await generateCertificateHTML(certificate);
+      
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      
+      if (!printWindow) {
+        toast.error('Please allow popups to print the certificate');
+        return;
+      }
+      
+      printWindow.document.write(certificateHTML);
+      printWindow.document.close();
+      
+      // Wait for content to load then print
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      };
+      
+      toast.success('Certificate is ready to print!');
+    } catch (error) {
+      console.error('Error printing certificate:', error);
+      toast.error('Failed to print certificate');
+    }
   };
 
-  const viewCertificate = (certificate: Certificate) => {
-    setSelectedCertificate(certificate);
-    setShowCertificateModal(true);
+  const viewCertificate = async (certificate: Certificate) => {
+    const html = await generateCertificateHTML(certificate);
+    const newWindow = window.open('', '_blank', 'width=900,height=700');
+    if (newWindow) {
+      newWindow.document.write(html);
+      newWindow.document.close();
+    }
   };
 
   if (loading) {
@@ -489,12 +584,12 @@ const CourseResultsPage = () => {
                               View
                             </Button>
                             <Button
-                              onClick={() => downloadCertificate(certificate)}
+                              onClick={() => printCertificate(certificate)}
                               size="sm"
                               className="bg-orange-600 hover:bg-orange-700"
                             >
                               <Download className="h-4 w-4 mr-2" />
-                              Download
+                              Print PDF
                             </Button>
                           </div>
                         </div>
@@ -546,31 +641,6 @@ const CourseResultsPage = () => {
               </Card>
             </div>
           </div>
-
-          {/* Certificate Preview Modal */}
-          <Dialog open={showCertificateModal} onOpenChange={setShowCertificateModal}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle>Certificate Preview</DialogTitle>
-                <DialogDescription>
-                  Preview of your course completion certificate
-                </DialogDescription>
-              </DialogHeader>
-              {selectedCertificate && (
-                <div 
-                  className="border rounded-lg p-4 bg-white"
-                  dangerouslySetInnerHTML={{ 
-                    __html: generateCertificateHTML(selectedCertificate)
-                      .replace('<html>', '<div>')
-                      .replace('</html>', '</div>')
-                      .replace(/<head>.*?<\/head>/s, '')
-                      .replace('<body>', '')
-                      .replace('</body>', '')
-                  }}
-                />
-              )}
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
     </Layout>

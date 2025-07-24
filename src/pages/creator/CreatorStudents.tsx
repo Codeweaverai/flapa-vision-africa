@@ -1,835 +1,607 @@
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import CreatorLayout from '@/components/creator/CreatorLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { format } from 'date-fns';
-import { Search, Download, Mail, BookOpen, Calendar, FileSpreadsheet, FileText, CheckCircle, Clock, Users } from 'lucide-react';
+import CreatorLayout from '@/components/creator/CreatorLayout';
+import { 
+  Users, 
+  Search, 
+  Download, 
+  GraduationCap, 
+  Calendar,
+  CheckCircle,
+  XCircle,
+  Clock,
+  MapPin,
+  UserCheck,
+  UserX,
+  BarChart3
+} from 'lucide-react';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
 
-interface Student {
+interface CourseEnrollment {
   id: string;
-  email: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  created_at: string;
-}
-
-interface EnrolledStudent extends Student {
+  user_id: string;
   course_id: string;
-  course_title: string;
   enrollment_date: string;
-  progress?: number;
+  completion_date?: string;
   is_completed: boolean;
-  payment_status: string;
+  course: {
+    title: string;
+    thumbnail_url?: string;
+  };
+  user: {
+    full_name: string;
+    email: string;
+    avatar_url?: string;
+  };
 }
 
-interface EventAttendee extends Student {
+interface EventBooking {
+  id: string;
+  user_id: string;
   event_id: string;
-  event_title: string;
-  registration_date: string;
+  booking_date: string;
   status: string;
   payment_status: string;
-  booking_code?: string;
-  booking_id: string;
-  tickets_generated: number;
-  tickets_checked_in: number;
-  check_in_status: 'all_checked_in' | 'partial_checked_in' | 'not_checked_in';
-  check_in_time?: string;
-  last_check_in?: string;
+  ticket_quantity: number;
+  booking_code: string;
+  event: {
+    title: string;
+    start_time: string;
+    location: string;
+    image_url?: string;
+  };
+  user: {
+    full_name: string;
+    email: string;
+    avatar_url?: string;
+  };
+  tickets: {
+    id: string;
+    ticket_code: string;
+    ticket_status: string;
+    check_in?: {
+      id: string;
+      check_in_time: string;
+      checked_in_by: string;
+    };
+  }[];
+}
+
+interface EventStats {
+  total_bookings: number;
+  total_tickets: number;
+  checked_in_count: number;
+  not_checked_in_count: number;
+  check_in_rate: number;
 }
 
 const CreatorStudents = () => {
   const { user } = useAuth();
+  const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollment[]>([]);
+  const [eventBookings, setEventBookings] = useState<EventBooking[]>([]);
+  const [eventStats, setEventStats] = useState<Record<string, EventStats>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [courseStudents, setCourseStudents] = useState<EnrolledStudent[]>([]);
-  const [eventAttendees, setEventAttendees] = useState<EventAttendee[]>([]);
-  const [activeTab, setActiveTab] = useState('all-students');
-  
+  const [activeTab, setActiveTab] = useState('courses');
+
   useEffect(() => {
     if (user) {
-      fetchStudentsData();
-      
-      // Set up real-time subscriptions for check-ins
-      const checkInsChannel = supabase
-        .channel('check_ins_changes')
-        .on('postgres_changes', {
+      fetchStudentData();
+      setupRealtimeSubscriptions();
+    }
+  }, [user]);
+
+  const setupRealtimeSubscriptions = () => {
+    // Subscribe to event bookings changes
+    const bookingsChannel = supabase
+      .channel('event-bookings-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'event_bookings'
+        },
+        () => {
+          fetchEventBookings();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to check-ins changes
+    const checkInsChannel = supabase
+      .channel('check-ins-changes')
+      .on(
+        'postgres_changes',
+        {
           event: '*',
           schema: 'public',
           table: 'check_ins'
-        }, () => {
-          console.log('Check-in data changed, refreshing...');
-          fetchStudentsData();
-        })
-        .on('postgres_changes', {
+        },
+        () => {
+          fetchEventBookings();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to generated tickets changes
+    const ticketsChannel = supabase
+      .channel('generated-tickets-changes')
+      .on(
+        'postgres_changes',
+        {
           event: '*',
           schema: 'public',
           table: 'generated_tickets'
-        }, () => {
-          console.log('Ticket data changed, refreshing...');
-          fetchStudentsData();
-        })
-        .subscribe();
+        },
+        () => {
+          fetchEventBookings();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(checkInsChannel);
-      };
-    }
-  }, [user]);
-  
-  const fetchStudentsData = async () => {
-    setLoading(true);
+    return () => {
+      supabase.removeChannel(bookingsChannel);
+      supabase.removeChannel(checkInsChannel);
+      supabase.removeChannel(ticketsChannel);
+    };
+  };
+
+  const fetchStudentData = async () => {
     try {
-      console.log('Fetching students data for creator:', user?.id);
-      
-      // Get course enrollment data
-      const { data: enrollmentData, error: enrollmentError } = await supabase
-        .from('course_enrollments')
-        .select(`
-          id,
-          course_id,
-          user_id,
-          enrollment_date,
-          is_completed,
-          payment_status,
-          courses!inner(
-            title,
-            creator_id
-          )
-        `)
-        .eq('courses.creator_id', user?.id);
-        
-      if (enrollmentError) {
-        console.error('Enrollment error:', enrollmentError);
-        throw enrollmentError;
-      }
-      
-      console.log('Enrollment data:', enrollmentData);
-      
-      // Get event registration data with check-in information
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('event_bookings')
-        .select(`
-          id,
-          event_id,
-          user_id,
-          created_at,
-          status,
-          payment_status,
-          booking_code,
-          ticket_quantity,
-          events!inner(
-            title,
-            creator_id
-          )
-        `)
-        .eq('events.creator_id', user?.id);
-        
-      if (bookingsError) {
-        console.error('Bookings error:', bookingsError);
-        throw bookingsError;
-      }
-      
-      console.log('Bookings data:', bookingsData);
-      
-      // Get unique user IDs
-      const enrollmentUserIds = enrollmentData?.map(item => item.user_id) || [];
-      const bookingUserIds = bookingsData?.map(item => item.user_id) || [];
-      const allUserIds = [...new Set([...enrollmentUserIds, ...bookingUserIds])];
-      
-      console.log('All user IDs:', allUserIds);
-      
-      // Get user profiles and auth data
-      let userProfiles: any[] = [];
-      let authUsers: any[] = [];
-      
-      if (allUserIds.length > 0) {
-        // Get profiles
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url, created_at')
-          .in('id', allUserIds);
-          
-        if (profilesError) {
-          console.error('Profiles error:', profilesError);
-        } else {
-          userProfiles = profiles || [];
-        }
-
-        // Get auth users for emails using the service role
-        try {
-          const { data: authData, error: authError } = await supabase.rpc('get_user_emails', {
-            user_ids: allUserIds
-          });
-          
-          if (authError) {
-            console.error('Auth data error:', authError);
-            authUsers = [];
-          } else {
-            authUsers = Array.isArray(authData) ? authData : [];
-          }
-        } catch (error) {
-          console.error('Error fetching auth users:', error);
-          authUsers = [];
-        }
-      }
-      
-      console.log('User profiles:', userProfiles);
-      console.log('Auth users:', authUsers);
-      
-      // Create user map with auth emails
-      const userMap = new Map();
-      
-      userProfiles.forEach(profile => {
-        const authUser = authUsers.find((u: any) => u.id === profile.id);
-        userMap.set(profile.id, {
-          id: profile.id,
-          full_name: profile.full_name,
-          avatar_url: profile.avatar_url,
-          created_at: profile.created_at,
-          email: authUser?.email || `user-${profile.id.substring(0, 8)}@platform.com`
-        });
-      });
-      
-      // Add users who might not have profiles but have auth records
-      authUsers.forEach((authUser: any) => {
-        if (!userMap.has(authUser.id)) {
-          userMap.set(authUser.id, {
-            id: authUser.id,
-            full_name: null,
-            avatar_url: null,
-            created_at: authUser.created_at,
-            email: authUser.email
-          });
-        }
-      });
-      
-      // Format course students data
-      const formattedCourseStudents: EnrolledStudent[] = (enrollmentData || []).map((enrollment: any) => {
-        const userData = userMap.get(enrollment.user_id) || {};
-        return {
-          id: enrollment.user_id,
-          email: userData.email || `user-${enrollment.user_id.substring(0, 8)}@platform.com`,
-          full_name: userData.full_name || 'Unknown User',
-          avatar_url: userData.avatar_url,
-          created_at: userData.created_at || enrollment.enrollment_date,
-          course_id: enrollment.course_id,
-          course_title: enrollment.courses?.title || 'Unnamed Course',
-          enrollment_date: enrollment.enrollment_date,
-          progress: 0,
-          is_completed: enrollment.is_completed || false,
-          payment_status: enrollment.payment_status || 'pending'
-        };
-      });
-      
-      // Get check-in data for event bookings
-      const bookingIds = bookingsData?.map(b => b.id) || [];
-      let checkInData: any[] = [];
-      let ticketData: any[] = [];
-      
-      if (bookingIds.length > 0) {
-        // Get generated tickets for these bookings
-        const { data: tickets, error: ticketsError } = await supabase
-          .from('generated_tickets')
-          .select(`
-            id,
-            booking_id,
-            event_id,
-            user_id,
-            ticket_code,
-            checked_in,
-            created_at
-          `)
-          .in('booking_id', bookingIds);
-        
-        if (ticketsError) {
-          console.error('Tickets error:', ticketsError);
-        } else {
-          ticketData = tickets || [];
-        }
-        
-        // Get check-in data for these bookings
-        const { data: checkIns, error: checkInsError } = await supabase
-          .from('check_ins')
-          .select(`
-            id,
-            ticket_id,
-            booking_id,
-            event_id,
-            checked_in_by,
-            check_in_time,
-            created_at
-          `)
-          .in('booking_id', bookingIds);
-        
-        if (checkInsError) {
-          console.error('Check-ins error:', checkInsError);
-        } else {
-          checkInData = checkIns || [];
-        }
-      }
-      
-      console.log('Ticket data:', ticketData);
-      console.log('Check-in data:', checkInData);
-      
-      // Format event attendees data with check-in information
-      const formattedEventAttendees: EventAttendee[] = (bookingsData || []).map((booking: any) => {
-        const userData = userMap.get(booking.user_id) || {};
-        
-        // Get tickets for this booking
-        const bookingTickets = ticketData.filter(ticket => ticket.booking_id === booking.id);
-        const ticketsGenerated = bookingTickets.length;
-        const ticketsCheckedIn = bookingTickets.filter(ticket => ticket.checked_in).length;
-        
-        // Get check-in information
-        const bookingCheckIns = checkInData.filter(checkIn => checkIn.booking_id === booking.id);
-        const lastCheckIn = bookingCheckIns.length > 0 
-          ? bookingCheckIns.sort((a, b) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime())[0]
-          : null;
-        
-        // Determine check-in status
-        let checkInStatus: 'all_checked_in' | 'partial_checked_in' | 'not_checked_in' = 'not_checked_in';
-        if (ticketsGenerated > 0) {
-          if (ticketsCheckedIn === ticketsGenerated) {
-            checkInStatus = 'all_checked_in';
-          } else if (ticketsCheckedIn > 0) {
-            checkInStatus = 'partial_checked_in';
-          }
-        }
-        
-        return {
-          id: booking.user_id,
-          email: userData.email || `user-${booking.user_id.substring(0, 8)}@platform.com`,
-          full_name: userData.full_name || 'Unknown User',
-          avatar_url: userData.avatar_url,
-          created_at: userData.created_at || booking.created_at,
-          event_id: booking.event_id,
-          event_title: booking.events?.title || 'Unnamed Event',
-          registration_date: booking.created_at,
-          status: booking.status || 'pending',
-          payment_status: booking.payment_status || 'pending',
-          booking_code: booking.booking_code,
-          booking_id: booking.id,
-          tickets_generated: ticketsGenerated,
-          tickets_checked_in: ticketsCheckedIn,
-          check_in_status: checkInStatus,
-          check_in_time: lastCheckIn?.check_in_time,
-          last_check_in: lastCheckIn?.check_in_time
-        };
-      });
-      
-      setCourseStudents(formattedCourseStudents);
-      setEventAttendees(formattedEventAttendees);
-      
-      console.log('Final course students:', formattedCourseStudents);
-      console.log('Final event attendees:', formattedEventAttendees);
-      
+      setLoading(true);
+      await Promise.all([
+        fetchCourseEnrollments(),
+        fetchEventBookings()
+      ]);
     } catch (error) {
-      console.error('Error fetching students data:', error);
-      toast.error('Failed to load students data');
+      console.error('Error fetching student data:', error);
+      toast.error('Failed to load student data');
     } finally {
       setLoading(false);
     }
   };
 
-  // Get unique students from both courses and events
-  const getAllStudents = (): Student[] => {
-    const studentMap = new Map<string, Student>();
-    
-    courseStudents.forEach(student => {
-      studentMap.set(student.id, {
-        id: student.id,
-        email: student.email,
-        full_name: student.full_name,
-        avatar_url: student.avatar_url,
-        created_at: student.created_at
-      });
-    });
-    
-    eventAttendees.forEach(attendee => {
-      studentMap.set(attendee.id, {
-        id: attendee.id,
-        email: attendee.email,
-        full_name: attendee.full_name,
-        avatar_url: attendee.avatar_url,
-        created_at: attendee.created_at
-      });
-    });
-    
-    return Array.from(studentMap.values());
-  };
-  
-  // Filter students based on search term
-  const filteredAllStudents = getAllStudents().filter(student => 
-    student.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (student.full_name && student.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-  
-  const filteredCourseStudents = courseStudents.filter(student => 
-    student.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (student.full_name && student.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    student.course_title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  const filteredEventAttendees = eventAttendees.filter(attendee => 
-    attendee.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (attendee.full_name && attendee.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    attendee.event_title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const fetchCourseEnrollments = async () => {
+    const { data, error } = await supabase
+      .from('course_enrollments')
+      .select(`
+        *,
+        course:courses!inner(title, thumbnail_url, creator_id),
+        user:profiles!inner(full_name, email, avatar_url)
+      `)
+      .eq('course.creator_id', user?.id)
+      .order('enrollment_date', { ascending: false });
 
-  // Get check-in statistics
-  const getCheckInStats = () => {
-    const totalAttendees = eventAttendees.length;
-    const checkedInAttendees = eventAttendees.filter(a => a.check_in_status === 'all_checked_in').length;
-    const partiallyCheckedIn = eventAttendees.filter(a => a.check_in_status === 'partial_checked_in').length;
-    const notCheckedIn = eventAttendees.filter(a => a.check_in_status === 'not_checked_in').length;
-    
-    return {
-      totalAttendees,
-      checkedInAttendees,
-      partiallyCheckedIn,
-      notCheckedIn
-    };
-  };
-
-  const getCheckInStatusBadge = (status: string) => {
-    switch (status) {
-      case 'all_checked_in':
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />All Checked In</Badge>;
-      case 'partial_checked_in':
-        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Partially Checked In</Badge>;
-      case 'not_checked_in':
-        return <Badge variant="outline"><Users className="h-3 w-3 mr-1" />Not Checked In</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
+    if (error) {
+      console.error('Error fetching course enrollments:', error);
+      return;
     }
+
+    setCourseEnrollments(data || []);
   };
 
-  // Export functions
-  const exportToExcel = (data: any[], filename: string) => {
+  const fetchEventBookings = async () => {
     try {
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Students');
-      XLSX.writeFile(wb, `${filename}.xlsx`);
-      toast.success('Data exported to Excel successfully!');
+      // First, get all bookings for creator's events
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from('event_bookings')
+        .select(`
+          *,
+          event:events!inner(title, start_time, location, image_url, creator_id),
+          user:profiles!inner(full_name, email, avatar_url)
+        `)
+        .eq('event.creator_id', user?.id)
+        .order('booking_date', { ascending: false });
+
+      if (bookingsError) {
+        console.error('Error fetching event bookings:', bookingsError);
+        return;
+      }
+
+      // Then get all tickets for these bookings with check-in status
+      const bookingIds = bookingsData?.map(booking => booking.id) || [];
+      
+      if (bookingIds.length === 0) {
+        setEventBookings([]);
+        setEventStats({});
+        return;
+      }
+
+      const { data: ticketsData, error: ticketsError } = await supabase
+        .from('generated_tickets')
+        .select(`
+          id,
+          booking_id,
+          ticket_code,
+          ticket_status,
+          check_ins(
+            id,
+            check_in_time,
+            checked_in_by
+          )
+        `)
+        .in('booking_id', bookingIds);
+
+      if (ticketsError) {
+        console.error('Error fetching tickets:', ticketsError);
+        return;
+      }
+
+      // Group tickets by booking_id
+      const ticketsByBooking = ticketsData?.reduce((acc, ticket) => {
+        if (!acc[ticket.booking_id]) {
+          acc[ticket.booking_id] = [];
+        }
+        acc[ticket.booking_id].push({
+          id: ticket.id,
+          ticket_code: ticket.ticket_code,
+          ticket_status: ticket.ticket_status,
+          check_in: ticket.check_ins?.[0] || null
+        });
+        return acc;
+      }, {} as Record<string, any[]>) || {};
+
+      // Combine bookings with tickets
+      const bookingsWithTickets = bookingsData?.map(booking => ({
+        ...booking,
+        tickets: ticketsByBooking[booking.id] || []
+      })) || [];
+
+      setEventBookings(bookingsWithTickets);
+
+      // Calculate stats by event
+      const statsByEvent = bookingsWithTickets.reduce((acc, booking) => {
+        const eventId = booking.event_id;
+        if (!acc[eventId]) {
+          acc[eventId] = {
+            total_bookings: 0,
+            total_tickets: 0,
+            checked_in_count: 0,
+            not_checked_in_count: 0,
+            check_in_rate: 0
+          };
+        }
+
+        acc[eventId].total_bookings += 1;
+        acc[eventId].total_tickets += booking.tickets.length;
+        
+        booking.tickets.forEach(ticket => {
+          if (ticket.check_in) {
+            acc[eventId].checked_in_count += 1;
+          } else {
+            acc[eventId].not_checked_in_count += 1;
+          }
+        });
+
+        acc[eventId].check_in_rate = acc[eventId].total_tickets > 0 
+          ? (acc[eventId].checked_in_count / acc[eventId].total_tickets) * 100 
+          : 0;
+
+        return acc;
+      }, {} as Record<string, EventStats>);
+
+      setEventStats(statsByEvent);
+
     } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export data');
+      console.error('Error fetching event bookings:', error);
+      toast.error('Failed to load event registrations');
     }
   };
 
-  const exportToPDF = (data: any[], filename: string, title: string) => {
-    try {
-      const doc = new jsPDF();
-      
-      doc.setFontSize(18);
-      doc.text(title, 14, 22);
-      doc.setFontSize(12);
-      doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 32);
-      
-      const headers = Object.keys(data[0] || {});
-      const rows = data.map(item => headers.map(header => item[header]));
-      
-      autoTable(doc, {
-        head: [headers],
-        body: rows,
-        startY: 40,
-        styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: [255, 140, 0], textColor: 255 },
-      });
-      
-      doc.save(`${filename}.pdf`);
-      toast.success('Data exported to PDF successfully!');
-    } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export data');
-    }
+  const exportCourseStudents = () => {
+    const csvContent = [
+      ['Student Name', 'Email', 'Course', 'Enrollment Date', 'Completion Status'],
+      ...filteredCourseEnrollments.map(enrollment => [
+        enrollment.user.full_name,
+        enrollment.user.email,
+        enrollment.course.title,
+        format(new Date(enrollment.enrollment_date), 'yyyy-MM-dd'),
+        enrollment.is_completed ? 'Completed' : 'In Progress'
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'course_students.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleExportAllStudents = (exportFormat: 'excel' | 'pdf') => {
-    const data = filteredAllStudents.map(student => ({
-      'Full Name': student.full_name || 'N/A',
-      'Email': student.email,
-      'Joined Date': format(new Date(student.created_at), 'PP')
-    }));
+  const exportEventAttendees = () => {
+    const csvContent = [
+      ['Attendee Name', 'Email', 'Event', 'Booking Date', 'Status', 'Tickets', 'Checked In', 'Check-in Rate'],
+      ...filteredEventBookings.map(booking => [
+        booking.user.full_name,
+        booking.user.email,
+        booking.event.title,
+        format(new Date(booking.booking_date), 'yyyy-MM-dd'),
+        booking.status,
+        booking.tickets.length.toString(),
+        booking.tickets.filter(t => t.check_in).length.toString(),
+        booking.tickets.length > 0 ? `${((booking.tickets.filter(t => t.check_in).length / booking.tickets.length) * 100).toFixed(1)}%` : '0%'
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'event_attendees.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const filteredCourseEnrollments = courseEnrollments.filter(enrollment =>
+    enrollment.user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    enrollment.course.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredEventBookings = eventBookings.filter(booking =>
+    booking.user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    booking.event.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getCheckInBadge = (tickets: any[]) => {
+    const checkedIn = tickets.filter(t => t.check_in).length;
+    const total = tickets.length;
     
-    if (exportFormat === 'excel') {
-      exportToExcel(data, 'all-students');
-    } else {
-      exportToPDF(data, 'all-students', 'All Students Report');
-    }
-  };
-
-  const handleExportCourseStudents = (exportFormat: 'excel' | 'pdf') => {
-    const data = filteredCourseStudents.map(student => ({
-      'Student Name': student.full_name || 'N/A',
-      'Email': student.email,
-      'Course': student.course_title,
-      'Enrollment Date': format(new Date(student.enrollment_date), 'PP'),
-      'Status': student.is_completed ? 'Completed' : 'In Progress',
-      'Payment Status': student.payment_status
-    }));
+    if (total === 0) return <Badge variant="outline">No Tickets</Badge>;
     
-    if (exportFormat === 'excel') {
-      exportToExcel(data, 'course-enrollments');
-    } else {
-      exportToPDF(data, 'course-enrollments', 'Course Enrollments Report');
-    }
-  };
-
-  const handleExportEventAttendees = (exportFormat: 'excel' | 'pdf') => {
-    const data = filteredEventAttendees.map(attendee => ({
-      'Attendee Name': attendee.full_name || 'N/A',
-      'Email': attendee.email,
-      'Event': attendee.event_title,
-      'Registration Date': format(new Date(attendee.registration_date), 'PP'),
-      'Status': attendee.status,
-      'Payment Status': attendee.payment_status,
-      'Booking Code': attendee.booking_code || 'N/A',
-      'Tickets Generated': attendee.tickets_generated,
-      'Tickets Checked In': attendee.tickets_checked_in,
-      'Check-in Status': attendee.check_in_status.replace('_', ' ').toUpperCase(),
-      'Last Check-in': attendee.last_check_in ? format(new Date(attendee.last_check_in), 'PP pp') : 'N/A'
-    }));
+    const rate = (checkedIn / total) * 100;
     
-    if (exportFormat === 'excel') {
-      exportToExcel(data, 'event-attendees');
+    if (rate === 100) {
+      return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />All Checked In</Badge>;
+    } else if (rate > 0) {
+      return <Badge variant="outline" className="border-yellow-500 text-yellow-700">
+        <Clock className="h-3 w-3 mr-1" />
+        {checkedIn}/{total} Checked In
+      </Badge>;
     } else {
-      exportToPDF(data, 'event-attendees', 'Event Attendees Report');
+      return <Badge variant="outline" className="border-red-500 text-red-700">
+        <XCircle className="h-3 w-3 mr-1" />
+        Not Checked In
+      </Badge>;
     }
   };
 
-  const checkInStats = getCheckInStats();
+  if (loading) {
+    return (
+      <CreatorLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        </div>
+      </CreatorLayout>
+    );
+  }
 
   return (
-    <CreatorLayout title="Students">
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200 p-6">
-        <Card className="mb-6 bg-white/90 backdrop-blur-sm border border-orange-200">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-              <div className="relative w-full md:w-96">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search students..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 border-orange-200 focus:border-purple-400"
-                />
-              </div>
+    <CreatorLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Students & Attendees</h1>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search students..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-64"
+              />
             </div>
-            
-            <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline" className="text-sm border-orange-300">
-                {getAllStudents().length} Total Students
-              </Badge>
-              <Badge variant="outline" className="text-sm border-purple-300">
-                {courseStudents.length} Course Enrollments
-              </Badge>
-              <Badge variant="outline" className="text-sm border-orange-300">
-                {eventAttendees.length} Event Registrations
-              </Badge>
-              <Badge variant="outline" className="text-sm border-green-300">
-                {checkInStats.checkedInAttendees} Checked In
-              </Badge>
-              <Badge variant="outline" className="text-sm border-yellow-300">
-                {checkInStats.partiallyCheckedIn} Partially Checked In
-              </Badge>
-              <Badge variant="outline" className="text-sm border-red-300">
-                {checkInStats.notCheckedIn} Not Checked In
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4 bg-white/90 backdrop-blur-sm">
-            <TabsTrigger value="all-students">All Students</TabsTrigger>
-            <TabsTrigger value="course-enrollments">Course Enrollments</TabsTrigger>
-            <TabsTrigger value="event-registrations">Event Registrations</TabsTrigger>
+            <Button
+              onClick={activeTab === 'courses' ? exportCourseStudents : exportEventAttendees}
+              variant="outline"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="courses" className="flex items-center gap-2">
+              <GraduationCap className="h-4 w-4" />
+              Course Students ({filteredCourseEnrollments.length})
+            </TabsTrigger>
+            <TabsTrigger value="events" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Event Attendees ({filteredEventBookings.length})
+            </TabsTrigger>
           </TabsList>
-          
-          {/* All Students Tab */}
-          <TabsContent value="all-students">
-            <Card className="bg-white/90 backdrop-blur-sm border border-orange-200">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>All Students</CardTitle>
-                  <CardDescription>List of all students enrolled in your courses or registered for your events</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleExportAllStudents('excel')}
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Export Excel
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleExportAllStudents('pdf')}
-                    className="border-purple-300 text-purple-600 hover:bg-purple-50"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export PDF
-                  </Button>
-                </div>
+
+          <TabsContent value="courses" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Course Enrollments
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : filteredAllStudents.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? "No students match your search" : "No students found"}
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Joined</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAllStudents.map((student) => (
-                        <TableRow key={student.id}>
-                          <TableCell className="font-medium">{student.full_name || "No Name"}</TableCell>
-                          <TableCell>{student.email}</TableCell>
-                          <TableCell>{format(new Date(student.created_at), 'PP')}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm">
-                              <Mail className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* Course Enrollments Tab */}
-          <TabsContent value="course-enrollments">
-            <Card className="bg-white/90 backdrop-blur-sm border border-orange-200">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Course Enrollments</CardTitle>
-                  <CardDescription>Students enrolled in your courses</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleExportCourseStudents('excel')}
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Export Excel
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleExportCourseStudents('pdf')}
-                    className="border-purple-300 text-purple-600 hover:bg-purple-50"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export PDF
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : filteredCourseStudents.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? "No course enrollments match your search" : "No course enrollments found"}
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Student</TableHead>
-                        <TableHead>Course</TableHead>
-                        <TableHead>Enrollment Date</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Payment</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredCourseStudents.map((student) => (
-                        <TableRow key={`${student.id}-${student.course_id}`}>
-                          <TableCell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Course</TableHead>
+                      <TableHead>Enrolled</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Completion</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCourseEnrollments.map((enrollment) => (
+                      <TableRow key={enrollment.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={enrollment.user.avatar_url} />
+                              <AvatarFallback>
+                                {enrollment.user.full_name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
                             <div>
-                              <div className="font-medium">{student.full_name || "No Name"}</div>
-                              <div className="text-xs text-muted-foreground">{student.email}</div>
+                              <div className="font-medium">{enrollment.user.full_name}</div>
+                              <div className="text-sm text-gray-500">{enrollment.user.email}</div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <BookOpen className="h-4 w-4 mr-2 text-muted-foreground" />
-                              <span>{student.course_title}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{format(new Date(student.enrollment_date), 'PP')}</TableCell>
-                          <TableCell>
-                            <div className="w-full bg-muted rounded-full h-2.5">
-                              <div 
-                                className="bg-gradient-to-r from-orange-500 to-purple-600 h-2.5 rounded-full" 
-                                style={{ width: `${student.progress || 0}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-xs text-muted-foreground mt-1 inline-block">{student.progress || 0}%</span>
-                          </TableCell>
-                          <TableCell>
-                            {student.is_completed ? (
-                              <Badge className="bg-green-100 text-green-800">Completed</Badge>
-                            ) : (
-                              <Badge variant="outline">In Progress</Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {enrollment.course.thumbnail_url && (
+                              <img 
+                                src={enrollment.course.thumbnail_url} 
+                                alt={enrollment.course.title}
+                                className="h-8 w-8 rounded object-cover"
+                              />
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={student.payment_status === 'completed' ? 'default' : 'outline'}
-                              className={student.payment_status === 'completed' ? 'bg-green-100 text-green-800' : ''}
-                            >
-                              {student.payment_status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                            <span className="font-medium">{enrollment.course.title}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(enrollment.enrollment_date), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={enrollment.is_completed ? 'default' : 'secondary'}>
+                            {enrollment.is_completed ? 'Completed' : 'In Progress'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {enrollment.completion_date ? (
+                            <span className="text-sm text-gray-600">
+                              {format(new Date(enrollment.completion_date), 'MMM dd, yyyy')}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
-          
-          {/* Event Registrations Tab */}
-          <TabsContent value="event-registrations">
-            <Card className="bg-white/90 backdrop-blur-sm border border-orange-200">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Event Registrations</CardTitle>
-                  <CardDescription>People registered for your events with check-in status</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleExportEventAttendees('excel')}
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Export Excel
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleExportEventAttendees('pdf')}
-                    className="border-purple-300 text-purple-600 hover:bg-purple-50"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export PDF
-                  </Button>
-                </div>
+
+          <TabsContent value="events" className="space-y-4">
+            {/* Event Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {Object.entries(eventStats).map(([eventId, stats]) => {
+                const eventTitle = eventBookings.find(b => b.event_id === eventId)?.event.title || 'Unknown Event';
+                return (
+                  <Card key={eventId}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-600 truncate">{eventTitle}</p>
+                          <p className="text-2xl font-bold text-green-600">{stats.check_in_rate.toFixed(1)}%</p>
+                          <p className="text-xs text-gray-500">Check-in Rate</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-1 text-sm">
+                            <UserCheck className="h-4 w-4 text-green-600" />
+                            <span>{stats.checked_in_count}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm">
+                            <UserX className="h-4 w-4 text-red-600" />
+                            <span>{stats.not_checked_in_count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Event Registrations
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : filteredEventAttendees.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? "No event registrations match your search" : "No event registrations found"}
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Attendee</TableHead>
-                        <TableHead>Event</TableHead>
-                        <TableHead>Registration Date</TableHead>
-                        <TableHead>Tickets</TableHead>
-                        <TableHead>Check-in Status</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Payment</TableHead>
-                        <TableHead>Booking Code</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEventAttendees.map((attendee) => (
-                        <TableRow key={`${attendee.id}-${attendee.event_id}`}>
-                          <TableCell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Attendee</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Booking Date</TableHead>
+                      <TableHead>Tickets</TableHead>
+                      <TableHead>Check-in Status</TableHead>
+                      <TableHead>Payment Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEventBookings.map((booking) => (
+                      <TableRow key={booking.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={booking.user.avatar_url} />
+                              <AvatarFallback>
+                                {booking.user.full_name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
                             <div>
-                              <div className="font-medium">{attendee.full_name || "No Name"}</div>
-                              <div className="text-xs text-muted-foreground">{attendee.email}</div>
+                              <div className="font-medium">{booking.user.full_name}</div>
+                              <div className="text-sm text-gray-500">{booking.user.email}</div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                              <span>{attendee.event_title}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {booking.event.image_url && (
+                              <img 
+                                src={booking.event.image_url} 
+                                alt={booking.event.title}
+                                className="h-8 w-8 rounded object-cover"
+                              />
+                            )}
+                            <div>
+                              <div className="font-medium">{booking.event.title}</div>
+                              <div className="text-sm text-gray-500 flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {booking.event.location}
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell>{format(new Date(attendee.registration_date), 'PP')}</TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <div className="font-medium">{attendee.tickets_checked_in}/{attendee.tickets_generated}</div>
-                              <div className="text-xs text-muted-foreground">checked in</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              {getCheckInStatusBadge(attendee.check_in_status)}
-                              {attendee.last_check_in && (
-                                <div className="text-xs text-muted-foreground">
-                                  Last: {format(new Date(attendee.last_check_in), 'PP pp')}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={attendee.status === 'confirmed' ? 'default' : 'outline'}
-                              className={attendee.status === 'confirmed' ? 'bg-green-100 text-green-800' : ''}
-                            >
-                              {attendee.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={attendee.payment_status === 'completed' ? 'default' : 'outline'}
-                              className={attendee.payment_status === 'completed' ? 'bg-green-100 text-green-800' : ''}
-                            >
-                              {attendee.payment_status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {attendee.booking_code || 'N/A'}
-                            </code>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(booking.booking_date), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {booking.tickets.length} Ticket{booking.tickets.length !== 1 ? 's' : ''}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getCheckInBadge(booking.tickets)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={booking.payment_status === 'completed' ? 'default' : 'secondary'}>
+                            {booking.payment_status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
