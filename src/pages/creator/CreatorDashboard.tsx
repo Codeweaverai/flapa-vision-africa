@@ -73,8 +73,8 @@ const CreatorDashboard = () => {
       setEarnings(earningsData);
       
       // Load payment transactions
-      const transactionsData = await fetchCreatorPaymentTransactions(user.id);
-      setTransactions(transactionsData);
+      const transactionsResult = await fetchCreatorPaymentTransactions(user.id);
+      setTransactions(transactionsResult.transactions);
       
       // Load comprehensive stats
       await loadComprehensiveStats();
@@ -166,7 +166,7 @@ const CreatorDashboard = () => {
 
   // Process monthly revenue data from transactions
   const monthlyRevenue = transactions.reduce((acc, transaction) => {
-    if (transaction.status === 'completed') {
+    if (transaction.payment_status === 'completed') {
       const month = new Date(transaction.created_at).toLocaleDateString('en-US', { 
         year: 'numeric', 
         month: 'short' 

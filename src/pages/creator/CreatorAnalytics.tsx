@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -81,10 +80,13 @@ const CreatorAnalytics: React.FC = () => {
       setLoading(true);
 
       // Get creator earnings and transactions from creator payments service
-      const [earnings, transactions] = await Promise.all([
+      const [earnings, transactionsResult] = await Promise.all([
         fetchCreatorEarnings(user.id),
-        fetchCreatorPaymentTransactions(user.id)
+        fetchCreatorPaymentTransactions(user.id, 100, 0)
       ]);
+
+      // Extract transactions from the result object
+      const transactions = transactionsResult.transactions;
 
       // Get courses with detailed analytics
       const { data: courses } = await supabase
@@ -154,7 +156,7 @@ const CreatorAnalytics: React.FC = () => {
 
     // Process monthly revenue from transactions
     const monthlyRevenue = transactions.reduce((acc, transaction) => {
-      if (transaction.status === 'completed') {
+      if (transaction.payment_status === 'completed') {
         const month = format(new Date(transaction.created_at), 'MMM yyyy');
         acc[month] = (acc[month] || 0) + (transaction.creator_earning || 0);
       }
