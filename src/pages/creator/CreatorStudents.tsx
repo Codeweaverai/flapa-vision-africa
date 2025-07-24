@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
 import { format } from 'date-fns';
-import { Search, Download, Mail, BookOpen, Calendar, FileSpreadsheet, FileText } from 'lucide-react';
+import { Search, Download, Mail, BookOpen, Calendar, FileSpreadsheet, FileText, CheckCircle, Clock, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -40,6 +40,12 @@ interface EventAttendee extends Student {
   status: string;
   payment_status: string;
   booking_code?: string;
+  booking_id: string;
+  tickets_generated: number;
+  tickets_checked_in: number;
+  check_in_status: 'all_checked_in' | 'partial_checked_in' | 'not_checked_in';
+  check_in_time?: string;
+  last_check_in?: string;
 }
 
 const CreatorStudents = () => {
@@ -53,6 +59,31 @@ const CreatorStudents = () => {
   useEffect(() => {
     if (user) {
       fetchStudentsData();
+      
+      // Set up real-time subscriptions for check-ins
+      const checkInsChannel = supabase
+        .channel('check_ins_changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'check_ins'
+        }, () => {
+          console.log('Check-in data changed, refreshing...');
+          fetchStudentsData();
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'generated_tickets'
+        }, () => {
+          console.log('Ticket data changed, refreshing...');
+          fetchStudentsData();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(checkInsChannel);
+      };
     }
   }, [user]);
   
@@ -85,7 +116,7 @@ const CreatorStudents = () => {
       
       console.log('Enrollment data:', enrollmentData);
       
-      // Get event registration data
+      // Get event registration data with check-in information
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
@@ -96,6 +127,7 @@ const CreatorStudents = () => {
           status,
           payment_status,
           booking_code,
+          ticket_quantity,
           events!inner(
             title,
             creator_id
@@ -200,9 +232,81 @@ const CreatorStudents = () => {
         };
       });
       
-      // Format event attendees data
+      // Get check-in data for event bookings
+      const bookingIds = bookingsData?.map(b => b.id) || [];
+      let checkInData: any[] = [];
+      let ticketData: any[] = [];
+      
+      if (bookingIds.length > 0) {
+        // Get generated tickets for these bookings
+        const { data: tickets, error: ticketsError } = await supabase
+          .from('generated_tickets')
+          .select(`
+            id,
+            booking_id,
+            event_id,
+            user_id,
+            ticket_code,
+            checked_in,
+            created_at
+          `)
+          .in('booking_id', bookingIds);
+        
+        if (ticketsError) {
+          console.error('Tickets error:', ticketsError);
+        } else {
+          ticketData = tickets || [];
+        }
+        
+        // Get check-in data for these bookings
+        const { data: checkIns, error: checkInsError } = await supabase
+          .from('check_ins')
+          .select(`
+            id,
+            ticket_id,
+            booking_id,
+            event_id,
+            checked_in_by,
+            check_in_time,
+            created_at
+          `)
+          .in('booking_id', bookingIds);
+        
+        if (checkInsError) {
+          console.error('Check-ins error:', checkInsError);
+        } else {
+          checkInData = checkIns || [];
+        }
+      }
+      
+      console.log('Ticket data:', ticketData);
+      console.log('Check-in data:', checkInData);
+      
+      // Format event attendees data with check-in information
       const formattedEventAttendees: EventAttendee[] = (bookingsData || []).map((booking: any) => {
         const userData = userMap.get(booking.user_id) || {};
+        
+        // Get tickets for this booking
+        const bookingTickets = ticketData.filter(ticket => ticket.booking_id === booking.id);
+        const ticketsGenerated = bookingTickets.length;
+        const ticketsCheckedIn = bookingTickets.filter(ticket => ticket.checked_in).length;
+        
+        // Get check-in information
+        const bookingCheckIns = checkInData.filter(checkIn => checkIn.booking_id === booking.id);
+        const lastCheckIn = bookingCheckIns.length > 0 
+          ? bookingCheckIns.sort((a, b) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime())[0]
+          : null;
+        
+        // Determine check-in status
+        let checkInStatus: 'all_checked_in' | 'partial_checked_in' | 'not_checked_in' = 'not_checked_in';
+        if (ticketsGenerated > 0) {
+          if (ticketsCheckedIn === ticketsGenerated) {
+            checkInStatus = 'all_checked_in';
+          } else if (ticketsCheckedIn > 0) {
+            checkInStatus = 'partial_checked_in';
+          }
+        }
+        
         return {
           id: booking.user_id,
           email: userData.email || `user-${booking.user_id.substring(0, 8)}@platform.com`,
@@ -214,7 +318,13 @@ const CreatorStudents = () => {
           registration_date: booking.created_at,
           status: booking.status || 'pending',
           payment_status: booking.payment_status || 'pending',
-          booking_code: booking.booking_code
+          booking_code: booking.booking_code,
+          booking_id: booking.id,
+          tickets_generated: ticketsGenerated,
+          tickets_checked_in: ticketsCheckedIn,
+          check_in_status: checkInStatus,
+          check_in_time: lastCheckIn?.check_in_time,
+          last_check_in: lastCheckIn?.check_in_time
         };
       });
       
@@ -276,6 +386,34 @@ const CreatorStudents = () => {
     (attendee.full_name && attendee.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     attendee.event_title.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Get check-in statistics
+  const getCheckInStats = () => {
+    const totalAttendees = eventAttendees.length;
+    const checkedInAttendees = eventAttendees.filter(a => a.check_in_status === 'all_checked_in').length;
+    const partiallyCheckedIn = eventAttendees.filter(a => a.check_in_status === 'partial_checked_in').length;
+    const notCheckedIn = eventAttendees.filter(a => a.check_in_status === 'not_checked_in').length;
+    
+    return {
+      totalAttendees,
+      checkedInAttendees,
+      partiallyCheckedIn,
+      notCheckedIn
+    };
+  };
+
+  const getCheckInStatusBadge = (status: string) => {
+    switch (status) {
+      case 'all_checked_in':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />All Checked In</Badge>;
+      case 'partial_checked_in':
+        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Partially Checked In</Badge>;
+      case 'not_checked_in':
+        return <Badge variant="outline"><Users className="h-3 w-3 mr-1" />Not Checked In</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
+    }
+  };
 
   // Export functions
   const exportToExcel = (data: any[], filename: string) => {
@@ -358,7 +496,11 @@ const CreatorStudents = () => {
       'Registration Date': format(new Date(attendee.registration_date), 'PP'),
       'Status': attendee.status,
       'Payment Status': attendee.payment_status,
-      'Booking Code': attendee.booking_code || 'N/A'
+      'Booking Code': attendee.booking_code || 'N/A',
+      'Tickets Generated': attendee.tickets_generated,
+      'Tickets Checked In': attendee.tickets_checked_in,
+      'Check-in Status': attendee.check_in_status.replace('_', ' ').toUpperCase(),
+      'Last Check-in': attendee.last_check_in ? format(new Date(attendee.last_check_in), 'PP pp') : 'N/A'
     }));
     
     if (exportFormat === 'excel') {
@@ -367,6 +509,8 @@ const CreatorStudents = () => {
       exportToPDF(data, 'event-attendees', 'Event Attendees Report');
     }
   };
+
+  const checkInStats = getCheckInStats();
 
   return (
     <CreatorLayout title="Students">
@@ -394,6 +538,15 @@ const CreatorStudents = () => {
               </Badge>
               <Badge variant="outline" className="text-sm border-orange-300">
                 {eventAttendees.length} Event Registrations
+              </Badge>
+              <Badge variant="outline" className="text-sm border-green-300">
+                {checkInStats.checkedInAttendees} Checked In
+              </Badge>
+              <Badge variant="outline" className="text-sm border-yellow-300">
+                {checkInStats.partiallyCheckedIn} Partially Checked In
+              </Badge>
+              <Badge variant="outline" className="text-sm border-red-300">
+                {checkInStats.notCheckedIn} Not Checked In
               </Badge>
             </div>
           </CardContent>
@@ -575,7 +728,7 @@ const CreatorStudents = () => {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Event Registrations</CardTitle>
-                  <CardDescription>People registered for your events</CardDescription>
+                  <CardDescription>People registered for your events with check-in status</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <Button 
@@ -612,6 +765,8 @@ const CreatorStudents = () => {
                         <TableHead>Attendee</TableHead>
                         <TableHead>Event</TableHead>
                         <TableHead>Registration Date</TableHead>
+                        <TableHead>Tickets</TableHead>
+                        <TableHead>Check-in Status</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Payment</TableHead>
                         <TableHead>Booking Code</TableHead>
@@ -633,6 +788,22 @@ const CreatorStudents = () => {
                             </div>
                           </TableCell>
                           <TableCell>{format(new Date(attendee.registration_date), 'PP')}</TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div className="font-medium">{attendee.tickets_checked_in}/{attendee.tickets_generated}</div>
+                              <div className="text-xs text-muted-foreground">checked in</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              {getCheckInStatusBadge(attendee.check_in_status)}
+                              {attendee.last_check_in && (
+                                <div className="text-xs text-muted-foreground">
+                                  Last: {format(new Date(attendee.last_check_in), 'PP pp')}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge 
                               variant={attendee.status === 'confirmed' ? 'default' : 'outline'}
