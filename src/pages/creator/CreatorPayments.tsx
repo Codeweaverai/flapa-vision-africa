@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -25,6 +26,16 @@ import PayoutMethodSetupDialog from '@/components/creator/PayoutMethodSetupDialo
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { supabase } from '@/lib/supabaseClient';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
+const ITEMS_PER_PAGE = 10;
 
 const CreatorPayments: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -37,6 +48,12 @@ const CreatorPayments: React.FC = () => {
     course_revenue: 0,
     event_revenue: 0
   });
+
+  // Pagination states
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [payoutsPage, setPayoutsPage] = useState(1);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [payoutsTotal, setPayoutsTotal] = useState(0);
 
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [loadingPayouts, setLoadingPayouts] = useState(true);
@@ -63,7 +80,6 @@ const CreatorPayments: React.FC = () => {
       const accountId = searchParams.get('account_id');
       
       if (success === 'true' && accountId) {
-        // Update the profile with the Stripe account ID and set as default payout method
         handleStripeOnboardingSuccess(accountId);
         setSearchParams({});
       } else if (refresh === 'true') {
@@ -75,6 +91,18 @@ const CreatorPayments: React.FC = () => {
       }
     }
   }, [user, searchParams]);
+
+  useEffect(() => {
+    if (user) {
+      loadTransactions();
+    }
+  }, [user, transactionsPage]);
+
+  useEffect(() => {
+    if (user) {
+      loadPayouts();
+    }
+  }, [user, payoutsPage]);
 
   const loadProfileData = async () => {
     if (!user) return;
@@ -120,7 +148,6 @@ const CreatorPayments: React.FC = () => {
           title: "Stripe Account Connected",
           description: "Your Stripe Connect account has been set up successfully!",
         });
-        // Reload payout method and profile data to reflect changes
         loadPayoutMethod();
         loadProfileData();
       }
@@ -133,18 +160,9 @@ const CreatorPayments: React.FC = () => {
     if (!user) return;
     
     try {
-      setLoadingTransactions(true);
-      setLoadingPayouts(true);
       setLoadingEarnings(true);
       
-      const [transactionsData, payoutsData, earningsData] = await Promise.all([
-        fetchCreatorPaymentTransactions(user.id),
-        fetchCreatorPayouts(user.id),
-        fetchCreatorEarnings(user.id)
-      ]);
-      
-      setTransactions(transactionsData);
-      setPayouts(payoutsData);
+      const earningsData = await fetchCreatorEarnings(user.id);
       setEarnings(earningsData);
     } catch (error) {
       console.error('Error loading payment data:', error);
@@ -154,9 +172,53 @@ const CreatorPayments: React.FC = () => {
         variant: "destructive"
       });
     } finally {
-      setLoadingTransactions(false);
-      setLoadingPayouts(false);
       setLoadingEarnings(false);
+    }
+  };
+
+  const loadTransactions = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingTransactions(true);
+      
+      const offset = (transactionsPage - 1) * ITEMS_PER_PAGE;
+      const { transactions: transactionsData, total } = await fetchCreatorPaymentTransactions(user.id, ITEMS_PER_PAGE, offset);
+      
+      setTransactions(transactionsData);
+      setTransactionsTotal(total);
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load transactions",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
+  const loadPayouts = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingPayouts(true);
+      
+      const offset = (payoutsPage - 1) * ITEMS_PER_PAGE;
+      const { payouts: payoutsData, total } = await fetchCreatorPayouts(user.id, ITEMS_PER_PAGE, offset);
+      
+      setPayouts(payoutsData);
+      setPayoutsTotal(total);
+    } catch (error) {
+      console.error('Error loading payouts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load payouts",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingPayouts(false);
     }
   };
 
@@ -197,6 +259,42 @@ const CreatorPayments: React.FC = () => {
       default:
         return type;
     }
+  };
+
+  const renderPagination = (currentPage: number, totalItems: number, onPageChange: (page: number) => void) => {
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center space-x-6 lg:space-x-8">
+          <div className="flex items-center space-x-2">
+            <p className="text-sm font-medium">
+              Page {currentPage} of {totalPages}
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderPayoutMethodInfo = () => {
@@ -420,68 +518,71 @@ const CreatorPayments: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Item</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Your Earning</TableHead>
-                            <TableHead>Platform Fee</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Payout Date</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {transactions.length === 0 ? (
+                    <div className="space-y-4">
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
-                                No payment transactions found
-                              </TableCell>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Customer</TableHead>
+                              <TableHead>Item</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead>Your Earning</TableHead>
+                              <TableHead>Platform Fee</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Payout Date</TableHead>
                             </TableRow>
-                          ) : (
-                            transactions.map((transaction) => (
-                              <TableRow key={transaction.id}>
-                                <TableCell>
-                                  {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
-                                </TableCell>
-                                <TableCell>
-                                  <div>{transaction.customer_name || 'Unknown'}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-medium">{transaction.item_name}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">
-                                    {getPaymentTypeLabel(transaction.item_type)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
-                                </TableCell>
-                                <TableCell className="font-medium text-green-600">
-                                  <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" />
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                  <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" />
-                                </TableCell>
-                                <TableCell>
-                                  {getStatusBadge(transaction.payment_status)}
-                                </TableCell>
-                                <TableCell>
-                                  {transaction.payout_eligible_date ? 
-                                    format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
-                                    'N/A'
-                                  }
+                          </TableHeader>
+                          <TableBody>
+                            {transactions.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                                  No payment transactions found
                                 </TableCell>
                               </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                            ) : (
+                              transactions.map((transaction) => (
+                                <TableRow key={transaction.id}>
+                                  <TableCell>
+                                    {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>{transaction.customer_name || 'Unknown'}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-medium">{transaction.item_name}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">
+                                      {getPaymentTypeLabel(transaction.item_type)}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
+                                  </TableCell>
+                                  <TableCell className="font-medium text-green-600">
+                                    <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" />
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" />
+                                  </TableCell>
+                                  <TableCell>
+                                    {getStatusBadge(transaction.payment_status)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {transaction.payout_eligible_date ? 
+                                      format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
+                                      'N/A'
+                                    }
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {renderPagination(transactionsPage, transactionsTotal, setTransactionsPage)}
                     </div>
                   )}
                 </CardContent>
@@ -504,51 +605,54 @@ const CreatorPayments: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Currency</TableHead>
-                            <TableHead>Method</TableHead>
-                            <TableHead>Destination</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {payouts.length === 0 ? (
+                    <div className="space-y-4">
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
                             <TableRow>
-                              <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                                No payout requests found
-                              </TableCell>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead>Currency</TableHead>
+                              <TableHead>Method</TableHead>
+                              <TableHead>Destination</TableHead>
+                              <TableHead>Status</TableHead>
                             </TableRow>
-                          ) : (
-                            payouts.map((payout) => (
-                              <TableRow key={payout.id}>
-                                <TableCell>
-                                  {format(new Date(payout.created_at), 'MMM dd, yyyy')}
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                  {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
-                                </TableCell>
-                                <TableCell>
-                                  {payout.currency?.toUpperCase() || 'USD'}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">
-                                    {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>{payout.destination}</TableCell>
-                                <TableCell>
-                                  {getStatusBadge(payout.status)}
+                          </TableHeader>
+                          <TableBody>
+                            {payouts.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                                  No payout requests found
                                 </TableCell>
                               </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                            ) : (
+                              payouts.map((payout) => (
+                                <TableRow key={payout.id}>
+                                  <TableCell>
+                                    {format(new Date(payout.created_at), 'MMM dd, yyyy')}
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {payout.currency?.toUpperCase() || 'USD'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">
+                                      {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>{payout.destination}</TableCell>
+                                  <TableCell>
+                                    {getStatusBadge(payout.status)}
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {renderPagination(payoutsPage, payoutsTotal, setPayoutsPage)}
                     </div>
                   )}
                 </CardContent>
@@ -563,7 +667,10 @@ const CreatorPayments: React.FC = () => {
           onOpenChange={setIsWithdrawDialogOpen}
           availableBalance={earnings.available_balance}
           currency={currentCurrency}
-          onSuccess={loadPaymentData}
+          onSuccess={() => {
+            loadPaymentData();
+            loadPayouts();
+          }}
         />
 
         {/* Payout Method Setup Dialog */}

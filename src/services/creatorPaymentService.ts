@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
 import { 
@@ -38,10 +37,10 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
   }
 }
 
-export async function fetchCreatorPaymentTransactions(creatorId: string): Promise<CreatorPaymentTransaction[]> {
+export async function fetchCreatorPaymentTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorPaymentTransaction[], total: number }> {
   try {
-    const transactions = await fetchCreatorTransactions(creatorId);
-    return transactions;
+    const result = await fetchCreatorTransactions(creatorId, limit, offset);
+    return result;
   } catch (error) {
     console.error('Error fetching creator payment transactions:', error);
     throw error;
@@ -180,16 +179,27 @@ export async function requestCreatorPayout(
   }
 }
 
-export async function fetchCreatorPayouts(creatorId: string) {
+export async function fetchCreatorPayouts(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ payouts: any[], total: number }> {
   try {
+    // Get total count for pagination
+    const { count: totalCount, error: countError } = await supabase
+      .from('creator_payouts')
+      .select('*', { count: 'exact', head: true })
+      .eq('creator_id', creatorId);
+
+    if (countError) throw countError;
+
+    // Get paginated payouts
     const { data, error } = await supabase
       .from('creator_payouts')
       .select('*')
       .eq('creator_id', creatorId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    return data || [];
+    
+    return { payouts: data || [], total: totalCount || 0 };
   } catch (error) {
     console.error('Error fetching creator payouts:', error);
     throw error;
