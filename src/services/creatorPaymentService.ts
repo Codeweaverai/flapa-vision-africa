@@ -29,7 +29,9 @@ export interface PayoutRequest {
 
 export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEarnings> {
   try {
+    console.log('Fetching creator earnings for:', creatorId);
     const earnings = await calculateCreatorEarningsFromOrders(creatorId);
+    console.log('Creator earnings calculated:', earnings);
     return earnings;
   } catch (error) {
     console.error('Error fetching creator earnings:', error);
@@ -39,7 +41,9 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
 
 export async function fetchCreatorPaymentTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorPaymentTransaction[], total: number }> {
   try {
+    console.log('Fetching creator payment transactions for:', creatorId, 'limit:', limit, 'offset:', offset);
     const result = await fetchCreatorTransactions(creatorId, limit, offset);
+    console.log('Creator transactions fetched:', result.transactions.length, 'total:', result.total);
     return result;
   } catch (error) {
     console.error('Error fetching creator payment transactions:', error);

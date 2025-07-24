@@ -190,7 +190,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
 export async function fetchCreatorTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorTransaction[], total: number }> {
   try {
-    // Get creator's course IDs
+    // Get creator's course IDs and titles
     const { data: creatorCourses, error: coursesError } = await supabase
       .from('courses')
       .select('id, title')
@@ -201,7 +201,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
     const courseIds = creatorCourses?.map(c => c.id) || [];
     const courseMap = new Map(creatorCourses?.map(c => [c.id, c.title]) || []);
 
-    // Get creator's event IDs
+    // Get creator's event IDs and titles
     const { data: creatorEvents, error: eventsError } = await supabase
       .from('events')
       .select('id, title')
@@ -227,26 +227,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       return { transactions: [], total: 0 };
     }
 
-    // Build the filter condition dynamically
-    let filterCondition = '';
-    if (courseIds.length > 0 && eventTicketIds.length > 0) {
-      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
-    } else if (courseIds.length > 0) {
-      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`;
-    } else if (eventTicketIds.length > 0) {
-      filterCondition = `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
-    }
-
-    // Get total count for pagination
-    const { count: totalCount, error: countError } = await supabase
-      .from('order_items')
-      .select('*', { count: 'exact', head: true })
-      .eq('orders.payment_status', 'completed')
-      .or(filterCondition, { foreignTable: 'orders' });
-
-    if (countError) throw countError;
-
-    // Get paginated order items with orders
+    // Fetch order items directly for creator's content
     const { data: orderItems, error } = await supabase
       .from('order_items')
       .select(`
@@ -264,14 +245,40 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         )
       `)
       .eq('orders.payment_status', 'completed')
-      .or(filterCondition)
-      .order('created_at', { ascending: false, foreignTable: 'orders' })
+      .or(
+        courseIds.length > 0 && eventTicketIds.length > 0
+          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
+          : courseIds.length > 0
+          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`
+          : `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
+      )
+      .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching order items:', error);
+      throw error;
+    }
 
     if (!orderItems || orderItems.length === 0) {
-      return { transactions: [], total: totalCount || 0 };
+      return { transactions: [], total: 0 };
+    }
+
+    // Get total count for pagination by doing a separate count query
+    const { count: totalCount, error: countError } = await supabase
+      .from('order_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('orders.payment_status', 'completed')
+      .or(
+        courseIds.length > 0 && eventTicketIds.length > 0
+          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
+          : courseIds.length > 0
+          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`
+          : `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
+      );
+
+    if (countError) {
+      console.error('Error counting order items:', countError);
     }
 
     // Get user profiles for customer names
