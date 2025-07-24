@@ -173,22 +173,42 @@ const CreatorStudents = () => {
   };
 
   const fetchCourseEnrollments = async () => {
-    const { data, error } = await supabase
-      .from('course_enrollments')
-      .select(`
-        *,
-        course:courses!inner(title, thumbnail_url, creator_id),
-        user:profiles!inner(full_name, email, avatar_url)
-      `)
-      .eq('course.creator_id', user?.id)
-      .order('enrollment_date', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('course_enrollments')
+        .select(`
+          id,
+          user_id,
+          course_id,
+          enrollment_date,
+          completion_date,
+          is_completed,
+          course:courses!inner(title, thumbnail_url, creator_id),
+          user:profiles!inner(full_name, email, avatar_url)
+        `)
+        .eq('course.creator_id', user?.id)
+        .order('enrollment_date', { ascending: false });
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching course enrollments:', error);
+        toast.error('Failed to load course enrollments');
+        return;
+      }
+
+      // Filter out any records where the joins failed
+      const validEnrollments = data?.filter(enrollment => 
+        enrollment.course && 
+        enrollment.user && 
+        typeof enrollment.user === 'object' &&
+        'full_name' in enrollment.user &&
+        'email' in enrollment.user
+      ) || [];
+
+      setCourseEnrollments(validEnrollments as CourseEnrollment[]);
+    } catch (error) {
       console.error('Error fetching course enrollments:', error);
-      return;
+      toast.error('Failed to load course enrollments');
     }
-
-    setCourseEnrollments(data || []);
   };
 
   const fetchEventBookings = async () => {
@@ -197,7 +217,14 @@ const CreatorStudents = () => {
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
-          *,
+          id,
+          user_id,
+          event_id,
+          booking_date,
+          status,
+          payment_status,
+          ticket_quantity,
+          booking_code,
           event:events!inner(title, start_time, location, image_url, creator_id),
           user:profiles!inner(full_name, email, avatar_url)
         `)
@@ -206,11 +233,21 @@ const CreatorStudents = () => {
 
       if (bookingsError) {
         console.error('Error fetching event bookings:', bookingsError);
+        toast.error('Failed to load event bookings');
         return;
       }
 
+      // Filter out any records where the joins failed
+      const validBookings = bookingsData?.filter(booking => 
+        booking.event && 
+        booking.user && 
+        typeof booking.user === 'object' &&
+        'full_name' in booking.user &&
+        'email' in booking.user
+      ) || [];
+
       // Then get all tickets for these bookings with check-in status
-      const bookingIds = bookingsData?.map(booking => booking.id) || [];
+      const bookingIds = validBookings.map(booking => booking.id);
       
       if (bookingIds.length === 0) {
         setEventBookings([]);
@@ -235,6 +272,7 @@ const CreatorStudents = () => {
 
       if (ticketsError) {
         console.error('Error fetching tickets:', ticketsError);
+        toast.error('Failed to load tickets data');
         return;
       }
 
@@ -253,12 +291,12 @@ const CreatorStudents = () => {
       }, {} as Record<string, any[]>) || {};
 
       // Combine bookings with tickets
-      const bookingsWithTickets = bookingsData?.map(booking => ({
+      const bookingsWithTickets = validBookings.map(booking => ({
         ...booking,
         tickets: ticketsByBooking[booking.id] || []
-      })) || [];
+      }));
 
-      setEventBookings(bookingsWithTickets);
+      setEventBookings(bookingsWithTickets as EventBooking[]);
 
       // Calculate stats by event
       const statsByEvent = bookingsWithTickets.reduce((acc, booking) => {
