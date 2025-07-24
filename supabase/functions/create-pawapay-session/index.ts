@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -386,15 +387,18 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Updated order data structure to match current table schema
     const orderData = {
       user_id: user.id,
-      total_amount: amount / 100,
+      total_amount: amount / 100, // Convert from cents to dollars
       currency: currency || 'USD',
       payment_method: 'mobile_money',
       payment_status: 'completed',
-      tax_amount: tax_amount || 0,
+      payment_provider_id: depositId,
       email: user.email || '',
-      payment_provider_id: depositId
+      tax_amount: tax_amount || 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     console.log('Creating order with data:', orderData);
@@ -556,11 +560,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('PawaPay session created successfully:', pawapayData);
 
-    // Update order with PawaPay session info
+    // Update order with PawaPay session info - use the correct field name
     await serviceRoleClient
       .from('orders')
       .update({
-        receipt_url: pawapayData.redirectUrl
+        payment_provider_id: depositId,
+        updated_at: new Date().toISOString()
       })
       .eq('id', order.id);
 
