@@ -21,8 +21,7 @@ import {
   Clock,
   MapPin,
   UserCheck,
-  UserX,
-  BarChart3
+  UserX
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -102,6 +101,22 @@ const CreatorStudents = () => {
   }, [user]);
 
   const setupRealtimeSubscriptions = () => {
+    // Subscribe to course enrollments changes
+    const enrollmentsChannel = supabase
+      .channel('course-enrollments-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'course_enrollments'
+        },
+        () => {
+          fetchCourseEnrollments();
+        }
+      )
+      .subscribe();
+
     // Subscribe to event bookings changes
     const bookingsChannel = supabase
       .channel('event-bookings-changes')
@@ -151,6 +166,7 @@ const CreatorStudents = () => {
       .subscribe();
 
     return () => {
+      supabase.removeChannel(enrollmentsChannel);
       supabase.removeChannel(bookingsChannel);
       supabase.removeChannel(checkInsChannel);
       supabase.removeChannel(ticketsChannel);
