@@ -19,9 +19,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  MapPin,
-  UserCheck,
-  UserX
+  MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -33,6 +31,7 @@ interface CourseEnrollment {
   enrollment_date: string;
   completion_date?: string;
   is_completed: boolean;
+  payment_status: string;
   course: {
     title: string;
     thumbnail_url?: string;
@@ -76,19 +75,10 @@ interface EventBooking {
   }[];
 }
 
-interface EventStats {
-  total_bookings: number;
-  total_tickets: number;
-  checked_in_count: number;
-  not_checked_in_count: number;
-  check_in_rate: number;
-}
-
 const CreatorStudents = () => {
   const { user } = useAuth();
   const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollment[]>([]);
   const [eventBookings, setEventBookings] = useState<EventBooking[]>([]);
-  const [eventStats, setEventStats] = useState<Record<string, EventStats>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('courses');
@@ -190,7 +180,7 @@ const CreatorStudents = () => {
 
   const fetchCourseEnrollments = async () => {
     try {
-      // First get enrollments for creator's courses
+      // Get all enrollments for courses created by the current user
       const { data: enrollmentsData, error: enrollmentsError } = await supabase
         .from('course_enrollments')
         .select(`
@@ -200,6 +190,7 @@ const CreatorStudents = () => {
           enrollment_date,
           completion_date,
           is_completed,
+          payment_status,
           courses!inner(title, thumbnail_url, creator_id)
         `)
         .eq('courses.creator_id', user?.id)
@@ -216,10 +207,10 @@ const CreatorStudents = () => {
         return;
       }
 
-      // Get unique user IDs
+      // Get unique user IDs from all enrollments
       const userIds = [...new Set(enrollmentsData.map(e => e.user_id))];
 
-      // Fetch user profiles using auth.users email via function
+      // Fetch user emails using the function
       const { data: usersData, error: usersError } = await supabase
         .rpc('get_user_emails', { user_ids: userIds });
 
@@ -260,6 +251,7 @@ const CreatorStudents = () => {
             enrollment_date: enrollment.enrollment_date,
             completion_date: enrollment.completion_date,
             is_completed: enrollment.is_completed,
+            payment_status: enrollment.payment_status,
             course: {
               title: enrollment.courses.title,
               thumbnail_url: enrollment.courses.thumbnail_url
@@ -282,7 +274,7 @@ const CreatorStudents = () => {
 
   const fetchEventBookings = async () => {
     try {
-      // First get bookings for creator's events
+      // Get all bookings for events created by the current user
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
@@ -307,11 +299,10 @@ const CreatorStudents = () => {
 
       if (!bookingsData || bookingsData.length === 0) {
         setEventBookings([]);
-        setEventStats({});
         return;
       }
 
-      // Get unique user IDs
+      // Get unique user IDs from all bookings
       const userIds = [...new Set(bookingsData.map(b => b.user_id))];
 
       // Fetch user emails
@@ -414,39 +405,6 @@ const CreatorStudents = () => {
 
       setEventBookings(enrichedBookings);
 
-      // Calculate stats by event
-      const statsByEvent = enrichedBookings.reduce((acc, booking) => {
-        const eventId = booking.event_id;
-        if (!acc[eventId]) {
-          acc[eventId] = {
-            total_bookings: 0,
-            total_tickets: 0,
-            checked_in_count: 0,
-            not_checked_in_count: 0,
-            check_in_rate: 0
-          };
-        }
-
-        acc[eventId].total_bookings += 1;
-        acc[eventId].total_tickets += booking.tickets.length;
-        
-        booking.tickets.forEach(ticket => {
-          if (ticket.check_in) {
-            acc[eventId].checked_in_count += 1;
-          } else {
-            acc[eventId].not_checked_in_count += 1;
-          }
-        });
-
-        acc[eventId].check_in_rate = acc[eventId].total_tickets > 0 
-          ? (acc[eventId].checked_in_count / acc[eventId].total_tickets) * 100 
-          : 0;
-
-        return acc;
-      }, {} as Record<string, EventStats>);
-
-      setEventStats(statsByEvent);
-
     } catch (error) {
       console.error('Error fetching event bookings:', error);
       toast.error('Failed to load event registrations');
@@ -455,12 +413,13 @@ const CreatorStudents = () => {
 
   const exportCourseStudents = () => {
     const csvContent = [
-      ['Student Name', 'Email', 'Course', 'Enrollment Date', 'Completion Status'],
+      ['Student Name', 'Email', 'Course', 'Enrollment Date', 'Payment Status', 'Completion Status'],
       ...filteredCourseEnrollments.map(enrollment => [
         enrollment.user.full_name,
         enrollment.user.email,
         enrollment.course.title,
         format(new Date(enrollment.enrollment_date), 'yyyy-MM-dd'),
+        enrollment.payment_status,
         enrollment.is_completed ? 'Completed' : 'In Progress'
       ])
     ].map(row => row.join(',')).join('\n');
@@ -476,13 +435,14 @@ const CreatorStudents = () => {
 
   const exportEventAttendees = () => {
     const csvContent = [
-      ['Attendee Name', 'Email', 'Event', 'Booking Date', 'Status', 'Tickets', 'Checked In', 'Check-in Rate'],
+      ['Attendee Name', 'Email', 'Event', 'Booking Date', 'Status', 'Payment Status', 'Tickets', 'Checked In', 'Check-in Rate'],
       ...filteredEventBookings.map(booking => [
         booking.user.full_name,
         booking.user.email,
         booking.event.title,
         format(new Date(booking.booking_date), 'yyyy-MM-dd'),
         booking.status,
+        booking.payment_status,
         booking.tickets.length.toString(),
         booking.tickets.filter(t => t.check_in).length.toString(),
         booking.tickets.length > 0 ? `${((booking.tickets.filter(t => t.check_in).length / booking.tickets.length) * 100).toFixed(1)}%` : '0%'
@@ -531,6 +491,32 @@ const CreatorStudents = () => {
     }
   };
 
+  const getPaymentStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-500">Completed</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="border-yellow-500 text-yellow-700">Pending</Badge>;
+      case 'failed':
+        return <Badge variant="outline" className="border-red-500 text-red-700">Failed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getBookingStatusBadge = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return <Badge className="bg-green-500">Confirmed</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="border-yellow-500 text-yellow-700">Pending</Badge>;
+      case 'cancelled':
+        return <Badge variant="outline" className="border-red-500 text-red-700">Cancelled</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   if (loading) {
     return (
       <CreatorLayout>
@@ -543,223 +529,220 @@ const CreatorStudents = () => {
 
   return (
     <CreatorLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Students & Attendees</h1>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search students..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64"
-              />
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="space-y-6 p-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              Students & Attendees
+            </h1>
+            <div className="flex gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search students..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+              <Button
+                onClick={activeTab === 'courses' ? exportCourseStudents : exportEventAttendees}
+                variant="outline"
+                className="bg-gradient-to-r from-orange-500 to-purple-500 text-white border-0 hover:from-orange-600 hover:to-purple-600"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </div>
-            <Button
-              onClick={activeTab === 'courses' ? exportCourseStudents : exportEventAttendees}
-              variant="outline"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
           </div>
-        </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="courses" className="flex items-center gap-2">
-              <GraduationCap className="h-4 w-4" />
-              Course Students ({filteredCourseEnrollments.length})
-            </TabsTrigger>
-            <TabsTrigger value="events" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Event Attendees ({filteredEventBookings.length})
-            </TabsTrigger>
-          </TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-white/50 backdrop-blur-sm">
+              <TabsTrigger value="courses" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
+                <GraduationCap className="h-4 w-4" />
+                Course Students ({filteredCourseEnrollments.length})
+              </TabsTrigger>
+              <TabsTrigger value="events" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
+                <Calendar className="h-4 w-4" />
+                Event Attendees ({filteredEventBookings.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="courses" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Course Enrollments
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Course</TableHead>
-                      <TableHead>Enrolled</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Completion</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCourseEnrollments.map((enrollment) => (
-                      <TableRow key={enrollment.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={enrollment.user.avatar_url} />
-                              <AvatarFallback>
-                                {enrollment.user.full_name.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{enrollment.user.full_name}</div>
-                              <div className="text-sm text-gray-500">{enrollment.user.email}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {enrollment.course.thumbnail_url && (
-                              <img 
-                                src={enrollment.course.thumbnail_url} 
-                                alt={enrollment.course.title}
-                                className="h-8 w-8 rounded object-cover"
-                              />
-                            )}
-                            <span className="font-medium">{enrollment.course.title}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(enrollment.enrollment_date), 'MMM dd, yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={enrollment.is_completed ? 'default' : 'secondary'}>
-                            {enrollment.is_completed ? 'Completed' : 'In Progress'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {enrollment.completion_date ? (
-                            <span className="text-sm text-gray-600">
-                              {format(new Date(enrollment.completion_date), 'MMM dd, yyyy')}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-gray-400">-</span>
-                          )}
-                        </TableCell>
+            <TabsContent value="courses" className="space-y-4">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    <Users className="h-5 w-5" />
+                    Course Enrollments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Student</TableHead>
+                        <TableHead>Course</TableHead>
+                        <TableHead>Enrolled</TableHead>
+                        <TableHead>Payment Status</TableHead>
+                        <TableHead>Progress</TableHead>
+                        <TableHead>Completion</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="events" className="space-y-4">
-            {/* Event Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {Object.entries(eventStats).map(([eventId, stats]) => {
-                const eventTitle = eventBookings.find(b => b.event_id === eventId)?.event.title || 'Unknown Event';
-                return (
-                  <Card key={eventId}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 truncate">{eventTitle}</p>
-                          <p className="text-2xl font-bold text-green-600">{stats.check_in_rate.toFixed(1)}%</p>
-                          <p className="text-xs text-gray-500">Check-in Rate</p>
-                        </div>
-                        <div className="text-right">
-                          <div className="flex items-center gap-1 text-sm">
-                            <UserCheck className="h-4 w-4 text-green-600" />
-                            <span>{stats.checked_in_count}</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-sm">
-                            <UserX className="h-4 w-4 text-red-600" />
-                            <span>{stats.not_checked_in_count}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Event Registrations
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Attendee</TableHead>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Booking Date</TableHead>
-                      <TableHead>Tickets</TableHead>
-                      <TableHead>Check-in Status</TableHead>
-                      <TableHead>Payment Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEventBookings.map((booking) => (
-                      <TableRow key={booking.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={booking.user.avatar_url} />
-                              <AvatarFallback>
-                                {booking.user.full_name.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{booking.user.full_name}</div>
-                              <div className="text-sm text-gray-500">{booking.user.email}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {booking.event.image_url && (
-                              <img 
-                                src={booking.event.image_url} 
-                                alt={booking.event.title}
-                                className="h-8 w-8 rounded object-cover"
-                              />
-                            )}
-                            <div>
-                              <div className="font-medium">{booking.event.title}</div>
-                              <div className="text-sm text-gray-500 flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {booking.event.location}
+                    </TableHeader>
+                    <TableBody>
+                      {filteredCourseEnrollments.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                            No course enrollments found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredCourseEnrollments.map((enrollment) => (
+                          <TableRow key={enrollment.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={enrollment.user.avatar_url} />
+                                  <AvatarFallback>
+                                    {enrollment.user.full_name.split(' ').map(n => n[0]).join('')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">{enrollment.user.full_name}</div>
+                                  <div className="text-sm text-gray-500">{enrollment.user.email}</div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(booking.booking_date), 'MMM dd, yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {booking.tickets.length} Ticket{booking.tickets.length !== 1 ? 's' : ''}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {getCheckInBadge(booking.tickets)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={booking.payment_status === 'completed' ? 'default' : 'secondary'}>
-                            {booking.payment_status}
-                          </Badge>
-                        </TableCell>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {enrollment.course.thumbnail_url && (
+                                  <img 
+                                    src={enrollment.course.thumbnail_url} 
+                                    alt={enrollment.course.title}
+                                    className="h-8 w-8 rounded object-cover"
+                                  />
+                                )}
+                                <span className="font-medium">{enrollment.course.title}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(enrollment.enrollment_date), 'MMM dd, yyyy')}
+                            </TableCell>
+                            <TableCell>
+                              {getPaymentStatusBadge(enrollment.payment_status)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={enrollment.is_completed ? 'default' : 'secondary'}>
+                                {enrollment.is_completed ? 'Completed' : 'In Progress'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {enrollment.completion_date ? (
+                                <span className="text-sm text-gray-600">
+                                  {format(new Date(enrollment.completion_date), 'MMM dd, yyyy')}
+                                </span>
+                              ) : (
+                                <span className="text-sm text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="events" className="space-y-4">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    <Users className="h-5 w-5" />
+                    Event Registrations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Attendee</TableHead>
+                        <TableHead>Event</TableHead>
+                        <TableHead>Booking Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Payment Status</TableHead>
+                        <TableHead>Tickets</TableHead>
+                        <TableHead>Check-in Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredEventBookings.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                            No event registrations found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredEventBookings.map((booking) => (
+                          <TableRow key={booking.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={booking.user.avatar_url} />
+                                  <AvatarFallback>
+                                    {booking.user.full_name.split(' ').map(n => n[0]).join('')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">{booking.user.full_name}</div>
+                                  <div className="text-sm text-gray-500">{booking.user.email}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {booking.event.image_url && (
+                                  <img 
+                                    src={booking.event.image_url} 
+                                    alt={booking.event.title}
+                                    className="h-8 w-8 rounded object-cover"
+                                  />
+                                )}
+                                <div>
+                                  <div className="font-medium">{booking.event.title}</div>
+                                  <div className="text-sm text-gray-500 flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {booking.event.location}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(booking.booking_date), 'MMM dd, yyyy')}
+                            </TableCell>
+                            <TableCell>
+                              {getBookingStatusBadge(booking.status)}
+                            </TableCell>
+                            <TableCell>
+                              {getPaymentStatusBadge(booking.payment_status)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {booking.tickets.length} Ticket{booking.tickets.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {getCheckInBadge(booking.tickets)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </CreatorLayout>
   );
