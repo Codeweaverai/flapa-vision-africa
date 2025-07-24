@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -195,16 +194,46 @@ const CreatorStudents = () => {
         return;
       }
 
-      // Filter out any records where the joins failed
-      const validEnrollments = data?.filter(enrollment => 
-        enrollment.course && 
-        enrollment.user && 
-        typeof enrollment.user === 'object' &&
-        'full_name' in enrollment.user &&
-        'email' in enrollment.user
-      ) || [];
+      // Type guard to check if user object has required properties
+      const isValidUser = (user: any): user is { full_name: string; email: string; avatar_url?: string } => {
+        return user && 
+               typeof user === 'object' && 
+               typeof user.full_name === 'string' && 
+               typeof user.email === 'string' &&
+               !('error' in user);
+      };
 
-      setCourseEnrollments(validEnrollments as CourseEnrollment[]);
+      // Type guard to check if course object has required properties
+      const isValidCourse = (course: any): course is { title: string; thumbnail_url?: string } => {
+        return course && 
+               typeof course === 'object' && 
+               typeof course.title === 'string' &&
+               !('error' in course);
+      };
+
+      // Filter and properly type the enrollments
+      const validEnrollments: CourseEnrollment[] = data?.filter((enrollment: any) => 
+        isValidCourse(enrollment.course) && 
+        isValidUser(enrollment.user)
+      ).map((enrollment: any) => ({
+        id: enrollment.id,
+        user_id: enrollment.user_id,
+        course_id: enrollment.course_id,
+        enrollment_date: enrollment.enrollment_date,
+        completion_date: enrollment.completion_date,
+        is_completed: enrollment.is_completed,
+        course: {
+          title: enrollment.course.title,
+          thumbnail_url: enrollment.course.thumbnail_url
+        },
+        user: {
+          full_name: enrollment.user.full_name,
+          email: enrollment.user.email,
+          avatar_url: enrollment.user.avatar_url
+        }
+      })) || [];
+
+      setCourseEnrollments(validEnrollments);
     } catch (error) {
       console.error('Error fetching course enrollments:', error);
       toast.error('Failed to load course enrollments');
@@ -237,17 +266,33 @@ const CreatorStudents = () => {
         return;
       }
 
+      // Type guard to check if user object has required properties
+      const isValidUser = (user: any): user is { full_name: string; email: string; avatar_url?: string } => {
+        return user && 
+               typeof user === 'object' && 
+               typeof user.full_name === 'string' && 
+               typeof user.email === 'string' &&
+               !('error' in user);
+      };
+
+      // Type guard to check if event object has required properties
+      const isValidEvent = (event: any): event is { title: string; start_time: string; location: string; image_url?: string } => {
+        return event && 
+               typeof event === 'object' && 
+               typeof event.title === 'string' &&
+               typeof event.start_time === 'string' &&
+               typeof event.location === 'string' &&
+               !('error' in event);
+      };
+
       // Filter out any records where the joins failed
-      const validBookings = bookingsData?.filter(booking => 
-        booking.event && 
-        booking.user && 
-        typeof booking.user === 'object' &&
-        'full_name' in booking.user &&
-        'email' in booking.user
+      const validBookings = bookingsData?.filter((booking: any) => 
+        isValidEvent(booking.event) && 
+        isValidUser(booking.user)
       ) || [];
 
       // Then get all tickets for these bookings with check-in status
-      const bookingIds = validBookings.map(booking => booking.id);
+      const bookingIds = validBookings.map((booking: any) => booking.id);
       
       if (bookingIds.length === 0) {
         setEventBookings([]);
@@ -277,7 +322,7 @@ const CreatorStudents = () => {
       }
 
       // Group tickets by booking_id
-      const ticketsByBooking = ticketsData?.reduce((acc, ticket) => {
+      const ticketsByBooking = ticketsData?.reduce((acc: Record<string, any[]>, ticket: any) => {
         if (!acc[ticket.booking_id]) {
           acc[ticket.booking_id] = [];
         }
@@ -288,15 +333,33 @@ const CreatorStudents = () => {
           check_in: ticket.check_ins?.[0] || null
         });
         return acc;
-      }, {} as Record<string, any[]>) || {};
+      }, {}) || {};
 
-      // Combine bookings with tickets
-      const bookingsWithTickets = validBookings.map(booking => ({
-        ...booking,
+      // Combine bookings with tickets and properly type them
+      const bookingsWithTickets: EventBooking[] = validBookings.map((booking: any) => ({
+        id: booking.id,
+        user_id: booking.user_id,
+        event_id: booking.event_id,
+        booking_date: booking.booking_date,
+        status: booking.status,
+        payment_status: booking.payment_status,
+        ticket_quantity: booking.ticket_quantity,
+        booking_code: booking.booking_code,
+        event: {
+          title: booking.event.title,
+          start_time: booking.event.start_time,
+          location: booking.event.location,
+          image_url: booking.event.image_url
+        },
+        user: {
+          full_name: booking.user.full_name,
+          email: booking.user.email,
+          avatar_url: booking.user.avatar_url
+        },
         tickets: ticketsByBooking[booking.id] || []
       }));
 
-      setEventBookings(bookingsWithTickets as EventBooking[]);
+      setEventBookings(bookingsWithTickets);
 
       // Calculate stats by event
       const statsByEvent = bookingsWithTickets.reduce((acc, booking) => {
