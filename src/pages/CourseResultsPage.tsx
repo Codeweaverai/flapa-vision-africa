@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -181,6 +182,23 @@ const CourseResultsPage = () => {
     }
   };
 
+  // Convert image URL to base64
+  const getImageAsBase64 = async (imageUrl: string): Promise<string> => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting image to base64:', error);
+      return '';
+    }
+  };
+
   const generateCertificateHTML = async (certificate: Certificate) => {
     const currentDate = new Date(certificate.issue_date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -190,6 +208,10 @@ const CourseResultsPage = () => {
 
     // Get creator name
     const creatorName = certificate.creator_id ? await fetchCreatorName(certificate.creator_id) : 'SkillPulse Instructor';
+
+    // Get director signature as base64
+    const signatureImageUrl = 'https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/certificates//d321231f-c3fb-46f0-b19f-2884efd3da99.png';
+    const signatureBase64 = await getImageAsBase64(signatureImageUrl);
 
     return `
     <!DOCTYPE html>
@@ -283,18 +305,30 @@ const CourseResultsPage = () => {
                 margin: 20px 0;
             }
             
+            .creator-section {
+                font-size: 1.1rem;
+                color: #6b7280;
+                margin: 30px 0;
+                text-align: center;
+            }
+            
+            .creator-name {
+                font-size: 1.3rem;
+                color: #1f2937;
+                font-weight: bold;
+                margin: 10px 0;
+            }
+            
             .signature {
                 margin-top: 50px;
                 display: flex;
-                justify-content: space-between;
+                justify-content: center;
                 align-items: flex-end;
                 flex-wrap: wrap;
                 gap: 30px;
             }
             
             .signature-section {
-                flex: 1;
-                min-width: 200px;
                 text-align: center;
                 display: flex;
                 flex-direction: column;
@@ -302,24 +336,16 @@ const CourseResultsPage = () => {
             }
             
             .signature-image {
-                width: 150px;
-                height: 60px;
-                background: linear-gradient(45deg, #f59e0b, #8b5cf6);
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-size: 18px;
-                font-weight: bold;
+                width: 200px;
+                height: 100px;
                 margin-bottom: 10px;
-                font-style: italic;
+                border-radius: 8px;
             }
             
             .signature-line {
                 border-top: 2px solid #1f2937;
                 width: 100%;
-                max-width: 200px;
+                max-width: 250px;
                 text-align: center;
                 padding-top: 10px;
                 font-size: 0.9rem;
@@ -328,13 +354,8 @@ const CourseResultsPage = () => {
             }
             
             .date-section {
-                flex: 1;
-                min-width: 200px;
                 text-align: center;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: flex-end;
+                margin-top: 30px;
             }
             
             .verification {
@@ -369,21 +390,28 @@ const CourseResultsPage = () => {
             <div class="completion">has successfully completed the course</div>
             <div class="course">"${certificate.course_title}"</div>
             <div class="completion">demonstrating professional competency and commitment to continuous learning</div>
+            
+            <div class="creator-section">
+                <div class="completion">Course Instructor:</div>
+                <div class="creator-name">${creatorName}</div>
+            </div>
+            
             <div class="signature">
                 <div class="signature-section">
-                    <div class="signature-image">
-                        ${creatorName.split(' ').map(n => n[0]).join('')}
-                    </div>
+                    ${signatureBase64 ? `<img src="${signatureBase64}" alt="Director Signature" class="signature-image" />` : ''}
                     <div class="signature-line">
-                        <strong>${creatorName}</strong><br>
-                        Course Instructor
+                        <strong>Mbolela Pule</strong><br>
+                        Director Learning - SkillPulse<br>
+                        Digital Technologies Limited
                     </div>
-                </div>
-                <div class="date-section">
-                    <div style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">${currentDate}</div>
-                    <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
                 </div>
             </div>
+            
+            <div class="date-section">
+                <div style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">${currentDate}</div>
+                <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px;">Date of Completion</div>
+            </div>
+            
             <div class="verification">
                 Verification Code: ${certificate.verification_code}<br>
                 This certificate can be verified at skillpulse.com/verify-certificate
