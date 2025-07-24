@@ -3289,6 +3289,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      is_creator_content_owner: {
+        Args: {
+          creator_uuid: string
+          item_type_param: string
+          item_id_param: string
+        }
+        Returns: boolean
+      }
       process_payment_success: {
         Args: {
           p_order_id: string
