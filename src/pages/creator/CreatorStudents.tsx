@@ -203,10 +203,20 @@ const CreatorStudents = () => {
       // Get unique user IDs
       const userIds = [...new Set(enrollmentsData.map(e => e.user_id))];
 
-      // Fetch user profiles
+      // Fetch user profiles using auth.users email via function
+      const { data: usersData, error: usersError } = await supabase
+        .rpc('get_user_emails', { user_ids: userIds });
+
+      if (usersError) {
+        console.error('Error fetching user emails:', usersError);
+        toast.error('Failed to load user data');
+        return;
+      }
+
+      // Fetch profiles for additional data
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, email, avatar_url')
+        .select('id, full_name, avatar_url')
         .in('id', userIds);
 
       if (profilesError) {
@@ -215,16 +225,17 @@ const CreatorStudents = () => {
         return;
       }
 
-      // Create a profile lookup map
-      const profilesMap = new Map(
-        profilesData?.map(profile => [profile.id, profile]) || []
-      );
+      // Create lookup maps
+      const usersMap = new Map(usersData?.map(user => [user.id, user]) || []);
+      const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]) || []);
 
-      // Combine enrollments with user profiles
+      // Combine enrollments with user data
       const enrichedEnrollments: CourseEnrollment[] = enrollmentsData
         .map(enrollment => {
+          const userAuth = usersMap.get(enrollment.user_id);
           const profile = profilesMap.get(enrollment.user_id);
-          if (!profile || !enrollment.courses) return null;
+          
+          if (!userAuth || !profile || !enrollment.courses) return null;
 
           return {
             id: enrollment.id,
@@ -239,7 +250,7 @@ const CreatorStudents = () => {
             },
             user: {
               full_name: profile.full_name || 'Unknown User',
-              email: profile.email || '',
+              email: userAuth.email || '',
               avatar_url: profile.avatar_url
             }
           };
@@ -287,10 +298,20 @@ const CreatorStudents = () => {
       // Get unique user IDs
       const userIds = [...new Set(bookingsData.map(b => b.user_id))];
 
-      // Fetch user profiles
+      // Fetch user emails
+      const { data: usersData, error: usersError } = await supabase
+        .rpc('get_user_emails', { user_ids: userIds });
+
+      if (usersError) {
+        console.error('Error fetching user emails:', usersError);
+        toast.error('Failed to load user data');
+        return;
+      }
+
+      // Fetch profiles for additional data
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, email, avatar_url')
+        .select('id, full_name, avatar_url')
         .in('id', userIds);
 
       if (profilesError) {
@@ -299,10 +320,9 @@ const CreatorStudents = () => {
         return;
       }
 
-      // Create a profile lookup map
-      const profilesMap = new Map(
-        profilesData?.map(profile => [profile.id, profile]) || []
-      );
+      // Create lookup maps
+      const usersMap = new Map(usersData?.map(user => [user.id, user]) || []);
+      const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]) || []);
 
       // Get booking IDs for fetching tickets
       const bookingIds = bookingsData.map(booking => booking.id);
@@ -343,11 +363,13 @@ const CreatorStudents = () => {
         return acc;
       }, {}) || {};
 
-      // Combine bookings with user profiles and tickets
+      // Combine bookings with user data and tickets
       const enrichedBookings: EventBooking[] = bookingsData
         .map(booking => {
+          const userAuth = usersMap.get(booking.user_id);
           const profile = profilesMap.get(booking.user_id);
-          if (!profile || !booking.events) return null;
+          
+          if (!userAuth || !profile || !booking.events) return null;
 
           return {
             id: booking.id,
@@ -366,7 +388,7 @@ const CreatorStudents = () => {
             },
             user: {
               full_name: profile.full_name || 'Unknown User',
-              email: profile.email || '',
+              email: userAuth.email || '',
               avatar_url: profile.avatar_url
             },
             tickets: ticketsByBooking[booking.id] || []
