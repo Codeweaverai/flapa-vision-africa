@@ -554,7 +554,7 @@ const CourseDetailPage = () => {
                           controls={true}
                           playing={false}
                           width="100%"
-                          height="90%"
+                          height="100%"
                           light={course.thumbnail_url}
                           config={{
                             file: {
