@@ -553,8 +553,8 @@ const CourseDetailPage = () => {
                           url={course.course_preview.preview_video_url}
                           controls={true}
                           playing={false}
-                          width="600px"
-                          height="600px"
+                          width="100%"
+                          height="350px"
                           light={course.thumbnail_url}
                           config={{
                             file: {
