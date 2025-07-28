@@ -183,7 +183,7 @@ function App() {
                   <Route path="/course/:courseId/enroll" element={<CourseEnrollmentPage />} />
                   <Route path="/course/:courseId/lesson/:lessonId" element={<LessonPage />} />
                   <Route path="/creators" element={<CreatorsPage />} />
-                  <Route path="/creator/profile/:Id" element={<CreatorPublicProfile />} />
+                  <Route path="/creator/profile/:creatorId" element={<CreatorPublicProfile />} />
                   <Route path="/events" element={<EventsPage />} />
                   <Route path="/event-detail/:id" element={<EventDetailPage />} />
                   <Route path="/explore-courses" element={<ExploreCoursesPage />} />
