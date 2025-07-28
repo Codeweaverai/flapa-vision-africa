@@ -469,9 +469,9 @@ const CourseDetailPage = () => {
       <Layout>
         <div className="container mx-auto px-4 py-8">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-300 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-            <div className="h-64 bg-gray-300 rounded"></div>
+            <div className="h-8 w-3/4 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
+            <div className="h-4 w-1/2 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-20"></div>
+            <div className="h-64 w-full rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
           </div>
         </div>
       </Layout>
