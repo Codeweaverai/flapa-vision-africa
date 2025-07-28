@@ -403,7 +403,7 @@ const CreatorPayments: React.FC = () => {
                 <Button 
                   onClick={() => setIsWithdrawDialogOpen(true)}
                   disabled={loadingEarnings || earnings.available_balance < 5 || (!profileData?.stripe_connect_account_id && !profileData?.mobile_money_operator)}
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Withdraw Funds
                 </Button>
