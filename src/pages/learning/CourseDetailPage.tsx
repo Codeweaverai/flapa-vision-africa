@@ -730,8 +730,7 @@ const CourseDetailPage = () => {
                       </Button>
                       {!course.is_free && (
                         <Button 
-                          variant="outline" 
-                          className="w-full"
+                          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
                           onClick={handleAddToCart}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
