@@ -21,7 +21,7 @@ const MobileBottomNav = () => {
       id: 'learning',
       label: 'My Learning',
       icon: BookOpen,
-      path: '/learning',
+      path: '/my-courses',
       color: 'text-purple-500'
     },
     {
