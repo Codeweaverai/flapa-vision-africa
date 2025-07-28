@@ -9,7 +9,7 @@ const CurrencySwitcher: React.FC = () => {
 
   return (
     <Select value={currentCurrency} onValueChange={(value: CurrencyCode) => setCurrency(value)}>
-      <SelectTrigger className="w-32 h-8 text-xs">
+      <SelectTrigger className="w-25 h-8 text-xs">
         <SelectValue>
           <span className="flex items-center gap-1">
             <span>{SUPPORTED_CURRENCIES[currentCurrency].flag}</span>
