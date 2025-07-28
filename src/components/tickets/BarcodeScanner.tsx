@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Camera, X, Scan } from 'lucide-react';
@@ -19,11 +19,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
     const config = {
       fps: 10,
       qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0,
-      supportedScanTypes: [
-        Html5QrcodeScanType.SCAN_TYPE_QR_CODE,
-        Html5QrcodeScanType.SCAN_TYPE_BARCODE
-      ]
+      aspectRatio: 1.0
     };
 
     const scanner = new Html5QrcodeScanner(
