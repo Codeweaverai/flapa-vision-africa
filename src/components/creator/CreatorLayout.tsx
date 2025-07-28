@@ -91,7 +91,7 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
   
   return (
     <Layout>
-      <div className="section-container py-8">
+        <div className="py-8 bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-1">
             <Card className="p-4">
