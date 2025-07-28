@@ -77,7 +77,8 @@
     @apply border-border;
   }
   body {
-    @apply bg-light-purple text-foreground;
+  @apply text-foreground;
+    background: linear-gradient(135deg, #FFEBCD, #EBD8FF);
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
