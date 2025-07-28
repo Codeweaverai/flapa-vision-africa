@@ -46,7 +46,7 @@ interface Event {
 }
 
 const CreatorPublicProfile: React.FC = () => {
-  const { id: creatorId } = useParams<{ id: string }>();
+  const { creatorId } = useParams<{ creatorId: string }>(); 
   const { user } = useAuth();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
