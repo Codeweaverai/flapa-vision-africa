@@ -1,955 +1,381 @@
+
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import ReactPlayer from 'react-player';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { toast } from 'sonner';
 import { 
-  Play, 
-  Clock, 
-  User, 
   BookOpen, 
-  Award, 
+  Clock, 
+  Users, 
   Star, 
-  Users,
-  MessageCircle,
-  Target,
-  CheckCircle,
+  Award, 
+  CheckCircle, 
+  Play,
+  MessageSquare,
   StickyNote,
-  CheckCircle2,
-  GraduationCap,
-  Eye,
   FileText
 } from 'lucide-react';
-import { toast } from 'sonner';
-import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
-import CourseReviewsTab from '@/components/course/CourseReviewsTab';
-import LessonDiscussionTab from '@/components/course/LessonDiscussionTab';
-import AddToCartButton from '@/components/cart/AddToCartButton';
-import LessonNotesTab from '@/components/course/LessonNotesTab';
-import FinalExamModal from '@/components/course/FinalExamModal';
-import QuizModal from '@/components/course/QuizModal';
-import VideoTranscripts from '@/components/course/VideoTranscripts';
-import QuizResultsModal from '@/components/course/QuizResultsModal';
-import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
+
+interface Module {
+  id: string;
+  title: string;
+  order_index: number;
+  lessons: Lesson[];
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  duration_minutes: number;
+  order_index: number;
+  video_url?: string;
+  content?: string;
+  is_preview: boolean;
+}
 
 interface Course {
-  id?: string;
+  id: string;
   title: string;
   description: string;
-  summary: string;
   thumbnail_url?: string;
-  category: string;
-  price: number;
-  is_free: boolean;
-  creator_id: string;
   duration_minutes: number;
   difficulty_level: string;
-  is_published: boolean;
-  created_at: string;
-  updated_at: string;
-  certificate_enabled: boolean;
-}
-
-interface CourseModule {
-  id: string;
-  course_id: string;
-  title: string;
-  description: string;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-  lessons: CourseLesson[];
-}
-
-interface CourseLesson {
-  id: string;
-  module_id: string;
-  title: string;
-  description: string;
-  content: any;
-  content_type: string;
-  video_url?: string;
-  materials_urls: string[];
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-  is_complete?: boolean;
-  duration_minutes?: number;
-}
-
-interface CourseEnrollment {
-  id: string;
-  user_id: string;
-  course_id: string;
-  enrollment_date: string;
-  payment_status: string;
-}
-
-interface ProgressData {
-  id: string;
-  user_id: string;
-  course_id: string;
-  progress_percentage: number;
-  last_accessed_module_id?: string;
-  last_accessed_lesson_id?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Review {
-  id: string;
-  course_id: string;
-  user_id: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-  updated_at: string;
-  profiles?: {
-    id: string;
-    username?: string;
-    full_name?: string;
+  category: string;
+  tags: string[];
+  is_free: boolean;
+  price: number;
+  modules: Module[];
+  enrollments_count: number;
+  reviews_count: number;
+  average_rating: number;
+  creator: {
+    full_name: string;
     avatar_url?: string;
   };
 }
 
-interface LearningOutcome {
-  id: string;
-  course_id: string;
-  outcome: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface FinalExam {
-  id: string;
-  course_id: string;
-  title: string;
-  description: string;
-  passing_score: number;
-  time_limit_minutes: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Profile {
-  id: string;
-  username?: string;
-  full_name?: string;
-  avatar_url?: string;
-  bio?: string;
-}
-
-interface ExamResult {
-  id: string;
-  passed: boolean;
-  score: number;
-  final_grade: number;
-  quiz_scores: number[];
-  attempt_number: number;
-}
-
 const CourseLearningPage = () => {
-  const params = useParams();
-  const navigate = useNavigate();
-  const courseId = params.courseId || params.id;
-  
+  const { courseId } = useParams<{ courseId: string }>();
+  const location = useLocation();
   const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
-  const [modules, setModules] = useState<CourseModule[]>([]);
-  const [enrollment, setEnrollment] = useState<CourseEnrollment | null>(null);
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState<ProgressData | null>(null);
-  const [enrollmentCount, setEnrollmentCount] = useState(0);
-  const [averageRating, setAverageRating] = useState(0);
-  const [reviewCount, setReviewCount] = useState(0);
-  const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
-  const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
-  const [instructor, setInstructor] = useState<Profile | null>(null);
-  const [markingComplete, setMarkingComplete] = useState(false);
-  const [showExamModal, setShowExamModal] = useState(false);
-  const [showQuizModal, setShowQuizModal] = useState(false);
-  const [currentQuizId, setCurrentQuizId] = useState<string>('');
-  const [currentLessonId, setCurrentLessonId] = useState<string>('');
-  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
-  const [showQuizResultsModal, setShowQuizResultsModal] = useState(false);
-  const [currentQuiz, setCurrentQuiz] = useState<any>(null);
-  const [quizScore, setQuizScore] = useState(0);
-  const [quizPassed, setQuizPassed] = useState(false);
-  const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
-  const [currentVideoTime, setCurrentVideoTime] = useState(0);
-  const [examResult, setExamResult] = useState<ExamResult | null>(null);
-  const [hasPassedExam, setHasPassedExam] = useState(false);
-  const [canRetakeExam, setCanRetakeExam] = useState(false);
-  const [showFinalExamModal, setShowFinalExamModal] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     if (courseId) {
-      fetchCourseData();
-      if (user?.id) {
-        fetchEnrollmentData();
-        fetchProgress();
-        fetchCompletedLessons();
-      }
-    } else {
-      setLoading(false);
+      fetchCourse();
+      fetchProgress();
     }
-  }, [courseId, user]);
+  }, [courseId]);
 
-  const fetchCourseData = async () => {
-    if (!courseId) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    
+  const fetchCourse = async () => {
     try {
-      const { data: courseData, error: courseError } = await supabase
+      const { data: courseData, error } = await supabase
         .from('courses')
-        .select('*')
+        .select(`
+          *,
+          creator:profiles!courses_creator_id_fkey(full_name, avatar_url),
+          course_modules!course_modules_course_id_fkey(
+            id,
+            title,
+            order_index,
+            lessons!lessons_module_id_fkey(
+              id,
+              title,
+              duration_minutes,
+              order_index,
+              video_url,
+              content,
+              is_preview
+            )
+          )
+        `)
         .eq('id', courseId)
-        .maybeSingle();
+        .single();
 
-      if (courseError) throw courseError;
+      if (error) throw error;
 
-      if (!courseData) {
-        setCourse(null);
-        setLoading(false);
-        return;
-      }
+      // Transform the data to match the Course interface
+      const transformedCourse: Course = {
+        ...courseData,
+        modules: courseData.course_modules?.map((module: any) => ({
+          ...module,
+          lessons: module.lessons?.sort((a: any, b: any) => a.order_index - b.order_index) || []
+        })).sort((a: any, b: any) => a.order_index - b.order_index) || [],
+        enrollments_count: 0,
+        reviews_count: 0,
+        average_rating: 0,
+        creator: Array.isArray(courseData.creator) ? courseData.creator[0] : courseData.creator || { full_name: 'Unknown', avatar_url: null }
+      };
 
-      setCourse(courseData as Course);
+      setCourse(transformedCourse);
 
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('course_modules')
-        .select('*')
-        .eq('course_id', courseId)
-        .order('order_index', { ascending: true });
-
-      if (modulesError) throw modulesError;
-
-      const modulesWithLessons = await Promise.all(
-        (modulesData as CourseModule[]).map(async (module) => {
-          const { data: lessonsData, error: lessonsError } = await supabase
-            .from('lessons')
-            .select('*')
-            .eq('module_id', module.id)
-            .order('order_index', { ascending: true });
-
-          if (lessonsError) return { ...module, lessons: [] };
-
-          return {
-            ...module,
-            lessons: lessonsData as CourseLesson[],
-          };
-        })
-      );
-      
-      setModules(modulesWithLessons);
-
-      const { count: enrolledCount, error: enrollCountError } = await supabase
-        .from('course_enrollments')
-        .select('*', { count: 'exact' })
-        .eq('course_id', courseId);
-
-      if (enrollCountError) throw enrollCountError;
-      setEnrollmentCount(enrolledCount || 0);
-
-      const { data: ratingData, error: ratingError } = await supabase
-        .from('course_reviews')
-        .select('rating')
-        .eq('course_id', courseId);
-
-      if (ratingError) throw ratingError;
-
-      const ratings = ratingData?.map((review) => review.rating) || [];
-      const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
-      const avgRating = ratings.length > 0 ? totalRating / ratings.length : 0;
-      setAverageRating(avgRating);
-      setReviewCount(ratings.length);
-
-      const { data: outcomesData, error: outcomesError } = await supabase
-        .from('course_learning_outcomes')
-        .select('*')
-        .eq('course_id', courseId);
-
-      if (outcomesError) throw outcomesError;
-      setLearningOutcomes(outcomesData as LearningOutcome[]);
-
-      const { data: examData, error: examError } = await supabase
-        .from('final_exams')
-        .select('*')
-        .eq('course_id', courseId)
-        .maybeSingle();
-
-      if (examError) throw examError;
-      if (examData) setFinalExam(examData as FinalExam);
-
-      if (courseData?.creator_id) {
-        const { data: instructorData, error: instructorError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', courseData.creator_id)
-          .maybeSingle();
-
-        if (instructorError) throw instructorError;
-        if (instructorData) setInstructor(instructorData as Profile);
+      // Set the first lesson as selected if none is selected
+      if (!selectedLessonId && transformedCourse.modules.length > 0) {
+        const firstLesson = transformedCourse.modules[0].lessons[0];
+        if (firstLesson) {
+          setSelectedLessonId(firstLesson.id);
+        }
       }
     } catch (error) {
-      toast.error('Failed to load course data');
+      console.error('Error fetching course:', error);
+      toast.error('Failed to load course');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchEnrollmentData = async () => {
-    let currentUser = user;
-    if (!currentUser) {
-      const { data: { user: sessionUser } } = await supabase.auth.getUser();
-      currentUser = sessionUser;
-    }
-
-    if (!currentUser?.id || !courseId) return;
-    
-    try {
-      const { data: enrollmentData, error: enrollmentError } = await supabase
-        .from('course_enrollments')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .eq('course_id', courseId)
-        .maybeSingle();
-
-      if (enrollmentError) throw enrollmentError;
-      setEnrollment(enrollmentData as CourseEnrollment);
-    } catch (error) {
-      console.error('Error fetching enrollment data:', error);
     }
   };
 
   const fetchProgress = async () => {
-    let currentUser = user;
-    if (!currentUser) {
-      const { data: { user: sessionUser } } = await supabase.auth.getUser();
-      currentUser = sessionUser;
-    }
+    if (!user) return;
 
-    if (!currentUser?.id || !courseId) return;
-    
     try {
-      const { data: progressData, error: progressError } = await supabase
+      const { data, error } = await supabase
         .from('course_progress')
-        .select('*')
-        .eq('user_id', currentUser.id)
+        .select('progress_percentage')
+        .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .maybeSingle();
+        .single();
 
-      if (progressError) throw progressError;
-      if (progressData) setProgress(progressData as ProgressData);
-    } catch (error) {
-      console.error('Error fetching progress data:', error);
-    }
-  };
+      if (error && error.code !== 'PGRST116') throw error;
 
-  const fetchCompletedLessons = async () => {
-    if (!user || !enrollment) return;
-    
-    try {
-      const { data: completedData, error } = await supabase
-        .from('lesson_progress')
-        .select('lesson_id')
-        .eq('enrollment_id', enrollment.id)
-        .eq('is_completed', true);
-
-      if (error) throw error;
-      const completedIds = completedData?.map(item => item.lesson_id) || [];
-      setCompletedLessons(completedIds);
-    } catch (error) {
-      console.error('Error fetching completed lessons:', error);
-    }
-  };
-
-  const updateCourseProgress = async (progressPercentage: number) => {
-    if (!user || !courseId) return;
-
-    try {
-      const { error: progressError } = await supabase
-        .from('course_progress')
-        .upsert({
-          user_id: user.id,
-          course_id: courseId,
-          progress_percentage: progressPercentage,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,course_id'
-        });
-
-      if (progressError) throw progressError;
-      await fetchProgress();
-    } catch (error) {
-      console.error('Error updating course progress:', error);
-    }
-  };
-
-  const markAllLessonsComplete = async () => {
-    if (!user || !courseId || !modules.length || !enrollment) {
-      toast.error('Unable to mark lessons complete');
-      return;
-    }
-
-    setMarkingComplete(true);
-    try {
-      const allLessonIds = modules.flatMap(module => 
-        module.lessons.map(lesson => lesson.id)
-      );
-
-      for (const lessonId of allLessonIds) {
-        const { error } = await supabase
-          .from('lesson_progress')
-          .upsert({
-            enrollment_id: enrollment.id,
-            lesson_id: lessonId,
-            is_completed: true,
-            completion_date: new Date().toISOString()
-          }, {
-            onConflict: 'enrollment_id,lesson_id'
-          });
-
-        if (error) {
-          console.error('Error marking lesson complete:', error);
-        }
+      if (data) {
+        setProgress(data.progress_percentage);
       }
-
-      await updateCourseProgress(100);
-      await fetchCompletedLessons();
-      toast.success('All lessons marked as complete!');
     } catch (error) {
-      console.error('Error marking lessons complete:', error);
-      toast.error('Failed to mark lessons complete');
-    } finally {
-      setMarkingComplete(false);
+      console.error('Error fetching progress:', error);
     }
   };
 
-  const handleStartLearning = () => {
-    if (modules.length > 0 && modules[0].lessons.length > 0) {
-      const firstLesson = modules[0].lessons[0];
-      setSelectedLesson(firstLesson);
-    }
-  };
-
-  const handleTakeExam = () => {
-    setShowExamModal(true);
-  };
-
-  const handleQuizStart = (quizId: string, lessonId: string) => {
-    setCurrentQuizId(quizId);
-    setCurrentLessonId(lessonId);
-    setShowQuizModal(true);
-  };
-
-  const handleQuizComplete = (quiz: any, score: number, passed: boolean) => {
-    setCurrentQuiz(quiz);
-    setQuizScore(score);
-    setQuizPassed(passed);
-    setShowQuizModal(false);
-    setShowQuizResultsModal(true);
-  };
-
-  const handleRetakeQuiz = () => {
-    setShowQuizResultsModal(false);
-    setShowQuizModal(true);
-  };
-
-  const handleLessonSelect = (lesson: CourseLesson) => {
-    setCurrentLessonId(lesson.id);
-    setSelectedLesson(lesson);
-  };
-
-  const handleVideoProgress = (progress: { played: number, playedSeconds: number, loaded: number, loadedSeconds: number }) => {
-    setCurrentVideoTime(progress.playedSeconds);
-    
-    if (progress.playedSeconds > 0 && selectedLesson && enrollment) {
-      const watchPercentage = progress.played * 100;
-      if (watchPercentage > 80) {
-        supabase
-          .from('lesson_progress')
-          .upsert({
-            enrollment_id: enrollment.id,
-            lesson_id: selectedLesson.id,
-            is_completed: true,
-            completion_date: new Date().toISOString()
-          }, {
-            onConflict: 'enrollment_id,lesson_id'
-          })
-          .then(() => {
-            fetchCompletedLessons();
-            const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
-            const completedCount = completedLessons.length + 1;
-            const progressPercentage = Math.round((completedCount / totalLessons) * 100);
-            updateCourseProgress(progressPercentage);
-          });
-      }
-    }
-  };
-
-  const handleSeekTo = (time: number) => {
-    setCurrentVideoTime(time);
-  };
-
-  const navigateToCourseResults = () => {
-    navigate(`/course/${courseId}/results`);
-  };
-
-  const enrolledUser = enrollment && enrollment.payment_status === 'completed';
-  const progressPercentage = progress?.progress_percentage || 0;
-  const isNotComplete = progressPercentage < 100;
-  const hasLessons = modules.some(module => module.lessons.length > 0);
-
-  const handleExamComplete = (result: any) => {
-    setShowExamModal(false);
-    
-    // Convert result to match ExamResult interface
-    const examResult: ExamResult = {
-      id: result.id || '',
-      passed: result.passed,
-      score: result.score,
-      final_grade: result.final_grade,
-      quiz_scores: Array.isArray(result.quiz_scores) ? result.quiz_scores : [],
-      attempt_number: result.attempt_number
-    };
-    
-    setExamResult(examResult);
-    setHasPassedExam(result.passed);
-    setCanRetakeExam(!result.passed);
-    setShowFinalExamModal(true);
-    
-    // Refresh course data to get updated exam status
-    fetchCourseData();
-  };
+  const selectedLesson = course?.modules
+    .flatMap(module => module.lessons)
+    .find(lesson => lesson.id === selectedLessonId);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-      </div>
-    );
-  }
-
-  if (!courseId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid course URL</h1>
-          <p className="text-gray-600 mb-4">The course ID is missing from the URL.</p>
-          <Link to="/explore-courses">
-            <Button>Browse Courses</Button>
-          </Link>
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
-          <Link to="/explore-courses">
-            <Button>Browse Courses</Button>
-          </Link>
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
+            <p className="text-gray-600">The course you're looking for doesn't exist.</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Badge variant="secondary">{course.category}</Badge>
-            <Badge variant="outline">{course.difficulty_level}</Badge>
-            {course.is_free && <Badge className="bg-green-500">Free</Badge>}
-          </div>
-          
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">{course.title}</h1>
-          <p className="text-xl text-gray-600 mb-6">{course.summary}</p>
-          
-          <div className="flex flex-wrap items-center gap-6 text-gray-600">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              <span>{course.duration_minutes} minutes</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              <span>{modules.length} modules</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              <span>{enrollmentCount} students</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-              <span>{averageRating.toFixed(1)} ({reviewCount} reviews)</span>
-            </div>
-          </div>
-        </div>
-
-        {enrollment && enrollment.payment_status === 'completed' && (
-          <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Your Progress</h3>
-                <span className="text-2xl font-bold text-orange-600">{progress?.progress_percentage || 0}%</span>
-              </div>
-              <Progress value={progress?.progress_percentage || 0} className="h-3" />
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-gray-600">
-                  Keep going! You're doing great.
-                </p>
-                <div className="flex gap-2">
-                  {isNotComplete && hasLessons && (
-                    <Button
-                      onClick={markAllLessonsComplete}
-                      disabled={markingComplete}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {markingComplete ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                      )}
-                      {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
-                    </Button>
-                  )}
-                  
-                  {(!hasLessons || progressPercentage === 100) && finalExam && (
-                    <Button
-                      onClick={handleTakeExam}
-                      size="sm"
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <GraduationCap className="h-4 w-4 mr-2" />
-                      Take Final Exam
-                    </Button>
-                  )}
-
-                  {progressPercentage === 100 && (
-                    <Button
-                      onClick={navigateToCourseResults}
-                      size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Course Results
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-5">
-            <Card className="sticky top-4">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Course Curriculum
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EnhancedCourseModuleList 
-                  modules={modules}
-                  courseId={courseId!}
-                  creatorId={course.creator_id}
-                  onLessonSelect={handleLessonSelect}
-                  currentLessonId={currentLessonId}
-                  completedLessons={completedLessons}
-                  onQuizStart={handleQuizStart}
-                  onFinalExamStart={() => setShowExamModal(true)}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-7">
-            {enrollment && enrollment.payment_status === 'completed' && selectedLesson && selectedLesson.video_url && (
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Course Content */}
+            <div className="lg:col-span-2">
               <Card className="mb-6">
                 <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-2xl">{course.title}</CardTitle>
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                      {course.difficulty_level}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {course.duration_minutes} minutes
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      {course.enrollments_count} students
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      {course.average_rating.toFixed(1)} ({course.reviews_count} reviews)
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* Progress */}
+              <Card className="mb-6">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Course Progress</span>
+                    <span className="text-sm text-gray-600">{progress}% Complete</span>
+                  </div>
+                  <Progress value={progress} className="h-2" />
+                </CardContent>
+              </Card>
+
+              {/* Video Player / Lesson Content */}
+              {selectedLesson && (
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Play className="h-5 w-5" />
+                      {selectedLesson.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedLesson.video_url ? (
+                      <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+                        <p className="text-gray-600">Video Player Component</p>
+                      </div>
+                    ) : (
+                      <div className="prose max-w-none">
+                        <p>{selectedLesson.content || 'No content available for this lesson.'}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Lesson Tabs */}
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="notes">Notes</TabsTrigger>
+                  <TabsTrigger value="discussion">Discussion</TabsTrigger>
+                  <TabsTrigger value="resources">Resources</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="overview" className="mt-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-gray-700">{course.description}</p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="notes" className="mt-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <StickyNote className="h-5 w-5" />
+                        <p>Take notes while you learn</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="discussion" className="mt-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <MessageSquare className="h-5 w-5" />
+                        <p>Join the discussion with other students</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="resources" className="mt-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <FileText className="h-5 w-5" />
+                        <p>Download course materials and resources</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            {/* Sidebar */}
+            <div className="lg:col-span-1">
+              {/* Course Modules */}
+              <Card>
+                <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Play className="h-5 w-5" />
-                    {selectedLesson.title}
+                    <BookOpen className="h-5 w-5" />
+                    Course Content
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="aspect-video rounded-lg overflow-hidden bg-black">
-                    <ReactPlayer
-                      url={selectedLesson.video_url}
-                      width="100%"
-                      height="100%"
-                      controls={true}
-                      config={{
-                        file: {
-                          attributes: {
-                            controlsList: 'nodownload'
-                          }
-                        }
-                      }}
-                      onProgress={handleVideoProgress}
-                      progressInterval={1000}
-                      light={course.thumbnail_url}
-                    />
+                  <div className="space-y-4">
+                    {course.modules.map((module, moduleIndex) => (
+                      <div key={module.id} className="space-y-2">
+                        <h4 className="font-medium text-sm text-gray-900">
+                          {moduleIndex + 1}. {module.title}
+                        </h4>
+                        <div className="space-y-1">
+                          {module.lessons.map((lesson, lessonIndex) => (
+                            <Button
+                              key={lesson.id}
+                              variant={selectedLessonId === lesson.id ? "default" : "ghost"}
+                              size="sm"
+                              className={`w-full justify-start text-left h-auto p-2 ${
+                                selectedLessonId === lesson.id 
+                                  ? 'bg-gradient-to-r from-orange-500 to-purple-600' 
+                                  : ''
+                              }`}
+                              onClick={() => setSelectedLessonId(lesson.id)}
+                            >
+                              <div className="flex items-center gap-2 w-full">
+                                <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">
+                                    {lessonIndex + 1}. {lesson.title}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {lesson.duration_minutes} min
+                                  </p>
+                                </div>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  {selectedLesson.description && (
-                    <p className="mt-4 text-gray-600">{selectedLesson.description}</p>
-                  )}
                 </CardContent>
               </Card>
-            )}
 
-            <Tabs defaultValue="content" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="content" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Content
-                </TabsTrigger>
-                <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
-                  <StickyNote className="h-4 w-4" />
-                  Notes
-                </TabsTrigger>
-                <TabsTrigger value="transcripts">Transcripts</TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                <TabsTrigger value="discussion">Discussion</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="content" className="space-y-6">
-                {enrollment && enrollment.payment_status === 'completed' ? (
-                  <Card>
-                    <CardContent className="p-6">
-                      {selectedLesson ? (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-4">{selectedLesson.title}</h3>
-                          {selectedLesson.description && (
-                            <p className="text-gray-600 mb-4">{selectedLesson.description}</p>
-                          )}
-                          {selectedLesson.content && (
-                            <div className="prose max-w-none">
-                              {typeof selectedLesson.content === 'string' 
-                                ? selectedLesson.content 
-                                : JSON.stringify(selectedLesson.content)
-                              }
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500">Select a lesson to view its content</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Enroll in this course to access lesson content</p>
-                      <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        Enroll Now
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="lesson-notes" className="space-y-6">
-                {enrollment && enrollment.payment_status === 'completed' ? (
-                  <LessonNotesTab 
-                    lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                  />
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Enroll in this course to start taking lesson notes</p>
-                      <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        Enroll Now
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="transcripts">
-                {enrollment && enrollment.payment_status === 'completed' ? (
-                  <VideoTranscripts 
-                    lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                    currentTime={currentVideoTime}
-                    onSeekTo={handleSeekTo}
-                  />
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-500 mb-4">Enroll in this course to access video transcripts</p>
-                      <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                        onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                      >
-                        Enroll Now
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="reviews">
-                <CourseReviewsTab courseId={courseId!} />
-              </TabsContent>
-              
-              <TabsContent value="discussion">
-                <LessonDiscussionTab lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} />
-              </TabsContent>
-            </Tabs>
+              {/* Instructor */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Instructor</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarImage src={course.creator.avatar_url} />
+                      <AvatarFallback>
+                        {course.creator.full_name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{course.creator.full_name}</p>
+                      <p className="text-sm text-gray-600">Course Instructor</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-
-        <FloatingAILearningAssistant 
-          courseId={courseId!}
-          lessonId={selectedLesson?.id}
-          lessonTitle={selectedLesson?.title}
-          lessonContent={typeof selectedLesson?.content === 'string' ? selectedLesson.content : JSON.stringify(selectedLesson?.content)}
-        />
-
-        {(!enrollment || enrollment.payment_status !== 'completed') && (
-          <Card className="mt-8 sticky bottom-4">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-orange-600 mb-2">
-                    {course.is_free ? 'Free' : `$${course.price}`}
-                  </div>
-                  {!course.is_free && (
-                    <p className="text-sm text-gray-600">One-time payment</p>
-                  )}
-                </div>
-                {user ? (
-                  <div className="flex gap-2">
-                    {!course.is_free && (
-                      <AddToCartButton
-                        itemType="course"
-                        itemId={courseId!}
-                        itemName={course.title}
-                        price={course.price || 0}
-                      />
-                    )}
-                    <Button 
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                      onClick={() => window.location.href = `/course/${courseId}/enroll`}
-                    >
-                      {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                    onClick={() => window.location.href = '/auth'}
-                  >
-                    Sign in to Enroll
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {instructor && (
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Your Instructor
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={instructor.avatar_url || undefined} />
-                  <AvatarFallback>
-                    {instructor.full_name?.charAt(0) || 'I'}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="font-semibold">{instructor.full_name}</h4>
-                  <p className="text-sm text-gray-600">Course Creator</p>
-                </div>
-              </div>
-              
-              {instructor.bio && (
-                <p className="text-sm text-gray-700">{instructor.bio}</p>
-              )}
-              
-              <div className="flex gap-2">
-                <Link to={`/creator/profile/${instructor.id}`}>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    View Profile
-                  </Button>
-                </Link>
-                <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    Send Message
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {finalExam && (
-          <FinalExamModal
-            isOpen={showExamModal}
-            onClose={() => setShowExamModal(false)}
-            exam={finalExam}
-            enrollmentId={enrollment?.id || ''}
-            onComplete={handleExamComplete}
-          />
-        )}
-
-        <QuizModal
-          isOpen={showQuizModal}
-          onClose={() => setShowQuizModal(false)}
-          quizId={currentQuizId}
-          lessonId={currentLessonId}
-          onComplete={handleQuizComplete}
-        />
-
-        {currentQuiz && (
-          <QuizResultsModal
-            isOpen={showQuizResultsModal}
-            onClose={() => setShowQuizResultsModal(false)}
-            quiz={currentQuiz}
-            score={quizScore}
-            passed={quizPassed}
-            onRetake={handleRetakeQuiz}
-            onProceed={() => setShowQuizResultsModal(false)}
-            hasNextContent={true}
-          />
-        )}
       </div>
-    </div>
+    </Layout>
   );
 };
 
