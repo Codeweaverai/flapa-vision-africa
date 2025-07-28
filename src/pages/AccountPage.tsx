@@ -412,7 +412,7 @@ const AccountPage = () => {
                 
                 <CardFooter>
                   <Button 
-                    className="w-full" 
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
                     onClick={profile.is_creator ? handleCreatorDashboardClick : handleEnableCreatorMode}
                     disabled={enablingCreator}
                   >
