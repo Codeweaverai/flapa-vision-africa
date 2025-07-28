@@ -123,7 +123,23 @@ const CourseLearningPage = () => {
         throw progressError;
       }
 
-      setCourse(courseData);
+      // Transform courseData to match Course interface
+      const transformedCourse: Course = {
+        id: courseData.id,
+        title: courseData.title,
+        description: courseData.description,
+        thumbnail_url: courseData.thumbnail_url,
+        creator: courseData.creator,
+        duration_minutes: courseData.duration_minutes,
+        difficulty_level: courseData.difficulty_level,
+        category: courseData.category,
+        modules: courseData.course_modules || [],
+        enrollments_count: 0, // Default value
+        reviews_count: 0, // Default value
+        average_rating: 0, // Default value
+      };
+
+      setCourse(transformedCourse);
       setEnrollment(enrollmentData);
       setProgress(progressData);
 
