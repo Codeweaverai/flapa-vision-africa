@@ -548,7 +548,7 @@ const CourseDetailPage = () => {
                   {course.course_preview?.preview_video_url && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="relative rounded-lg overflow-hidden bg-gradient-to-r from-orange-500 to-purple-600">
+                      <div className="aspect-video rounded-lg overflow-hidden bg-gradient-to-r from-orange-500 to-purple-600">
                         <ReactPlayer
                           url={course.course_preview.preview_video_url}
                           controls={true}
