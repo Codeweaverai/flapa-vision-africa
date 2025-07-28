@@ -58,7 +58,7 @@ const CreatorPublicProfile: React.FC = () => {
     if (creatorId) {
       fetchCreatorData();
     } else {
-      setError('No creator ID provided');
+      setError('Creator not found');
       setLoading(false);
     }
   }, [creatorId]);
@@ -72,69 +72,64 @@ const CreatorPublicProfile: React.FC = () => {
 
       console.log('Fetching creator profile for ID:', creatorId);
       
-      // Fetch creator profile with timeout
-      const profilePromise = supabase
+      // Fetch creator profile
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, bio, avatar_url, username, is_creator, role')
         .eq('id', creatorId)
         .single();
 
-      const { data: profile, error: profileError } = await Promise.race([
-        profilePromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 10000)
-        )
-      ]) as any;
-
       if (profileError) {
         console.error('Profile error:', profileError);
-        throw new Error('Creator profile not found');
+        setError('Creator profile not found');
+        setLoading(false);
+        return;
       }
 
       if (!profile) {
-        throw new Error('Creator profile not found');
+        setError('Creator profile not found');
+        setLoading(false);
+        return;
       }
 
       console.log('Profile loaded:', profile);
       setCreator(profile);
 
-      // Fetch courses and events in parallel with simplified queries
-      const [coursesResult, eventsResult] = await Promise.allSettled([
+      // Fetch courses and events in parallel
+      const [coursesResult, eventsResult] = await Promise.all([
         supabase
           .from('courses')
           .select('id, title, description, thumbnail_url, price, is_free, duration_minutes, difficulty_level')
           .eq('creator_id', creatorId)
-          .eq('is_published', true)
-          .limit(10),
+          .eq('is_published', true),
         
         supabase
           .from('events')
           .select('id, title, description, image_url, price, is_free, start_time, end_time, location, event_type')
           .eq('creator_id', creatorId)
-          .limit(10)
       ]);
 
-      // Handle courses result
-      if (coursesResult.status === 'fulfilled' && !coursesResult.value.error) {
-        setCourses(coursesResult.value.data || []);
-        console.log('Courses loaded:', coursesResult.value.data?.length || 0);
-      } else {
-        console.error('Courses error:', coursesResult.status === 'rejected' ? coursesResult.reason : coursesResult.value.error);
+      // Handle courses
+      if (coursesResult.error) {
+        console.error('Courses error:', coursesResult.error);
         setCourses([]);
+      } else {
+        setCourses(coursesResult.data || []);
+        console.log('Courses loaded:', coursesResult.data?.length || 0);
       }
 
-      // Handle events result
-      if (eventsResult.status === 'fulfilled' && !eventsResult.value.error) {
-        setEvents(eventsResult.value.data || []);
-        console.log('Events loaded:', eventsResult.value.data?.length || 0);
-      } else {
-        console.error('Events error:', eventsResult.status === 'rejected' ? eventsResult.reason : eventsResult.value.error);
+      // Handle events
+      if (eventsResult.error) {
+        console.error('Events error:', eventsResult.error);
         setEvents([]);
+      } else {
+        setEvents(eventsResult.data || []);
+        console.log('Events loaded:', eventsResult.data?.length || 0);
       }
 
     } catch (error) {
       console.error('Error fetching creator data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load creator profile');
+      setError('Failed to load creator profile');
       toast.error('Failed to load creator profile');
     } finally {
       setLoading(false);

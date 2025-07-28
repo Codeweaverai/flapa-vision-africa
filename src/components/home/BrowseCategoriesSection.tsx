@@ -140,13 +140,7 @@ const BrowseCategoriesSection = () => {
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-4">
                       <div className="p-4 bg-gradient-to-r from-orange-100 to-purple-100 rounded-xl group-hover:from-orange-200 group-hover:to-purple-200 transition-all duration-300 flex items-center justify-center">
-                        <IconComponent className="h-8 w-8 text-transparent bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text" style={{
-                          filter: 'drop-shadow(0 0 0 #f97316) drop-shadow(0 0 0 #9333ea)',
-                          WebkitTextStroke: '1px transparent',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundImage: 'linear-gradient(to right, #f97316, #9333ea)',
-                          WebkitBackgroundClip: 'text'
-                        }} />
+                        <IconComponent className="h-8 w-8 text-orange-500 group-hover:text-purple-600 transition-colors duration-300" />
                       </div>
                       <div>
                         <CardTitle className="text-xl bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent group-hover:from-orange-700 group-hover:to-purple-700">
