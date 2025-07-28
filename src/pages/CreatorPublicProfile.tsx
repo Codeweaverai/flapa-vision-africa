@@ -54,64 +54,84 @@ const CreatorPublicProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  console.log('CreatorPublicProfile - creatorId from useParams:', creatorId);
+  console.log('CreatorPublicProfile - current user:', user?.id);
+
   useEffect(() => {
-    if (creatorId) {
-      fetchCreatorData();
-    } else {
-      setError('Creator not found');
+    // Only proceed if creatorId is available
+    if (!creatorId) {
+      console.log('No creatorId found in URL params');
+      setError('Creator ID not found in URL');
       setLoading(false);
+      return;
     }
+
+    // Validate creatorId format (should be a UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(creatorId)) {
+      console.log('Invalid creator ID format:', creatorId);
+      setError('Invalid creator ID format');
+      setLoading(false);
+      return;
+    }
+
+    console.log('Valid creatorId found, fetching data for:', creatorId);
+    fetchCreatorData(creatorId);
   }, [creatorId]);
 
-  const fetchCreatorData = async () => {
-    if (!creatorId) return;
-
+  const fetchCreatorData = async (id: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log('Fetching creator profile for ID:', creatorId);
+      console.log('Fetching creator profile for ID:', id);
       
-      // Fetch creator profile
+      // Fetch creator profile with explicit error handling
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, bio, avatar_url, username, is_creator, role')
-        .eq('id', creatorId)
-        .single();
+        .eq('id', id)
+        .maybeSingle();
+
+      console.log('Profile query result:', { profile, profileError });
 
       if (profileError) {
-        console.error('Profile error:', profileError);
-        setError('Creator profile not found');
-        setLoading(false);
+        console.error('Profile fetch error:', profileError);
+        setError(`Failed to fetch creator profile: ${profileError.message}`);
         return;
       }
 
       if (!profile) {
+        console.log('No profile found for ID:', id);
         setError('Creator profile not found');
-        setLoading(false);
         return;
       }
 
-      console.log('Profile loaded:', profile);
+      console.log('Profile loaded successfully:', profile);
       setCreator(profile);
 
       // Fetch courses and events in parallel
+      console.log('Fetching courses and events for creator:', id);
+      
       const [coursesResult, eventsResult] = await Promise.all([
         supabase
           .from('courses')
           .select('id, title, description, thumbnail_url, price, is_free, duration_minutes, difficulty_level')
-          .eq('creator_id', creatorId)
+          .eq('creator_id', id)
           .eq('is_published', true),
         
         supabase
           .from('events')
           .select('id, title, description, image_url, price, is_free, start_time, end_time, location, event_type')
-          .eq('creator_id', creatorId)
+          .eq('creator_id', id)
       ]);
+
+      console.log('Courses query result:', coursesResult);
+      console.log('Events query result:', eventsResult);
 
       // Handle courses
       if (coursesResult.error) {
-        console.error('Courses error:', coursesResult.error);
+        console.error('Courses fetch error:', coursesResult.error);
         setCourses([]);
       } else {
         setCourses(coursesResult.data || []);
@@ -120,7 +140,7 @@ const CreatorPublicProfile: React.FC = () => {
 
       // Handle events
       if (eventsResult.error) {
-        console.error('Events error:', eventsResult.error);
+        console.error('Events fetch error:', eventsResult.error);
         setEvents([]);
       } else {
         setEvents(eventsResult.data || []);
@@ -128,8 +148,8 @@ const CreatorPublicProfile: React.FC = () => {
       }
 
     } catch (error) {
-      console.error('Error fetching creator data:', error);
-      setError('Failed to load creator profile');
+      console.error('Unexpected error in fetchCreatorData:', error);
+      setError('An unexpected error occurred while loading the creator profile');
       toast.error('Failed to load creator profile');
     } finally {
       setLoading(false);
@@ -186,6 +206,7 @@ const CreatorPublicProfile: React.FC = () => {
     }
   };
 
+  // Loading state
   if (loading) {
     return (
       <Layout>
@@ -212,17 +233,46 @@ const CreatorPublicProfile: React.FC = () => {
     );
   }
 
-  if (error || !creator) {
+  // Error state
+  if (error) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100 flex items-center justify-center">
           <Card>
             <CardContent className="p-6 text-center">
               <h2 className="text-xl font-semibold mb-2">
-                {error || 'Creator Not Found'}
+                Creator Profile Error
               </h2>
               <p className="text-muted-foreground mb-4">
-                {error || "The creator profile you're looking for doesn't exist."}
+                {error}
+              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  Creator ID: {creatorId || 'Not found'}
+                </p>
+                <Button asChild>
+                  <Link to="/courses">Browse Courses</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  // No creator found
+  if (!creator) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100 flex items-center justify-center">
+          <Card>
+            <CardContent className="p-6 text-center">
+              <h2 className="text-xl font-semibold mb-2">
+                Creator Not Found
+              </h2>
+              <p className="text-muted-foreground mb-4">
+                The creator profile you're looking for doesn't exist.
               </p>
               <Button asChild>
                 <Link to="/courses">Browse Courses</Link>
