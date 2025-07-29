@@ -33,7 +33,6 @@ interface AttendeeData {
   check_in_time?: string;
   user_profile?: {
     full_name: string;
-    email: string;
   };
   booking_status: string;
   payment_status: string;
@@ -112,14 +111,14 @@ const CreatorAttendeeManagement: React.FC = () => {
 
       if (ticketsError) throw ticketsError;
 
-      // Get user profiles separately
+      // Get user profiles separately (without email field)
       const userIds = ticketsData?.map(ticket => ticket.user_id).filter(Boolean) || [];
       
       let profilesData: any[] = [];
       if (userIds.length > 0) {
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, full_name, email')
+          .select('id, full_name')
           .in('id', userIds);
 
         if (profilesError) throw profilesError;
@@ -195,8 +194,7 @@ const CreatorAttendeeManagement: React.FC = () => {
       attendee.ticket_holder_name?.toLowerCase().includes(searchLower) ||
       attendee.ticket_code?.toLowerCase().includes(searchLower) ||
       attendee.booking_code?.toLowerCase().includes(searchLower) ||
-      attendee.user_profile?.full_name?.toLowerCase().includes(searchLower) ||
-      attendee.user_profile?.email?.toLowerCase().includes(searchLower)
+      attendee.user_profile?.full_name?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -366,11 +364,6 @@ const CreatorAttendeeManagement: React.FC = () => {
                                     <span className="font-medium">
                                       {attendee.ticket_holder_name || attendee.user_profile?.full_name || 'Unknown'}
                                     </span>
-                                    {attendee.user_profile?.email && (
-                                      <span className="text-sm text-gray-500">
-                                        {attendee.user_profile.email}
-                                      </span>
-                                    )}
                                   </div>
                                 </TableCell>
                                 <TableCell>
