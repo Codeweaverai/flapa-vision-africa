@@ -59,7 +59,7 @@ const NotFoundPage = () => {
                 size="lg"
                 className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-purple-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                <Link to="/courses">
+                <Link to="/Explore-courses">
                   <BookOpen className="mr-2 h-5 w-5" />
                   Explore Courses
                 </Link>
@@ -71,7 +71,7 @@ const NotFoundPage = () => {
               <p className="text-white/80 text-sm mb-4">Popular destinations:</p>
               <div className="flex flex-wrap justify-center gap-3">
                 <Link 
-                  to="/courses" 
+                  to="/learning" 
                   className="text-white/90 hover:text-white text-sm underline hover:no-underline transition-all duration-200 hover:scale-105 transform"
                 >
                   My Learning
@@ -85,14 +85,14 @@ const NotFoundPage = () => {
                 </Link>
                 <span className="text-white/60">•</span>
                 <Link 
-                  to="/profile" 
+                  to="/community" 
                   className="text-white/90 hover:text-white text-sm underline hover:no-underline transition-all duration-200 hover:scale-105 transform"
                 >
-                  Profile
+                  Community
                 </Link>
                 <span className="text-white/60">•</span>
                 <Link 
-                  to="/contact" 
+                  to="/help" 
                   className="text-white/90 hover:text-white text-sm underline hover:no-underline transition-all duration-200 hover:scale-105 transform"
                 >
                   Help Center
