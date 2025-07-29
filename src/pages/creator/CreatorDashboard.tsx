@@ -218,14 +218,24 @@ const CreatorDashboard = () => {
               <h1 className="text-3xl font-bold mb-2">Creator Dashboard</h1>
               <p className="text-muted-foreground">Welcome back! Here's your performance overview.</p>
             </div>
-            <Button
-              onClick={() => setIsWithdrawDialogOpen(true)}
-              disabled={!earnings?.available_balance || earnings.available_balance < 5}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-            >
-              <DollarSign className="h-4 w-4 mr-2" />
-              Withdraw Funds
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => window.location.href = '/creator/attendee-management'}
+                variant="outline"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Manage Attendees
+              </Button>
+              <Button
+                onClick={() => setIsWithdrawDialogOpen(true)}
+                disabled={!earnings?.available_balance || earnings.available_balance < 5}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Withdraw Funds
+              </Button>
+            </div>
           </div>
 
           {/* Enhanced Key Metrics */}
