@@ -1,26 +1,24 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { QueryClient } from 'react-query';
-import { QueryClientProvider } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Profile from './pages/Profile';
-import Courses from './pages/Courses';
-import CourseDetail from './pages/CourseDetail';
+import Home from './pages/HomePage';
+import Login from './pages/LoginPage';
+import Register from './pages/RegisterPage';
+import Profile from './pages/ProfilePage';
+import Courses from './pages/CoursesPage';
+import CourseDetail from './pages/CourseDetailPage';
 import CoursePlayerPage from './pages/CoursePlayerPage';
-import Events from './pages/Events';
-import EventDetail from './pages/EventDetail';
-import TicketVerification from './pages/TicketVerification';
+import Events from './pages/EventsPage';
+import EventDetail from './pages/EventDetailPage';
+import TicketVerification from './pages/TicketVerificationPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminCourses from './pages/admin/AdminCourses';
 import AdminEvents from './pages/admin/AdminEvents';
-import AdminCategories from './pages/admin/AdminCategories';
-import AdminPromoCodes from './pages/admin/AdminPromoCodes';
 import AdminSettings from './pages/admin/AdminSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 import CreatorDashboard from './pages/creator/CreatorDashboard';
@@ -69,8 +67,6 @@ function App() {
                 <Route path="/admin/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
                 <Route path="/admin/courses" element={<ProtectedRoute><AdminCourses /></ProtectedRoute>} />
                 <Route path="/admin/events" element={<ProtectedRoute><AdminEvents /></ProtectedRoute>} />
-                <Route path="/admin/categories" element={<ProtectedRoute><AdminCategories /></ProtectedRoute>} />
-                <Route path="/admin/promo-codes" element={<ProtectedRoute><AdminPromoCodes /></ProtectedRoute>} />
                 <Route path="/admin/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
                 
                 {/* Creator Routes */}
