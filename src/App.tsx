@@ -39,6 +39,7 @@ import CreatorPayments from './pages/creator/CreatorPayments';
 import CreatorPromoCodes from './pages/creator/CreatorPromoCodes';
 import CreatorSettings from './pages/creator/CreatorSettings';
 import CreatorAttendeeManagement from './pages/creator/CreatorAttendeeManagement';
+import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
   return (
@@ -88,6 +89,9 @@ function App() {
                 <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
                 <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
                 <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
+                
+                {/* Catch-all route for 404 */}
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Router>
           </AuthProvider>
