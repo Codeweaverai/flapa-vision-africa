@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -8,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Users, CheckCircle, Clock, QrCode, Download, Calendar } from 'lucide-react';
+import { Search, Users, CheckCircle, Clock, QrCode, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import CreatorLayout from '@/components/creator/CreatorLayout';
+import AttendeeExportButton from '@/components/creator/AttendeeExportButton';
 
 interface Event {
   id: string;
@@ -305,14 +305,10 @@ const CreatorAttendeeManagement: React.FC = () => {
                         <QrCode className="h-4 w-4" />
                         Scan Tickets
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        Export Report
-                      </Button>
+                      <AttendeeExportButton 
+                        attendees={filteredAttendees}
+                        eventTitle={selectedEventData?.title || 'Event'}
+                      />
                     </div>
                   </div>
                 </CardContent>
