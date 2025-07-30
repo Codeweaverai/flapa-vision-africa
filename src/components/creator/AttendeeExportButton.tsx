@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, FileSpreadsheet, FileText } from 'lucide-react';
@@ -22,13 +23,8 @@ interface AttendeeData {
   booking_code: string;
   payment_status: string;
   created_at: string;
-  profiles: {
-    full_name: string | null;
-    username: string | null;
-  } | null;
-  events: {
-    title: string;
-  } | null;
+  user_name: string;
+  event_title: string;
 }
 
 interface AttendeeExportButtonProps {
@@ -41,30 +37,16 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ eventId, ev
 
   const fetchAttendeeData = async (): Promise<AttendeeData[]> => {
     try {
-      let query = supabase
+      let bookingsQuery = supabase
         .from('event_bookings')
-        .select(`
-          id,
-          user_id,
-          event_id,
-          booking_code,
-          payment_status,
-          created_at,
-          profiles:user_id (
-            full_name,
-            username
-          ),
-          events:event_id (
-            title
-          )
-        `)
+        .select('id, user_id, event_id, booking_code, payment_status, created_at')
         .eq('payment_status', 'completed');
 
       // If eventId is provided, filter by specific event
       if (eventId) {
-        query = query.eq('event_id', eventId);
+        bookingsQuery = bookingsQuery.eq('event_id', eventId);
       } else {
-        // Otherwise, get all events for the current creator
+        // Get all events for the current creator
         const { data: creatorEvents, error: eventsError } = await supabase
           .from('events')
           .select('id')
@@ -75,18 +57,91 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ eventId, ev
         const eventIds = creatorEvents?.map(e => e.id) || [];
         if (eventIds.length === 0) return [];
         
-        query = query.in('event_id', eventIds);
+        bookingsQuery = bookingsQuery.in('event_id', eventIds);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data: bookings, error: bookingsError } = await bookingsQuery.order('created_at', { ascending: false });
+      if (bookingsError) throw bookingsError;
 
-      if (error) throw error;
-      return data || [];
+      if (!bookings || bookings.length === 0) return [];
+
+      // Get user profiles
+      const userIds = [...new Set(bookings.map(b => b.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', userIds);
+
+      // Get event details
+      const eventIds = [...new Set(bookings.map(b => b.event_id))];
+      const { data: events } = await supabase
+        .from('events')
+        .select('id, title')
+        .in('id', eventIds);
+
+      // Combine data manually
+      const attendees: AttendeeData[] = bookings.map(booking => {
+        const profile = profiles?.find(p => p.id === booking.user_id);
+        const event = events?.find(e => e.id === booking.event_id);
+        
+        return {
+          id: booking.id,
+          user_id: booking.user_id,
+          event_id: booking.event_id,
+          booking_code: booking.booking_code || 'N/A',
+          payment_status: booking.payment_status,
+          created_at: booking.created_at,
+          user_name: profile?.full_name || profile?.username || 'Unknown',
+          event_title: event?.title || 'Unknown Event'
+        };
+      });
+
+      return attendees;
     } catch (error) {
       console.error('Error fetching attendee data:', error);
       toast.error('Failed to fetch attendee data');
       return [];
     }
+  };
+
+  const exportToCSV = async () => {
+    const attendees = await fetchAttendeeData();
+    if (attendees.length === 0) {
+      toast.error('No attendee data available for export');
+      return;
+    }
+
+    const csvContent = [
+      ['Event Title', 'Attendee Name', 'Booking Code', 'Payment Status', 'Registration Date'],
+      ...attendees.map(attendee => [
+        attendee.event_title,
+        attendee.user_name,
+        attendee.booking_code,
+        attendee.payment_status,
+        formatDate(attendee.created_at)
+      ])
+    ];
+
+    const csvString = csvContent.map(row => 
+      row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    
+    const filename = eventTitle 
+      ? `${eventTitle}-attendees.csv` 
+      : `all-event-attendees-${new Date().toISOString().split('T')[0]}.csv`;
+    
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success('CSV report exported successfully');
   };
 
   const exportToExcel = async () => {
@@ -97,9 +152,9 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ eventId, ev
     }
 
     const exportData = attendees.map(attendee => ({
-      'Event Title': attendee.events?.title || 'Unknown Event',
-      'Attendee Name': attendee.profiles?.full_name || attendee.profiles?.username || 'Unknown',
-      'Booking Code': attendee.booking_code || 'N/A',
+      'Event Title': attendee.event_title,
+      'Attendee Name': attendee.user_name,
+      'Booking Code': attendee.booking_code,
       'Payment Status': attendee.payment_status,
       'Registration Date': formatDate(attendee.created_at)
     }));
@@ -133,9 +188,9 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ eventId, ev
     
     // Prepare table data
     const tableData = attendees.map(attendee => [
-      attendee.events?.title || 'Unknown Event',
-      attendee.profiles?.full_name || attendee.profiles?.username || 'Unknown',
-      attendee.booking_code || 'N/A',
+      attendee.event_title,
+      attendee.user_name,
+      attendee.booking_code,
       attendee.payment_status,
       formatDate(attendee.created_at)
     ]);
@@ -166,6 +221,10 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ eventId, ev
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={exportToCSV}>
+          <FileText className="h-4 w-4 mr-2" />
+          Export as CSV
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={exportToExcel}>
           <FileSpreadsheet className="h-4 w-4 mr-2" />
           Export as Excel

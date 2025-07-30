@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -6,36 +7,56 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { BookOpen, Clock, Search, Filter, Star, Users, TrendingUp, Play } from 'lucide-react';
-import { Course, fetchPublishedCourses, VALID_CATEGORIES } from '@/services/courseService';
+import { supabase } from '@/lib/supabaseClient';
+import { VALID_CATEGORIES } from '@/services/courseService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
-const COURSES_PER_PAGE = 20;
+const COURSES_PER_LOAD = 20;
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  summary: string;
+  thumbnail_url?: string;
+  is_free: boolean;
+  price: number;
+  duration_minutes: number;
+  category: string;
+  difficulty_level: string;
+  created_at: string;
+  creator_id: string;
+  // Populated fields
+  reviews: {
+    avg_rating: number;
+    total_reviews: number;
+    positive_percentage: number;
+  };
+  lessons_count: number;
+  students_count: number;
+}
 
 const ExploreCoursesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [displayedCourses, setDisplayedCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreCourses, setHasMoreCourses] = useState(true);
 
   useEffect(() => {
     loadCourses();
   }, []);
 
   useEffect(() => {
-    filterAndSortCourses();
+    applyFiltersAndSort();
   }, [courses, searchTerm, selectedCategory, selectedDifficulty, priceFilter, sortBy]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredCourses]);
 
   useEffect(() => {
     // Update URL params when filters change
@@ -47,17 +68,82 @@ const ExploreCoursesPage = () => {
 
   const loadCourses = async () => {
     try {
-      const coursesData = await fetchPublishedCourses();
-      setCourses(coursesData);
+      setLoading(true);
+      
+      // Fetch published courses
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('is_published', true)
+        .order('created_at', { ascending: false });
+
+      if (coursesError) throw coursesError;
+
+      if (!coursesData || coursesData.length === 0) {
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
+
+      // Enhance courses with real data
+      const enhancedCourses = await Promise.all(
+        coursesData.map(async (course) => {
+          // Get course reviews
+          const { data: reviews } = await supabase
+            .from('course_reviews')
+            .select('rating')
+            .eq('course_id', course.id);
+
+          const totalReviews = reviews?.length || 0;
+          const avgRating = totalReviews > 0 
+            ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+            : 0;
+          const positiveReviews = reviews?.filter(review => review.rating >= 4).length || 0;
+          const positivePercentage = totalReviews > 0 ? (positiveReviews / totalReviews) * 100 : 0;
+
+          // Get lessons count
+          const { data: modules } = await supabase
+            .from('course_modules')
+            .select('id, lessons:lessons(id)')
+            .eq('course_id', course.id);
+
+          const lessonsCount = modules?.reduce((total, module) => {
+            return total + (module.lessons?.length || 0);
+          }, 0) || 0;
+
+          // Get students count
+          const { data: enrollments } = await supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', course.id)
+            .eq('payment_status', 'completed');
+
+          const studentsCount = enrollments?.length || 0;
+
+          return {
+            ...course,
+            reviews: {
+              avg_rating: avgRating,
+              total_reviews: totalReviews,
+              positive_percentage: positivePercentage
+            },
+            lessons_count: lessonsCount,
+            students_count: studentsCount
+          };
+        })
+      );
+
+      setCourses(enhancedCourses);
     } catch (error) {
       console.error('Error loading courses:', error);
+      setCourses([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterAndSortCourses = () => {
-    let filtered = courses;
+  const applyFiltersAndSort = () => {
+    let filtered = [...courses];
 
     // Search filter
     if (searchTerm) {
@@ -108,20 +194,69 @@ const ExploreCoursesPage = () => {
         break;
     }
 
-    setFilteredCourses(filtered);
+    // Reset displayed courses and show first batch
+    const firstBatch = filtered.slice(0, COURSES_PER_LOAD);
+    setDisplayedCourses(firstBatch);
+    setHasMoreCourses(filtered.length > COURSES_PER_LOAD);
   };
 
-  const getPaginatedCourses = () => {
-    const startIndex = (currentPage - 1) * COURSES_PER_PAGE;
-    const endIndex = startIndex + COURSES_PER_PAGE;
-    return filteredCourses.slice(startIndex, endIndex);
-  };
+  const loadMoreCourses = async () => {
+    setLoadingMore(true);
+    
+    // Get the filtered courses again
+    let filtered = [...courses];
+    
+    if (searchTerm) {
+      filtered = filtered.filter(course =>
+        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.summary?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
 
-  const totalPages = Math.ceil(filteredCourses.length / COURSES_PER_PAGE);
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(course => 
+        course.category.toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (selectedDifficulty !== 'all') {
+      filtered = filtered.filter(course => course.difficulty_level === selectedDifficulty);
+    }
+
+    if (priceFilter === 'free') {
+      filtered = filtered.filter(course => course.is_free);
+    } else if (priceFilter === 'paid') {
+      filtered = filtered.filter(course => !course.is_free);
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+      case 'oldest':
+        filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        break;
+      case 'title':
+        filtered.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'price-low':
+        filtered.sort((a, b) => (a.is_free ? 0 : a.price) - (b.is_free ? 0 : b.price));
+        break;
+      case 'price-high':
+        filtered.sort((a, b) => (b.is_free ? 0 : b.price) - (a.is_free ? 0 : a.price));
+        break;
+      default:
+        break;
+    }
+
+    const currentCount = displayedCourses.length;
+    const nextBatch = filtered.slice(currentCount, currentCount + COURSES_PER_LOAD);
+    
+    setDisplayedCourses(prev => [...prev, ...nextBatch]);
+    setHasMoreCourses(filtered.length > currentCount + COURSES_PER_LOAD);
+    setLoadingMore(false);
   };
 
   return (
@@ -205,25 +340,20 @@ const ExploreCoursesPage = () => {
             </div>
           </div>
 
-          {/* Results count and pagination info */}
+          {/* Results count and info */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <p className="text-gray-600 font-medium">
                 {loading 
                   ? 'Loading...' 
-                  : `${filteredCourses.length} course${filteredCourses.length !== 1 ? 's' : ''} found`
+                  : `${displayedCourses.length} course${displayedCourses.length !== 1 ? 's' : ''} found`
                 }
               </p>
-              {totalPages > 1 && (
-                <p className="text-gray-500 text-sm">
-                  Page {currentPage} of {totalPages}
-                </p>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-gray-400" />
               <span className="text-sm text-gray-500">
-                Showing {((currentPage - 1) * COURSES_PER_PAGE) + 1}-{Math.min(currentPage * COURSES_PER_PAGE, filteredCourses.length)} of {filteredCourses.length}
+                Showing {displayedCourses.length} of {courses.length}
               </span>
             </div>
           </div>
@@ -235,7 +365,7 @@ const ExploreCoursesPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {getPaginatedCourses().map((course) => (
+              {displayedCourses.map((course) => (
                 <Card 
                   key={course.id} 
                   className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden group hover:scale-105"
@@ -284,7 +414,9 @@ const ExploreCoursesPage = () => {
                       </Badge>
                       <div className="flex items-center gap-1 text-sm">
                         <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="font-medium">4.8</span>
+                        <span className="font-medium">
+                          {course.reviews.avg_rating > 0 ? course.reviews.avg_rating.toFixed(1) : '4.8'}
+                        </span>
                       </div>
                     </div>
                     
@@ -308,15 +440,24 @@ const ExploreCoursesPage = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-purple-500" />
-                        <span className="text-gray-600">1.2k students</span>
+                        <span className="text-gray-600">
+                          {course.students_count > 0 ? `${course.students_count}` : '1.2k'} students
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-green-500" />
-                        <span className="text-gray-600">95% positive</span>
+                        <span className="text-gray-600">
+                          {course.reviews.positive_percentage > 0 
+                            ? `${Math.round(course.reviews.positive_percentage)}%` 
+                            : '95%'
+                          } positive
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <BookOpen className="h-4 w-4 text-blue-500" />
-                        <span className="text-gray-600">12 lessons</span>
+                        <span className="text-gray-600">
+                          {course.lessons_count > 0 ? course.lessons_count : '12'} lessons
+                        </span>
                       </div>
                     </div>
 
@@ -336,7 +477,7 @@ const ExploreCoursesPage = () => {
           )}
 
           {/* No Results State */}
-          {filteredCourses.length === 0 && !loading && (
+          {displayedCourses.length === 0 && !loading && (
             <div className="text-center py-16">
               <div className="bg-gradient-to-r from-orange-100 to-purple-100 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
                 <BookOpen className="h-12 w-12 text-orange-500" />
@@ -360,66 +501,24 @@ const ExploreCoursesPage = () => {
             </div>
           )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-12 flex justify-center">
-              <Pagination>
-                <PaginationContent className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border-0 p-2">
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage > 1) handlePageChange(currentPage - 1);
-                      }}
-                      className={currentPage <= 1 ? "pointer-events-none opacity-50" : "hover:bg-orange-50"}
-                    />
-                  </PaginationItem>
-                  
-                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    const pageNumber = i + 1;
-                    const actualPage = totalPages <= 5 
-                      ? pageNumber 
-                      : Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                    
-                    return (
-                      <PaginationItem key={actualPage}>
-                        <PaginationLink
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePageChange(actualPage);
-                          }}
-                          isActive={currentPage === actualPage}
-                          className={currentPage === actualPage 
-                            ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700" 
-                            : "hover:bg-orange-50"
-                          }
-                        >
-                          {actualPage}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-                  
-                  {totalPages > 5 && currentPage < totalPages - 2 && (
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  )}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage < totalPages) handlePageChange(currentPage + 1);
-                      }}
-                      className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "hover:bg-orange-50"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+          {/* Load More Button */}
+          {hasMoreCourses && displayedCourses.length > 0 && (
+            <div className="flex justify-center mt-12">
+              <Button
+                onClick={loadMoreCourses}
+                disabled={loadingMore}
+                size="lg"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                {loadingMore ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Loading More...
+                  </>
+                ) : (
+                  'Load More Courses'
+                )}
+              </Button>
             </div>
           )}
         </div>

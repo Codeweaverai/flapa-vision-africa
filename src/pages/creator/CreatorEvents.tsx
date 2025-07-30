@@ -12,6 +12,9 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { Event } from '@/services/eventService';
+import PaginationControls from '@/components/creator/PaginationControls';
+
+const EVENTS_PER_PAGE = 6; // 2 rows × 3 cards per row
 
 const CreatorEvents = () => {
   const navigate = useNavigate();
@@ -19,12 +22,17 @@ const CreatorEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (user) {
       loadEvents();
     }
   }, [user]);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when search changes
+  }, [searchTerm]);
 
   const loadEvents = async () => {
     if (!user) return;
@@ -73,6 +81,12 @@ const CreatorEvents = () => {
     event.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * EVENTS_PER_PAGE;
+  const endIndex = startIndex + EVENTS_PER_PAGE;
+  const paginatedEvents = filteredEvents.slice(startIndex, endIndex);
+
   const getEventStatus = (event: Event) => {
     const now = new Date();
     const startTime = new Date(event.start_time);
@@ -108,18 +122,18 @@ const CreatorEvents = () => {
 
   return (
     <CreatorLayout title="My Events">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-    <div>
-      <p className="text-gray-600">Manage your events and track Attendees</p>
-    </div>
-    <Button
-      onClick={() => navigate('/creator/events/create')}
-      className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
-    >
-      <Plus className="h-4 w-4 mr-2" />
-      Create Event
-    </Button>
-  </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <p className="text-gray-600">Manage your events and track Attendees</p>
+        </div>
+        <Button
+          onClick={() => navigate('/creator/events/create')}
+          className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Create Event
+        </Button>
+      </div>
 
       <div className="mb-6">
         <Input
@@ -149,124 +163,132 @@ const CreatorEvents = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => (
-            <Card key={event.id} className="relative overflow-hidden">
-              {event.image_url && (
-                <div className="h-48 bg-cover bg-center" style={{ backgroundImage: `url(${event.image_url})` }} />
-              )}
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CardTitle className="text-lg line-clamp-1">{event.title}</CardTitle>
-                      {getStatusBadge(getEventStatus(event))}
-                    </div>
-                    <div className="flex items-center text-sm text-muted-foreground mb-2">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {format(parseISO(event.start_time), 'MMM d, yyyy')}
-                    </div>
-                    {event.location && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+            {paginatedEvents.map((event) => (
+              <Card key={event.id} className="relative overflow-hidden">
+                {event.image_url && (
+                  <div className="h-48 bg-cover bg-center" style={{ backgroundImage: `url(${event.image_url})` }} />
+                )}
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CardTitle className="text-lg line-clamp-1">{event.title}</CardTitle>
+                        {getStatusBadge(getEventStatus(event))}
+                      </div>
                       <div className="flex items-center text-sm text-muted-foreground mb-2">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        <span className="line-clamp-1">{event.location}</span>
+                        <Calendar className="w-4 h-4 mr-1" />
+                        {format(parseISO(event.start_time), 'MMM d, yyyy')}
                       </div>
-                    )}
-                    {event.capacity && (
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Users className="w-4 h-4 mr-1" />
-                        {event.capacity} capacity
-                      </div>
-                    )}
+                      {event.location && (
+                        <div className="flex items-center text-sm text-muted-foreground mb-2">
+                          <MapPin className="w-4 h-4 mr-1" />
+                          <span className="line-clamp-1">{event.location}</span>
+                        </div>
+                      )}
+                      {event.capacity && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Users className="w-4 h-4 mr-1" />
+                          {event.capacity} capacity
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                  {event.description}
-                </p>
-                
-                <div className="flex items-center gap-2 mb-4">
-                  <Badge variant={event.is_free ? "secondary" : "default"}>
-                    {event.is_free ? "Free" : `$${event.price}`}
-                  </Badge>
-                  <Badge variant="outline">{event.event_type}</Badge>
-                </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                    {event.description}
+                  </p>
+                  
+                  <div className="flex items-center gap-2 mb-4">
+                    <Badge variant={event.is_free ? "secondary" : "default"}>
+                      {event.is_free ? "Free" : `$${event.price}`}
+                    </Badge>
+                    <Badge variant="outline">{event.event_type}</Badge>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/creator/events/${event.id}/edit`)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/event-detail/${event.id}`)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/creator/events/${event.id}/registrations`)}
-                  >
-                    <UserCheck className="h-4 w-4 mr-1" />
-                    Registrations
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/creator/events/${event.id}/agenda`)}
-                  >
-                    <CalendarIcon className="h-4 w-4 mr-1" />
-                    Agenda
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/creator/events/${event.id}/speakers`)}
-                  >
-                    <Users className="h-4 w-4 mr-1" />
-                    Speakers
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/creator/events/${event.id}/tickets`)}
-                  >
-                    <Ticket className="h-4 w-4 mr-1" />
-                    Tickets
-                  </Button>
-                </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/creator/events/${event.id}/edit`)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/event-detail/${event.id}`)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/creator/events/${event.id}/registrations`)}
+                    >
+                      <UserCheck className="h-4 w-4 mr-1" />
+                      Registrations
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/creator/events/${event.id}/agenda`)}
+                    >
+                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      Agenda
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/creator/events/${event.id}/speakers`)}
+                    >
+                      <Users className="h-4 w-4 mr-1" />
+                      Speakers
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/creator/events/${event.id}/tickets`)}
+                    >
+                      <Ticket className="h-4 w-4 mr-1" />
+                      Tickets
+                    </Button>
+                  </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => navigate(`/creator/promo-codes?item_type=event&item_id=${event.id}`)}
-                >
-                  <Percent className="h-4 w-4 mr-1" />
-                  Promo Codes
-                </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => navigate(`/creator/promo-codes?item_type=event&item_id=${event.id}`)}
+                  >
+                    <Percent className="h-4 w-4 mr-1" />
+                    Promo Codes
+                  </Button>
 
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => handleDeleteEvent(event.id)}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete Event
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => handleDeleteEvent(event.id)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete Event
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </>
       )}
     </CreatorLayout>
   );
