@@ -175,8 +175,15 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     if (completedPayouts) {
       completedPayouts.forEach(payout => {
         // For mobile money payouts, use the original USD amount if available
-        if (payout.method === 'mobile_money' && payout.mobile_money_details && payout.mobile_money_details.original_usd_amount) {
-          totalPayouts += Number(payout.mobile_money_details.original_usd_amount);
+        if (payout.method === 'mobile_money' && payout.mobile_money_details) {
+          // Type assertion with proper checking
+          const mobileMoneyDetails = payout.mobile_money_details as any;
+          if (mobileMoneyDetails && typeof mobileMoneyDetails === 'object' && mobileMoneyDetails.original_usd_amount) {
+            totalPayouts += Number(mobileMoneyDetails.original_usd_amount);
+          } else {
+            // Fallback to the amount field if original_usd_amount is not available
+            totalPayouts += Number(payout.amount);
+          }
         } else {
           // For Stripe payouts or mobile money payouts without original USD amount, use the amount directly
           totalPayouts += Number(payout.amount);
