@@ -75,68 +75,71 @@ export const useCourseData = (limit?: number, offset?: number) => {
 
       if (coursesError) throw coursesError;
 
-      // Fetch additional data for each course
-      const coursesWithData: CourseData[] = await Promise.all(
-        (coursesData || []).map(async (course: any) => {
-          // Fetch reviews
-          const { data: reviews } = await supabase
-            .from('course_reviews')
-            .select('*')
-            .eq('course_id', course.id);
+      // Process each course individually to avoid complex type inference
+      const processedCourses: CourseData[] = [];
+      
+      for (const course of coursesData || []) {
+        // Fetch reviews
+        const { data: reviews } = await supabase
+          .from('course_reviews')
+          .select('*')
+          .eq('course_id', course.id);
 
-          // Fetch lesson count
-          const { count: lessonCount } = await supabase
-            .from('lessons')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id);
+        // Fetch lesson count
+        const { count: lessonCount } = await supabase
+          .from('lessons')
+          .select('*', { count: 'exact', head: true })
+          .eq('course_id', course.id);
 
-          // Fetch student count (enrollments)
-          const { count: studentCount } = await supabase
-            .from('course_enrollments')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id);
+        // Fetch student count (enrollments)
+        const { count: studentCount } = await supabase
+          .from('course_enrollments')
+          .select('*', { count: 'exact', head: true })
+          .eq('course_id', course.id);
 
-          // Calculate review statistics
-          const reviewCount = reviews?.length || 0;
-          const averageRating = reviewCount > 0 
-            ? reviews!.reduce((sum, review) => sum + review.rating, 0) / reviewCount
-            : 0;
+        // Calculate review statistics
+        const reviewCount = reviews?.length || 0;
+        const averageRating = reviewCount > 0 
+          ? reviews!.reduce((sum, review) => sum + review.rating, 0) / reviewCount
+          : 0;
 
-          // Calculate positive percentage (4+ star reviews)
-          const positiveReviews = reviews?.filter(review => review.rating >= 4).length || 0;
-          const positivePercentage = reviewCount > 0 ? (positiveReviews / reviewCount) * 100 : 0;
+        // Calculate positive percentage (4+ star reviews)
+        const positiveReviews = reviews?.filter(review => review.rating >= 4).length || 0;
+        const positivePercentage = reviewCount > 0 ? (positiveReviews / reviewCount) * 100 : 0;
 
-          return {
-            id: course.id,
-            title: course.title,
-            description: course.description,
-            summary: course.summary,
-            thumbnail_url: course.thumbnail_url,
-            price: course.price,
-            is_free: course.is_free,
-            category: course.category,
-            difficulty_level: course.difficulty_level,
-            duration_minutes: course.duration_minutes,
-            creator_id: course.creator_id,
-            is_published: course.is_published,
-            profiles: course.profiles && !Array.isArray(course.profiles) ? {
-              full_name: course.profiles.full_name || '',
-              avatar_url: course.profiles.avatar_url || ''
-            } : null,
-            reviews: reviews || [],
-            average_rating: averageRating,
-            review_count: reviewCount,
-            lesson_count: lessonCount || 0,
-            student_count: studentCount || 0,
-            positive_percentage: positivePercentage
-          };
-        })
-      );
+        // Create the processed course object
+        const processedCourse: CourseData = {
+          id: course.id,
+          title: course.title,
+          description: course.description,
+          summary: course.summary,
+          thumbnail_url: course.thumbnail_url,
+          price: course.price,
+          is_free: course.is_free,
+          category: course.category,
+          difficulty_level: course.difficulty_level,
+          duration_minutes: course.duration_minutes,
+          creator_id: course.creator_id,
+          is_published: course.is_published,
+          profiles: course.profiles && !Array.isArray(course.profiles) ? {
+            full_name: course.profiles.full_name || '',
+            avatar_url: course.profiles.avatar_url || ''
+          } : null,
+          reviews: reviews || [],
+          average_rating: averageRating,
+          review_count: reviewCount,
+          lesson_count: lessonCount || 0,
+          student_count: studentCount || 0,
+          positive_percentage: positivePercentage
+        };
+
+        processedCourses.push(processedCourse);
+      }
 
       if (loadMore) {
-        setCourses(prev => [...prev, ...coursesWithData]);
+        setCourses(prev => [...prev, ...processedCourses]);
       } else {
-        setCourses(coursesWithData);
+        setCourses(processedCourses);
       }
 
       // Check if there are more courses to load
