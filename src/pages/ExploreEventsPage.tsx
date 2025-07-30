@@ -1,17 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, MapPin, DollarSign, Users, Star } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, MapPin, Users, Clock, Search, Filter, Star, CalendarDays, History } from 'lucide-react';
-import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
-import { format } from 'date-fns';
-import Layout from '@/components/layout/Layout';
+import { formatDate } from '@/lib/utils';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Event {
   id: string;
@@ -20,25 +19,35 @@ interface Event {
   start_time: string;
   end_time: string;
   location: string;
-  event_type: string;
-  price: number;
-  is_free: boolean;
-  capacity: number;
   image_url: string;
-  currency: string;
+  event_type: string;
   creator_id: string;
-  creator_name?: string;
+  capacity?: number;
+  profiles?: {
+    username: string;
+    full_name: string;
+  };
+  event_tickets: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity_available: number;
+    quantity_sold: number;
+  }>;
+  reviews?: {
+    avg_rating: number;
+    total_reviews: number;
+  };
 }
 
 const ExploreEventsPage = () => {
   const navigate = useNavigate();
-  const [allEvents, setAllEvents] = useState<Event[]>([]);
+  const { currentCurrency } = useCurrency();
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState('all');
-
-  const eventTypes = ['online', 'offline', 'hybrid'];
+  const [filterType, setFilterType] = useState('all');
+  const [sortBy, setSortBy] = useState('date');
 
   useEffect(() => {
     fetchEvents();
@@ -46,315 +55,258 @@ const ExploreEventsPage = () => {
 
   const fetchEvents = async () => {
     try {
-      setLoading(true);
-      
-      const { data: eventsData, error: eventsError } = await supabase
+      const { data: eventsData, error } = await supabase
         .from('events')
-        .select('*')
+        .select(`
+          *,
+          profiles:creator_id (
+            username,
+            full_name
+          ),
+          event_tickets (
+            id,
+            name,
+            price,
+            quantity_available,
+            quantity_sold
+          )
+        `)
+        .gte('end_time', new Date().toISOString())
         .order('start_time', { ascending: true });
 
-      if (eventsError) throw eventsError;
+      if (error) throw error;
 
-      const eventsWithCreators = await Promise.all(
+      // Fetch reviews for each event
+      const eventsWithReviews = await Promise.all(
         (eventsData || []).map(async (event) => {
-          if (event.creator_id) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', event.creator_id)
-              .single();
-            
-            return {
-              ...event,
-              creator_name: profile?.full_name || 'Unknown Creator'
-            };
+          const { data: reviews, error: reviewsError } = await supabase
+            .from('event_reviews')
+            .select('rating')
+            .eq('event_id', event.id);
+
+          if (reviewsError) {
+            console.error('Error fetching reviews:', reviewsError);
+            return { ...event, reviews: { avg_rating: 0, total_reviews: 0 } };
           }
+
+          const totalReviews = reviews?.length || 0;
+          const avgRating = totalReviews > 0 
+            ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+            : 0;
+
           return {
             ...event,
-            creator_name: 'Unknown Creator'
+            reviews: {
+              avg_rating: avgRating,
+              total_reviews: totalReviews
+            }
           };
         })
       );
-      
-      setAllEvents(eventsWithCreators);
+
+      setEvents(eventsWithReviews);
     } catch (error) {
       console.error('Error fetching events:', error);
-      toast.error('Failed to load events');
     } finally {
       setLoading(false);
     }
   };
 
-  const getFilteredEvents = (tab: string) => {
-    const now = new Date();
-    let filteredByTime = allEvents;
-    
-    if (tab === 'upcoming') {
-      filteredByTime = allEvents.filter(event => new Date(event.start_time) > now);
-    } else if (tab === 'past') {
-      filteredByTime = allEvents.filter(event => new Date(event.end_time) < now);
-    }
-    
-    return filteredByTime.filter(event => {
-      const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           event.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType = selectedType === 'all' || event.event_type === selectedType;
-      
-      return matchesSearch && matchesType;
-    });
-  };
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         event.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || event.event_type === filterType;
+    return matchesSearch && matchesType;
+  });
 
-  const formatEventTime = (startTime: string, endTime: string) => {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    
-    if (start.toDateString() === end.toDateString()) {
-      return `${format(start, 'MMM dd, yyyy')} • ${format(start, 'h:mm a')} - ${format(end, 'h:mm a')}`;
-    } else {
-      return `${format(start, 'MMM dd, h:mm a')} - ${format(end, 'MMM dd, h:mm a')}`;
-    }
-  };
-
-  const getEventTypeColor = (type: string) => {
-    switch (type) {
-      case 'online':
-        return 'bg-blue-100 text-blue-800';
-      case 'offline':
-        return 'bg-green-100 text-green-800';
-      case 'hybrid':
-        return 'bg-purple-100 text-purple-800';
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
+    switch (sortBy) {
+      case 'date':
+        return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+      case 'title':
+        return a.title.localeCompare(b.title);
+      case 'price':
+        const aMinPrice = Math.min(...a.event_tickets.map(t => t.price));
+        const bMinPrice = Math.min(...b.event_tickets.map(t => t.price));
+        return aMinPrice - bMinPrice;
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 0;
     }
+  });
+
+  const getMinPrice = (tickets: Event['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return Math.min(...tickets.map(t => t.price));
   };
 
-  const renderEventGrid = (events: Event[]) => {
-    if (events.length === 0) {
-      return (
-        <div className="text-center py-12">
-          <div className="text-gray-400 mb-4">
-            <Calendar className="h-16 w-16 mx-auto" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Events Found</h3>
-          <p className="text-gray-600">
-            {searchTerm || selectedType !== 'all' 
-              ? 'Try adjusting your search criteria.' 
-              : 'Check back later for upcoming events.'}
-          </p>
-        </div>
-      );
-    }
+  const getTotalCapacity = (tickets: Event['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_available, 0);
+  };
 
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {events.map((event) => (
-          <Card 
-            key={event.id} 
-            className="group hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden bg-white/95 backdrop-blur-sm border border-orange-200 hover:border-purple-300"
-            onClick={() => navigate(`/events/${event.id}`)}
-          >
-            <div className="relative h-48 overflow-hidden">
-              {event.image_url ? (
-                <img
-                  src={event.image_url}
-                  alt={event.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-orange-200 to-purple-200 flex items-center justify-center">
-                  <Calendar className="h-12 w-12 text-orange-600" />
-                </div>
-              )}
-              
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              
-              <Badge 
-                className={`absolute top-3 left-3 ${getEventTypeColor(event.event_type)} shadow-sm`}
-              >
-                {event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1)}
-              </Badge>
-              
-              <Badge 
-                className={`absolute top-3 right-3 shadow-sm ${
-                  event.is_free 
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' 
-                    : 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white'
-                }`}
-              >
-                {event.is_free ? 'Free' : `${event.currency} ${event.price}`}
-              </Badge>
-            </div>
-
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold line-clamp-2 group-hover:bg-gradient-to-r group-hover:from-orange-600 group-hover:to-purple-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
-                {event.title}
-              </CardTitle>
-              <CardDescription className="line-clamp-2">
-                {event.description}
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="pt-0">
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex items-center">
-                  <Clock className="h-4 w-4 mr-2 text-orange-500" />
-                  <span className="text-xs">
-                    {formatEventTime(event.start_time, event.end_time)}
-                  </span>
-                </div>
-
-                <div className="flex items-center">
-                  <MapPin className="h-4 w-4 mr-2 text-purple-500" />
-                  <span className="text-xs line-clamp-1">
-                    {event.location || 'Online Event'}
-                  </span>
-                </div>
-
-                {event.capacity && (
-                  <div className="flex items-center">
-                    <Users className="h-4 w-4 mr-2 text-orange-500" />
-                    <span className="text-xs">
-                      Up to {event.capacity} attendees
-                    </span>
-                  </div>
-                )}
-
-                {event.creator_name && (
-                  <div className="flex items-center pt-2 border-t border-orange-100">
-                    <span className="text-xs text-gray-500">
-                      by {event.creator_name}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <Button 
-                className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-md"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/event-detail/${event.id}`);
-                }}
-              >
-                View Details
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
+  const getSoldTickets = (tickets: Event['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_sold, 0);
   };
 
   if (loading) {
     return (
-      <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          </div>
-        </div>
-      </Layout>
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-200 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600"></div>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header with Gradient */}
-          <div className="text-center mb-8">
-            <div className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-              <h1 className="text-4xl font-bold mb-4">Explore Events</h1>
-            </div>
-            <p className="text-xl text-gray-700 max-w-2xl mx-auto">
-              Discover amazing events happening around you. From workshops to conferences, 
-              find the perfect event to expand your knowledge and network.
-            </p>
-          </div>
-
-          {/* Search and Filters */}
-          <div className="mb-8 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 border border-orange-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search events..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-orange-200 focus:border-purple-400"
-                />
-              </div>
-              
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="border-orange-200 focus:border-purple-400">
-                  <SelectValue placeholder="Event Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {eventTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button 
-                variant="outline" 
-                className="w-full border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                More Filters
-              </Button>
-            </div>
-          </div>
-
-          {/* Event Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-white/90 backdrop-blur-sm border border-orange-200">
-              <TabsTrigger value="all" className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" />
-                All Events
-              </TabsTrigger>
-              <TabsTrigger value="upcoming" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Upcoming
-              </TabsTrigger>
-              <TabsTrigger value="past" className="flex items-center gap-2">
-                <History className="h-4 w-4" />
-                Past Events
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="all" className="mt-6">
-              {renderEventGrid(getFilteredEvents('all'))}
-            </TabsContent>
-            
-            <TabsContent value="upcoming" className="mt-6">
-              {renderEventGrid(getFilteredEvents('upcoming'))}
-            </TabsContent>
-            
-            <TabsContent value="past" className="mt-6">
-              {renderEventGrid(getFilteredEvents('past'))}
-            </TabsContent>
-          </Tabs>
-
-          {/* Load More Button */}
-          {getFilteredEvents(activeTab).length > 0 && (
-            <div className="text-center mt-12">
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 hover:from-orange-600 hover:to-purple-700 shadow-lg"
-              >
-                Load More Events
-              </Button>
-            </div>
-          )}
+    <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-200">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-6xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Explore Events
+          </h1>
+          <p className="text-xl text-gray-700 max-w-2xl mx-auto">
+            Discover amazing events and workshops from talented creators around the world.
+          </p>
         </div>
+
+        {/* Filters */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <div className="flex-1">
+            <Input
+              placeholder="Search events..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="workshop">Workshop</SelectItem>
+              <SelectItem value="conference">Conference</SelectItem>
+              <SelectItem value="webinar">Webinar</SelectItem>
+              <SelectItem value="seminar">Seminar</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date">Date</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="price">Price</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Events Grid */}
+        {sortedEvents.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-xl text-gray-600">No events found matching your criteria.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {sortedEvents.map((event) => (
+              <Card key={event.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                <div onClick={() => navigate(`/events/${event.id}`)}>
+                  {event.image_url && (
+                    <div className="relative h-48 overflow-hidden">
+                      <img
+                        src={event.image_url}
+                        alt={event.title}
+                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                      />
+                      <Badge className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                        {event.event_type}
+                      </Badge>
+                    </div>
+                  )}
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2">
+                      {event.title}
+                    </CardTitle>
+                    <CardDescription className="text-gray-600 line-clamp-2">
+                      {event.description}
+                    </CardDescription>
+                    
+                    {/* Reviews Section */}
+                    {event.reviews && event.reviews.total_reviews > 0 && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-4 w-4 ${
+                                i < Math.round(event.reviews?.avg_rating || 0)
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {event.reviews.avg_rating.toFixed(1)} ({event.reviews.total_reviews} review{event.reviews.total_reviews !== 1 ? 's' : ''})
+                        </span>
+                      </div>
+                    )}
+                  </CardHeader>
+
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Calendar className="h-4 w-4 mr-2 text-orange-500" />
+                      {formatDate(event.start_time)}
+                    </div>
+                    
+                    {event.location && (
+                      <div className="flex items-center text-sm text-gray-600">
+                        <MapPin className="h-4 w-4 mr-2 text-orange-500" />
+                        <span className="truncate">{event.location}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Users className="h-4 w-4 mr-2 text-orange-500" />
+                      {getSoldTickets(event.event_tickets)}/{getTotalCapacity(event.event_tickets)} registered
+                    </div>
+                    
+                    {event.profiles && (
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">
+                          By: {event.profiles.full_name || event.profiles.username}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+
+                  <CardFooter className="flex justify-between items-center pt-4 border-t">
+                    <div className="flex items-center">
+                      <DollarSign className="h-4 w-4 mr-1 text-orange-500" />
+                      <span className="font-bold text-lg text-gray-900">
+                        <PriceDisplay amount={getMinPrice(event.event_tickets)} originalCurrency="USD" />
+                      </span>
+                      {event.event_tickets.length > 1 && (
+                        <span className="text-sm text-gray-500 ml-1">+</span>
+                      )}
+                    </div>
+                    <Button 
+                      size="sm" 
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                    >
+                      View Details
+                    </Button>
+                  </CardFooter>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-    </Layout>
+    </div>
   );
 };
 

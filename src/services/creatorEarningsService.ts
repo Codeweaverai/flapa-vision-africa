@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 
 export interface CreatorEarningsData {
@@ -164,14 +163,27 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
     });
 
-    // Subtract completed payouts from available balance
+    // Get completed payouts and subtract the correct amounts from available balance
     const { data: completedPayouts } = await supabase
       .from('creator_payouts')
-      .select('amount')
+      .select('amount, method, mobile_money_details, currency')
       .eq('creator_id', creatorId)
       .in('status', ['completed', 'processing']);
 
-    const totalPayouts = completedPayouts?.reduce((sum, payout) => sum + Number(payout.amount), 0) || 0;
+    let totalPayouts = 0;
+    
+    if (completedPayouts) {
+      completedPayouts.forEach(payout => {
+        // For mobile money payouts, use the original USD amount if available
+        if (payout.method === 'mobile_money' && payout.mobile_money_details && payout.mobile_money_details.original_usd_amount) {
+          totalPayouts += Number(payout.mobile_money_details.original_usd_amount);
+        } else {
+          // For Stripe payouts or mobile money payouts without original USD amount, use the amount directly
+          totalPayouts += Number(payout.amount);
+        }
+      });
+    }
+
     availableBalance = Math.max(0, availableBalance - totalPayouts);
 
     return {
