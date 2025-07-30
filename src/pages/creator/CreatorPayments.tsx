@@ -391,7 +391,7 @@ const CreatorPayments: React.FC = () => {
                 {loadingEarnings ? (
                   <Skeleton className="h-7 w-24" />
                 ) : (
-                  <div className="text-2xl font-bold">
+                  <div className="text-base md:text-lg font-semibold">
                     <PriceDisplay amount={earnings.available_balance} originalCurrency="USD" />
                   </div>
                 )}
@@ -419,7 +419,7 @@ const CreatorPayments: React.FC = () => {
                 {loadingEarnings ? (
                   <Skeleton className="h-7 w-24" />
                 ) : (
-                  <div className="text-2xl font-bold">
+                  <div className="text-base md:text-lg font-semibold">
                     <PriceDisplay amount={earnings.pending_balance} originalCurrency="USD" />
                   </div>
                 )}
@@ -438,7 +438,7 @@ const CreatorPayments: React.FC = () => {
                 {loadingEarnings ? (
                   <Skeleton className="h-7 w-24" />
                 ) : (
-                  <div className="text-2xl font-bold">
+                  <div className="text-base md:text-lg font-semibold">
                     <PriceDisplay amount={earnings.total_earnings} originalCurrency="USD" />
                   </div>
                 )}
@@ -457,7 +457,7 @@ const CreatorPayments: React.FC = () => {
                 {loadingEarnings ? (
                   <Skeleton className="h-7 w-24" />
                 ) : (
-                  <div className="text-2xl font-bold">
+                  <div className="text-base md:text-lg font-semibold">
                     <PriceDisplay amount={earnings.total_platform_fees} originalCurrency="USD" />
                   </div>
                 )}
