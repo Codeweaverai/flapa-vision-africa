@@ -38,7 +38,7 @@ interface Event {
   profiles?: {
     full_name: string;
     avatar_url: string;
-  };
+  } | null;
   reviews?: EventReview[];
   average_rating?: number;
   review_count?: number;
@@ -80,8 +80,8 @@ const ExploreEventsPage: React.FC = () => {
       if (eventsError) throw eventsError;
 
       // Fetch reviews for each event
-      const eventsWithReviews = await Promise.all(
-        (eventsData || []).map(async (event) => {
+      const eventsWithReviews: Event[] = await Promise.all(
+        (eventsData || []).map(async (event: any) => {
           const { data: reviews } = await supabase
             .from('event_reviews')
             .select('*')
@@ -101,8 +101,24 @@ const ExploreEventsPage: React.FC = () => {
             .eq('payment_status', 'completed');
 
           return {
-            ...event,
-            reviews,
+            id: event.id,
+            title: event.title,
+            description: event.description,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            location: event.location,
+            image_url: event.image_url,
+            price: event.price,
+            is_free: event.is_free,
+            capacity: event.capacity,
+            event_type: event.event_type,
+            creator_id: event.creator_id,
+            currency: event.currency,
+            profiles: event.profiles && !Array.isArray(event.profiles) ? {
+              full_name: event.profiles.full_name || '',
+              avatar_url: event.profiles.avatar_url || ''
+            } : null,
+            reviews: reviews || [],
             average_rating: averageRating,
             review_count: reviewCount,
             attendee_count: attendeeCount || 0
@@ -281,7 +297,7 @@ const ExploreEventsPage: React.FC = () => {
                   </p>
                   
                   {/* Reviews Section */}
-                  {event.review_count > 0 && (
+                  {event.review_count && event.review_count > 0 && (
                     <div className="flex items-center gap-2">
                       {renderStars(Math.round(event.average_rating || 0))}
                       <span className="text-sm text-gray-600">
