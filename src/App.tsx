@@ -222,7 +222,7 @@ function App() {
 
                   {/* Creator Routes */}
                   <Route path="/creators" element={<CreatorsPage />} />
-                  <Route path="/creator/:id" element={<CreatorPublicProfile />} />
+                  <Route path="/creator/profile/:creatorId" element={<CreatorPublicProfile />} />
                   <Route path="/become-creator" element={<BecomeCreatorPage />} />
 
                   {/* Protected Creator Routes */}
@@ -294,7 +294,7 @@ function App() {
                   <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
                   <Route path="/consult" element={<ConsultPage />} />
                   <Route path="/speaking" element={<SpeakingPage />} />
-                  <Route path="/help-center" element={<HelpCenterPage />} />
+                  <Route path="/help" element={<HelpCenterPage />} />
                   <Route path="/careers/:id" element={<JobDetailPage />} />
                   <Route path="/careers" element={<CareersPage />} />
 
