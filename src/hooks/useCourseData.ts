@@ -53,16 +53,10 @@ export const useCourseData = (limit?: number, offset?: number) => {
 
       setTotal(totalCount || 0);
 
-      // Build query
+      // Build query for courses
       let query = supabase
         .from('courses')
-        .select(`
-          *,
-          profiles:creator_id (
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('is_published', true)
         .order('created_at', { ascending: false });
 
@@ -75,10 +69,17 @@ export const useCourseData = (limit?: number, offset?: number) => {
 
       if (coursesError) throw coursesError;
 
-      // Process each course individually to avoid complex type inference
       const processedCourses: CourseData[] = [];
       
+      // Process each course individually
       for (const course of coursesData || []) {
+        // Fetch creator profile separately
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', course.creator_id)
+          .single();
+
         // Fetch reviews
         const { data: reviews } = await supabase
           .from('course_reviews')
@@ -121,9 +122,9 @@ export const useCourseData = (limit?: number, offset?: number) => {
           duration_minutes: course.duration_minutes,
           creator_id: course.creator_id,
           is_published: course.is_published,
-          profiles: course.profiles && !Array.isArray(course.profiles) ? {
-            full_name: course.profiles.full_name || '',
-            avatar_url: course.profiles.avatar_url || ''
+          profiles: profileData ? {
+            full_name: profileData.full_name || '',
+            avatar_url: profileData.avatar_url || ''
           } : null,
           reviews: reviews || [],
           average_rating: averageRating,
