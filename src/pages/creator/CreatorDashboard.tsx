@@ -220,7 +220,7 @@ const CreatorDashboard = () => {
             </div>
             <div className="flex gap-2">
               <Button
-                onClick={() => window.location.href = '/creator/attendee-management'}
+                onClick={() => window.location.href = '/creator/attendees'}
                 variant="outline"
                 className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
               >
