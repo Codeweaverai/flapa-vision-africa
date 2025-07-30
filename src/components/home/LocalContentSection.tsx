@@ -61,7 +61,7 @@ const LocalContentSection = () => {
           <Button 
             size="lg" 
             onClick={() => navigate('/local-content')}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4"
+            className="bg-gradient-to-r from-orange-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4"
           >
             Explore Local Content
             <ArrowRight className="ml-2 h-5 w-5" />
