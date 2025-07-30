@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -30,7 +31,6 @@ import ExploreEventsPage from '@/pages/ExploreEventsPage';
 import LocalContentPage from '@/pages/LocalContentPage';
 import EventDetailPage from '@/pages/EventDetailPage';
 import MyEventsPage from '@/pages/MyEventsPage';
-import EventRegistrationPage from '@/pages/EventRegistrationPage';
 
 // Import account pages
 import AccountPage from '@/pages/AccountPage';
@@ -132,7 +132,7 @@ import ConsultPage from '@/pages/ConsultPage';
 import SpeakingPage from '@/pages/SpeakingPage';
 import HelpCenterPage from '@/pages/HelpCenterPage';
 import JobDetailPage from '@/pages/JobDetailPage';
-import CareersPage from '@/pages/CareersPage';
+import CareersPage from '@/pages/careers';
 import TicketPage from '@/pages/TicketPage';
 import TicketDetailPage from '@/pages/TicketDetailPage';
 import TicketViewPage from '@/pages/TicketViewPage';
@@ -197,7 +197,6 @@ function App() {
                   <Route path="/event-detail/:id" element={<EventDetailPage />} />
                   <Route path="/events/:id" element={<EventDetailPage />} />
                   <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
-                  <Route path="/event/:id/register" element={<EventRegistrationPage />} />
 
                   {/* Commerce Routes */}
                   <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
