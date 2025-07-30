@@ -5,14 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, BookOpen, Edit, Trash2, Eye, Users, DollarSign, Clock, Star, Play } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Eye, Users, DollarSign, Clock, Star, Play, Percent, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import PaginationControls from '@/components/creator/PaginationControls';
+import CoursePreviewDialog from '@/components/creator/CoursePreviewDialog';
 
-const COURSES_PER_PAGE = 8; // 2 rows × 4 cards per row
+const COURSES_PER_PAGE = 6; // 2 rows × 3 cards per row
 
 interface Course {
   id: string;
@@ -36,6 +37,8 @@ const CreatorCourses = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -106,6 +109,11 @@ const CreatorCourses = () => {
     }
   };
 
+  const handleAddPreview = (course: Course) => {
+    setSelectedCourse(course);
+    setPreviewDialogOpen(true);
+  };
+
   const filteredCourses = courses.filter(course =>
     course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -172,7 +180,7 @@ const CreatorCourses = () => {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-8">
             {paginatedCourses.map((course) => (
               <Card key={course.id} className="relative overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="relative">
@@ -272,6 +280,26 @@ const CreatorCourses = () => {
                   </div>
 
                   <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleAddPreview(course)}
+                  >
+                    <Video className="h-4 w-4 mr-1" />
+                    Add Preview
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => navigate(`/creator/promo-codes?item_type=course&item_id=${course.id}`)}
+                  >
+                    <Percent className="h-4 w-4 mr-1" />
+                    Promo Codes
+                  </Button>
+
+                  <Button
                     variant={course.is_published ? "secondary" : "default"}
                     size="sm"
                     className="w-full"
@@ -302,6 +330,13 @@ const CreatorCourses = () => {
           />
         </>
       )}
+
+      <CoursePreviewDialog
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        course={selectedCourse}
+        onPreviewAdded={loadCourses}
+      />
     </CreatorLayout>
   );
 };

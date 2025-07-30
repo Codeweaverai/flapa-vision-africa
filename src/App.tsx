@@ -1,152 +1,156 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { CurrencyProvider } from './contexts/CurrencyContext';
-import { CartProvider } from './contexts/CartContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
-import ProtectedRoute from './components/ProtectedRoute';
+import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
+import { CartProvider } from '@/contexts/CartContext';
 
-// Import all pages
-import Index from './pages/Index';
-import HomePage from './pages/HomePage';
-import AboutPage from './pages/AboutPage';
-import AccountPage from './pages/AccountPage';
-import AnimationsPage from './pages/AnimationsPage';
-import AuthPage from './pages/AuthPage';
-import BecomeCreatorPage from './pages/BecomeCreatorPage';
-import BlogPage from './pages/BlogPage';
-import BlogPostPage from './pages/BlogPostPage';
-import CheckoutPage from './pages/CheckoutPage';
-import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
-import CommunityChatPage from './pages/CommunityChatPage';
-import CommunityCoursesPage from './pages/CommunityCoursesPage';
-import CommunityNotificationsPage from './pages/CommunityNotificationsPage';
-import CommunityPage from './pages/CommunityPage';
-import ConsultPage from './pages/ConsultPage';
-import ContactPage from './pages/ContactPage';
-import CourseDetailPage from './pages/learning/CourseDetailPage';
-import CoursePlayerPage from './pages/CoursePlayerPage';
-import CourseResultsPage from './pages/CourseResultsPage';
-import CoursesPage from './pages/CoursesPage';
-import CreatorPublicProfile from './pages/CreatorPublicProfile';
-import CreatorsPage from './pages/CreatorsPage';
-import EventDetailPage from './pages/EventDetailPage';
-import EventsPage from './pages/EventsPage';
-import ExploreCoursesPage from './pages/ExploreCoursesPage';
-import ExploreEventsPage from './pages/ExploreEventsPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import HelpCenterPage from './pages/HelpCenterPage';
-import InboxPage from './pages/InboxPage';
-import JobDetailPage from './pages/JobDetailPage';
-import LearnOurCulturePage from './pages/LearnOurCulturePage';
-import LearningPage from './pages/LearningPage';
-import LoginPage from './pages/LoginPage';
-import MediaPage from './pages/MediaPage';
-import MediaPostDetailPage from './pages/MediaPostDetailPage';
-import MyCoursesPage from './pages/MyCoursesPage';
-import MyEventsPage from './pages/MyEventsPage';
-import MyOrdersPage from './pages/MyOrdersPage';
-import NotFoundPage from './pages/NotFoundPage';
-import NotificationsPage from './pages/NotificationsPage';
-import PaymentCancelPage from './pages/PaymentCancelPage';
-import PaymentSuccessPage from './pages/PaymentSuccessPage';
-import PricingPage from './pages/PricingPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import ProfilePage from './pages/ProfilePage';
-import RegisterPage from './pages/RegisterPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import SettingsPage from './pages/SettingsPage';
-import SigninPage from './pages/SigninPage';
-import SpeakingPage from './pages/SpeakingPage';
-import TermsOfServicePage from './pages/TermsOfServicePage';
-import TicketPage from './pages/TicketPage';
-import TicketViewPage from './pages/TicketViewPage';
-import TicketVerificationPage from './pages/TicketVerificationPage';
-import VenturesPage from './pages/VenturesPage';
-import VerifyPage from './pages/VerifyPage';
-import CareersPage from './pages/careers';
-import TrendingPage from './pages/TrendingPage';
-import VerifyCertificatePage from './pages/VerifyCertificatePage';
+// Import pages
+import Index from '@/pages/Index';
+import HomePage from '@/pages/HomePage';
+import AuthPage from '@/pages/AuthPage';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import VerifyPage from '@/pages/VerifyPage';
+import CoursesPage from '@/pages/CoursesPage';
+import ExploreCoursesPage from '@/pages/ExploreCoursesPage';
+import CourseDetailPage from '@/pages/CourseDetailPage';
+import CourseEnrollmentPage from '@/pages/CourseEnrollmentPage';
+import MyCoursesPage from '@/pages/MyCoursesPage';
+import LearningPage from '@/pages/LearningPage';
+import CourseLearningPage from '@/pages/CourseLearningPage';
+import CoursePlayerPage from '@/pages/CoursePlayerPage';
+import LessonPage from '@/pages/LessonPage';
+import EventsPage from '@/pages/EventsPage';
+import ExploreEventsPage from '@/pages/ExploreEventsPage';
+import LocalContentPage from '@/pages/LocalContentPage';
+import EventDetailPage from '@/pages/EventDetailPage';
+import MyEventsPage from '@/pages/MyEventsPage';
+import EventRegistrationPage from '@/pages/EventRegistrationPage';
+import CheckoutPage from '@/pages/CheckoutPage';
+import CheckoutSuccessPage from '@/pages/CheckoutSuccessPage';
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
+import PaymentCancelPage from '@/pages/PaymentCancelPage';
+import MyOrdersPage from '@/pages/MyOrdersPage';
+import ProfilePage from '@/pages/ProfilePage';
+import SettingsPage from '@/pages/SettingsPage';
+import CreatorsPage from '@/pages/CreatorsPage';
+import CreatorPublicProfile from '@/pages/CreatorPublicProfile';
+import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
+import AboutPage from '@/pages/AboutPage';
+import ContactPage from '@/pages/ContactPage';
+import PricingPage from '@/pages/PricingPage';
+import BlogPage from '@/pages/BlogPage';
+import BlogPostPage from '@/pages/BlogPostPage';
+import MediaPage from '@/pages/MediaPage';
+import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
+import AnimationsPage from '@/pages/AnimationsPage';
+import TrendingPage from '@/pages/TrendingPage';
+import VenturesPage from '@/pages/VenturesPage';
+import LearnOurCulturePage from '@/pages/LearnOurCulturePage';
+import ConsultPage from '@/pages/ConsultPage';
+import SpeakingPage from '@/pages/SpeakingPage';
+import HelpCenterPage from '@/pages/HelpCenterPage';
+import TicketPage from '@/pages/TicketPage';
+import TicketDetailPage from '@/pages/TicketDetailPage';
+import TicketViewPage from '@/pages/TicketViewPage';
+import TicketVerificationPage from '@/pages/TicketVerificationPage';
+import VerifyCertificatePage from '@/pages/VerifyCertificatePage';
+import CourseResultsPage from '@/pages/CourseResultsPage';
+import JobDetailPage from '@/pages/JobDetailPage';
+import CareersPage from '@/pages/careers';
+import TermsOfServicePage from '@/pages/TermsOfServicePage';
+import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
-// Learning pages
-import CourseLearningPage from './pages/learning/CourseLearningPage';
-import CourseEnrollmentPage from './pages/CourseEnrollmentPage';
-import LessonPage from './pages/LessonPage';
-import MessagesPage from './pages/MessagesPage';
-import CartPage from './pages/cart/CartPage';
+// Import account pages
+import AccountPage from '@/pages/AccountPage';
+import UserProfile from '@/pages/account/UserProfile';
+import UserSettings from '@/pages/account/UserSettings';
+import UserCourses from '@/pages/account/UserCourses';
+import UserEvents from '@/pages/account/UserEvents';
+import UserConsultations from '@/pages/account/UserConsultations';
+import UserOrders from '@/pages/account/UserOrders';
 
-// Creator pages
-import CreatorAnalytics from './pages/creator/CreatorAnalytics';
-import CreatorCourseContent from './pages/creator/CreatorCourseContent';
-import CreatorCourseCreate from './pages/creator/CreatorCourseCreate';
-import CreatorCourseEdit from './pages/creator/CreatorCourseEdit';
-import CreatorCourseForm from './pages/creator/CreatorCourseForm';
-import CreatorCourses from './pages/creator/CreatorCourses';
-import CreatorDashboard from './pages/creator/CreatorDashboard';
-import CreatorEventAgenda from './pages/creator/CreatorEventAgenda';
-import CreatorEventCreate from './pages/creator/CreatorEventCreate';
-import CreatorEventEdit from './pages/creator/CreatorEventEdit';
-import CreatorEventForm from './pages/creator/CreatorEventForm';
-import CreatorEventRegistrations from './pages/creator/CreatorEventRegistrations';
-import CreatorEventSpeakers from './pages/creator/CreatorEventSpeakers';
-import CreatorEventTickets from './pages/creator/CreatorEventTickets';
-import CreatorEvents from './pages/creator/CreatorEvents';
-import CreatorPayments from './pages/creator/CreatorPayments';
-import CreatorPromoCodes from './pages/creator/CreatorPromoCodes';
-import CreatorSettings from './pages/creator/CreatorSettings';
-import CreatorStudents from './pages/creator/CreatorStudents';
-import EventAgenda from './pages/creator/EventAgenda';
-import CreatorAttendeeManagement from './pages/creator/CreatorAttendeeManagement';
-import EventSpeakers from './pages/creator/EventSpeakers';
+// Import community pages
+import CommunityPage from '@/pages/CommunityPage';
+import CommunityChatPage from '@/pages/CommunityChatPage';
+import CommunityCoursesPage from '@/pages/CommunityCoursesPage';
+import CommunityNotificationsPage from '@/pages/CommunityNotificationsPage';
 
-// Admin pages
-import AdminAnalytics from './pages/admin/AdminAnalytics';
-import AdminCareers from './pages/admin/AdminCareers';
-import AdminConsultations from './pages/admin/AdminConsultations';
-import AdminContactSubmissions from './pages/admin/AdminContactSubmissions';
-import AdminCourseContent from './pages/admin/AdminCourseContent';
-import AdminCourseCreate from './pages/admin/AdminCourseCreate';
-import AdminCourseEdit from './pages/admin/AdminCourseEdit';
-import AdminCourseForm from './pages/admin/AdminCourseForm';
-import AdminCourses from './pages/admin/AdminCourses';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminEventCreate from './pages/admin/AdminEventCreate';
-import AdminEventEdit from './pages/admin/AdminEventEdit';
-import AdminEventForm from './pages/admin/AdminEventForm';
-import AdminEventRegistrations from './pages/admin/AdminEventRegistrations';
-import AdminEvents from './pages/admin/AdminEvents';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminMedia from './pages/admin/AdminMedia';
-import AdminMediaForm from './pages/admin/AdminMediaForm';
-import AdminNewsletters from './pages/admin/AdminNewsletters';
-import AdminOrders from './pages/admin/AdminOrders';
-import AdminPayouts from './pages/admin/AdminPayouts';
-import AdminRegistrations from './pages/admin/AdminRegistrations';
-import AdminReviews from './pages/admin/AdminReviews';
-import AdminSettings from './pages/admin/AdminSettings';
-import AdminSpeaking from './pages/admin/AdminSpeaking';
-import AdminSupportInbox from './pages/admin/AdminSupportInbox';
-import AdminUsers from './pages/admin/AdminUsers';
-import CourseContentPage from './pages/admin/CourseContentPage';
-import CourseForm from './pages/admin/CourseForm';
-import EventForm from './pages/admin/EventForm';
-import EventRegistrations from './pages/admin/EventRegistrations';
-import LessonFormDialog from './pages/admin/LessonFormDialog';
-import MediaForm from './pages/admin/MediaForm';
+// Import learning pages
+import CourseDetailLearningPage from '@/pages/learning/CourseDetailPage';
+import CourseLearningPlayerPage from '@/pages/learning/CourseLearningPage';
 
-// Account pages
-import UserConsultations from './pages/account/UserConsultations';
-import UserCourses from './pages/account/UserCourses';
-import UserEvents from './pages/account/UserEvents';
-import UserOrders from './pages/account/UserOrders';
-import UserProfile from './pages/account/UserProfile';
-import UserSettings from './pages/account/UserSettings';
+// Import creator pages
+import CreatorDashboard from '@/pages/creator/CreatorDashboard';
+import CreatorCourses from '@/pages/creator/CreatorCourses';
+import CreatorCourseCreate from '@/pages/creator/CreatorCourseCreate';
+import CreatorCourseEdit from '@/pages/creator/CreatorCourseEdit';
+import CreatorCourseContent from '@/pages/creator/CreatorCourseContent';
+import CreatorStudents from '@/pages/creator/CreatorStudents';
+import CreatorEvents from '@/pages/creator/CreatorEvents';
+import CreatorEventCreate from '@/pages/creator/CreatorEventCreate';
+import CreatorEventEdit from '@/pages/creator/CreatorEventEdit';
+import CreatorEventRegistrations from '@/pages/creator/CreatorEventRegistrations';
+import CreatorEventAgenda from '@/pages/creator/CreatorEventAgenda';
+import CreatorEventSpeakers from '@/pages/creator/CreatorEventSpeakers';
+import CreatorEventTickets from '@/pages/creator/CreatorEventTickets';
+import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
+import CreatorPayments from '@/pages/creator/CreatorPayments';
+import CreatorPromoCodes from '@/pages/creator/CreatorPromoCodes';
+import CreatorSettings from '@/pages/creator/CreatorSettings';
+import CreatorAttendeeManagement from '@/pages/creator/CreatorAttendeeManagement';
 
-// Admin help center
-import AdminHelpCenter from './pages/admin/AdminHelpCenter';
+// Import admin pages
+import AdminLogin from '@/pages/admin/AdminLogin';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
+import AdminUsers from '@/pages/admin/AdminUsers';
+import AdminCourses from '@/pages/admin/AdminCourses';
+import AdminCourseCreate from '@/pages/admin/AdminCourseCreate';
+import AdminCourseEdit from '@/pages/admin/AdminCourseEdit';
+import AdminCourseContent from '@/pages/admin/AdminCourseContent';
+import AdminEvents from '@/pages/admin/AdminEvents';
+import AdminEventCreate from '@/pages/admin/AdminEventCreate';
+import AdminEventEdit from '@/pages/admin/AdminEventEdit';
+import AdminEventRegistrations from '@/pages/admin/AdminEventRegistrations';
+import AdminMedia from '@/pages/admin/AdminMedia';
+import AdminMediaForm from '@/pages/admin/AdminMediaForm';
+import AdminOrders from '@/pages/admin/AdminOrders';
+import AdminPayouts from '@/pages/admin/AdminPayouts';
+import AdminAnalytics from '@/pages/admin/AdminAnalytics';
+import AdminSettings from '@/pages/admin/AdminSettings';
+import AdminRegistrations from '@/pages/admin/AdminRegistrations';
+import AdminReviews from '@/pages/admin/AdminReviews';
+import AdminConsultations from '@/pages/admin/AdminConsultations';
+import AdminSpeaking from '@/pages/admin/AdminSpeaking';
+import AdminCareers from '@/pages/admin/AdminCareers';
+import AdminContactSubmissions from '@/pages/admin/AdminContactSubmissions';
+import AdminHelpCenter from '@/pages/admin/AdminHelpCenter';
+import AdminSupportInbox from '@/pages/admin/AdminSupportInbox';
+import AdminNewsletters from '@/pages/admin/AdminNewsletters';
 
-const queryClient = new QueryClient();
+// Import other pages
+import CartPage from '@/pages/cart/CartPage';
+import InboxPage from '@/pages/InboxPage';
+import NotificationsPage from '@/pages/NotificationsPage';
+import MessagesPage from '@/pages/MessagesPage';
+
+// Import components
+import ProtectedRoute from '@/components/ProtectedRoute';
+import AdminRoute from '@/components/admin/AdminRoute';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
 function App() {
   return (
@@ -155,135 +159,163 @@ function App() {
         <CurrencyProvider>
           <CartProvider>
             <Router>
-              <div className="App">
-                <Toaster />
+              <div className="min-h-screen bg-background">
                 <Routes>
-                  {/* Main pages */}
+                  {/* Public Routes */}
                   <Route path="/" element={<Index />} />
                   <Route path="/home" element={<HomePage />} />
-                  <Route path="/about" element={<AboutPage />} />
-                  <Route path="/account" element={<AccountPage />} />
-                  <Route path="/animations" element={<AnimationsPage />} />
+                  
+                  {/* Auth Routes */}
                   <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/verify" element={<VerifyPage />} />
+
+                  {/* Course Routes */}
+                  <Route path="/courses" element={<CoursesPage />} />
+                  <Route path="/explore-courses" element={<ExploreCoursesPage />} />
+                  <Route path="/course/:id" element={<CourseDetailPage />} />
+                  <Route path="/course/:id/enroll" element={<CourseEnrollmentPage />} />
+                  <Route path="/my-courses" element={<ProtectedRoute><MyCoursesPage /></ProtectedRoute>} />
+                  <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
+                  <Route path="/learning/course/:id" element={<ProtectedRoute><CourseLearningPage /></ProtectedRoute>} />
+                  <Route path="/learning/course-detail/:id" element={<ProtectedRoute><CourseDetailLearningPage /></ProtectedRoute>} />
+                  <Route path="/learning/course-player/:id" element={<ProtectedRoute><CourseLearningPlayerPage /></ProtectedRoute>} />
+                  <Route path="/course/:courseId/play" element={<ProtectedRoute><CoursePlayerPage /></ProtectedRoute>} />
+                  <Route path="/lesson/:lessonId" element={<ProtectedRoute><LessonPage /></ProtectedRoute>} />
+                  <Route path="/course/:id/results" element={<ProtectedRoute><CourseResultsPage /></ProtectedRoute>} />
+
+                  {/* Event Routes */}
+                  <Route path="/events" element={<EventsPage />} />
+                  <Route path="/explore-events" element={<ExploreEventsPage />} />
+                  <Route path="/local-content" element={<LocalContentPage />} />
+                  <Route path="/event-detail/:id" element={<EventDetailPage />} />
+                  <Route path="/events/:id" element={<EventDetailPage />} />
+                  <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
+                  <Route path="/event/:id/register" element={<EventRegistrationPage />} />
+
+                  {/* Commerce Routes */}
+                  <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+                  <Route path="/checkout-success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
+                  <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccessPage /></ProtectedRoute>} />
+                  <Route path="/payment-cancel" element={<ProtectedRoute><PaymentCancelPage /></ProtectedRoute>} />
+                  <Route path="/my-orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
+                  <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+
+                  {/* User Account Routes */}
+                  <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>}>
+                    <Route index element={<Navigate to="/account/profile" replace />} />
+                    <Route path="profile" element={<UserProfile />} />
+                    <Route path="settings" element={<UserSettings />} />
+                    <Route path="courses" element={<UserCourses />} />
+                    <Route path="events" element={<UserEvents />} />
+                    <Route path="consultations" element={<UserConsultations />} />
+                    <Route path="orders" element={<UserOrders />} />
+                  </Route>
+                  
+                  <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+
+                  {/* Creator Routes */}
+                  <Route path="/creators" element={<CreatorsPage />} />
+                  <Route path="/creator/:id" element={<CreatorPublicProfile />} />
                   <Route path="/become-creator" element={<BecomeCreatorPage />} />
+
+                  {/* Protected Creator Routes */}
+                  <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
+                  <Route path="/creator/courses" element={<ProtectedRoute><CreatorCourses /></ProtectedRoute>} />
+                  <Route path="/creator/courses/create" element={<ProtectedRoute><CreatorCourseCreate /></ProtectedRoute>} />
+                  <Route path="/creator/courses/:id/edit" element={<ProtectedRoute><CreatorCourseEdit /></ProtectedRoute>} />
+                  <Route path="/creator/courses/:id/content" element={<ProtectedRoute><CreatorCourseContent /></ProtectedRoute>} />
+                  <Route path="/creator/courses/:id/students" element={<ProtectedRoute><CreatorStudents /></ProtectedRoute>} />
+                  <Route path="/creator/events" element={<ProtectedRoute><CreatorEvents /></ProtectedRoute>} />
+                  <Route path="/creator/events/create" element={<ProtectedRoute><CreatorEventCreate /></ProtectedRoute>} />
+                  <Route path="/creator/events/:id/edit" element={<ProtectedRoute><CreatorEventEdit /></ProtectedRoute>} />
+                  <Route path="/creator/events/:id/registrations" element={<ProtectedRoute><CreatorEventRegistrations /></ProtectedRoute>} />
+                  <Route path="/creator/events/:id/agenda" element={<ProtectedRoute><CreatorEventAgenda /></ProtectedRoute>} />
+                  <Route path="/creator/events/:id/speakers" element={<ProtectedRoute><CreatorEventSpeakers /></ProtectedRoute>} />
+                  <Route path="/creator/events/:id/tickets" element={<ProtectedRoute><CreatorEventTickets /></ProtectedRoute>} />
+                  <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
+                  <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
+                  <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
+                  <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
+                  <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
+
+                  {/* Community Routes */}
+                  <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
+                  <Route path="/community/chat" element={<ProtectedRoute><CommunityChatPage /></ProtectedRoute>} />
+                  <Route path="/community/courses" element={<ProtectedRoute><CommunityCoursesPage /></ProtectedRoute>} />
+                  <Route path="/community/notifications" element={<ProtectedRoute><CommunityNotificationsPage /></ProtectedRoute>} />
+
+                  {/* Admin Routes */}
+                  <Route path="/admin/login" element={<AdminLogin />} />
+                  <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                  <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                  <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
+                  <Route path="/admin/courses/create" element={<AdminRoute><AdminCourseCreate /></AdminRoute>} />
+                  <Route path="/admin/courses/:id/edit" element={<AdminRoute><AdminCourseEdit /></AdminRoute>} />
+                  <Route path="/admin/courses/:id/content" element={<AdminRoute><AdminCourseContent /></AdminRoute>} />
+                  <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
+                  <Route path="/admin/events/create" element={<AdminRoute><AdminEventCreate /></AdminRoute>} />
+                  <Route path="/admin/events/:id/edit" element={<AdminRoute><AdminEventEdit /></AdminRoute>} />
+                  <Route path="/admin/events/:id/registrations" element={<AdminRoute><AdminEventRegistrations /></AdminRoute>} />
+                  <Route path="/admin/media" element={<AdminRoute><AdminMedia /></AdminRoute>} />
+                  <Route path="/admin/media/create" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+                  <Route path="/admin/media/:id/edit" element={<AdminRoute><AdminMediaForm /></AdminRoute>} />
+                  <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
+                  <Route path="/admin/payouts" element={<AdminRoute><AdminPayouts /></AdminRoute>} />
+                  <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+                  <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+                  <Route path="/admin/registrations" element={<AdminRoute><AdminRegistrations /></AdminRoute>} />
+                  <Route path="/admin/reviews" element={<AdminRoute><AdminReviews /></AdminRoute>} />
+                  <Route path="/admin/consultations" element={<AdminRoute><AdminConsultations /></AdminRoute>} />
+                  <Route path="/admin/speaking" element={<AdminRoute><AdminSpeaking /></AdminRoute>} />
+                  <Route path="/admin/careers" element={<AdminRoute><AdminCareers /></AdminRoute>} />
+                  <Route path="/admin/contact" element={<AdminRoute><AdminContactSubmissions /></AdminRoute>} />
+                  <Route path="/admin/help-center" element={<AdminRoute><AdminHelpCenter /></AdminRoute>} />
+                  <Route path="/admin/support-inbox" element={<AdminRoute><AdminSupportInbox /></AdminRoute>} />
+                  <Route path="/admin/newsletters" element={<AdminRoute><AdminNewsletters /></AdminRoute>} />
+
+                  {/* Content Routes */}
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/blog/:slug" element={<BlogPostPage />} />
-                  <Route path="/cart" element={<CartPage />} />
-                  <Route path="/checkout" element={<CheckoutPage />} />
-                  <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
-                  <Route path="/community" element={<CommunityPage />} />
-                  <Route path="/community/chat" element={<CommunityChatPage />} />
-                  <Route path="/community/courses" element={<CommunityCoursesPage />} />
-                  <Route path="/community/notifications" element={<CommunityNotificationsPage />} />
-                  <Route path="/consult" element={<ConsultPage />} />
-                  <Route path="/contact" element={<ContactPage />} />
-                  <Route path="/courses" element={<CoursesPage />} />
-                  <Route path="/learning/course-detail/:id" element={<CourseDetailPage />} />
-                  <Route path="/course/:courseId/player" element={<CoursePlayerPage />} />
-                  <Route path="/course/:courseId/results" element={<CourseResultsPage />} />
-                  <Route path="/course/:courseId/enroll" element={<CourseEnrollmentPage />} />
-                  <Route path="/course/:courseId/lesson/:lessonId" element={<LessonPage />} />
-                  <Route path="/creators" element={<CreatorsPage />} />
-                  <Route path="/creator/profile/:creatorId" element={<CreatorPublicProfile />} />
-                  <Route path="/events" element={<EventsPage />} />
-                  <Route path="/event-detail/:id" element={<EventDetailPage />} />
-                  <Route path="/explore-courses" element={<ExploreCoursesPage />} />
-                  <Route path="/explore-events" element={<ExploreEventsPage />} />
-                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                  <Route path="/help" element={<HelpCenterPage />} />
-                  <Route path="/inbox" element={<InboxPage />} />
-                  <Route path="/job/:id" element={<JobDetailPage />} />
-                  <Route path="/culture" element={<LearnOurCulturePage />} />
-                  <Route path="/learning" element={<LearningPage />} />
-                  <Route path="/login" element={<LoginPage />} />
                   <Route path="/media" element={<MediaPage />} />
                   <Route path="/media/:id" element={<MediaPostDetailPage />} />
-                  <Route path="/messages/:userId" element={<MessagesPage />} />
-                  <Route path="/my-courses" element={<MyCoursesPage />} />
-                  <Route path="/my-events" element={<MyEventsPage />} />
-                  <Route path="/my-orders" element={<MyOrdersPage />} />
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                  <Route path="/payment/cancel" element={<PaymentCancelPage />} />
-                  <Route path="/payment/success" element={<PaymentSuccessPage />} />
-                  <Route path="/pricing" element={<PricingPage />} />
-                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/signin" element={<SigninPage />} />
-                  <Route path="/speaking" element={<SpeakingPage />} />
-                  <Route path="/terms" element={<TermsOfServicePage />} />
-                  <Route path="/ticket/:id" element={<TicketPage />} />
-                  <Route path="/ticket/view/:id" element={<TicketViewPage />} />
-                  <Route path="/ticket-verification" element={<TicketVerificationPage />} />
+                  <Route path="/animations" element={<AnimationsPage />} />
                   <Route path="/trending" element={<TrendingPage />} />
-                  <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
                   <Route path="/ventures" element={<VenturesPage />} />
-                  <Route path="/verify" element={<VerifyPage />} />
+                  <Route path="/learn-our-culture" element={<LearnOurCulturePage />} />
+                  <Route path="/consult" element={<ConsultPage />} />
+                  <Route path="/speaking" element={<SpeakingPage />} />
+                  <Route path="/help-center" element={<HelpCenterPage />} />
+                  <Route path="/careers/:id" element={<JobDetailPage />} />
                   <Route path="/careers" element={<CareersPage />} />
 
-                  {/* Learning routes */}
-                  <Route path="/learning/course/:id" element={<CourseLearningPage />} />
+                  {/* Ticket Routes */}
+                  <Route path="/tickets" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
+                  <Route path="/ticket/:id" element={<ProtectedRoute><TicketDetailPage /></ProtectedRoute>} />
+                  <Route path="/ticket/:id/view" element={<ProtectedRoute><TicketViewPage /></ProtectedRoute>} />
+                  <Route path="/verify-ticket" element={<TicketVerificationPage />} />
+                  <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
 
-                  {/* Creator routes */}
-                  <Route path="/creator/dashboard" element={<CreatorDashboard />} />
-                  <Route path="/creator/attendee-management" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
-                  <Route path="/creator/analytics" element={<CreatorAnalytics />} />
-                  <Route path="/creator/courses" element={<CreatorCourses />} />
-                  <Route path="/creator/courses/create" element={<CreatorCourseCreate />} />
-                  <Route path="/creator/courses/:id/edit" element={<CreatorCourseEdit />} />
-                  <Route path="/creator/courses/:id/content" element={<CreatorCourseContent />} />
-                  <Route path="/creator/events" element={<CreatorEvents />} />
-                  <Route path="/creator/events/create" element={<CreatorEventCreate />} />
-                  <Route path="/creator/events/:id/edit" element={<CreatorEventEdit />} />
-                  <Route path="/creator/events/:id/agenda" element={<CreatorEventAgenda />} />
-                  <Route path="/creator/events/:id/speakers" element={<CreatorEventSpeakers />} />
-                  <Route path="/creator/events/:id/tickets" element={<CreatorEventTickets />} />
-                  <Route path="/creator/events/:id/registrations" element={<CreatorEventRegistrations />} />
-                  <Route path="/creator/payments" element={<CreatorPayments />} />
-                  <Route path="/creator/promo-codes" element={<CreatorPromoCodes />} />
-                  <Route path="/creator/students" element={<CreatorStudents />} />
-                  <Route path="/creator/settings" element={<CreatorSettings />} />
+                  {/* Communication Routes */}
+                  <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+                  <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+                  <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
 
-                  {/* Admin routes */}
-                  <Route path="/admin" element={<AdminLogin />} />
-                  <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                  <Route path="/admin/analytics" element={<AdminAnalytics />} />
-                  <Route path="/admin/careers" element={<AdminCareers />} />
-                  <Route path="/admin/consultations" element={<AdminConsultations />} />
-                  <Route path="/admin/contact-submissions" element={<AdminContactSubmissions />} />
-                  <Route path="/admin/courses" element={<AdminCourses />} />
-                  <Route path="/admin/courses/create" element={<AdminCourseCreate />} />
-                  <Route path="/admin/courses/:id/edit" element={<AdminCourseEdit />} />
-                  <Route path="/admin/courses/:id/content" element={<AdminCourseContent />} />
-                  <Route path="/admin/events" element={<AdminEvents />} />
-                  <Route path="/admin/events/create" element={<AdminEventCreate />} />
-                  <Route path="/admin/events/:id/edit" element={<AdminEventEdit />} />
-                  <Route path="/admin/events/:id/registrations" element={<AdminEventRegistrations />} />
-                  <Route path="/admin/help-center" element={<AdminHelpCenter />} />
-                  <Route path="/admin/media" element={<AdminMedia />} />
-                  <Route path="/admin/newsletters" element={<AdminNewsletters />} />
-                  <Route path="/admin/orders" element={<AdminOrders />} />
-                  <Route path="/admin/payouts" element={<AdminPayouts />} />
-                  <Route path="/admin/registrations" element={<AdminRegistrations />} />
-                  <Route path="/admin/reviews" element={<AdminReviews />} />
-                  <Route path="/admin/settings" element={<AdminSettings />} />
-                  <Route path="/admin/speaking" element={<AdminSpeaking />} />
-                  <Route path="/admin/support" element={<AdminSupportInbox />} />
-                  <Route path="/admin/users" element={<AdminUsers />} />
+                  {/* Legal Routes */}
+                  <Route path="/terms" element={<TermsOfServicePage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
-                  {/* Account routes */}
-                  <Route path="/account/profile" element={<UserProfile />} />
-                  <Route path="/account/courses" element={<UserCourses />} />
-                  <Route path="/account/events" element={<UserEvents />} />
-                  <Route path="/account/orders" element={<UserOrders />} />
-                  <Route path="/account/consultations" element={<UserConsultations />} />
-                  <Route path="/account/settings" element={<UserSettings />} />
-
-                  {/* 404 route */}
+                  {/* 404 Route */}
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
+                <Toaster />
               </div>
             </Router>
           </CartProvider>
