@@ -302,8 +302,8 @@ function App() {
                   <Route path="/tickets" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
                   <Route path="/ticket/:id" element={<ProtectedRoute><TicketDetailPage /></ProtectedRoute>} />
                   <Route path="/ticket/:id/view" element={<ProtectedRoute><TicketViewPage /></ProtectedRoute>} />
-                  <Route path="/verify-ticket" element={<TicketVerificationPage />} />
                   <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
+                  <Route path="/ticket-verification" element={<TicketVerificationPage />} />
 
                   {/* Communication Routes */}
                   <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
