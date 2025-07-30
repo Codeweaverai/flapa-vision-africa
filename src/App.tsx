@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -103,6 +104,43 @@ import CartPage from '@/pages/cart/CartPage';
 import InboxPage from '@/pages/InboxPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import MessagesPage from '@/pages/MessagesPage';
+
+// Import missing pages that are used in routes
+import CourseResultsPage from '@/pages/CourseResultsPage';
+import CheckoutPage from '@/pages/CheckoutPage';
+import CheckoutSuccessPage from '@/pages/CheckoutSuccessPage';
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
+import PaymentCancelPage from '@/pages/PaymentCancelPage';
+import MyOrdersPage from '@/pages/MyOrdersPage';
+import ProfilePage from '@/pages/ProfilePage';
+import SettingsPage from '@/pages/SettingsPage';
+import CreatorsPage from '@/pages/CreatorsPage';
+import CreatorPublicProfile from '@/pages/CreatorPublicProfile';
+import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
+import AboutPage from '@/pages/AboutPage';
+import ContactPage from '@/pages/ContactPage';
+import PricingPage from '@/pages/PricingPage';
+import BlogPage from '@/pages/BlogPage';
+import BlogPostPage from '@/pages/BlogPostPage';
+import MediaPage from '@/pages/MediaPage';
+import MediaPostDetailPage from '@/pages/MediaPostDetailPage';
+import AnimationsPage from '@/pages/AnimationsPage';
+import TrendingPage from '@/pages/TrendingPage';
+import VenturesPage from '@/pages/VenturesPage';
+import LearnOurCulturePage from '@/pages/LearnOurCulturePage';
+import ConsultPage from '@/pages/ConsultPage';
+import SpeakingPage from '@/pages/SpeakingPage';
+import HelpCenterPage from '@/pages/HelpCenterPage';
+import JobDetailPage from '@/pages/JobDetailPage';
+import CareersPage from '@/pages/CareersPage';
+import TicketPage from '@/pages/TicketPage';
+import TicketDetailPage from '@/pages/TicketDetailPage';
+import TicketViewPage from '@/pages/TicketViewPage';
+import TicketVerificationPage from '@/pages/TicketVerificationPage';
+import VerifyCertificatePage from '@/pages/VerifyCertificatePage';
+import TermsOfServicePage from '@/pages/TermsOfServicePage';
+import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
 // Import components
 import ProtectedRoute from '@/components/ProtectedRoute';
