@@ -364,7 +364,8 @@ const ExploreCoursesPage = () => {
               <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
+
               {displayedCourses.map((course) => (
                 <Card 
                   key={course.id} 
