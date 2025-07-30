@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,8 +11,23 @@ import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 
 interface CoursePreviewDialogProps {
-  courseId: string;
-  onPreviewUpdated?: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  course: {
+    id: string;
+    title: string;
+    description: string;
+    summary: string;
+    thumbnail_url?: string;
+    is_published: boolean;
+    is_free: boolean;
+    price: number;
+    duration_minutes: number;
+    category: string;
+    difficulty_level: string;
+    created_at: string;
+  } | null;
+  onPreviewAdded: () => Promise<void>;
 }
 
 interface LearningOutcome {
@@ -22,10 +37,11 @@ interface LearningOutcome {
 }
 
 const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
-  courseId,
-  onPreviewUpdated
+  open,
+  onOpenChange,
+  course,
+  onPreviewAdded
 }) => {
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
@@ -33,19 +49,21 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
   const [videoFile, setVideoFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && course) {
       loadExistingData();
     }
-  }, [open, courseId]);
+  }, [open, course]);
 
   const loadExistingData = async () => {
+    if (!course) return;
+    
     setLoading(true);
     try {
       // Load learning outcomes
       const { data: outcomes, error: outcomesError } = await supabase
         .from('course_learning_outcomes')
         .select('*')
-        .eq('course_id', courseId)
+        .eq('course_id', course.id)
         .order('order_index');
 
       if (outcomesError) throw outcomesError;
@@ -54,7 +72,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       const { data: preview, error: previewError } = await supabase
         .from('course_previews')
         .select('*')
-        .eq('course_id', courseId)
+        .eq('course_id', course.id)
         .single();
 
       if (previewError && previewError.code !== 'PGRST116') throw previewError;
@@ -87,12 +105,12 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
   };
 
   const handleVideoUpload = async () => {
-    if (!videoFile) return null;
+    if (!videoFile || !course) return null;
 
     setUploading(true);
     try {
       const fileExt = videoFile.name.split('.').pop();
-      const fileName = `${courseId}/preview_${uuidv4()}.${fileExt}`;
+      const fileName = `${course.id}/preview_${uuidv4()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('course-videos')
@@ -115,6 +133,8 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
   };
 
   const handleSave = async () => {
+    if (!course) return;
+    
     setLoading(true);
     try {
       // Upload video if new file selected
@@ -130,7 +150,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       const { error: previewError } = await supabase
         .from('course_previews')
         .upsert({
-          course_id: courseId,
+          course_id: course.id,
           preview_video_url: videoData.url,
           preview_video_path: videoData.path
         });
@@ -141,14 +161,14 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       await supabase
         .from('course_learning_outcomes')
         .delete()
-        .eq('course_id', courseId);
+        .eq('course_id', course.id);
 
       // Save learning outcomes
       if (learningOutcomes.length > 0) {
         const outcomesToSave = learningOutcomes
           .filter(outcome => outcome.outcome.trim())
           .map((outcome, index) => ({
-            course_id: courseId,
+            course_id: course.id,
             outcome: outcome.outcome.trim(),
             order_index: index
           }));
@@ -163,8 +183,8 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       }
 
       toast.success('Course preview updated successfully!');
-      setOpen(false);
-      onPreviewUpdated?.();
+      onOpenChange(false);
+      await onPreviewAdded();
     } catch (error) {
       console.error('Error saving preview:', error);
       toast.error('Failed to save course preview');
@@ -173,14 +193,10 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
     }
   };
 
+  if (!course) return null;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Play className="h-4 w-4 mr-2" />
-          Add Preview
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Course Preview & Learning Outcomes</DialogTitle>
@@ -258,7 +274,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
           <div className="flex justify-end gap-2 pt-4">
             <Button 
               variant="outline" 
-              onClick={() => setOpen(false)}
+              onClick={() => onOpenChange(false)}
               disabled={loading || uploading}
             >
               Cancel
