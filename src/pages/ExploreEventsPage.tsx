@@ -201,7 +201,7 @@ const ExploreEventsPage = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-200 flex items-center justify-center">
+          <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-200 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600"></div>
         </div>
       </Layout>
@@ -210,7 +210,7 @@ const ExploreEventsPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-200">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-16">
           {/* Header */}
           <div className="text-center mb-16">
