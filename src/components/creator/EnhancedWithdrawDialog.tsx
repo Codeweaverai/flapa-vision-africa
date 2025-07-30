@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -237,23 +238,22 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // FIXED BUG: Calculate the correct USD amount to deduct from balance
-        // When withdrawing local currency, we need to convert it back to USD for balance deduction
-        const usdAmountToDeduct = withdrawAmount / exchangeRate;
+        // Calculate the equivalent USD amount to deduct from balance
+        const AmountToDeduct = withdrawAmount;
 
-        console.log('Mobile Money Withdrawal (FIXED):', {
+        console.log('Mobile Money Withdrawal:', {
           withdrawAmount,
           localCurrency,
           exchangeRate,
-          usdAmountToDeduct,
+          AmountToDeduct,
           availableBalance
         });
 
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
           body: {
-            amount: usdAmountToDeduct,        // USD amount to deduct from creator balance
-            targetAmount: withdrawAmount,      // Local currency amount to send to user
-            targetCurrency: localCurrency,     // Local currency code (e.g., ZMW, KES)
+            amount: AmountToDeduct,          // USD amount to deduct from creator balance
+            targetAmount: AmountToDeduct,       // Local currency amount to send to user
+            targetCurrency: localCurrency,      // Local currency code (e.g., ZMW, KES)
             phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
             country: countryCode,
