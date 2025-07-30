@@ -361,7 +361,7 @@ const ExploreEventsPage = () => {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
                 {displayedEvents.map((event) => (
                   <Card key={event.id} className="group overflow-hidden hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:scale-[1.02]">
                     <div onClick={() => navigate(`/events/${event.id}`)}>
