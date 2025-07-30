@@ -295,7 +295,7 @@ function App() {
                   <Route path="/consult" element={<ConsultPage />} />
                   <Route path="/speaking" element={<SpeakingPage />} />
                   <Route path="/help" element={<HelpCenterPage />} />
-                  <Route path="/careers/:id" element={<JobDetailPage />} />
+                  <Route path="/job/:id" element={<JobDetailPage />} />
                   <Route path="/careers" element={<CareersPage />} />
 
                   {/* Ticket Routes */}
