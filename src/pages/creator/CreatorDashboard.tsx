@@ -239,14 +239,14 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Enhanced Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={earnings?.total_earnings || 0} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -261,7 +261,7 @@ const CreatorDashboard = () => {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -276,7 +276,7 @@ const CreatorDashboard = () => {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalStudents}</div>
+                <div className="text-base md:text-lg font-semibold">{stats.totalStudents}</div>
                 <p className="text-xs text-muted-foreground">
                   {stats.totalEnrollments} enrollments, {stats.totalBookings} bookings
                 </p>
@@ -289,7 +289,7 @@ const CreatorDashboard = () => {
                 <Star className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.averageRating.toFixed(1)}</div>
+                <div className="text-base md:text-lg font-semibold">{stats.averageRating.toFixed(1)}</div>
                 <p className="text-xs text-muted-foreground">
                   From {stats.totalReviews} reviews
                 </p>
@@ -298,14 +298,14 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Content Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Courses</CardTitle>
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalCourses}</div>
+                <div className="text-base md:text-lg font-semibold">{stats.totalCourses}</div>
                 <p className="text-xs text-muted-foreground">
                   {stats.courseReviews} reviews • {stats.courseRating.toFixed(1)} ⭐
                 </p>
@@ -318,7 +318,7 @@ const CreatorDashboard = () => {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalEvents}</div>
+                <div className="text-base md:text-lg font-semibold">{stats.totalEvents}</div>
                 <p className="text-xs text-muted-foreground">
                   {stats.eventReviews} reviews • {stats.eventRating.toFixed(1)} ⭐
                 </p>
@@ -331,7 +331,7 @@ const CreatorDashboard = () => {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={earnings?.course_revenue || 0} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -346,7 +346,7 @@ const CreatorDashboard = () => {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={earnings?.event_revenue || 0} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
