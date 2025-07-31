@@ -1,347 +1,57 @@
-
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PAWAPAY_API_URL = 'https://api.sandbox.pawapay.io/v1/widget/sessions';
-const PAWAPAY_TOKEN = Deno.env.get('PAWAPAY_TOKEN');
+interface PawaPayRequest {
+  amount: number;
+  currency: string;
+  msisdn: string;
+  country: string;
+  returnUrl: string;
+  items: Array<{
+    item_type: string;
+    item_id: string;
+    item_name: string;
+    title: string;
+    quantity: number;
+    price: number;
+    ticket_holder_names?: string[];
+  }>;
+  tax_amount?: number;
+  discount_amount?: number;
+  promo_code?: string;
+}
 
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[CREATE-PAWAPAY] ${step}${detailsStr}`);
-};
-
-// Helper function to update event ticket inventory
-const updateTicketInventory = async (supabase: any, ticketId: string, quantity: number) => {
-  logStep("Updating ticket inventory", { ticketId, quantity });
-  
-  const { data: currentTicket, error: fetchError } = await supabase
-    .from('event_tickets')
-    .select('quantity_available, quantity_sold')
-    .eq('id', ticketId)
-    .single();
-
-  if (fetchError) {
-    logStep("Error fetching ticket data", fetchError);
-    throw new Error(`Failed to fetch ticket data: ${fetchError.message}`);
-  }
-
-  if (currentTicket.quantity_available < quantity) {
-    logStep("Insufficient inventory", { available: currentTicket.quantity_available, requested: quantity });
-    throw new Error(`Insufficient ticket inventory. Available: ${currentTicket.quantity_available}, Requested: ${quantity}`);
-  }
-
-  const { error: updateError } = await supabase
-    .from('event_tickets')
-    .update({
-      quantity_available: currentTicket.quantity_available - quantity,
-      quantity_sold: currentTicket.quantity_sold + quantity,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', ticketId);
-
-  if (updateError) {
-    logStep("Error updating ticket inventory", updateError);
-    throw new Error(`Failed to update ticket inventory: ${updateError.message}`);
-  }
-
-  logStep("Ticket inventory updated successfully", { 
-    newAvailable: currentTicket.quantity_available - quantity,
-    newSold: currentTicket.quantity_sold + quantity
-  });
-};
-
-// Helper function to create or get existing event booking
-const createOrGetEventBooking = async (supabase: any, bookingData: any) => {
-  logStep("Creating or getting event booking", bookingData);
-  
-  // First, try to get existing booking
-  const { data: existingBooking, error: existingError } = await supabase
-    .from('event_bookings')
-    .select('*')
-    .eq('user_id', bookingData.user_id)
-    .eq('event_id', bookingData.event_id)
-    .maybeSingle();
-
-  if (existingError) {
-    logStep("Error checking existing booking", existingError);
-    throw new Error(`Failed to check existing booking: ${existingError.message}`);
-  }
-
-  if (existingBooking) {
-    logStep("Found existing booking", { bookingId: existingBooking.id });
-    
-    // Update the existing booking with new order info
-    const { data: updatedBooking, error: updateError } = await supabase
-      .from('event_bookings')
-      .update({
-        order_id: bookingData.order_id,
-        ticket_quantity: existingBooking.ticket_quantity + bookingData.quantity,
-        payment_amount: (existingBooking.payment_amount || 0) + bookingData.total_price,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', existingBooking.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      logStep("Error updating existing booking", updateError);
-      throw new Error(`Failed to update existing booking: ${updateError.message}`);
-    }
-
-    logStep("Updated existing booking successfully", { bookingId: updatedBooking.id });
-    return updatedBooking;
-  }
-
-  // Create new booking if none exists
-  const { data: booking, error: bookingError } = await supabase
-    .from('event_bookings')
-    .insert({
-      user_id: bookingData.user_id,
-      event_id: bookingData.event_id,
-      event_ticket_id: bookingData.event_ticket_id,
-      order_id: bookingData.order_id,
-      ticket_quantity: bookingData.quantity,
-      status: 'confirmed',
-      payment_status: 'completed',
-      payment_amount: bookingData.total_price,
-      payment_currency: 'USD',
-      booking_date: new Date().toISOString(),
-      booking_code: `EVT-${crypto.randomUUID().substring(0, 8).toUpperCase()}`
-    })
-    .select()
-    .single();
-
-  if (bookingError) {
-    logStep("Error creating new booking", bookingError);
-    throw new Error(`Failed to create booking: ${bookingError.message}`);
-  }
-
-  logStep("New booking created successfully", { bookingId: booking.id });
-  return booking;
-};
-
-// Helper function to generate tickets
-const generateTickets = async (supabase: any, ticketData: any) => {
-  logStep("Generating individual tickets", { 
-    bookingId: ticketData.bookingId, 
-    quantity: ticketData.quantity,
-    holderNames: ticketData.ticket_holder_names?.length,
-    holderEmails: ticketData.ticket_holder_emails?.length,
-    userEmail: ticketData.userEmail,
-    userFullName: ticketData.userFullName
-  });
-  
-  const generatedTickets = [];
-  
-  for (let i = 0; i < ticketData.quantity; i++) {
-    const ticketCode = `TCK-${crypto.randomUUID().substring(0, 8).toUpperCase()}`;
-    const holderName = ticketData.ticket_holder_names?.[i] || ticketData.userFullName || `Ticket Holder ${i + 1}`;
-    const holderEmail = ticketData.ticket_holder_emails?.[i] || ticketData.userEmail || null;
-    
-    const qrData = JSON.stringify({
-      ticketCode,
-      bookingId: ticketData.bookingId,
-      eventId: ticketData.eventId,
-      orderId: ticketData.orderId,
-      userId: ticketData.userId,
-      ticketHolderName: holderName,
-      ticketHolderEmail: holderEmail,
-      generatedAt: new Date().toISOString()
-    });
-
-    const { data: ticket, error: ticketError } = await supabase
-      .from('generated_tickets')
-      .insert({
-        booking_id: ticketData.bookingId,
-        event_id: ticketData.eventId,
-        order_id: ticketData.orderId,
-        user_id: ticketData.userId,
-        event_ticket_id: ticketData.eventTicketId,
-        ticket_code: ticketCode,
-        ticket_holder_name: holderName,
-        ticket_holder_email: holderEmail,
-        qr_code_data: qrData,
-        ticket_status: 'active',
-        generated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (ticketError) {
-      logStep("Error generating ticket", ticketError);
-      throw new Error(`Failed to generate ticket: ${ticketError.message}`);
-    }
-
-    generatedTickets.push(ticket);
-    logStep("Generated ticket", { ticketCode, holderName, holderEmail });
-  }
-
-  logStep("All tickets generated successfully", { count: generatedTickets.length });
-  return generatedTickets;
-};
-
-// Helper function to process event ticket purchase
-const processEventTicketPurchase = async (supabase: any, orderItem: any, order: any, user: any) => {
-  logStep("Processing event ticket purchase", { 
-    ticketId: orderItem.item_id, 
-    quantity: orderItem.quantity 
-  });
-
-  // Get event details from ticket - Fix the relationship issue
-  const { data: ticketWithEvent, error: ticketError } = await supabase
-    .from('event_tickets')
-    .select(`
-      *,
-      events!event_tickets_event_id_fkey (
-        id,
-        title
-      )
-    `)
-    .eq('id', orderItem.item_id)
-    .single();
-
-  if (ticketError) {
-    logStep("Error fetching ticket with event", ticketError);
-    throw new Error(`Failed to fetch ticket details: ${ticketError.message}`);
-  }
-
-  // Verify event exists
-  if (!ticketWithEvent.events) {
-    logStep("No event found for ticket", { ticketId: orderItem.item_id });
-    throw new Error(`No event found for ticket: ${orderItem.item_id}`);
-  }
-
-  // Update ticket inventory
-  await updateTicketInventory(supabase, orderItem.item_id, orderItem.quantity);
-
-  // Create or get event booking
-  const booking = await createOrGetEventBooking(supabase, {
-    user_id: user.id,
-    event_id: ticketWithEvent.events.id,
-    event_ticket_id: orderItem.item_id,
-    order_id: order.id,
-    quantity: orderItem.quantity,
-    total_price: orderItem.total_price
-  });
-
-  // Safely parse metadata
-  let ticketHolderNames = [];
-  let ticketHolderEmails = [];
-  try {
-    const metadata = orderItem.metadata || {};
-    ticketHolderNames = metadata.ticket_holder_names || [];
-    ticketHolderEmails = metadata.ticket_holder_emails || [];
-  } catch (e) {
-    logStep("Error parsing metadata", e);
-    ticketHolderNames = [];
-    ticketHolderEmails = [];
-  }
-
-  // Generate individual tickets with user info
-  await generateTickets(supabase, {
-    bookingId: booking.id,
-    eventId: ticketWithEvent.events.id,
-    orderId: order.id,
-    userId: user.id,
-    eventTicketId: orderItem.item_id,
-    quantity: orderItem.quantity,
-    ticket_holder_names: ticketHolderNames,
-    ticket_holder_emails: ticketHolderEmails,
-    userEmail: user.email,
-    userFullName: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email
-  });
-
-  logStep("Event ticket purchase processed successfully", { 
-    bookingId: booking.id,
-    ticketsGenerated: orderItem.quantity 
-  });
-};
-
-// Helper function to process course enrollment
-const processCourseEnrollment = async (supabase: any, orderItem: any, order: any, user: any) => {
-  logStep("Processing course enrollment", { 
-    courseId: orderItem.item_id, 
-    quantity: orderItem.quantity 
-  });
-
-  // Check if enrollment already exists
-  const { data: existingEnrollment, error: checkError } = await supabase
-    .from('course_enrollments')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('course_id', orderItem.item_id)
-    .eq('order_id', order.id)
-    .maybeSingle();
-
-  if (checkError) {
-    logStep("Error checking existing enrollment", checkError);
-    throw new Error(`Failed to check existing enrollment: ${checkError.message}`);
-  }
-
-  if (existingEnrollment) {
-    logStep("Course enrollment already exists", { enrollmentId: existingEnrollment.id });
-    return existingEnrollment;
-  }
-
-  // Create course enrollment
-  const { data: enrollment, error: enrollmentError } = await supabase
-    .from('course_enrollments')
-    .insert({
-      user_id: user.id,
-      course_id: orderItem.item_id,
-      order_id: order.id,
-      payment_status: 'completed',
-      enrollment_date: new Date().toISOString()
-    })
-    .select()
-    .single();
-
-  if (enrollmentError) {
-    logStep("Error creating course enrollment", enrollmentError);
-    throw new Error(`Failed to create course enrollment: ${enrollmentError.message}`);
-  }
-
-  logStep("Course enrollment created successfully", { enrollmentId: enrollment.id });
-  return enrollment;
-};
-
-const handler = async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Starting PawaPay session creation...');
-    
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      console.error('Missing authorization header');
-      throw new Error('Missing authorization header');
-    }
+    console.log('[PAWAPAY] Session creation started');
 
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { 
-        global: { headers: { Authorization: authHeader } },
-        auth: { persistSession: false }
-      }
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      console.error('Authentication error:', userError);
-      throw new Error('Unauthorized');
+    // Authenticate user
+    const authHeader = req.headers.get("Authorization")!;
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+
+    if (authError || !user?.email) {
+      throw new Error("User not authenticated");
     }
 
-    const requestBody = await req.json();
-    console.log('Request body received:', requestBody);
+    console.log('[PAWAPAY] User authenticated:', user.email);
+
+    const requestBody: PawaPayRequest = await req.json();
+    console.log('[PAWAPAY] Request body:', requestBody);
 
     const {
       amount,
@@ -355,243 +65,189 @@ const handler = async (req: Request): Promise<Response> => {
       promo_code
     } = requestBody;
 
-    console.log('Request payload:', { amount, currency, msisdn, country, itemsCount: items?.length });
-
-    if (!PAWAPAY_TOKEN) {
-      console.error('PawaPay token not configured');
-      throw new Error('PawaPay token not configured');
-    }
-
-    if (!amount || !currency || !msisdn || !country || !items || !returnUrl) {
-      console.error('Missing required fields:', { amount, currency, msisdn, country, items: !!items, returnUrl: !!returnUrl });
-      throw new Error('Missing required payment fields');
-    }
-
-    // Validate amount is positive
-    if (amount <= 0) {
-      throw new Error('Amount must be greater than 0');
-    }
-
-    // Validate phone number format
-    if (!msisdn.match(/^\d{10,15}$/)) {
-      throw new Error('Invalid phone number format');
-    }
-
-    // Generate unique deposit ID
-    const depositId = crypto.randomUUID();
-    console.log('Generated deposit ID:', depositId);
-
-    // Create order record in Supabase using service role
-    const serviceRoleClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Updated order data structure to match current table schema
-    const orderData = {
-      user_id: user.id,
-      total_amount: amount / 100, // Convert from cents to dollars
-      currency: currency || 'USD',
-      payment_method: 'mobile_money',
-      payment_status: 'completed',
-      payment_provider_id: depositId,
-      email: user.email || '',
+    const payload = {
+      amount,
+      currency,
+      msisdn,
+      country,
+      return_url: returnUrl,
+      items: items.map(item => ({
+        item_type: item.item_type,
+        item_id: item.item_id,
+        item_name: item.title,
+        quantity: item.quantity,
+        price: item.price,
+        ticket_holder_names: item.ticket_holder_names || []
+      })),
       tax_amount: tax_amount || 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      discount_amount: discount_amount || 0,
+      promo_code: promo_code || null,
     };
 
-    console.log('Creating order with data:', orderData);
+    console.log('[PAWAPAY] Payload:', payload);
 
-    const { data: order, error: orderError } = await serviceRoleClient
+    const pawaPayApiUrl = Deno.env.get("PAWAPAY_API_URL");
+    const pawaPayApiKey = Deno.env.get("PAWAPAY_API_KEY");
+
+    if (!pawaPayApiUrl || !pawaPayApiKey) {
+      throw new Error("PawaPay API URL or API Key not set in environment variables");
+    }
+
+    const res = await fetch(`${pawaPayApiUrl}/session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": pawaPayApiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error('[PAWAPAY] PawaPay API Error:', data);
+      throw new Error(`PawaPay API Error: ${data.message || res.statusText}`);
+    }
+
+    console.log('[PAWAPAY] PawaPay API Response:', data);
+
+    const { redirectUrl, sessionId } = data;
+
+    if (!redirectUrl) {
+      throw new Error("No redirect URL received from PawaPay");
+    }
+
+    // Create Supabase admin client
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    // Calculate total amount
+    const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    // Create order in Supabase
+    const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .insert(orderData)
+      .insert({
+        user_id: user.id,
+        total_amount: totalAmount,
+        currency: currency.toUpperCase(),
+        payment_status: 'pending',
+        payment_method: 'mobile_money',
+        payment_provider_id: sessionId,
+        email: user.email,
+        tax_amount: tax_amount || 0,
+        discount_amount: discount_amount || 0,
+        promo_code: promo_code || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
       .select()
       .single();
 
     if (orderError) {
-      console.error('Error creating order:', orderError);
-      throw new Error('Failed to create order: ' + orderError.message);
+      console.error('[PAWAPAY] Error creating order:', orderError);
+      throw new Error(`Failed to create order: ${orderError.message}`);
     }
 
-    console.log('Order created successfully:', order.id);
+    console.log('[PAWAPAY] Order created successfully', { orderId: order.id });
 
-    // Create order items using service role
-    const orderItems = items.map((item: any) => {
-      const itemType = item.item_type || item.itemType || 'event_ticket';
-      const itemId = item.item_id || item.itemId || item.id;
-      const itemName = item.item_name || item.itemName || item.title || item.name || 'Item';
-      
-      return {
-        order_id: order.id,
-        item_id: itemId,
-        item_type: itemType,
-        item_name: itemName,
-        quantity: item.quantity || 1,
-        unit_price: item.price || 0,
-        total_price: (item.price || 0) * (item.quantity || 1),
-        metadata: {
-          ticket_holder_names: item.ticket_holder_names || [],
-          ticket_holder_emails: item.ticket_holder_emails || []
-        }
-      };
-    });
+    // Insert order items
+    const orderItemsToInsert = items.map(item => ({
+      order_id: order.id,
+      item_id: item.item_id,
+      item_type: item.item_type,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      unit_price: item.price,
+      total_price: item.price * item.quantity,
+      metadata: {
+        ticket_holder_names: item.ticket_holder_names || []
+      }
+    }));
 
-    console.log('Creating order items:', orderItems);
-
-    const { data: createdOrderItems, error: itemsError } = await serviceRoleClient
+    const { data: createdOrderItems, error: itemsError } = await supabaseAdmin
       .from('order_items')
-      .insert(orderItems)
+      .insert(orderItemsToInsert)
       .select();
 
     if (itemsError) {
-      console.error('Error creating order items:', itemsError);
-      throw new Error('Failed to create order items: ' + itemsError.message);
+      console.error('[PAWAPAY] Error creating order items:', itemsError);
+      throw new Error(`Failed to create order items: ${itemsError.message}`);
     }
 
-    console.log('Order items created successfully');
-    logStep("Created order items", createdOrderItems);
+    console.log('[PAWAPAY] Order items created successfully', { count: createdOrderItems.length });
 
-    // Process each order item
-    for (const orderItem of createdOrderItems) {
-      if (orderItem.item_type === 'event_ticket') {
-        await processEventTicketPurchase(serviceRoleClient, orderItem, order, user);
-      } else if (orderItem.item_type === 'course') {
-        await processCourseEnrollment(serviceRoleClient, orderItem, order, user);
-      }
-    }
-
-    // Prepare statement description (4-22 characters as per PawaPay docs)
-    let statementDescription = 'SkillPulse Purchase';
-    if (items.length === 1 && items[0].item_name) {
-      const itemName = items[0].item_name.substring(0, 18);
-      statementDescription = itemName.length >= 4 ? itemName : 'SkillPulse Purchase';
-    }
-
-    // Determine reason based on items
-    const hasEvents = items.some((item: any) => 
-      (item.item_type || item.itemType) === 'event_ticket' || 
-      (item.item_type || item.itemType) === 'event'
-    );
-    const hasCourses = items.some((item: any) => 
-      (item.item_type || item.itemType) === 'course'
-    );
-    const reason = hasEvents && hasCourses ? 'Course & Event' : hasEvents ? 'Event' : 'Course';
-
-    // Prepare metadata as per PawaPay documentation (simplified)
-    const metadata = [
-      {
-        "fieldName": "orderId",
-        "fieldValue": order.id
-      },
-      {
-        "fieldName": "userId", 
-        "fieldValue": user.id
-      }
-    ];
-
-    // Create PawaPay session with exact format from documentation
-    const pawapayPayload = {
-      "depositId": depositId,
-      "returnUrl": returnUrl,
-      "statementDescription": statementDescription,
-      "amount": Math.round(amount / 100).toString(),
-      "msisdn": msisdn,
-      "language": "EN",
-      "country": country,
-      "reason": reason,
-      "metadata": metadata
-    };
-
-    console.log('Creating PawaPay session with payload:', pawapayPayload);
-
-    const pawapayResponse = await fetch(PAWAPAY_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${PAWAPAY_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(pawapayPayload),
-    });
-
-    const responseText = await pawapayResponse.text();
-    console.log('PawaPay API response status:', pawapayResponse.status);
-    console.log('PawaPay API response:', responseText);
-
-    if (!pawapayResponse.ok) {
-      console.error('PawaPay API error:', pawapayResponse.status, responseText);
-      
-      let errorMessage = 'Payment service error';
-      
-      try {
-        const errorData = JSON.parse(responseText);
-        
-        if (pawapayResponse.status === 400) {
-          errorMessage = `Invalid request: ${errorData.errorMessage || 'Bad request'}`;
-        } else if (pawapayResponse.status === 401) {
-          errorMessage = 'Authentication failed with payment provider';
-        } else if (pawapayResponse.status === 403) {
-          errorMessage = 'Access denied by payment provider';
-        } else if (pawapayResponse.status === 500) {
-          errorMessage = 'Payment service temporarily unavailable';
-        }
-        
-        console.error('Parsed error data:', errorData);
-      } catch (parseError) {
-        console.error('Failed to parse error response:', parseError);
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    let pawapayData;
-    try {
-      pawapayData = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('Failed to parse PawaPay response:', parseError);
-      throw new Error('Invalid response from payment provider');
-    }
-
-    // Validate response format
-    if (!pawapayData.redirectUrl) {
-      console.error('Missing redirectUrl in response:', pawapayData);
-      throw new Error('Payment provider did not return a valid payment URL');
-    }
-
-    console.log('PawaPay session created successfully:', pawapayData);
-
-    // Update order with PawaPay session info - use the correct field name
-    await serviceRoleClient
+    // Update order status to completed
+    const { error: updateError } = await supabaseAdmin
       .from('orders')
       .update({
-        payment_provider_id: depositId,
+        payment_status: 'completed',
         updated_at: new Date().toISOString()
       })
       .eq('id', order.id);
 
-    return new Response(JSON.stringify({
-      success: true,
-      redirectUrl: pawapayData.redirectUrl,
-      depositId,
-      orderId: order.id
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    if (updateError) {
+      console.error('[PAWAPAY] Error updating order status', updateError);
+      // Don't throw here as the payment was successful
+    }
+
+    // After successful payment processing, trigger email confirmation
+    console.log('[PAWAPAY] Triggering payment confirmation email');
+    
+    const emailPayload = {
+      orderId: order.id, // Assume order was created in the existing flow
+      userId: user.id,
+      userEmail: user.email,
+      customerName: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email,
+      orderItems: requestBody.items.map(item => ({
+        item_id: item.item_id,
+        item_type: item.item_type as 'course' | 'event_ticket',
+        item_name: item.item_name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      })),
+      totalAmount: requestBody.amount / 100, // Convert from cents
+      currency: requestBody.currency.toUpperCase(),
+      paymentMethod: 'Mobile Money (PawaPay)'
+    };
+
+    // Send email in background without waiting
+    EdgeRuntime.waitUntil(
+      supabaseAdmin.functions.invoke('send-payment-success-email', {
+        body: emailPayload
+      }).then(({ error: emailError }) => {
+        if (emailError) {
+          console.error('[PAWAPAY] Email sending failed:', emailError);
+        } else {
+          console.log('[PAWAPAY] Payment confirmation email sent successfully');
+        }
+      }).catch(emailError => {
+        console.error('[PAWAPAY] Email sending error:', emailError);
+      })
+    );
+
+    console.log('[PAWAPAY] Session and email trigger completed successfully');
+
+    return new Response(
+      JSON.stringify({ redirectUrl }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
 
   } catch (error) {
-    console.error('Error in create-pawapay-session:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    
-    return new Response(JSON.stringify({
-      error: errorMessage,
-      success: false
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    console.error('[PAWAPAY] Error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
-};
-
-serve(handler);
+});
