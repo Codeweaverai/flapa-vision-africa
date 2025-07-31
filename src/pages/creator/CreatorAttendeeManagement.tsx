@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Users, CheckCircle, Clock, QrCode, Calendar } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Search, Users, CheckCircle, Clock, QrCode, Calendar, Mail, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import AttendeeExportButton from '@/components/creator/AttendeeExportButton';
+import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
 
 interface Event {
   id: string;
@@ -47,6 +49,8 @@ const CreatorAttendeeManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState<string | null>(null);
+  const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -188,6 +192,22 @@ const CreatorAttendeeManagement: React.FC = () => {
     }
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedAttendees(filteredAttendees.map(a => a.id));
+    } else {
+      setSelectedAttendees([]);
+    }
+  };
+
+  const handleSelectAttendee = (attendeeId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedAttendees(prev => [...prev, attendeeId]);
+    } else {
+      setSelectedAttendees(prev => prev.filter(id => id !== attendeeId));
+    }
+  };
+
   const filteredAttendees = attendees.filter(attendee => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -296,6 +316,16 @@ const CreatorAttendeeManagement: React.FC = () => {
                       />
                     </div>
                     <div className="flex gap-2">
+                      {selectedAttendees.length > 0 && (
+                        <Button
+                          onClick={() => setShowAnnouncementModal(true)}
+                          className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white"
+                          size="sm"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Send Announcement ({selectedAttendees.length})
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -337,6 +367,12 @@ const CreatorAttendeeManagement: React.FC = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="w-12">
+                              <Checkbox
+                                checked={selectedAttendees.length === filteredAttendees.length && filteredAttendees.length > 0}
+                                onCheckedChange={handleSelectAll}
+                              />
+                            </TableHead>
                             <TableHead>Attendee</TableHead>
                             <TableHead>Ticket Code</TableHead>
                             <TableHead>Booking Code</TableHead>
@@ -348,13 +384,19 @@ const CreatorAttendeeManagement: React.FC = () => {
                         <TableBody>
                           {filteredAttendees.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                              <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                                 {searchTerm ? 'No attendees found matching your search.' : 'No attendees found for this event.'}
                               </TableCell>
                             </TableRow>
                           ) : (
                             filteredAttendees.map((attendee) => (
                               <TableRow key={attendee.id}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedAttendees.includes(attendee.id)}
+                                    onCheckedChange={(checked) => handleSelectAttendee(attendee.id, !!checked)}
+                                  />
+                                </TableCell>
                                 <TableCell>
                                   <div className="flex flex-col">
                                     <span className="font-medium">
@@ -440,6 +482,15 @@ const CreatorAttendeeManagement: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Bulk Announcement Modal */}
+      <BulkAnnouncementModal
+        isOpen={showAnnouncementModal}
+        onClose={() => setShowAnnouncementModal(false)}
+        selectedAttendees={selectedAttendees}
+        attendeesData={attendees}
+        eventTitle={selectedEventData?.title || 'Event'}
+      />
     </CreatorLayout>
   );
 };

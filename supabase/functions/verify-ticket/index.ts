@@ -1,213 +1,247 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { corsHeaders } from '../_shared/cors.ts';
 
-const supabaseClient = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  { auth: { persistSession: false } }
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
+interface VerifyTicketRequest {
+  ticketCode?: string;
+  bookingCode?: string;
+  ticketHolderName?: string;
+  verifierUserId?: string;
+}
+
+const handler = async (req: Request): Promise<Response> => {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { ticketCode, bookingCode, ticketHolderName } = await req.json();
+    const { 
+      ticketCode, 
+      bookingCode, 
+      ticketHolderName,
+      verifierUserId 
+    }: VerifyTicketRequest = await req.json();
+
+    console.log('Ticket verification request:', { ticketCode, bookingCode, ticketHolderName, verifierUserId });
 
     if (!ticketCode && !bookingCode) {
-      throw new Error("Either ticket code or booking code is required");
-    }
-
-    let ticketData = null;
-
-    // Verify by ticket code
-    if (ticketCode) {
-      const { data, error } = await supabaseClient
-        .from('generated_tickets')
-        .select(`
-          *,
-          booking:event_bookings!generated_tickets_booking_id_fkey (
-            *,
-            event:events!event_bookings_event_id_fkey (
-              title,
-              start_time,
-              end_time,
-              location
-            ),
-            event_ticket:event_tickets!event_bookings_event_ticket_id_fkey (
-              name,
-              ticket_type,
-              price
-            )
-          )
-        `)
-        .eq('ticket_code', ticketCode)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error("Error fetching ticket by code:", error);
-        throw error;
-      }
-
-      if (data) {
-        // Get user profile separately
-        const { data: userProfile, error: userError } = await supabaseClient
-          .from('profiles')
-          .select('full_name, avatar_url, email')
-          .eq('id', data.user_id)
-          .single();
-
-        if (userError) {
-          console.error("Error fetching user profile:", userError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Either ticket code or booking code is required' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-
-        ticketData = {
-          ...data,
-          user: userProfile || { full_name: 'Unknown User', avatar_url: null, email: 'N/A' }
-        };
-      }
+      );
     }
 
-    // Verify by booking code if ticket code didn't work
-    if (!ticketData && bookingCode) {
-      const { data: bookingData, error: bookingError } = await supabaseClient
+    let ticketQuery = supabase
+      .from('generated_tickets')
+      .select(`
+        *,
+        booking:event_bookings!generated_tickets_booking_id_fkey (
+          booking_code,
+          status,
+          payment_status
+        ),
+        event:events!generated_tickets_event_id_fkey (
+          id,
+          title,
+          start_time,
+          end_time,
+          location,
+          creator_id
+        ),
+        check_ins (
+          check_in_time,
+          checked_in_by
+        )
+      `);
+
+    // Search by ticket code or booking code
+    if (ticketCode) {
+      ticketQuery = ticketQuery.eq('ticket_code', ticketCode);
+    } else if (bookingCode) {
+      // Find tickets by booking code
+      const { data: bookingData, error: bookingError } = await supabase
         .from('event_bookings')
-        .select(`
-          *,
-          generated_tickets!generated_tickets_booking_id_fkey (
-            *
-          ),
-          event:events!event_bookings_event_id_fkey (
-            title,
-            start_time,
-            end_time,
-            location
-          ),
-          event_ticket:event_tickets!event_bookings_event_ticket_id_fkey (
-            name,
-            ticket_type,
-            price
-          )
-        `)
+        .select('id')
         .eq('booking_code', bookingCode)
         .single();
 
-      if (bookingError && bookingError.code !== 'PGRST116') {
-        console.error("Error fetching booking by code:", bookingError);
-        throw bookingError;
+      if (bookingError || !bookingData) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: 'No booking found with this code' 
+          }),
+          { 
+            status: 404, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
       }
 
-      if (bookingData && bookingData.generated_tickets?.length > 0) {
-        // Get user profile separately
-        const { data: userProfile, error: userError } = await supabaseClient
-          .from('profiles')
-          .select('full_name, avatar_url, email')
-          .eq('id', bookingData.user_id)
-          .single();
+      ticketQuery = ticketQuery.eq('booking_id', bookingData.id);
+    }
 
-        if (userError) {
-          console.error("Error fetching user profile:", userError);
+    const { data: tickets, error: ticketError } = await ticketQuery.limit(1);
+
+    if (ticketError) {
+      console.error('Database error:', ticketError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Database error occurred' 
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-
-        // Use the first ticket from the booking
-        ticketData = {
-          ...bookingData.generated_tickets[0],
-          booking: bookingData,
-          user: userProfile || { full_name: 'Unknown User', avatar_url: null, email: 'N/A' }
-        };
-      }
+      );
     }
 
-    if (!ticketData) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'TICKET_NOT_FOUND',
-        message: 'Invalid ticket or booking code'
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 404
+    if (!tickets || tickets.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Ticket not found' 
+        }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    const ticket = tickets[0];
+
+    // Check if the verifier is authorized (creator of the event)
+    if (verifierUserId && ticket.event?.creator_id !== verifierUserId) {
+      console.log('Unauthorized verification attempt:', {
+        verifierUserId,
+        eventCreatorId: ticket.event?.creator_id,
+        eventId: ticket.event?.id
       });
-    }
-
-    // Validate ticket holder name if provided
-    if (ticketHolderName && ticketData.ticket_holder_name) {
-      const normalizedInput = ticketHolderName.toLowerCase().trim();
-      const normalizedTicket = ticketData.ticket_holder_name.toLowerCase().trim();
       
-      if (!normalizedTicket.includes(normalizedInput) && !normalizedInput.includes(normalizedTicket)) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'NAME_MISMATCH',
-          message: 'Ticket holder name does not match'
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400
-        });
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'unauthorized',
+          message: 'You are not authorized to verify tickets for this event' 
+        }),
+        { 
+          status: 403, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Additional verification by ticket holder name if provided
+    if (ticketHolderName && ticket.ticket_holder_name) {
+      const providedName = ticketHolderName.toLowerCase().trim();
+      const actualName = ticket.ticket_holder_name.toLowerCase().trim();
+      
+      if (!actualName.includes(providedName) && !providedName.includes(actualName)) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: 'Ticket holder name does not match' 
+          }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
       }
     }
 
-    // Check if booking is confirmed and payment completed
-    if (ticketData.booking.status !== 'confirmed' || ticketData.booking.payment_status !== 'completed') {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'BOOKING_NOT_CONFIRMED',
-        message: 'Booking is not confirmed or payment not completed'
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400
-      });
-    }
+    // Check if ticket is already checked in
+    const alreadyCheckedIn = ticket.checked_in || (ticket.check_ins && ticket.check_ins.length > 0);
 
-    // Check if event has started (optional validation)
-    const eventStartTime = new Date(ticketData.booking.event.start_time);
-    const currentTime = new Date();
-    const hoursBeforeEvent = 2; // Allow check-in 2 hours before event
+    // Get user profile
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name, username, avatar_url')
+      .eq('id', ticket.user_id)
+      .single();
 
-    if (currentTime < new Date(eventStartTime.getTime() - (hoursBeforeEvent * 60 * 60 * 1000))) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'EVENT_NOT_STARTED',
-        message: `Check-in opens ${hoursBeforeEvent} hours before the event`
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400
-      });
-    }
-
-    // Check if already checked in
-    const isAlreadyCheckedIn = ticketData.checked_in;
-
-    return new Response(JSON.stringify({
-      success: true,
-      ticket: {
-        id: ticketData.id,
-        ticket_code: ticketData.ticket_code,
-        ticket_holder_name: ticketData.ticket_holder_name,
-        checked_in: isAlreadyCheckedIn,
-        booking_id: ticketData.booking_id,
-        event_id: ticketData.booking.event_id,
-        event: ticketData.booking.event,
-        ticket_type: ticketData.booking.event_ticket,
-        user: ticketData.user,
-        booking: ticketData.booking
-      },
-      already_checked_in: isAlreadyCheckedIn
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    // Get user email
+    const { data: userEmails, error: emailError } = await supabase.rpc('get_user_emails', { 
+      user_ids: [ticket.user_id] 
     });
+
+    const userEmail = userEmails?.[0]?.email || '';
+
+    // Get ticket type information (mock data for now, as we don't have ticket types table)
+    const ticketType = {
+      name: ticket.booking?.status === 'confirmed' ? 'General Admission' : 'Pending',
+      ticket_type: 'standard',
+      price: 0 // You might want to get this from booking or event data
+    };
+
+    const response = {
+      success: true,
+      already_checked_in: alreadyCheckedIn,
+      ticket: {
+        id: ticket.id,
+        ticket_code: ticket.ticket_code,
+        ticket_holder_name: ticket.ticket_holder_name,
+        checked_in: ticket.checked_in || false,
+        booking_id: ticket.booking_id,
+        event_id: ticket.event_id,
+        event: {
+          title: ticket.event?.title || 'Unknown Event',
+          start_time: ticket.event?.start_time || '',
+          end_time: ticket.event?.end_time || '',
+          location: ticket.event?.location || 'Unknown Location',
+          creator_id: ticket.event?.creator_id
+        },
+        ticket_type: ticketType,
+        user: {
+          full_name: userProfile?.full_name || userProfile?.username || 'Unknown User',
+          avatar_url: userProfile?.avatar_url,
+          email: userEmail
+        },
+        booking: {
+          booking_code: ticket.booking?.booking_code || '',
+          status: ticket.booking?.status || 'pending',
+          payment_status: ticket.booking?.payment_status || 'pending'
+        }
+      }
+    };
+
+    console.log('Ticket verification successful');
+
+    return new Response(
+      JSON.stringify(response),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
 
   } catch (error) {
-    console.error("Error verifying ticket:", error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: 'INTERNAL_ERROR',
-      message: error.message || 'Failed to verify ticket'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500
-    });
+    console.error('Error in verify-ticket function:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        message: 'Internal server error' 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
-});
+};
+
+serve(handler);

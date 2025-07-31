@@ -42,6 +42,7 @@ interface VerifiedTicket {
     start_time: string;
     end_time: string;
     location: string;
+    creator_id: string;
   };
   ticket_type: {
     name: string;
@@ -66,7 +67,7 @@ const TicketVerificationPage = () => {
   const [bookingCode, setBookingCode] = useState('');
   const [ticketHolderName, setTicketHolderName] = useState('');
   const [verifiedTicket, setVerifiedTicket] = useState<VerifiedTicket | null>(null);
-  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'success' | 'error' | 'already_checked_in'>('idle');
+  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'success' | 'error' | 'already_checked_in' | 'unauthorized'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showCheckinModal, setShowCheckinModal] = useState(false);
@@ -80,6 +81,11 @@ const TicketVerificationPage = () => {
       return;
     }
 
+    if (!user) {
+      toast.error('You must be logged in to verify tickets');
+      return;
+    }
+
     setLoading(true);
     setVerificationStatus('idle');
     setErrorMessage('');
@@ -89,7 +95,8 @@ const TicketVerificationPage = () => {
         body: {
           ticketCode: ticketCode.trim() || undefined,
           bookingCode: bookingCode.trim() || undefined,
-          ticketHolderName: ticketHolderName.trim() || undefined
+          ticketHolderName: ticketHolderName.trim() || undefined,
+          verifierUserId: user.id
         }
       });
 
@@ -105,7 +112,12 @@ const TicketVerificationPage = () => {
         toast.success('Ticket verified successfully!');
       } else {
         setVerificationStatus('error');
-        setErrorMessage(data.message || 'Ticket verification failed');
+        if (data.error === 'unauthorized') {
+          setVerificationStatus('unauthorized');
+          setErrorMessage('You are not authorized to verify tickets for this event. You can only verify tickets for events you have created.');
+        } else {
+          setErrorMessage(data.message || 'Ticket verification failed');
+        }
         toast.error(data.message || 'Ticket verification failed');
       }
     } catch (error) {
@@ -186,6 +198,7 @@ const TicketVerificationPage = () => {
       case 'already_checked_in':
         return 'bg-blue-50 border-blue-200 backdrop-blur-sm';
       case 'error':
+      case 'unauthorized':
         return 'bg-red-50 border-red-200 backdrop-blur-sm';
       default:
         return 'bg-white/70 backdrop-blur-sm';
@@ -199,6 +212,7 @@ const TicketVerificationPage = () => {
       case 'already_checked_in':
         return <Shield className="h-8 w-8 text-blue-600" />;
       case 'error':
+      case 'unauthorized':
         return <XCircle className="h-8 w-8 text-red-600" />;
       default:
         return null;
@@ -220,6 +234,11 @@ const TicketVerificationPage = () => {
               <p className="text-xl text-gray-600">
                 Scan or enter ticket details to verify and check-in attendees
               </p>
+              {user && (
+                <p className="text-sm text-gray-500 mt-2">
+                  You can only verify tickets for events you have created
+                </p>
+              )}
             </div>
 
             {/* Enhanced Verification Form */}
@@ -368,12 +387,20 @@ const TicketVerificationPage = () => {
                       {getStatusIcon()}
                     </div>
                     <div className="flex-1">
-                      {verificationStatus === 'error' ? (
+                      {verificationStatus === 'error' || verificationStatus === 'unauthorized' ? (
                         <div>
                           <h3 className="text-2xl font-bold text-red-800 mb-3">
                             ❌ Verification Failed
                           </h3>
                           <p className="text-red-700 text-lg">{errorMessage}</p>
+                          {verificationStatus === 'unauthorized' && (
+                            <div className="mt-4 p-4 bg-red-100 rounded-lg border border-red-200">
+                              <p className="text-red-800 text-sm">
+                                <strong>Access Restricted:</strong> As a creator, you can only verify tickets for events that you have created. 
+                                If you believe this is an error, please contact the event organizer.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ) : verifiedTicket ? (
                         <div className="space-y-6">
