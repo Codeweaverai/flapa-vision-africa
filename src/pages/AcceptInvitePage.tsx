@@ -47,6 +47,7 @@ const AcceptInvitePage: React.FC = () => {
 
   const fetchInvitation = async () => {
     try {
+      // First fetch the invitation details
       const { data, error } = await supabase
         .from('creator_workplace_invitations')
         .select(`
@@ -56,8 +57,8 @@ const AcceptInvitePage: React.FC = () => {
           role,
           status,
           expires_at,
-          workplace:creator_workplaces(name, description),
-          invited_by_profile:profiles!invited_by(full_name, username)
+          invited_by,
+          workplace:creator_workplaces(name, description)
         `)
         .eq('invitation_token', token)
         .single();
@@ -79,11 +80,29 @@ const AcceptInvitePage: React.FC = () => {
         return;
       }
 
+      // Fetch the invited_by profile separately to avoid relationship issues
+      let invitedByProfile = { full_name: 'Unknown User', username: 'unknown' };
+      
+      if (data.invited_by) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, username')
+          .eq('id', data.invited_by)
+          .single();
+        
+        if (profileData) {
+          invitedByProfile = {
+            full_name: profileData.full_name || 'Unknown User',
+            username: profileData.username || 'unknown'
+          };
+        }
+      }
+
       // Handle potential profile fetch error gracefully and ensure proper typing
       const processedData: InvitationDetails = {
         ...data,
         role: data.role as 'owner' | 'editor' | 'viewer',
-        invited_by_profile: data.invited_by_profile || { full_name: 'Unknown User', username: 'unknown' }
+        invited_by_profile: invitedByProfile
       };
 
       setInvitation(processedData);
