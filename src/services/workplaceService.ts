@@ -75,7 +75,7 @@ export const workplaceService = {
       .from('creator_workplace_members')
       .select(`
         *,
-        profiles!creator_workplace_members_user_id_fkey (
+        profiles (
           full_name,
           username
         )
