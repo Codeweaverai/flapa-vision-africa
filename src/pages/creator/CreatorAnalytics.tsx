@@ -13,6 +13,7 @@ import {
   fetchCreatorPaymentTransactions 
 } from '@/services/creatorPaymentService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { toast } from 'sonner';
 
 interface AnalyticsData {
   totalRevenue: number;
@@ -116,7 +117,7 @@ const CreatorAnalytics: React.FC = () => {
       const courseIds = courses?.map(c => c.id) || [];
       const eventIds = events?.map(e => e.id) || [];
 
-      // Get course enrollments
+      // Get course enrollments with completed payments
       let allEnrollments: any[] = [];
       let courseReviews: any[] = [];
       
@@ -128,8 +129,7 @@ const CreatorAnalytics: React.FC = () => {
             user_id, 
             enrollment_date,
             payment_status,
-            course_id,
-            profiles!inner(id, username, full_name)
+            course_id
           `)
           .in('course_id', courseIds)
           .eq('payment_status', 'completed');
@@ -152,7 +152,7 @@ const CreatorAnalytics: React.FC = () => {
         }
       }
 
-      // Get event bookings
+      // Get event bookings with completed payments
       let allBookings: any[] = [];
       let eventReviews: any[] = [];
       
@@ -165,8 +165,7 @@ const CreatorAnalytics: React.FC = () => {
             booking_date,
             payment_status,
             ticket_quantity,
-            event_id,
-            profiles!inner(id, username, full_name)
+            event_id
           `)
           .in('event_id', eventIds)
           .eq('payment_status', 'completed');
@@ -194,11 +193,13 @@ const CreatorAnalytics: React.FC = () => {
       console.log('Course reviews found:', courseReviews.length);
       console.log('Event reviews found:', eventReviews.length);
 
-      // Calculate unique students
-      const uniqueStudentIds = new Set([
-        ...allEnrollments.map(e => e.user_id),
-        ...allBookings.map(b => b.user_id)
-      ]);
+      // Calculate unique students from enrollments and bookings
+      const enrollmentUserIds = allEnrollments.map(e => e.user_id);
+      const bookingUserIds = allBookings.map(b => b.user_id);
+      const uniqueStudentIds = new Set([...enrollmentUserIds, ...bookingUserIds]);
+      const totalStudents = uniqueStudentIds.size;
+
+      console.log('Total unique students calculated:', totalStudents);
 
       // Calculate ratings
       const courseRating = courseReviews.length > 0 
@@ -214,21 +215,21 @@ const CreatorAnalytics: React.FC = () => {
         ? (courseReviews.reduce((sum, r) => sum + r.rating, 0) + eventReviews.reduce((sum, r) => sum + r.rating, 0)) / totalReviews
         : 0;
 
-      // Process monthly revenue
-      const monthlyRevenue = transactions.reduce((acc, transaction) => {
-        if (transaction.payment_status === 'completed') {
+      // Process monthly revenue from completed transactions
+      const monthlyRevenue = transactions
+        .filter(t => t.payment_status === 'completed')
+        .reduce((acc, transaction) => {
           const month = format(new Date(transaction.created_at), 'MMM yyyy');
           acc[month] = (acc[month] || 0) + (transaction.creator_earning || 0);
-        }
-        return acc;
-      }, {} as Record<string, number>);
+          return acc;
+        }, {} as Record<string, number>);
 
       const monthlyRevenueData = Object.entries(monthlyRevenue).map(([month, revenue]) => ({
         month,
         revenue
       }));
 
-      // Top performing courses
+      // Top performing courses based on enrollments
       const topCourses = courses?.map(course => {
         const courseEnrollments = allEnrollments.filter(e => e.course_id === course.id);
         const courseReviewsForCourse = courseReviews.filter(r => r.course_id === course.id);
@@ -246,7 +247,7 @@ const CreatorAnalytics: React.FC = () => {
       .sort((a, b) => b.enrollments - a.enrollments)
       .slice(0, 5) || [];
 
-      // Top performing events
+      // Top performing events based on bookings
       const topEvents = events?.map(event => {
         const eventBookings = allBookings.filter(b => b.event_id === event.id);
         const eventReviewsForEvent = eventReviews.filter(r => r.event_id === event.id);
@@ -264,18 +265,26 @@ const CreatorAnalytics: React.FC = () => {
       .sort((a, b) => b.bookings - a.bookings)
       .slice(0, 5) || [];
 
-      // Recent activity
+      // Recent activity - get user details for recent enrollments and bookings
       const recentEnrollments = allEnrollments
         .sort((a, b) => new Date(b.enrollment_date).getTime() - new Date(a.enrollment_date).getTime())
-        .slice(0, 10);
+        .slice(0, 10)
+        .map(enrollment => ({
+          ...enrollment,
+          profiles: { username: 'Student', full_name: 'Student' } // Placeholder since we can't access profiles.email
+        }));
 
       const recentBookings = allBookings
         .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
-        .slice(0, 10);
+        .slice(0, 10)
+        .map(booking => ({
+          ...booking,
+          profiles: { username: 'Attendee', full_name: 'Attendee' } // Placeholder since we can't access profiles.email
+        }));
 
       const processedData = {
         totalRevenue: earnings.total_earnings || 0,
-        totalStudents: uniqueStudentIds.size,
+        totalStudents: totalStudents,
         totalCourses: courses?.length || 0,
         totalEvents: events?.length || 0,
         courseRevenue: earnings.course_revenue || 0,

@@ -24,8 +24,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import AttendeeExportButton from '@/components/creator/AttendeeExportButton';
-import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
 
 interface Student {
   id: string;
@@ -40,6 +38,55 @@ interface Student {
   type: 'course' | 'event';
   payment_status: string;
 }
+
+interface AttendeeExportButtonProps {
+  students: Student[];
+  fileName: string;
+}
+
+const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ students, fileName }) => {
+  const handleExport = () => {
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "Name,Email,Username,Type,Date\n"
+      + students.map(s => `${s.full_name},${s.email},${s.username},${s.type},${s.enrollment_date || s.booking_date}`).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${fileName}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <Button onClick={handleExport} variant="outline">
+      <Download className="h-4 w-4 mr-2" />
+      Export CSV
+    </Button>
+  );
+};
+
+interface BulkAnnouncementModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedStudents: string[];
+  onSuccess: () => void;
+}
+
+const BulkAnnouncementModal: React.FC<BulkAnnouncementModalProps> = ({ 
+  open, 
+  onOpenChange, 
+  selectedStudents, 
+  onSuccess 
+}) => {
+  return (
+    <div>
+      {/* Placeholder for bulk announcement modal */}
+      <p>Bulk announcement feature coming soon</p>
+    </div>
+  );
+};
 
 const CreatorStudents: React.FC = () => {
   const { user } = useAuth();
@@ -117,19 +164,28 @@ const CreatorStudents: React.FC = () => {
         return;
       }
 
-      // Get user profiles
+      // Use the get_user_emails RPC function to fetch email data
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_emails', { user_ids: allUserIds });
+
+      if (emailError) {
+        console.error('Error fetching user emails:', emailError);
+        toast.error('Failed to load student emails');
+      }
+
+      // Get user profiles for additional data
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, username, email')
+        .select('id, full_name, username')
         .in('id', allUserIds);
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
         toast.error('Failed to load student profiles');
-        return;
       }
 
       console.log('Found profiles:', profiles?.length);
+      console.log('Found email data:', emailData?.length);
 
       // Combine the data
       const studentsData: Student[] = [];
@@ -138,12 +194,14 @@ const CreatorStudents: React.FC = () => {
       if (courseEnrollments) {
         courseEnrollments.forEach(enrollment => {
           const profile = profiles?.find(p => p.id === enrollment.user_id);
-          if (profile) {
+          const emailInfo = emailData?.find(e => e.id === enrollment.user_id);
+          
+          if (profile && emailInfo) {
             studentsData.push({
               id: enrollment.id,
               user_id: enrollment.user_id,
               full_name: profile.full_name || 'Unknown',
-              email: profile.email || '',
+              email: emailInfo.email || '',
               username: profile.username || '',
               enrollment_date: enrollment.enrollment_date,
               course_title: enrollment.courses.title,
@@ -158,12 +216,14 @@ const CreatorStudents: React.FC = () => {
       if (eventBookings) {
         eventBookings.forEach(booking => {
           const profile = profiles?.find(p => p.id === booking.user_id);
-          if (profile) {
+          const emailInfo = emailData?.find(e => e.id === booking.user_id);
+          
+          if (profile && emailInfo) {
             studentsData.push({
               id: booking.id,
               user_id: booking.user_id,
               full_name: profile.full_name || 'Unknown',
-              email: profile.email || '',
+              email: emailInfo.email || '',
               username: profile.username || '',
               booking_date: booking.booking_date,
               event_title: booking.events.title,

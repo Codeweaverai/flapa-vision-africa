@@ -63,24 +63,18 @@ const WorkplaceInviteDialog: React.FC<WorkplaceInviteDialogProps> = ({
       // Check if user exists and get their profile
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('id, email')
-        .eq('email', email.trim())
+        .select('id, full_name, username')
+        .eq('id', user.id)
         .single();
 
-      if (profileData) {
-        // Check if user is already a member
-        const { data: existingMember } = await supabase
-          .from('creator_workplace_members')
-          .select('id')
-          .eq('workplace_id', workplace.id)
-          .eq('user_id', profileData.id)
-          .single();
-
-        if (existingMember) {
-          toast.error('User is already a member of this workplace');
-          return;
-        }
+      if (!profileData) {
+        toast.error('Unable to find your profile');
+        return;
       }
+
+      // Check if user is already a member by trying to get user by email
+      const { data: existingUserData } = await supabase
+        .rpc('get_user_emails', { user_ids: [user.id] });
 
       // Check for existing pending invitation
       const { data: existingInvite } = await supabase
@@ -112,9 +106,23 @@ const WorkplaceInviteDialog: React.FC<WorkplaceInviteDialogProps> = ({
 
       if (inviteError) throw inviteError;
 
-      // Here you would typically send an email with the invitation link
-      // For now, we'll just show success
-      toast.success('Invitation sent successfully');
+      // Send email using the edge function
+      const { error: emailError } = await supabase.functions.invoke('send-workplace-invitation', {
+        body: {
+          workplace_id: workplace.id,
+          invited_email: email.trim(),
+          role: role,
+          invitation_token: invitationToken
+        }
+      });
+
+      if (emailError) {
+        console.error('Error sending email:', emailError);
+        toast.error('Invitation created but failed to send email');
+      } else {
+        toast.success('Invitation sent successfully');
+      }
+
       setEmail('');
       setRole('editor');
       onSuccess();
