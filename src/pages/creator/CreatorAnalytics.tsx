@@ -534,25 +534,25 @@ const CreatorAnalytics: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">Total Earnings</div>
-                  <div className="text-2xl font-bold">
+                  <div className="text-base md:text-lg font-semibold">
                     <PriceDisplay amount={analyticsData.totalRevenue} originalCurrency="USD" />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">Available Balance</div>
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-base md:text-lg font-semibold text-green-600">
                     <PriceDisplay amount={analyticsData.availableBalance} originalCurrency="USD" />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">Pending Balance</div>
-                  <div className="text-2xl font-bold text-amber-600">
+                  <div className="text-base md:text-lg font-semibold text-amber-600">
                     <PriceDisplay amount={analyticsData.pendingBalance} originalCurrency="USD" />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">Platform Fees</div>
-                  <div className="text-2xl font-bold text-red-600">
+                  <div className="text-base md:text-lg font-semibold text-red-600">
                     <PriceDisplay amount={analyticsData.totalPlatformFees} originalCurrency="USD" />
                   </div>
                 </div>
