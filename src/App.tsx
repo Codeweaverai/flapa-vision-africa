@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -179,8 +178,8 @@ function App() {
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/verify" element={<VerifyPage />} />
 
-                  {/* Workplace Routes */}
-                  <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
+                  {/* Workplace Routes - Fixed to use query parameters */}
+                  <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
                   {/* Course Routes */}
                   <Route path="/courses" element={<CoursesPage />} />

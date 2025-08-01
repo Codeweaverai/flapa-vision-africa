@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,7 @@ import {
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { getUserProfiles, UserProfile } from '@/utils/userUtils';
 
 interface Workplace {
   id: string;
@@ -54,10 +56,7 @@ interface Member {
   role: 'owner' | 'editor' | 'viewer';
   status: string;
   joined_at: string;
-  profile?: {
-    full_name?: string;
-    username?: string;
-  };
+  profile?: UserProfile;
 }
 
 interface Invitation {
@@ -84,17 +83,10 @@ const WorkspaceDetailView: React.FC<WorkspaceDetailViewProps> = ({ workplace, on
   const fetchMembersAndInvitations = async () => {
     setLoading(true);
     try {
-      // Fetch active members
+      // Fetch active members without the problematic profiles join
       const { data: membersData, error: membersError } = await supabase
         .from('creator_workplace_members')
-        .select(`
-          id,
-          user_id,
-          role,
-          status,
-          joined_at,
-          profiles!user_id(full_name, username)
-        `)
+        .select('id, user_id, role, status, joined_at')
         .eq('workplace_id', workplace.id)
         .eq('status', 'active');
 
@@ -109,7 +101,18 @@ const WorkspaceDetailView: React.FC<WorkspaceDetailViewProps> = ({ workplace, on
 
       if (invitationsError) throw invitationsError;
 
-      setMembers(membersData || []);
+      // Fetch user profiles separately for all members
+      const userIds = (membersData || []).map(member => member.user_id);
+      const profiles = await getUserProfiles(userIds);
+      const profileMap = new Map(profiles.map(p => [p.id, p]));
+
+      // Combine members with their profiles
+      const membersWithProfiles = (membersData || []).map(member => ({
+        ...member,
+        profile: profileMap.get(member.user_id)
+      }));
+
+      setMembers(membersWithProfiles);
       
       // Type assertion for invitations to ensure role has the correct type
       const typedInvitations = (invitationsData || []).map(invitation => ({
@@ -315,7 +318,7 @@ const WorkspaceDetailView: React.FC<WorkspaceDetailViewProps> = ({ workplace, on
                   <TableCell>
                     <div>
                       <div className="font-medium">
-                        {member.profile?.full_name || member.profile?.username || 'Unknown User'}
+                        {member.profile?.display_name || 'Unknown User'}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {member.user_id === user?.id ? 'You' : 'Member'}

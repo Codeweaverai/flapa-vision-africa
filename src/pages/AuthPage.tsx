@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 const AuthPage = () => {
   const { user, loading, signIn, signUp } = useAuth();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -29,6 +30,8 @@ const AuthPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const redirectParam = searchParams.get('redirect');
 
   useEffect(() => {
     // Load from localStorage if available (for convenience)
@@ -38,8 +41,24 @@ const AuthPage = () => {
     }
   }, []);
 
+  // Handle post-authentication redirect
+  useEffect(() => {
+    if (!loading && user) {
+      const invitationToken = sessionStorage.getItem('invitation_token');
+      
+      if (redirectParam === 'accept-invite' && invitationToken) {
+        // Redirect back to invitation acceptance with the stored token
+        navigate(`/accept-invite?token=${invitationToken}`);
+        return;
+      }
+      
+      // Default redirect for authenticated users
+      navigate('/account');
+    }
+  }, [user, loading, redirectParam, navigate]);
+
   // Redirect if already authenticated
-  if (!loading && user) {
+  if (!loading && user && !redirectParam) {
     return <Navigate to="/account" />;
   }
 
@@ -55,7 +74,7 @@ const AuthPage = () => {
     
     try {
       await signIn(email, password);
-      // Success handling is done in AuthContext
+      // Success handling is done in AuthContext and useEffect above
     } catch (error: any) {
       console.error('Sign in error:', error);
       setErrorMessage(error.message || 'Failed to sign in. Please check your credentials.');
@@ -100,7 +119,7 @@ const AuthPage = () => {
     
     try {
       await signUp(email, password, { full_name: fullName, username });
-      // Success handling is done in AuthContext
+      // Success handling is done in AuthContext and useEffect above
     } catch (error: any) {
       console.error('Sign up error:', error);
       setErrorMessage(error.message || 'Failed to sign up. Please try again.');
@@ -114,10 +133,14 @@ const AuthPage = () => {
     setErrorMessage(null);
     
     try {
+      const redirectUrl = redirectParam === 'accept-invite' 
+        ? `${window.location.origin}/accept-invite`
+        : `${window.location.origin}/account`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/account`
+          redirectTo: redirectUrl
         }
       });
       
@@ -136,6 +159,8 @@ const AuthPage = () => {
       </div>
     );
   }
+
+  const isInvitationFlow = redirectParam === 'accept-invite';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex">
@@ -156,8 +181,15 @@ const AuthPage = () => {
             <Link to="/" className="text-3xl font-bold text-white inline-block mb-4 hover:text-orange-200 transition-colors">
               SkillPulse Events & Professional Skills Marketplace
             </Link>
-            <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">Welcome</h1>
-            <p className="text-orange-100">Sign in to your account or create a new one</p>
+            <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
+              {isInvitationFlow ? 'Join Workplace' : 'Welcome'}
+            </h1>
+            <p className="text-orange-100">
+              {isInvitationFlow 
+                ? 'Sign in to accept your workplace invitation' 
+                : 'Sign in to your account or create a new one'
+              }
+            </p>
           </div>
           
           <Card className="backdrop-blur-md bg-white/20 border-0 shadow-2xl rounded-2xl">

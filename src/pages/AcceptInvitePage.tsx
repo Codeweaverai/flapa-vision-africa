@@ -38,16 +38,23 @@ const AcceptInvitePage: React.FC = () => {
 
   useEffect(() => {
     if (token) {
+      // Store token for post-auth redirect
+      sessionStorage.setItem('invitation_token', token);
       fetchInvitation();
     } else {
-      setError('Invalid invitation link');
-      setLoading(false);
+      // Check if we have a stored token from post-auth redirect
+      const storedToken = sessionStorage.getItem('invitation_token');
+      if (storedToken) {
+        fetchInvitationWithToken(storedToken);
+      } else {
+        setError('Invalid invitation link');
+        setLoading(false);
+      }
     }
   }, [token]);
 
-  const fetchInvitation = async () => {
+  const fetchInvitationWithToken = async (invitationToken: string) => {
     try {
-      // First fetch the invitation details
       const { data, error } = await supabase
         .from('creator_workplace_invitations')
         .select(`
@@ -60,7 +67,7 @@ const AcceptInvitePage: React.FC = () => {
           invited_by,
           workplace:creator_workplaces(name, description)
         `)
-        .eq('invitation_token', token)
+        .eq('invitation_token', invitationToken)
         .single();
 
       if (error) throw error;
@@ -80,7 +87,7 @@ const AcceptInvitePage: React.FC = () => {
         return;
       }
 
-      // Fetch the invited_by profile separately to avoid relationship issues
+      // Fetch the invited_by profile separately
       let invitedByProfile = { full_name: 'Unknown User', username: 'unknown' };
       
       if (data.invited_by) {
@@ -98,7 +105,6 @@ const AcceptInvitePage: React.FC = () => {
         }
       }
 
-      // Handle potential profile fetch error gracefully and ensure proper typing
       const processedData: InvitationDetails = {
         ...data,
         role: data.role as 'owner' | 'editor' | 'viewer',
@@ -113,6 +119,8 @@ const AcceptInvitePage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchInvitation = () => fetchInvitationWithToken(token!);
 
   const handleAccept = async () => {
     if (!user || !invitation) return;
@@ -139,7 +147,7 @@ const AcceptInvitePage: React.FC = () => {
         .eq('id', invitation.id)
         .single();
 
-      // Add user to workplace with correct property names
+      // Add user to workplace
       const { error: memberError } = await supabase
         .from('creator_workplace_members')
         .insert({
@@ -162,6 +170,9 @@ const AcceptInvitePage: React.FC = () => {
         .eq('id', invitation.id);
 
       if (updateError) throw updateError;
+
+      // Clear stored token
+      sessionStorage.removeItem('invitation_token');
 
       toast.success('Welcome to the workplace!');
       navigate('/creator/workplaces');
@@ -187,6 +198,9 @@ const AcceptInvitePage: React.FC = () => {
         .eq('id', invitation.id);
 
       if (error) throw error;
+
+      // Clear stored token
+      sessionStorage.removeItem('invitation_token');
 
       toast.success('Invitation declined');
       navigate('/');
@@ -241,7 +255,10 @@ const AcceptInvitePage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate('/auth')} className="w-full">
+            <Button 
+              onClick={() => navigate('/auth?redirect=accept-invite')} 
+              className="w-full"
+            >
               Sign In
             </Button>
           </CardContent>
