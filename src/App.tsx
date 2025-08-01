@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -11,7 +12,7 @@ import EventDetailPage from '@/pages/EventDetailPage';
 import LearningPage from '@/pages/LearningPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AuthPage from '@/pages/AuthPage';
-import AdminLoginPage from '@/pages/AdminLoginPage';
+import AdminLogin from '@/pages/admin/AdminLogin';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminRoute from '@/components/admin/AdminRoute';
 import CreatorDashboard from '@/pages/creator/CreatorDashboard';
@@ -46,7 +47,7 @@ function App() {
                 <Route path="/learning/course-detail/:courseId" element={<CourseDetailPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/auth" element={<AuthPage />} />
-                <Route path="/admin-login" element={<AdminLoginPage />} />
+                <Route path="/admin-login" element={<AdminLogin />} />
                 <Route path="/payment/result" element={<PaymentResultPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/terms" element={<TermsOfServicePage />} />
