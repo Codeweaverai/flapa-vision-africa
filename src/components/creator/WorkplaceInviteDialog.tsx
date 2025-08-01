@@ -53,23 +53,33 @@ const WorkplaceInviteDialog: React.FC<WorkplaceInviteDialogProps> = ({
 
     setLoading(true);
     try {
-      // Check if user is already a member
-      const { data: existingMember } = await supabase
-        .from('creator_workplace_members')
-        .select('id')
-        .eq('workplace_id', workplace.id)
-        .eq('user_id', (
-          await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', email.trim())
-            .single()
-        ).data?.id)
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('You must be logged in to send invitations');
+        return;
+      }
+
+      // Check if user exists and get their profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', email.trim())
         .single();
 
-      if (existingMember) {
-        toast.error('User is already a member of this workplace');
-        return;
+      if (profileData) {
+        // Check if user is already a member
+        const { data: existingMember } = await supabase
+          .from('creator_workplace_members')
+          .select('id')
+          .eq('workplace_id', workplace.id)
+          .eq('user_id', profileData.id)
+          .single();
+
+        if (existingMember) {
+          toast.error('User is already a member of this workplace');
+          return;
+        }
       }
 
       // Check for existing pending invitation
@@ -95,9 +105,9 @@ const WorkplaceInviteDialog: React.FC<WorkplaceInviteDialogProps> = ({
           invited_email: email.trim(),
           role: role,
           invitation_token: invitationToken,
-          invited_by: (await supabase.auth.getUser()).data.user?.id,
+          invited_by: user.id,
           status: 'pending',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         });
 
       if (inviteError) throw inviteError;

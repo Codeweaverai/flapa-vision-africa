@@ -889,6 +889,56 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_workplace_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          declined_at: string | null
+          expires_at: string
+          id: string
+          invitation_token: string
+          invited_by: string
+          invited_email: string
+          role: string
+          status: string
+          workplace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          declined_at?: string | null
+          expires_at?: string
+          id?: string
+          invitation_token: string
+          invited_by: string
+          invited_email: string
+          role?: string
+          status?: string
+          workplace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          declined_at?: string | null
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string
+          invited_email?: string
+          role?: string
+          status?: string
+          workplace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_workplace_invitations_workplace_id_fkey"
+            columns: ["workplace_id"]
+            isOneToOne: false
+            referencedRelation: "creator_workplaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_workplace_members: {
         Row: {
           created_at: string
