@@ -353,7 +353,7 @@ const CreatorAnalytics: React.FC = () => {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={analyticsData.totalRevenue} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -368,7 +368,7 @@ const CreatorAnalytics: React.FC = () => {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={analyticsData.availableBalance} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -383,7 +383,7 @@ const CreatorAnalytics: React.FC = () => {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalStudents}</div>
+                <div className="text-base md:text-lg font-semibold">{analyticsData.totalStudents}</div>
                 <p className="text-xs text-muted-foreground">
                   {analyticsData.totalEnrollments} enrollments, {analyticsData.totalBookings} bookings
                 </p>
@@ -396,7 +396,7 @@ const CreatorAnalytics: React.FC = () => {
                 <Star className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.averageRating.toFixed(1)}</div>
+                <div className="text-base md:text-lg font-semibold">{analyticsData.averageRating.toFixed(1)}</div>
                 <p className="text-xs text-muted-foreground">
                   From {analyticsData.totalReviews} reviews
                 </p>
@@ -412,7 +412,7 @@ const CreatorAnalytics: React.FC = () => {
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalCourses}</div>
+                <div className="text-base md:text-lg font-semibold">{analyticsData.totalCourses}</div>
                 <p className="text-xs text-muted-foreground">
                   {analyticsData.courseReviews} reviews • {analyticsData.courseRating.toFixed(1)} ⭐
                 </p>
@@ -425,7 +425,7 @@ const CreatorAnalytics: React.FC = () => {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalEvents}</div>
+                <div className="text-base md:text-lg font-semibold">{analyticsData.totalEvents}</div>
                 <p className="text-xs text-muted-foreground">
                   {analyticsData.eventReviews} reviews • {analyticsData.eventRating.toFixed(1)} ⭐
                 </p>
@@ -438,7 +438,7 @@ const CreatorAnalytics: React.FC = () => {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={analyticsData.courseRevenue} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -453,7 +453,7 @@ const CreatorAnalytics: React.FC = () => {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-base md:text-lg font-semibold">
                   <PriceDisplay amount={analyticsData.eventRevenue} originalCurrency="USD" />
                 </div>
                 <p className="text-xs text-muted-foreground">
