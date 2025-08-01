@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -111,7 +110,14 @@ const WorkspaceDetailView: React.FC<WorkspaceDetailViewProps> = ({ workplace, on
       if (invitationsError) throw invitationsError;
 
       setMembers(membersData || []);
-      setInvitations(invitationsData || []);
+      
+      // Type assertion for invitations to ensure role has the correct type
+      const typedInvitations = (invitationsData || []).map(invitation => ({
+        ...invitation,
+        role: invitation.role as 'owner' | 'editor' | 'viewer'
+      }));
+      
+      setInvitations(typedInvitations);
     } catch (error) {
       console.error('Error fetching workspace details:', error);
       toast.error('Failed to load workspace details');
