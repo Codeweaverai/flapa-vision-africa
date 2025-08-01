@@ -89,60 +89,106 @@ const CreatorDashboard = () => {
     if (!user) return;
     
     try {
-      // Fetch courses with reviews and enrollments
+      // Fetch courses - simplified query
       const { data: courses, error: coursesError } = await supabase
         .from('courses')
-        .select(`
-          id,
-          title,
-          course_enrollments(id, user_id),
-          course_reviews(id, rating)
-        `)
+        .select('id, title')
         .eq('creator_id', user.id)
         .eq('is_published', true);
       
-      if (coursesError) throw coursesError;
+      if (coursesError) {
+        console.error('Error fetching courses:', coursesError);
+      }
 
-      // Fetch events with reviews and bookings
+      // Fetch events - simplified query
       const { data: events, error: eventsError } = await supabase
         .from('events')
-        .select(`
-          id,
-          title,
-          event_bookings(id, user_id),
-          event_reviews(id, rating)
-        `)
+        .select('id, title')
         .eq('creator_id', user.id);
       
-      if (eventsError) throw eventsError;
+      if (eventsError) {
+        console.error('Error fetching events:', eventsError);
+      }
 
-      // Calculate comprehensive statistics
       const totalCourses = courses?.length || 0;
       const totalEvents = events?.length || 0;
+      const courseIds = courses?.map(c => c.id) || [];
+      const eventIds = events?.map(e => e.id) || [];
       
-      // Calculate enrollments and unique students
-      const allEnrollments = courses?.flatMap(c => c.course_enrollments || []) || [];
-      const allBookings = events?.flatMap(e => e.event_bookings || []) || [];
+      // Get course enrollments
+      let totalEnrollments = 0;
+      let courseReviewsData: any[] = [];
+      
+      if (courseIds.length > 0) {
+        const { data: enrollments } = await supabase
+          .from('course_enrollments')
+          .select('id, user_id')
+          .in('course_id', courseIds)
+          .eq('payment_status', 'completed');
+          
+        totalEnrollments = enrollments?.length || 0;
+        
+        // Get course reviews
+        const { data: reviews } = await supabase
+          .from('course_reviews')
+          .select('id, rating')
+          .in('course_id', courseIds);
+          
+        courseReviewsData = reviews || [];
+      }
+      
+      // Get event bookings
+      let totalBookings = 0;
+      let eventReviewsData: any[] = [];
+      
+      if (eventIds.length > 0) {
+        const { data: bookings } = await supabase
+          .from('event_bookings')
+          .select('id, user_id, ticket_quantity')
+          .in('event_id', eventIds)
+          .eq('payment_status', 'completed');
+        
+        totalBookings = bookings?.reduce((sum, booking) => sum + (booking.ticket_quantity || 1), 0) || 0;
+        
+        // Get event reviews
+        const { data: reviews } = await supabase
+          .from('event_reviews')
+          .select('id, rating')
+          .in('event_id', eventIds);
+          
+        eventReviewsData = reviews || [];
+      }
+      
+      // Calculate unique students from both enrollments and bookings
+      const allEnrollments = courseIds.length > 0 ? await supabase
+        .from('course_enrollments')
+        .select('user_id')
+        .in('course_id', courseIds)
+        .eq('payment_status', 'completed') : { data: [] };
+        
+      const allBookings = eventIds.length > 0 ? await supabase
+        .from('event_bookings')
+        .select('user_id')
+        .in('event_id', eventIds)
+        .eq('payment_status', 'completed') : { data: [] };
+      
       const uniqueStudentIds = new Set([
-        ...allEnrollments.map(e => e.user_id),
-        ...allBookings.map(b => b.user_id)
+        ...(allEnrollments.data?.map(e => e.user_id) || []),
+        ...(allBookings.data?.map(b => b.user_id) || [])
       ]);
       
-      // Calculate reviews and ratings
-      const courseReviews = courses?.flatMap(c => c.course_reviews || []) || [];
-      const eventReviews = events?.flatMap(e => e.event_reviews || []) || [];
-      
-      const courseRating = courseReviews.length > 0 
-        ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length 
+      // Calculate ratings
+      const courseRating = courseReviewsData.length > 0 
+        ? courseReviewsData.reduce((sum, r) => sum + r.rating, 0) / courseReviewsData.length 
         : 0;
       
-      const eventRating = eventReviews.length > 0 
-        ? eventReviews.reduce((sum, r) => sum + r.rating, 0) / eventReviews.length 
+      const eventRating = eventReviewsData.length > 0 
+        ? eventReviewsData.reduce((sum, r) => sum + r.rating, 0) / eventReviewsData.length 
         : 0;
       
-      const totalReviews = courseReviews.length + eventReviews.length;
+      const totalReviews = courseReviewsData.length + eventReviewsData.length;
       const overallRating = totalReviews > 0 
-        ? (courseReviews.reduce((sum, r) => sum + r.rating, 0) + eventReviews.reduce((sum, r) => sum + r.rating, 0)) / totalReviews
+        ? (courseReviewsData.reduce((sum, r) => sum + r.rating, 0) + eventReviewsData.reduce((sum, r) => sum + r.rating, 0)) / totalReviews
         : 0;
 
       setStats({
@@ -152,15 +198,16 @@ const CreatorDashboard = () => {
         totalReviews,
         averageRating: overallRating,
         totalViews: 0, // This would require tracking views
-        totalEnrollments: allEnrollments.length,
-        totalBookings: allBookings.length,
-        courseReviews: courseReviews.length,
-        eventReviews: eventReviews.length,
+        totalEnrollments,
+        totalBookings,
+        courseReviews: courseReviewsData.length,
+        eventReviews: eventReviewsData.length,
         courseRating,
         eventRating
       });
     } catch (error) {
       console.error('Error loading comprehensive stats:', error);
+      // Keep existing stats on error
     }
   };
 

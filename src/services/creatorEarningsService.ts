@@ -40,7 +40,10 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       .select('id')
       .eq('creator_id', creatorId);
 
-    if (coursesError) throw coursesError;
+    if (coursesError) {
+      console.log('Error fetching creator courses:', coursesError);
+      // Return zero earnings if we can't fetch courses
+    }
 
     const courseIds = creatorCourses?.map(c => c.id) || [];
 
@@ -50,19 +53,27 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       .select('id')
       .eq('creator_id', creatorId);
 
-    if (eventsError) throw eventsError;
+    if (eventsError) {
+      console.log('Error fetching creator events:', eventsError);
+      // Continue with empty array if events fetch fails
+    }
 
     const eventIds = creatorEvents?.map(e => e.id) || [];
 
     // Get event ticket IDs for creator's events
-    const { data: eventTickets, error: ticketsError } = await supabase
-      .from('event_tickets')
-      .select('id')
-      .in('event_id', eventIds);
+    let eventTicketIds: string[] = [];
+    if (eventIds.length > 0) {
+      const { data: eventTickets, error: ticketsError } = await supabase
+        .from('event_tickets')
+        .select('id')
+        .in('event_id', eventIds);
 
-    if (ticketsError) throw ticketsError;
-
-    const eventTicketIds = eventTickets?.map(t => t.id) || [];
+      if (ticketsError) {
+        console.log('Error fetching event tickets:', ticketsError);
+      } else {
+        eventTicketIds = eventTickets?.map(t => t.id) || [];
+      }
+    }
 
     if (courseIds.length === 0 && eventTicketIds.length === 0) {
       return {
@@ -75,45 +86,66 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       };
     }
 
-    // Build the filter condition dynamically
-    let filterCondition = '';
-    if (courseIds.length > 0 && eventTicketIds.length > 0) {
-      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
-    } else if (courseIds.length > 0) {
-      filterCondition = `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`;
-    } else if (eventTicketIds.length > 0) {
-      filterCondition = `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`;
-    } else {
-      return {
-        available_balance: 0,
-        pending_balance: 0,
-        total_earnings: 0,
-        total_platform_fees: 0,
-        course_revenue: 0,
-        event_revenue: 0
-      };
+    // Fetch order items for courses separately
+    let courseOrderItems: any[] = [];
+    if (courseIds.length > 0) {
+      const { data: courseItems, error: courseError } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          orders!inner(
+            id,
+            user_id,
+            email,
+            total_amount,
+            currency,
+            payment_status,
+            payment_method,
+            created_at
+          )
+        `)
+        .eq('orders.payment_status', 'completed')
+        .eq('item_type', 'course')
+        .in('item_id', courseIds);
+
+      if (courseError) {
+        console.error('Error fetching course order items:', courseError);
+      } else {
+        courseOrderItems = courseItems || [];
+      }
     }
 
-    // Get all completed orders with order items for this creator's content
-    const { data: orderItems, error } = await supabase
-      .from('order_items')
-      .select(`
-        *,
-        orders!inner(
-          id,
-          user_id,
-          email,
-          total_amount,
-          currency,
-          payment_status,
-          payment_method,
-          created_at
-        )
-      `)
-      .eq('orders.payment_status', 'completed')
-      .or(filterCondition);
+    // Fetch order items for event tickets separately
+    let eventOrderItems: any[] = [];
+    if (eventTicketIds.length > 0) {
+      const { data: eventItems, error: eventError } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          orders!inner(
+            id,
+            user_id,
+            email,
+            total_amount,
+            currency,
+            payment_status,
+            payment_method,
+            created_at
+          )
+        `)
+        .eq('orders.payment_status', 'completed')
+        .eq('item_type', 'event_ticket')
+        .in('item_id', eventTicketIds);
 
-    if (error) throw error;
+      if (eventError) {
+        console.error('Error fetching event order items:', eventError);
+      } else {
+        eventOrderItems = eventItems || [];
+      }
+    }
+
+    // Combine all order items
+    const orderItems = [...courseOrderItems, ...eventOrderItems];
 
     if (!orderItems || orderItems.length === 0) {
       return {
@@ -203,7 +235,15 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     };
   } catch (error) {
     console.error('Error calculating creator earnings from orders:', error);
-    throw error;
+    // Return zero earnings on error instead of throwing
+    return {
+      available_balance: 0,
+      pending_balance: 0,
+      total_earnings: 0,
+      total_platform_fees: 0,
+      course_revenue: 0,
+      event_revenue: 0
+    };
   }
 }
 
@@ -215,7 +255,10 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       .select('id, title')
       .eq('creator_id', creatorId);
 
-    if (coursesError) throw coursesError;
+    if (coursesError) {
+      console.error('Error fetching courses for transactions:', coursesError);
+      return { transactions: [], total: 0 };
+    }
 
     const courseIds = creatorCourses?.map(c => c.id) || [];
     const courseMap = new Map(creatorCourses?.map(c => [c.id, c.title]) || []);
@@ -226,78 +269,107 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       .select('id, title')
       .eq('creator_id', creatorId);
 
-    if (eventsError) throw eventsError;
+    if (eventsError) {
+      console.error('Error fetching events for transactions:', eventsError);
+      return { transactions: [], total: 0 };
+    }
 
     const eventIds = creatorEvents?.map(e => e.id) || [];
     const eventMap = new Map(creatorEvents?.map(e => [e.id, e.title]) || []);
 
     // Get event ticket IDs for creator's events
-    const { data: eventTickets, error: ticketsError } = await supabase
-      .from('event_tickets')
-      .select('id, event_id')
-      .in('event_id', eventIds);
+    let eventTicketIds: string[] = [];
+    let ticketToEventMap = new Map();
+    
+    if (eventIds.length > 0) {
+      const { data: eventTickets, error: ticketsError } = await supabase
+        .from('event_tickets')
+        .select('id, event_id')
+        .in('event_id', eventIds);
 
-    if (ticketsError) throw ticketsError;
-
-    const eventTicketIds = eventTickets?.map(t => t.id) || [];
-    const ticketToEventMap = new Map(eventTickets?.map(t => [t.id, t.event_id]) || []);
+      if (ticketsError) {
+        console.error('Error fetching tickets for transactions:', ticketsError);
+      } else {
+        eventTicketIds = eventTickets?.map(t => t.id) || [];
+        ticketToEventMap = new Map(eventTickets?.map(t => [t.id, t.event_id]) || []);
+      }
+    }
 
     if (courseIds.length === 0 && eventTicketIds.length === 0) {
       return { transactions: [], total: 0 };
     }
 
-    // Fetch order items directly for creator's content
-    const { data: orderItems, error } = await supabase
-      .from('order_items')
-      .select(`
-        *,
-        orders!inner(
-          id,
-          user_id,
-          email,
-          total_amount,
-          currency,
-          payment_status,
-          payment_method,
-          created_at,
-          updated_at
-        )
-      `)
-      .eq('orders.payment_status', 'completed')
-      .or(
-        courseIds.length > 0 && eventTicketIds.length > 0
-          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
-          : courseIds.length > 0
-          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`
-          : `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
-      )
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    // Fetch course order items
+    let courseOrderItems: any[] = [];
+    if (courseIds.length > 0) {
+      const { data: courseItems, error: courseError } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          orders!inner(
+            id,
+            user_id,
+            email,
+            total_amount,
+            currency,
+            payment_status,
+            payment_method,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('orders.payment_status', 'completed')
+        .eq('item_type', 'course')
+        .in('item_id', courseIds)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
-    if (error) {
-      console.error('Error fetching order items:', error);
-      throw error;
+      if (courseError) {
+        console.error('Error fetching course transactions:', courseError);
+      } else {
+        courseOrderItems = courseItems || [];
+      }
     }
+
+    // Fetch event order items
+    let eventOrderItems: any[] = [];
+    if (eventTicketIds.length > 0) {
+      const { data: eventItems, error: eventError } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          orders!inner(
+            id,
+            user_id,
+            email,
+            total_amount,
+            currency,
+            payment_status,
+            payment_method,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('orders.payment_status', 'completed')
+        .eq('item_type', 'event_ticket')
+        .in('item_id', eventTicketIds)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (eventError) {
+        console.error('Error fetching event transactions:', eventError);
+      } else {
+        eventOrderItems = eventItems || [];
+      }
+    }
+
+    // Combine and sort by date
+    const orderItems = [...courseOrderItems, ...eventOrderItems]
+      .sort((a, b) => new Date(b.orders.created_at).getTime() - new Date(a.orders.created_at).getTime())
+      .slice(0, limit);
 
     if (!orderItems || orderItems.length === 0) {
       return { transactions: [], total: 0 };
-    }
-
-    // Get total count for pagination by doing a separate count query
-    const { count: totalCount, error: countError } = await supabase
-      .from('order_items')
-      .select('*', { count: 'exact', head: true })
-      .eq('orders.payment_status', 'completed')
-      .or(
-        courseIds.length > 0 && eventTicketIds.length > 0
-          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')})),and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
-          : courseIds.length > 0
-          ? `and(item_type.eq.course,item_id.in.(${courseIds.join(',')}))`
-          : `and(item_type.eq.event_ticket,item_id.in.(${eventTicketIds.join(',')}))`
-      );
-
-    if (countError) {
-      console.error('Error counting order items:', countError);
     }
 
     // Get user profiles for customer names
@@ -354,10 +426,10 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       });
     }
 
-    return { transactions: creatorTransactions, total: totalCount || 0 };
+    return { transactions: creatorTransactions, total: creatorTransactions.length };
   } catch (error) {
     console.error('Error fetching creator transactions from orders:', error);
-    throw error;
+    return { transactions: [], total: 0 };
   }
 }
 

@@ -96,51 +96,55 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
   
   return (
     <Layout>
-        <div className="section-container py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="md:col-span-1">
-            <Card className="p-4">
-              <div className="mb-4 flex items-center space-x-2">
-                <div className="rounded-full bg-primary/10 p-2">
-                  <Rocket className="h-5 w-5 text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="md:col-span-1">
+              <Card className="p-4 bg-white/80 backdrop-blur-sm">
+                <div className="mb-4 flex items-center space-x-2">
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <Rocket className="h-5 w-5 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-bold">Creator Portal</h2>
                 </div>
-                <h2 className="text-xl font-bold">Creator Portal</h2>
-              </div>
-              
-              <nav className="space-y-1">
-                {navItems.map((item) => (
-                  <Button
-                    key={item.href}
-                    variant="ghost"
-                    className={cn(
-                      "w-full justify-start",
-                      location.pathname === item.href && "bg-primary/10 text-primary font-medium"
-                    )}
-                    asChild
-                  >
-                    <Link to={item.href}>
-                      {item.icon}
-                      {item.label}
+                
+                <nav className="space-y-1">
+                  {navItems.map((item) => (
+                    <Button
+                      key={item.href}
+                      variant="ghost"
+                      className={cn(
+                        "w-full justify-start",
+                        location.pathname === item.href && "bg-primary/10 text-primary font-medium"
+                      )}
+                      asChild
+                    >
+                      <Link to={item.href}>
+                        {item.icon}
+                        {item.label}
+                      </Link>
+                    </Button>
+                  ))}
+                </nav>
+                
+                <div className="mt-8 pt-4 border-t">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link to="/account">
+                      Back to My Account
                     </Link>
                   </Button>
-                ))}
-              </nav>
-              
-              <div className="mt-8 pt-4 border-t">
-                <Button variant="outline" className="w-full" asChild>
-                  <Link to="/account">
-                    Back to My Account
-                  </Link>
-                </Button>
+                </div>
+              </Card>
+            </div>
+            
+            <div className="md:col-span-3">
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border-0 p-6">
+                {title && (
+                  <h1 className="text-2xl font-bold mb-6">{title}</h1>
+                )}
+                {children}
               </div>
-            </Card>
-          </div>
-          
-          <div className="md:col-span-3">
-            {title && (
-              <h1 className="text-2xl font-bold mb-6">{title}</h1>
-            )}
-            {children}
+            </div>
           </div>
         </div>
       </div>
