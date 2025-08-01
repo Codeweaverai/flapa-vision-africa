@@ -12,7 +12,7 @@ interface InvitationDetails {
   id: string;
   workplace_id: string;
   invited_email: string;
-  role: string;
+  role: 'owner' | 'editor' | 'viewer';
   status: string;
   expires_at: string;
   workplace: {
@@ -79,11 +79,12 @@ const AcceptInvitePage: React.FC = () => {
         return;
       }
 
-      // Handle potential profile fetch error gracefully
-      const processedData = {
+      // Handle potential profile fetch error gracefully and ensure proper typing
+      const processedData: InvitationDetails = {
         ...data,
+        role: data.role as 'owner' | 'editor' | 'viewer',
         invited_by_profile: data.invited_by_profile || { full_name: 'Unknown User', username: 'unknown' }
-      } as InvitationDetails;
+      };
 
       setInvitation(processedData);
     } catch (error: any) {
@@ -112,16 +113,21 @@ const AcceptInvitePage: React.FC = () => {
         return;
       }
 
-      // Add user to workplace
+      // Get the invited_by user ID from the invitation
+      const { data: invitationData } = await supabase
+        .from('creator_workplace_invitations')
+        .select('invited_by')
+        .eq('id', invitation.id)
+        .single();
+
+      // Add user to workplace with correct property names
       const { error: memberError } = await supabase
         .from('creator_workplace_members')
         .insert({
           workplace_id: invitation.workplace_id,
           user_id: user.id,
           role: invitation.role,
-          invited_by: invitation.invited_by_profile ? 
-            (await supabase.from('creator_workplace_invitations').select('invited_by').eq('id', invitation.id).single()).data?.invited_by 
-            : null,
+          invited_by: invitationData?.invited_by || null,
           status: 'active'
         });
 
