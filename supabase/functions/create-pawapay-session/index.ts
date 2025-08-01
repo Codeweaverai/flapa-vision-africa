@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -134,7 +135,7 @@ serve(async (req) => {
         user_id: user.id,
         total_amount: totalAmount,
         currency: currency.toUpperCase(),
-        payment_status: 'pending',
+        payment_status: 'completed', // PawaPay payments are completed immediately
         payment_method: 'mobile_money',
         payment_provider_id: sessionId,
         email: user.email,
@@ -180,29 +181,148 @@ serve(async (req) => {
 
     console.log('[PAWAPAY] Order items created successfully', { count: createdOrderItems.length });
 
-    // Update order status to completed
-    const { error: updateError } = await supabaseAdmin
-      .from('orders')
-      .update({
-        payment_status: 'completed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', order.id);
+    // Process each order item - handle course enrollments and event tickets
+    for (const orderItem of createdOrderItems) {
+      if (orderItem.item_type === 'course') {
+        console.log('[PAWAPAY] Creating course enrollment for item:', orderItem.item_id);
+        
+        // Create course enrollment
+        const { error: enrollmentError } = await supabaseAdmin
+          .from('course_enrollments')
+          .insert({
+            user_id: user.id,
+            course_id: orderItem.item_id,
+            payment_status: 'completed',
+            order_id: order.id,
+            enrollment_date: new Date().toISOString()
+          });
 
-    if (updateError) {
-      console.error('[PAWAPAY] Error updating order status', updateError);
-      // Don't throw here as the payment was successful
+        if (enrollmentError) {
+          console.error('[PAWAPAY] Error creating course enrollment:', enrollmentError);
+          // Continue processing other items even if one fails
+        } else {
+          console.log('[PAWAPAY] Course enrollment created successfully');
+        }
+
+      } else if (orderItem.item_type === 'event_ticket') {
+        console.log('[PAWAPAY] Processing event ticket for item:', orderItem.item_id);
+        
+        // Get event details from ticket
+        const { data: eventTicket, error: ticketError } = await supabaseAdmin
+          .from('event_tickets')
+          .select(`
+            *,
+            events (*)
+          `)
+          .eq('id', orderItem.item_id)
+          .single();
+
+        if (ticketError || !eventTicket) {
+          console.error('[PAWAPAY] Error fetching event ticket:', ticketError);
+          continue;
+        }
+
+        const event = eventTicket.events;
+
+        // Update ticket inventory
+        const { error: inventoryError } = await supabaseAdmin
+          .from('event_tickets')
+          .update({
+            quantity_available: Math.max(0, eventTicket.quantity_available - orderItem.quantity),
+            quantity_sold: eventTicket.quantity_sold + orderItem.quantity,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderItem.item_id);
+
+        if (inventoryError) {
+          console.error('[PAWAPAY] Error updating ticket inventory:', inventoryError);
+          // Continue processing
+        }
+
+        // Generate unique booking code
+        const bookingCode = 'EVT-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+        // Create event booking
+        const { data: booking, error: bookingError } = await supabaseAdmin
+          .from('event_bookings')
+          .insert({
+            user_id: user.id,
+            event_id: event.id,
+            event_ticket_id: orderItem.item_id,
+            status: 'confirmed',
+            payment_status: 'completed',
+            payment_amount: orderItem.total_price,
+            payment_currency: currency.toUpperCase(),
+            ticket_quantity: orderItem.quantity,
+            order_id: order.id,
+            booking_date: new Date().toISOString(),
+            booking_code: bookingCode
+          })
+          .select()
+          .single();
+
+        if (bookingError) {
+          console.error('[PAWAPAY] Error creating event booking:', bookingError);
+          continue;
+        }
+
+        console.log('[PAWAPAY] Event booking created successfully', { bookingId: booking.id });
+
+        // Generate individual tickets for each quantity
+        const ticketHolderNames = orderItem.metadata?.ticket_holder_names || [];
+        
+        for (let i = 0; i < orderItem.quantity; i++) {
+          const ticketCode = 'TCK-' + user.id + '-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+          
+          const qrData = JSON.stringify({
+            ticket_code: ticketCode,
+            booking_id: booking.id,
+            event_id: event.id,
+            order_id: order.id,
+            user_id: user.id,
+            generated_at: new Date().toISOString()
+          });
+
+          const holderName = ticketHolderNames[i] || 
+                           (await supabaseAdmin
+                             .from('profiles')
+                             .select('full_name')
+                             .eq('id', user.id)
+                             .single()
+                           ).data?.full_name || 
+                           `Ticket Holder ${i + 1}`;
+
+          const { error: ticketError } = await supabaseAdmin
+            .from('generated_tickets')
+            .insert({
+              booking_id: booking.id,
+              event_id: event.id,
+              order_id: order.id,
+              user_id: user.id,
+              ticket_holder_name: holderName,
+              ticket_code: ticketCode,
+              qr_code_data: qrData,
+              ticket_status: 'active'
+            });
+
+          if (ticketError) {
+            console.error('[PAWAPAY] Error generating ticket:', ticketError);
+          } else {
+            console.log('[PAWAPAY] Generated ticket:', ticketCode);
+          }
+        }
+      }
     }
 
-    // After successful payment processing, trigger email confirmation
+    // Trigger payment success email in background
     console.log('[PAWAPAY] Triggering payment confirmation email');
     
     const emailPayload = {
-      orderId: order.id, // Assume order was created in the existing flow
+      orderId: order.id,
       userId: user.id,
       userEmail: user.email,
       customerName: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email,
-      orderItems: requestBody.items.map(item => ({
+      orderItems: items.map(item => ({
         item_id: item.item_id,
         item_type: item.item_type as 'course' | 'event_ticket',
         item_name: item.item_name,
@@ -210,27 +330,25 @@ serve(async (req) => {
         unit_price: item.price,
         total_price: item.price * item.quantity
       })),
-      totalAmount: requestBody.amount / 100, // Convert from cents
-      currency: requestBody.currency.toUpperCase(),
+      totalAmount: totalAmount,
+      currency: currency.toUpperCase(),
       paymentMethod: 'Mobile Money (PawaPay)'
     };
 
     // Send email in background without waiting
-    EdgeRuntime.waitUntil(
-      supabaseAdmin.functions.invoke('send-payment-success-email', {
-        body: emailPayload
-      }).then(({ error: emailError }) => {
-        if (emailError) {
-          console.error('[PAWAPAY] Email sending failed:', emailError);
-        } else {
-          console.log('[PAWAPAY] Payment confirmation email sent successfully');
-        }
-      }).catch(emailError => {
-        console.error('[PAWAPAY] Email sending error:', emailError);
-      })
-    );
+    supabaseAdmin.functions.invoke('send-payment-success-email', {
+      body: emailPayload
+    }).then(({ error: emailError }) => {
+      if (emailError) {
+        console.error('[PAWAPAY] Email sending failed:', emailError);
+      } else {
+        console.log('[PAWAPAY] Payment confirmation email sent successfully');
+      }
+    }).catch(emailError => {
+      console.error('[PAWAPAY] Email sending error:', emailError);
+    });
 
-    console.log('[PAWAPAY] Session and email trigger completed successfully');
+    console.log('[PAWAPAY] Session and order fulfillment completed successfully');
 
     return new Response(
       JSON.stringify({ redirectUrl }),
