@@ -13,7 +13,7 @@ import LearningPage from '@/pages/LearningPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AuthPage from '@/pages/AuthPage';
 import AdminLogin from '@/pages/admin/AdminLogin';
-import AdminDashboard from '@/pages/AdminDashboard';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminRoute from '@/components/admin/AdminRoute';
 import CreatorDashboard from '@/pages/creator/CreatorDashboard';
 import CreatorRoute from '@/components/creator/CreatorRoute';
