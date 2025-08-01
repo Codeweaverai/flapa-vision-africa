@@ -47,21 +47,50 @@ const CreatorWorkplaces: React.FC = () => {
     if (!user) return;
 
     try {
-      // Simplified query to avoid recursion issues
-      const { data: workplaceData, error: workplaceError } = await supabase
+      console.log('Fetching workplaces for user:', user.id);
+      
+      // Fetch workplaces where user is the owner
+      const { data: ownedWorkplaces, error: ownedError } = await supabase
         .from('creator_workplaces')
         .select('id, name, description, created_at, owner_id')
         .eq('owner_id', user.id);
 
-      if (workplaceError) {
-        console.error('Error fetching owned workplaces:', workplaceError);
-        setWorkplaces([]);
+      if (ownedError) {
+        console.error('Error fetching owned workplaces:', ownedError);
+        toast.error('Failed to load owned workplaces');
         return;
       }
 
-      // For each workplace, get member count and user role
-      const workplacesWithDetails = await Promise.all(
-        (workplaceData || []).map(async (workplace) => {
+      console.log('Found owned workplaces:', ownedWorkplaces?.length || 0);
+
+      // Fetch workplaces where user is a member
+      const { data: memberWorkplaces, error: memberError } = await supabase
+        .from('creator_workplace_members')
+        .select(`
+          workplace_id,
+          role,
+          creator_workplaces!inner (
+            id,
+            name,
+            description,
+            created_at,
+            owner_id
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .neq('creator_workplaces.owner_id', user.id);
+
+      if (memberError) {
+        console.error('Error fetching member workplaces:', memberError);
+        toast.error('Failed to load member workplaces');
+      }
+
+      console.log('Found member workplaces:', memberWorkplaces?.length || 0);
+
+      // Process owned workplaces
+      const ownedWorkplacesWithDetails = await Promise.all(
+        (ownedWorkplaces || []).map(async (workplace) => {
           // Get member count
           const { data: members, error: memberError } = await supabase
             .from('creator_workplace_members')
@@ -70,29 +99,18 @@ const CreatorWorkplaces: React.FC = () => {
             .eq('status', 'active');
 
           if (memberError) {
-            console.error('Error fetching member count:', memberError);
+            console.error('Error fetching member count for workplace:', workplace.id, memberError);
           }
 
           return {
             ...workplace,
-            member_count: members?.length || 0,
+            member_count: (members?.length || 0) + 1, // +1 for owner
             user_role: 'owner' as const
           };
         })
       );
 
-      // Also fetch workplaces where user is a member (not owner)
-      const { data: memberWorkplaces, error: memberError } = await supabase
-        .from('creator_workplace_members')
-        .select('workplace_id, role, creator_workplaces!inner(id, name, description, created_at, owner_id)')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .neq('creator_workplaces.owner_id', user.id);
-
-      if (memberError) {
-        console.error('Error fetching member workplaces:', memberError);
-      }
-
+      // Process member workplaces
       const memberWorkplacesWithDetails = await Promise.all(
         (memberWorkplaces || []).map(async (member: any) => {
           // Get member count
@@ -108,17 +126,18 @@ const CreatorWorkplaces: React.FC = () => {
             description: member.creator_workplaces.description,
             created_at: member.creator_workplaces.created_at,
             owner_id: member.creator_workplaces.owner_id,
-            member_count: members?.length || 0,
+            member_count: (members?.length || 0) + 1, // +1 for owner
             user_role: member.role
           };
         })
       );
 
-      const allWorkplaces = [...workplacesWithDetails, ...memberWorkplacesWithDetails];
+      const allWorkplaces = [...ownedWorkplacesWithDetails, ...memberWorkplacesWithDetails];
+      console.log('Total workplaces:', allWorkplaces.length);
       setWorkplaces(allWorkplaces);
     } catch (error: any) {
-      toast.error('Failed to load workplaces');
       console.error('Error fetching workplaces:', error);
+      toast.error('Failed to load workplaces');
       setWorkplaces([]);
     } finally {
       setLoading(false);
@@ -259,6 +278,7 @@ const CreatorWorkplaces: React.FC = () => {
         onSuccess={() => {
           fetchWorkplaces();
           setShowCreateDialog(false);
+          toast.success('Workplace created successfully');
         }}
       />
 

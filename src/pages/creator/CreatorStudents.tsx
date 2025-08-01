@@ -1,748 +1,493 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
 import CreatorLayout from '@/components/creator/CreatorLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { 
   Users, 
   Search, 
   Download, 
-  GraduationCap, 
+  Mail, 
   Calendar,
-  CheckCircle,
-  XCircle,
-  Clock,
-  MapPin
+  BookOpen,
+  Filter,
+  MoreHorizontal 
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import AttendeeExportButton from '@/components/creator/AttendeeExportButton';
+import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
 
-interface CourseEnrollment {
+interface Student {
   id: string;
   user_id: string;
-  course_id: string;
-  enrollment_date: string;
-  completion_date?: string;
-  is_completed: boolean;
+  full_name: string;
+  email: string;
+  username: string;
+  enrollment_date?: string;
+  booking_date?: string;
+  course_title?: string;
+  event_title?: string;
+  type: 'course' | 'event';
   payment_status: string;
-  course: {
-    title: string;
-    thumbnail_url?: string;
-  };
-  user: {
-    full_name: string;
-    email: string;
-    avatar_url?: string;
-  };
 }
 
-interface EventBooking {
-  id: string;
-  user_id: string;
-  event_id: string;
-  booking_date: string;
-  status: string;
-  payment_status: string;
-  ticket_quantity: number;
-  booking_code: string;
-  event: {
-    title: string;
-    start_time: string;
-    location: string;
-    image_url?: string;
-  };
-  user: {
-    full_name: string;
-    email: string;
-    avatar_url?: string;
-  };
-  tickets: {
-    id: string;
-    ticket_code: string;
-    ticket_status: string;
-    check_in?: {
-      id: string;
-      check_in_time: string;
-      checked_in_by: string;
-    };
-  }[];
-}
-
-const CreatorStudents = () => {
+const CreatorStudents: React.FC = () => {
   const { user } = useAuth();
-  const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollment[]>([]);
-  const [eventBookings, setEventBookings] = useState<EventBooking[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('courses');
+  const [filterType, setFilterType] = useState<'all' | 'course' | 'event'>('all');
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
-      fetchStudentData();
-      setupRealtimeSubscriptions();
+      fetchStudents();
     }
   }, [user]);
 
-  const setupRealtimeSubscriptions = () => {
-    // Subscribe to course enrollments changes
-    const enrollmentsChannel = supabase
-      .channel('course-enrollments-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'course_enrollments'
-        },
-        () => {
-          fetchCourseEnrollments();
-        }
-      )
-      .subscribe();
+  const fetchStudents = async () => {
+    if (!user) return;
 
-    // Subscribe to event bookings changes
-    const bookingsChannel = supabase
-      .channel('event-bookings-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'event_bookings'
-        },
-        () => {
-          fetchEventBookings();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to check-ins changes
-    const checkInsChannel = supabase
-      .channel('check-ins-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'check_ins'
-        },
-        () => {
-          fetchEventBookings();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to generated tickets changes
-    const ticketsChannel = supabase
-      .channel('generated-tickets-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'generated_tickets'
-        },
-        () => {
-          fetchEventBookings();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(enrollmentsChannel);
-      supabase.removeChannel(bookingsChannel);
-      supabase.removeChannel(checkInsChannel);
-      supabase.removeChannel(ticketsChannel);
-    };
-  };
-
-  const fetchStudentData = async () => {
     try {
       setLoading(true);
-      await Promise.all([
-        fetchCourseEnrollments(),
-        fetchEventBookings()
-      ]);
+      console.log('Fetching students for creator:', user.id);
+
+      // Get course enrollments
+      const { data: courseEnrollments, error: courseError } = await supabase
+        .from('course_enrollments')
+        .select(`
+          id,
+          user_id,
+          enrollment_date,
+          payment_status,
+          courses!inner (
+            title,
+            creator_id
+          )
+        `)
+        .eq('courses.creator_id', user.id)
+        .eq('payment_status', 'completed');
+
+      if (courseError) {
+        console.error('Error fetching course enrollments:', courseError);
+        toast.error('Failed to load course enrollments');
+      }
+
+      // Get event bookings
+      const { data: eventBookings, error: eventError } = await supabase
+        .from('event_bookings')
+        .select(`
+          id,
+          user_id,
+          booking_date,
+          payment_status,
+          events!inner (
+            title,
+            creator_id
+          )
+        `)
+        .eq('events.creator_id', user.id)
+        .eq('payment_status', 'completed');
+
+      if (eventError) {
+        console.error('Error fetching event bookings:', eventError);
+        toast.error('Failed to load event bookings');
+      }
+
+      // Get unique user IDs
+      const courseUserIds = courseEnrollments?.map(e => e.user_id) || [];
+      const eventUserIds = eventBookings?.map(b => b.user_id) || [];
+      const allUserIds = [...new Set([...courseUserIds, ...eventUserIds])];
+
+      console.log('Found unique user IDs:', allUserIds.length);
+
+      if (allUserIds.length === 0) {
+        setStudents([]);
+        return;
+      }
+
+      // Get user profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, email')
+        .in('id', allUserIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        toast.error('Failed to load student profiles');
+        return;
+      }
+
+      console.log('Found profiles:', profiles?.length);
+
+      // Combine the data
+      const studentsData: Student[] = [];
+
+      // Add course students
+      if (courseEnrollments) {
+        courseEnrollments.forEach(enrollment => {
+          const profile = profiles?.find(p => p.id === enrollment.user_id);
+          if (profile) {
+            studentsData.push({
+              id: enrollment.id,
+              user_id: enrollment.user_id,
+              full_name: profile.full_name || 'Unknown',
+              email: profile.email || '',
+              username: profile.username || '',
+              enrollment_date: enrollment.enrollment_date,
+              course_title: enrollment.courses.title,
+              type: 'course',
+              payment_status: enrollment.payment_status
+            });
+          }
+        });
+      }
+
+      // Add event students
+      if (eventBookings) {
+        eventBookings.forEach(booking => {
+          const profile = profiles?.find(p => p.id === booking.user_id);
+          if (profile) {
+            studentsData.push({
+              id: booking.id,
+              user_id: booking.user_id,
+              full_name: profile.full_name || 'Unknown',
+              email: profile.email || '',
+              username: profile.username || '',
+              booking_date: booking.booking_date,
+              event_title: booking.events.title,
+              type: 'event',
+              payment_status: booking.payment_status
+            });
+          }
+        });
+      }
+
+      console.log('Total students found:', studentsData.length);
+      setStudents(studentsData);
     } catch (error) {
-      console.error('Error fetching student data:', error);
-      toast.error('Failed to load student data');
+      console.error('Error fetching students:', error);
+      toast.error('Failed to load students');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCourseEnrollments = async () => {
-    try {
-      // Get all enrollments for courses created by the current user
-      const { data: enrollmentsData, error: enrollmentsError } = await supabase
-        .from('course_enrollments')
-        .select(`
-          id,
-          user_id,
-          course_id,
-          enrollment_date,
-          completion_date,
-          is_completed,
-          payment_status,
-          courses!inner(title, thumbnail_url, creator_id)
-        `)
-        .eq('courses.creator_id', user?.id)
-        .order('enrollment_date', { ascending: false });
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (student.course_title && student.course_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         (student.event_title && student.event_title.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesFilter = filterType === 'all' || student.type === filterType;
+    
+    return matchesSearch && matchesFilter;
+  });
 
-      if (enrollmentsError) {
-        console.error('Error fetching course enrollments:', enrollmentsError);
-        toast.error('Failed to load course enrollments');
-        return;
-      }
-
-      if (!enrollmentsData || enrollmentsData.length === 0) {
-        setCourseEnrollments([]);
-        return;
-      }
-
-      // Get unique user IDs from all enrollments
-      const userIds = [...new Set(enrollmentsData.map(e => e.user_id))];
-
-      // Fetch user emails using the function
-      const { data: usersData, error: usersError } = await supabase
-        .rpc('get_user_emails', { user_ids: userIds });
-
-      if (usersError) {
-        console.error('Error fetching user emails:', usersError);
-        toast.error('Failed to load user data');
-        return;
-      }
-
-      // Fetch profiles for additional data
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        toast.error('Failed to load user profiles');
-        return;
-      }
-
-      // Create lookup maps
-      const usersMap = new Map(usersData?.map(user => [user.id, user]) || []);
-      const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]) || []);
-
-      // Combine enrollments with user data
-      const enrichedEnrollments: CourseEnrollment[] = enrollmentsData
-        .map(enrollment => {
-          const userAuth = usersMap.get(enrollment.user_id);
-          const profile = profilesMap.get(enrollment.user_id);
-          
-          if (!userAuth || !profile || !enrollment.courses) return null;
-
-          return {
-            id: enrollment.id,
-            user_id: enrollment.user_id,
-            course_id: enrollment.course_id,
-            enrollment_date: enrollment.enrollment_date,
-            completion_date: enrollment.completion_date,
-            is_completed: enrollment.is_completed,
-            payment_status: enrollment.payment_status,
-            course: {
-              title: enrollment.courses.title,
-              thumbnail_url: enrollment.courses.thumbnail_url
-            },
-            user: {
-              full_name: profile.full_name || 'Unknown User',
-              email: userAuth.email || '',
-              avatar_url: profile.avatar_url
-            }
-          };
-        })
-        .filter(Boolean) as CourseEnrollment[];
-
-      setCourseEnrollments(enrichedEnrollments);
-    } catch (error) {
-      console.error('Error fetching course enrollments:', error);
-      toast.error('Failed to load course enrollments');
+  const uniqueStudents = filteredStudents.reduce((acc, current) => {
+    const existingStudent = acc.find(student => student.user_id === current.user_id);
+    if (!existingStudent) {
+      acc.push(current);
     }
-  };
+    return acc;
+  }, [] as Student[]);
 
-  const fetchEventBookings = async () => {
-    try {
-      // Get all bookings for events created by the current user
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('event_bookings')
-        .select(`
-          id,
-          user_id,
-          event_id,
-          booking_date,
-          status,
-          payment_status,
-          ticket_quantity,
-          booking_code,
-          events!inner(title, start_time, location, image_url, creator_id)
-        `)
-        .eq('events.creator_id', user?.id)
-        .order('booking_date', { ascending: false });
-
-      if (bookingsError) {
-        console.error('Error fetching event bookings:', bookingsError);
-        toast.error('Failed to load event bookings');
-        return;
-      }
-
-      if (!bookingsData || bookingsData.length === 0) {
-        setEventBookings([]);
-        return;
-      }
-
-      // Get unique user IDs from all bookings
-      const userIds = [...new Set(bookingsData.map(b => b.user_id))];
-
-      // Fetch user emails
-      const { data: usersData, error: usersError } = await supabase
-        .rpc('get_user_emails', { user_ids: userIds });
-
-      if (usersError) {
-        console.error('Error fetching user emails:', usersError);
-        toast.error('Failed to load user data');
-        return;
-      }
-
-      // Fetch profiles for additional data
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        toast.error('Failed to load user profiles');
-        return;
-      }
-
-      // Create lookup maps
-      const usersMap = new Map(usersData?.map(user => [user.id, user]) || []);
-      const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]) || []);
-
-      // Get booking IDs for fetching tickets
-      const bookingIds = bookingsData.map(booking => booking.id);
-
-      // Fetch tickets with check-in status
-      const { data: ticketsData, error: ticketsError } = await supabase
-        .from('generated_tickets')
-        .select(`
-          id,
-          booking_id,
-          ticket_code,
-          ticket_status,
-          check_ins(
-            id,
-            check_in_time,
-            checked_in_by
-          )
-        `)
-        .in('booking_id', bookingIds);
-
-      if (ticketsError) {
-        console.error('Error fetching tickets:', ticketsError);
-        toast.error('Failed to load tickets data');
-        return;
-      }
-
-      // Group tickets by booking_id
-      const ticketsByBooking = ticketsData?.reduce((acc: Record<string, any[]>, ticket: any) => {
-        if (!acc[ticket.booking_id]) {
-          acc[ticket.booking_id] = [];
-        }
-        acc[ticket.booking_id].push({
-          id: ticket.id,
-          ticket_code: ticket.ticket_code,
-          ticket_status: ticket.ticket_status,
-          check_in: ticket.check_ins?.[0] || null
-        });
-        return acc;
-      }, {}) || {};
-
-      // Combine bookings with user data and tickets
-      const enrichedBookings: EventBooking[] = bookingsData
-        .map(booking => {
-          const userAuth = usersMap.get(booking.user_id);
-          const profile = profilesMap.get(booking.user_id);
-          
-          if (!userAuth || !profile || !booking.events) return null;
-
-          return {
-            id: booking.id,
-            user_id: booking.user_id,
-            event_id: booking.event_id,
-            booking_date: booking.booking_date,
-            status: booking.status,
-            payment_status: booking.payment_status,
-            ticket_quantity: booking.ticket_quantity,
-            booking_code: booking.booking_code,
-            event: {
-              title: booking.events.title,
-              start_time: booking.events.start_time,
-              location: booking.events.location,
-              image_url: booking.events.image_url
-            },
-            user: {
-              full_name: profile.full_name || 'Unknown User',
-              email: userAuth.email || '',
-              avatar_url: profile.avatar_url
-            },
-            tickets: ticketsByBooking[booking.id] || []
-          };
-        })
-        .filter(Boolean) as EventBooking[];
-
-      setEventBookings(enrichedBookings);
-
-    } catch (error) {
-      console.error('Error fetching event bookings:', error);
-      toast.error('Failed to load event registrations');
-    }
-  };
-
-  const exportCourseStudents = () => {
-    const csvContent = [
-      ['Student Name', 'Email', 'Course', 'Enrollment Date', 'Payment Status', 'Completion Status'],
-      ...filteredCourseEnrollments.map(enrollment => [
-        enrollment.user.full_name,
-        enrollment.user.email,
-        enrollment.course.title,
-        format(new Date(enrollment.enrollment_date), 'yyyy-MM-dd'),
-        enrollment.payment_status,
-        enrollment.is_completed ? 'Completed' : 'In Progress'
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'course_students.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportEventAttendees = () => {
-    const csvContent = [
-      ['Attendee Name', 'Email', 'Event', 'Booking Date', 'Status', 'Payment Status', 'Tickets', 'Checked In', 'Check-in Rate'],
-      ...filteredEventBookings.map(booking => [
-        booking.user.full_name,
-        booking.user.email,
-        booking.event.title,
-        format(new Date(booking.booking_date), 'yyyy-MM-dd'),
-        booking.status,
-        booking.payment_status,
-        booking.tickets.length.toString(),
-        booking.tickets.filter(t => t.check_in).length.toString(),
-        booking.tickets.length > 0 ? `${((booking.tickets.filter(t => t.check_in).length / booking.tickets.length) * 100).toFixed(1)}%` : '0%'
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'event_attendees.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const filteredCourseEnrollments = courseEnrollments.filter(enrollment =>
-    enrollment.user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    enrollment.course.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredEventBookings = eventBookings.filter(booking =>
-    booking.user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    booking.event.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getCheckInBadge = (tickets: any[]) => {
-    const checkedIn = tickets.filter(t => t.check_in).length;
-    const total = tickets.length;
-    
-    if (total === 0) return <Badge variant="outline">No Tickets</Badge>;
-    
-    const rate = (checkedIn / total) * 100;
-    
-    if (rate === 100) {
-      return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />All Checked In</Badge>;
-    } else if (rate > 0) {
-      return <Badge variant="outline" className="border-yellow-500 text-yellow-700">
-        <Clock className="h-3 w-3 mr-1" />
-        {checkedIn}/{total} Checked In
-      </Badge>;
+  const handleSelectAll = () => {
+    if (selectedStudents.length === uniqueStudents.length) {
+      setSelectedStudents([]);
     } else {
-      return <Badge variant="outline" className="border-red-500 text-red-700">
-        <XCircle className="h-3 w-3 mr-1" />
-        Not Checked In
-      </Badge>;
+      setSelectedStudents(uniqueStudents.map(s => s.user_id));
     }
   };
 
-  const getPaymentStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <Badge className="bg-green-500">Completed</Badge>;
-      case 'pending':
-        return <Badge variant="outline" className="border-yellow-500 text-yellow-700">Pending</Badge>;
-      case 'failed':
-        return <Badge variant="outline" className="border-red-500 text-red-700">Failed</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const getBookingStatusBadge = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return <Badge className="bg-green-500">Confirmed</Badge>;
-      case 'pending':
-        return <Badge variant="outline" className="border-yellow-500 text-yellow-700">Pending</Badge>;
-      case 'cancelled':
-        return <Badge variant="outline" className="border-red-500 text-red-700">Cancelled</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+  const handleSelectStudent = (userId: string) => {
+    setSelectedStudents(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
   };
 
   if (loading) {
     return (
-      <CreatorLayout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      <CreatorLayout title="Students & Attendees">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </CreatorLayout>
     );
   }
 
   return (
-    <CreatorLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="space-y-6 p-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-              Students & Attendees
-            </h1>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search students..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                />
+    <CreatorLayout title="Students & Attendees">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Students & Attendees</h2>
+            <p className="text-muted-foreground">
+              Manage students from your courses and event attendees
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowBulkModal(true)}
+              disabled={selectedStudents.length === 0}
+              variant="outline"
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Send Announcement ({selectedStudents.length})
+            </Button>
+            <AttendeeExportButton
+              students={uniqueStudents}
+              fileName="students-attendees"
+            />
+          </div>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search students by name, email, or content..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={filterType === 'all' ? 'default' : 'outline'}
+              onClick={() => setFilterType('all')}
+              size="sm"
+            >
+              All
+            </Button>
+            <Button
+              variant={filterType === 'course' ? 'default' : 'outline'}
+              onClick={() => setFilterType('course')}
+              size="sm"
+            >
+              <BookOpen className="h-4 w-4 mr-1" />
+              Courses
+            </Button>
+            <Button
+              variant={filterType === 'event' ? 'default' : 'outline'}
+              onClick={() => setFilterType('event')}
+              size="sm"
+            >
+              <Calendar className="h-4 w-4 mr-1" />
+              Events
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Total Students</p>
+                  <p className="text-2xl font-bold">{uniqueStudents.length}</p>
+                </div>
               </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Course Enrollments</p>
+                  <p className="text-2xl font-bold">
+                    {students.filter(s => s.type === 'course').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Event Bookings</p>
+                  <p className="text-2xl font-bold">
+                    {students.filter(s => s.type === 'event').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Students List */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                Students List ({uniqueStudents.length})
+              </CardTitle>
               <Button
-                onClick={activeTab === 'courses' ? exportCourseStudents : exportEventAttendees}
                 variant="outline"
-                className="bg-gradient-to-r from-orange-500 to-purple-500 text-white border-0 hover:from-orange-600 hover:to-purple-600"
+                size="sm"
+                onClick={handleSelectAll}
               >
-                <Download className="h-4 w-4 mr-2" />
-                Export
+                {selectedStudents.length === uniqueStudents.length ? 'Deselect All' : 'Select All'}
               </Button>
             </div>
-          </div>
+          </CardHeader>
+          <CardContent>
+            {uniqueStudents.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No students found</h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || filterType !== 'all' 
+                    ? 'No students match your current filters'
+                    : 'You don\'t have any students or attendees yet'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {uniqueStudents.map((student) => {
+                  const studentCourses = students.filter(s => 
+                    s.user_id === student.user_id && s.type === 'course'
+                  );
+                  const studentEvents = students.filter(s => 
+                    s.user_id === student.user_id && s.type === 'event'
+                  );
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-white/50 backdrop-blur-sm">
-              <TabsTrigger value="courses" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-                <GraduationCap className="h-4 w-4" />
-                Course Students ({filteredCourseEnrollments.length})
-              </TabsTrigger>
-              <TabsTrigger value="events" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-                <Calendar className="h-4 w-4" />
-                Event Attendees ({filteredEventBookings.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="courses" className="space-y-4">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                    <Users className="h-5 w-5" />
-                    Course Enrollments
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Student</TableHead>
-                        <TableHead>Course</TableHead>
-                        <TableHead>Enrolled</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead>Completion</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredCourseEnrollments.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                            No course enrollments found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredCourseEnrollments.map((enrollment) => (
-                          <TableRow key={enrollment.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={enrollment.user.avatar_url} />
-                                  <AvatarFallback>
-                                    {enrollment.user.full_name.split(' ').map(n => n[0]).join('')}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <div className="font-medium">{enrollment.user.full_name}</div>
-                                  <div className="text-sm text-gray-500">{enrollment.user.email}</div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {enrollment.course.thumbnail_url && (
-                                  <img 
-                                    src={enrollment.course.thumbnail_url} 
-                                    alt={enrollment.course.title}
-                                    className="h-8 w-8 rounded object-cover"
-                                  />
-                                )}
-                                <span className="font-medium">{enrollment.course.title}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(enrollment.enrollment_date), 'MMM dd, yyyy')}
-                            </TableCell>
-                            <TableCell>
-                              {getPaymentStatusBadge(enrollment.payment_status)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={enrollment.is_completed ? 'default' : 'secondary'}>
-                                {enrollment.is_completed ? 'Completed' : 'In Progress'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {enrollment.completion_date ? (
-                                <span className="text-sm text-gray-600">
-                                  {format(new Date(enrollment.completion_date), 'MMM dd, yyyy')}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-gray-400">-</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="events" className="space-y-4">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                    <Users className="h-5 w-5" />
-                    Event Registrations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Attendee</TableHead>
-                        <TableHead>Event</TableHead>
-                        <TableHead>Booking Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Tickets</TableHead>
-                        <TableHead>Check-in Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEventBookings.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                            No event registrations found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredEventBookings.map((booking) => (
-                          <TableRow key={booking.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={booking.user.avatar_url} />
-                                  <AvatarFallback>
-                                    {booking.user.full_name.split(' ').map(n => n[0]).join('')}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <div className="font-medium">{booking.user.full_name}</div>
-                                  <div className="text-sm text-gray-500">{booking.user.email}</div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {booking.event.image_url && (
-                                  <img 
-                                    src={booking.event.image_url} 
-                                    alt={booking.event.title}
-                                    className="h-8 w-8 rounded object-cover"
-                                  />
-                                )}
-                                <div>
-                                  <div className="font-medium">{booking.event.title}</div>
-                                  <div className="text-sm text-gray-500 flex items-center gap-1">
-                                    <MapPin className="h-3 w-3" />
-                                    {booking.event.location}
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(booking.booking_date), 'MMM dd, yyyy')}
-                            </TableCell>
-                            <TableCell>
-                              {getBookingStatusBadge(booking.status)}
-                            </TableCell>
-                            <TableCell>
-                              {getPaymentStatusBadge(booking.payment_status)}
-                            </TableCell>
-                            <TableCell>
+                  return (
+                    <div
+                      key={student.user_id}
+                      className={`p-4 border rounded-lg transition-colors ${
+                        selectedStudents.includes(student.user_id)
+                          ? 'bg-primary/5 border-primary'
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={selectedStudents.includes(student.user_id)}
+                            onChange={() => handleSelectStudent(student.user_id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-semibold">{student.full_name}</h4>
                               <Badge variant="outline">
-                                {booking.tickets.length} Ticket{booking.tickets.length !== 1 ? 's' : ''}
+                                @{student.username}
                               </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {getCheckInBadge(booking.tickets)}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {student.email}
+                            </p>
+                            
+                            {studentCourses.length > 0 && (
+                              <div className="mb-2">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">
+                                  Enrolled Courses ({studentCourses.length}):
+                                </p>
+                                {studentCourses.map((course, index) => (
+                                  <div key={course.id} className="text-xs text-muted-foreground">
+                                    • {course.course_title} 
+                                    {course.enrollment_date && (
+                                      <span className="ml-1">
+                                        - {new Date(course.enrollment_date).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {studentEvents.length > 0 && (
+                              <div className="mb-2">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">
+                                  Event Bookings ({studentEvents.length}):
+                                </p>
+                                {studentEvents.map((event, index) => (
+                                  <div key={event.id} className="text-xs text-muted-foreground">
+                                    • {event.event_title}
+                                    {event.booking_date && (
+                                      <span className="ml-1">
+                                        - {new Date(event.booking_date).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="flex gap-2">
+                              {studentCourses.length > 0 && (
+                                <Badge variant="secondary">
+                                  <BookOpen className="h-3 w-3 mr-1" />
+                                  {studentCourses.length} Course{studentCourses.length > 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                              {studentEvents.length > 0 && (
+                                <Badge variant="secondary">
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  {studentEvents.length} Event{studentEvents.length > 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => window.open(`mailto:${student.email}`)}
+                            >
+                              <Mail className="h-4 w-4 mr-2" />
+                              Send Email
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <BulkAnnouncementModal
+          open={showBulkModal}
+          onOpenChange={setShowBulkModal}
+          selectedStudents={selectedStudents}
+          onSuccess={() => {
+            setShowBulkModal(false);
+            setSelectedStudents([]);
+            toast.success('Announcement sent successfully');
+          }}
+        />
       </div>
     </CreatorLayout>
   );

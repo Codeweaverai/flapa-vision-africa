@@ -78,154 +78,234 @@ const CreatorAnalytics: React.FC = () => {
 
     try {
       setLoading(true);
+      console.log('Loading analytics data for creator:', user.id);
 
-      // Get creator earnings and transactions from creator payments service
+      // Get creator earnings and transactions
       const [earnings, transactionsResult] = await Promise.all([
         fetchCreatorEarnings(user.id),
         fetchCreatorPaymentTransactions(user.id, 100, 0)
       ]);
 
-      // Extract transactions from the result object
       const transactions = transactionsResult.transactions;
+      console.log('Earnings:', earnings);
+      console.log('Transactions:', transactions.length);
 
-      // Get courses with detailed analytics
-      const { data: courses } = await supabase
+      // Get courses
+      const { data: courses, error: coursesError } = await supabase
         .from('courses')
-        .select(`
-          id, 
-          title,
-          course_enrollments(id, user_id, enrollment_date, profiles(username, full_name)),
-          course_reviews(id, rating, created_at)
-        `)
+        .select('id, title')
         .eq('creator_id', user.id);
 
-      // Get events with detailed analytics
-      const { data: events } = await supabase
+      if (coursesError) {
+        console.error('Error fetching courses:', coursesError);
+      }
+
+      // Get events
+      const { data: events, error: eventsError } = await supabase
         .from('events')
-        .select(`
-          id, 
-          title,
-          event_bookings(id, user_id, booking_date, profiles(username, full_name)),
-          event_reviews(id, rating, created_at)
-        `)
+        .select('id, title')
         .eq('creator_id', user.id);
 
-      // Process comprehensive analytics
-      const processedData = await processAnalyticsData(
-        earnings, 
-        transactions, 
-        courses || [], 
-        events || []
-      );
+      if (eventsError) {
+        console.error('Error fetching events:', eventsError);
+      }
 
+      console.log('Courses found:', courses?.length || 0);
+      console.log('Events found:', events?.length || 0);
+
+      const courseIds = courses?.map(c => c.id) || [];
+      const eventIds = events?.map(e => e.id) || [];
+
+      // Get course enrollments
+      let allEnrollments: any[] = [];
+      let courseReviews: any[] = [];
+      
+      if (courseIds.length > 0) {
+        const { data: enrollments, error: enrollmentsError } = await supabase
+          .from('course_enrollments')
+          .select(`
+            id, 
+            user_id, 
+            enrollment_date,
+            payment_status,
+            course_id,
+            profiles!inner(id, username, full_name)
+          `)
+          .in('course_id', courseIds)
+          .eq('payment_status', 'completed');
+
+        if (enrollmentsError) {
+          console.error('Error fetching enrollments:', enrollmentsError);
+        } else {
+          allEnrollments = enrollments || [];
+        }
+
+        const { data: reviews, error: reviewsError } = await supabase
+          .from('course_reviews')
+          .select('id, rating, created_at, course_id')
+          .in('course_id', courseIds);
+
+        if (reviewsError) {
+          console.error('Error fetching course reviews:', reviewsError);
+        } else {
+          courseReviews = reviews || [];
+        }
+      }
+
+      // Get event bookings
+      let allBookings: any[] = [];
+      let eventReviews: any[] = [];
+      
+      if (eventIds.length > 0) {
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('event_bookings')
+          .select(`
+            id, 
+            user_id, 
+            booking_date,
+            payment_status,
+            ticket_quantity,
+            event_id,
+            profiles!inner(id, username, full_name)
+          `)
+          .in('event_id', eventIds)
+          .eq('payment_status', 'completed');
+
+        if (bookingsError) {
+          console.error('Error fetching bookings:', bookingsError);
+        } else {
+          allBookings = bookings || [];
+        }
+
+        const { data: reviews, error: reviewsError } = await supabase
+          .from('event_reviews')
+          .select('id, rating, created_at, event_id')
+          .in('event_id', eventIds);
+
+        if (reviewsError) {
+          console.error('Error fetching event reviews:', reviewsError);
+        } else {
+          eventReviews = reviews || [];
+        }
+      }
+
+      console.log('Enrollments found:', allEnrollments.length);
+      console.log('Bookings found:', allBookings.length);
+      console.log('Course reviews found:', courseReviews.length);
+      console.log('Event reviews found:', eventReviews.length);
+
+      // Calculate unique students
+      const uniqueStudentIds = new Set([
+        ...allEnrollments.map(e => e.user_id),
+        ...allBookings.map(b => b.user_id)
+      ]);
+
+      // Calculate ratings
+      const courseRating = courseReviews.length > 0 
+        ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length 
+        : 0;
+      
+      const eventRating = eventReviews.length > 0 
+        ? eventReviews.reduce((sum, r) => sum + r.rating, 0) / eventReviews.length 
+        : 0;
+      
+      const totalReviews = courseReviews.length + eventReviews.length;
+      const overallRating = totalReviews > 0 
+        ? (courseReviews.reduce((sum, r) => sum + r.rating, 0) + eventReviews.reduce((sum, r) => sum + r.rating, 0)) / totalReviews
+        : 0;
+
+      // Process monthly revenue
+      const monthlyRevenue = transactions.reduce((acc, transaction) => {
+        if (transaction.payment_status === 'completed') {
+          const month = format(new Date(transaction.created_at), 'MMM yyyy');
+          acc[month] = (acc[month] || 0) + (transaction.creator_earning || 0);
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const monthlyRevenueData = Object.entries(monthlyRevenue).map(([month, revenue]) => ({
+        month,
+        revenue
+      }));
+
+      // Top performing courses
+      const topCourses = courses?.map(course => {
+        const courseEnrollments = allEnrollments.filter(e => e.course_id === course.id);
+        const courseReviewsForCourse = courseReviews.filter(r => r.course_id === course.id);
+        const avgRating = courseReviewsForCourse.length > 0
+          ? courseReviewsForCourse.reduce((sum, r) => sum + r.rating, 0) / courseReviewsForCourse.length
+          : 0;
+
+        return {
+          name: course.title,
+          enrollments: courseEnrollments.length,
+          reviews: courseReviewsForCourse.length,
+          rating: avgRating
+        };
+      })
+      .sort((a, b) => b.enrollments - a.enrollments)
+      .slice(0, 5) || [];
+
+      // Top performing events
+      const topEvents = events?.map(event => {
+        const eventBookings = allBookings.filter(b => b.event_id === event.id);
+        const eventReviewsForEvent = eventReviews.filter(r => r.event_id === event.id);
+        const avgRating = eventReviewsForEvent.length > 0
+          ? eventReviewsForEvent.reduce((sum, r) => sum + r.rating, 0) / eventReviewsForEvent.length
+          : 0;
+
+        return {
+          name: event.title,
+          bookings: eventBookings.reduce((sum, b) => sum + (b.ticket_quantity || 1), 0),
+          reviews: eventReviewsForEvent.length,
+          rating: avgRating
+        };
+      })
+      .sort((a, b) => b.bookings - a.bookings)
+      .slice(0, 5) || [];
+
+      // Recent activity
+      const recentEnrollments = allEnrollments
+        .sort((a, b) => new Date(b.enrollment_date).getTime() - new Date(a.enrollment_date).getTime())
+        .slice(0, 10);
+
+      const recentBookings = allBookings
+        .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
+        .slice(0, 10);
+
+      const processedData = {
+        totalRevenue: earnings.total_earnings || 0,
+        totalStudents: uniqueStudentIds.size,
+        totalCourses: courses?.length || 0,
+        totalEvents: events?.length || 0,
+        courseRevenue: earnings.course_revenue || 0,
+        eventRevenue: earnings.event_revenue || 0,
+        recentEnrollments,
+        recentBookings,
+        monthlyRevenue: monthlyRevenueData,
+        topCourses,
+        topEvents,
+        totalReviews,
+        averageRating: overallRating,
+        courseReviews: courseReviews.length,
+        eventReviews: eventReviews.length,
+        courseRating,
+        eventRating,
+        totalEnrollments: allEnrollments.length,
+        totalBookings: allBookings.reduce((sum, b) => sum + (b.ticket_quantity || 1), 0),
+        availableBalance: earnings.available_balance || 0,
+        pendingBalance: earnings.pending_balance || 0,
+        totalPlatformFees: earnings.total_platform_fees || 0
+      };
+
+      console.log('Processed analytics data:', processedData);
       setAnalyticsData(processedData);
     } catch (error) {
       console.error('Error loading analytics data:', error);
+      toast.error('Failed to load analytics data');
     } finally {
       setLoading(false);
     }
-  };
-
-  const processAnalyticsData = async (earnings: any, transactions: any[], courses: any[], events: any[]) => {
-    // Calculate enrollments and bookings
-    const allEnrollments = courses.flatMap(c => c.course_enrollments || []);
-    const allBookings = events.flatMap(e => e.event_bookings || []);
-    
-    // Calculate unique students
-    const uniqueStudentIds = new Set([
-      ...allEnrollments.map(e => e.user_id),
-      ...allBookings.map(b => b.user_id)
-    ]);
-
-    // Calculate reviews and ratings
-    const courseReviews = courses.flatMap(c => c.course_reviews || []);
-    const eventReviews = events.flatMap(e => e.event_reviews || []);
-    
-    const courseRating = courseReviews.length > 0 
-      ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length 
-      : 0;
-    
-    const eventRating = eventReviews.length > 0 
-      ? eventReviews.reduce((sum, r) => sum + r.rating, 0) / eventReviews.length 
-      : 0;
-    
-    const totalReviews = courseReviews.length + eventReviews.length;
-    const overallRating = totalReviews > 0 
-      ? (courseReviews.reduce((sum, r) => sum + r.rating, 0) + eventReviews.reduce((sum, r) => sum + r.rating, 0)) / totalReviews
-      : 0;
-
-    // Process monthly revenue from transactions
-    const monthlyRevenue = transactions.reduce((acc, transaction) => {
-      if (transaction.payment_status === 'completed') {
-        const month = format(new Date(transaction.created_at), 'MMM yyyy');
-        acc[month] = (acc[month] || 0) + (transaction.creator_earning || 0);
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
-    const monthlyRevenueData = Object.entries(monthlyRevenue).map(([month, revenue]) => ({
-      month,
-      revenue
-    }));
-
-    // Top performing content
-    const topCourses = courses
-      .map(course => ({
-        name: course.title,
-        enrollments: course.course_enrollments?.length || 0,
-        reviews: course.course_reviews?.length || 0,
-        rating: course.course_reviews?.length > 0 
-          ? course.course_reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / course.course_reviews.length 
-          : 0
-      }))
-      .sort((a, b) => b.enrollments - a.enrollments)
-      .slice(0, 5);
-
-    const topEvents = events
-      .map(event => ({
-        name: event.title,
-        bookings: event.event_bookings?.length || 0,
-        reviews: event.event_reviews?.length || 0,
-        rating: event.event_reviews?.length > 0 
-          ? event.event_reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / event.event_reviews.length 
-          : 0
-      }))
-      .sort((a, b) => b.bookings - a.bookings)
-      .slice(0, 5);
-
-    // Recent activity
-    const recentEnrollments = allEnrollments
-      .sort((a, b) => new Date(b.enrollment_date).getTime() - new Date(a.enrollment_date).getTime())
-      .slice(0, 10);
-
-    const recentBookings = allBookings
-      .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
-      .slice(0, 10);
-
-    return {
-      totalRevenue: earnings.total_earnings,
-      totalStudents: uniqueStudentIds.size,
-      totalCourses: courses.length,
-      totalEvents: events.length,
-      courseRevenue: earnings.course_revenue,
-      eventRevenue: earnings.event_revenue,
-      recentEnrollments,
-      recentBookings,
-      monthlyRevenue: monthlyRevenueData,
-      topCourses,
-      topEvents,
-      totalReviews,
-      averageRating: overallRating,
-      courseReviews: courseReviews.length,
-      eventReviews: eventReviews.length,
-      courseRating,
-      eventRating,
-      totalEnrollments: allEnrollments.length,
-      totalBookings: allBookings.length,
-      availableBalance: earnings.available_balance,
-      pendingBalance: earnings.pending_balance,
-      totalPlatformFees: earnings.total_platform_fees
-    };
   };
 
   const revenueBreakdown = [

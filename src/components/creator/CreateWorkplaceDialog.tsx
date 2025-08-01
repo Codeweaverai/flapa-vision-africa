@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateWorkplaceDialogProps {
   open: boolean;
@@ -35,12 +35,13 @@ const CreateWorkplaceDialog: React.FC<CreateWorkplaceDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !name.trim()) return;
+    if (!name.trim() || !user) return;
 
     setLoading(true);
     try {
-      // Create the workplace
-      const { data: workplace, error: workplaceError } = await supabase
+      console.log('Creating workplace with data:', { name: name.trim(), description: description.trim(), owner_id: user.id });
+      
+      const { data, error } = await supabase
         .from('creator_workplaces')
         .insert({
           name: name.trim(),
@@ -50,62 +51,72 @@ const CreateWorkplaceDialog: React.FC<CreateWorkplaceDialogProps> = ({
         .select()
         .single();
 
-      if (workplaceError) throw workplaceError;
+      if (error) {
+        console.error('Error creating workplace:', error);
+        toast.error(`Failed to create workplace: ${error.message}`);
+        return;
+      }
 
-      // Add creator as owner member
-      const { error: memberError } = await supabase
-        .from('creator_workplace_members')
-        .insert({
-          workplace_id: workplace.id,
-          user_id: user.id,
-          role: 'owner',
-          status: 'active',
-          joined_at: new Date().toISOString()
-        });
-
-      if (memberError) throw memberError;
-
+      console.log('Workplace created successfully:', data);
       toast.success('Workplace created successfully');
+      
+      // Reset form
       setName('');
       setDescription('');
+      
+      // Call success callback
       onSuccess();
     } catch (error: any) {
-      toast.error('Failed to create workplace');
       console.error('Error creating workplace:', error);
+      toast.error('Failed to create workplace');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!loading) {
+      onOpenChange(newOpen);
+      if (!newOpen) {
+        // Reset form when closing
+        setName('');
+        setDescription('');
+      }
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create New Workplace</DialogTitle>
           <DialogDescription>
-            Create a collaborative workspace for your creator team
+            Create a collaborative workspace for your content creation team
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Workplace Name</Label>
+            <Label htmlFor="name">Workplace Name *</Label>
             <Input
               id="name"
+              type="text"
               placeholder="Enter workplace name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="description">Description (Optional)</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="Describe your workplace"
+              placeholder="Describe your workplace (optional)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              disabled={loading}
               rows={3}
             />
           </div>
@@ -114,7 +125,8 @@ const CreateWorkplaceDialog: React.FC<CreateWorkplaceDialogProps> = ({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
+              disabled={loading}
             >
               Cancel
             </Button>

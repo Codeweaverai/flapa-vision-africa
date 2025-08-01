@@ -3502,6 +3502,14 @@ export type Database = {
         Args: { workplace_uuid: string }
         Returns: boolean
       }
+      is_workspace_member_func: {
+        Args: { workspace_uuid: string }
+        Returns: boolean
+      }
+      is_workspace_owner: {
+        Args: { workspace_uuid: string }
+        Returns: boolean
+      }
       process_payment_success: {
         Args: {
           p_order_id: string
