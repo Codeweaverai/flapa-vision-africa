@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Users, BookOpen, Calendar, TrendingUp, Eye, Download, MessageSquare, Star, Building2 } from 'lucide-react';
+import { DollarSign, Users, BookOpen, Calendar, TrendingUp, Eye, Download, MessageSquare, Star } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   fetchCreatorEarnings, 
@@ -19,8 +18,6 @@ import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { supabase } from '@/lib/supabaseClient';
 import CreatorFloatingAI from '@/components/creator/CreatorFloatingAI';
-import WorkplaceManagement from '@/components/creator/WorkplaceManagement';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface DashboardStats {
   totalCourses: number;
@@ -58,7 +55,6 @@ const CreatorDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     if (user) {
@@ -242,247 +238,227 @@ const CreatorDashboard = () => {
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="overview" className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="workplace" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Workplace
-              </TabsTrigger>
-            </TabsList>
+          {/* Enhanced Key Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">
+                  <PriceDisplay amount={earnings?.total_earnings || 0} originalCurrency="USD" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your lifetime earnings (after platform fees)
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">
+                  <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ready for withdrawal
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">{stats.totalStudents}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.totalEnrollments} enrollments, {stats.totalBookings} bookings
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Overall Rating</CardTitle>
+                <Star className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">{stats.averageRating.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">
+                  From {stats.totalReviews} reviews
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-            <TabsContent value="overview" className="space-y-6">
-              {/* Enhanced Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">
-                      <PriceDisplay amount={earnings?.total_earnings || 0} originalCurrency="USD" />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Your lifetime earnings (after platform fees)
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">
-                      <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Ready for withdrawal
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">{stats.totalStudents}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {stats.totalEnrollments} enrollments, {stats.totalBookings} bookings
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Overall Rating</CardTitle>
-                    <Star className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">{stats.averageRating.toFixed(1)}</div>
-                    <p className="text-xs text-muted-foreground">
-                      From {stats.totalReviews} reviews
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+          {/* Content Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Courses</CardTitle>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">{stats.totalCourses}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.courseReviews} reviews • {stats.courseRating.toFixed(1)} ⭐
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Events</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">{stats.totalEvents}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.eventReviews} reviews • {stats.eventRating.toFixed(1)} ⭐
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Course Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">
+                  <PriceDisplay amount={earnings?.course_revenue || 0} originalCurrency="USD" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  From course sales
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-base md:text-lg font-semibold">
+                  <PriceDisplay amount={earnings?.event_revenue || 0} originalCurrency="USD" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  From event tickets
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Content Statistics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Courses</CardTitle>
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">{stats.totalCourses}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {stats.courseReviews} reviews • {stats.courseRating.toFixed(1)} ⭐
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Events</CardTitle>
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">{stats.totalEvents}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {stats.eventReviews} reviews • {stats.eventRating.toFixed(1)} ⭐
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Course Revenue</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">
-                      <PriceDisplay amount={earnings?.course_revenue || 0} originalCurrency="USD" />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      From course sales
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base md:text-lg font-semibold">
-                      <PriceDisplay amount={earnings?.event_revenue || 0} originalCurrency="USD" />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      From event tickets
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Revenue Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Overview</CardTitle>
+                <CardDescription>Monthly earnings from completed payments</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={monthlyRevenueData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Earnings']}
+                      labelFormatter={(label) => `Month: ${label}`}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke="#8b5cf6" 
+                      strokeWidth={2}
+                      dot={{ fill: '#8b5cf6' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Revenue Overview */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Revenue Overview</CardTitle>
-                    <CardDescription>Monthly earnings from completed payments</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={monthlyRevenueData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip 
-                          formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Earnings']}
-                          labelFormatter={(label) => `Month: ${label}`}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="revenue" 
-                          stroke="#8b5cf6" 
-                          strokeWidth={2}
-                          dot={{ fill: '#8b5cf6' }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
-                {/* Revenue Breakdown */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Revenue by Source</CardTitle>
-                    <CardDescription>Course vs Event earnings</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={revenueBySource.filter(item => item.value > 0)}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          dataKey="value"
-                        >
-                          {revenueBySource.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: any) => `$${Number(value).toFixed(2)}`} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="flex justify-center gap-4 mt-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                        <span className="text-sm">Courses</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                        <span className="text-sm">Events</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Financial Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Financial Summary</CardTitle>
-                  <CardDescription>Detailed breakdown of your earnings</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Total Earnings</div>
-                      <div className="text-lg font-semibold">
-                        <PriceDisplay amount={earnings?.total_earnings || 0} originalCurrency="USD" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Available Balance</div>
-                      <div className="text-base md:text-lg font-semibold text-green-600">
-                        <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Pending Balance</div>
-                      <div className="text-base md:text-lg font-semibold text-amber-600">
-                        <PriceDisplay amount={earnings?.pending_balance || 0} originalCurrency="USD" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Platform Fees</div>
-                      <div className="text-base md:text-lg font-semibold text-red-600">
-                        <PriceDisplay amount={earnings?.total_platform_fees || 0} originalCurrency="USD" />
-                      </div>
-                    </div>
+            {/* Revenue Breakdown */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue by Source</CardTitle>
+                <CardDescription>Course vs Event earnings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={revenueBySource.filter(item => item.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      dataKey="value"
+                    >
+                      {revenueBySource.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: any) => `$${Number(value).toFixed(2)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center gap-4 mt-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                    <span className="text-sm">Courses</span>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    <span className="text-sm">Events</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-            <TabsContent value="workplace" className="space-y-6">
-              <WorkplaceManagement />
-            </TabsContent>
-          </Tabs>
+          {/* Financial Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Financial Summary</CardTitle>
+              <CardDescription>Detailed breakdown of your earnings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Total Earnings</div>
+                  <div className="text-lg font-semibold">
+                    <PriceDisplay amount={earnings?.total_earnings || 0} originalCurrency="USD" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Available Balance</div>
+                  <div className="text-base md:text-lg font-semibold text-green-600">
+                    <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Pending Balance</div>
+                  <div className="text-base md:text-lg font-semibold text-amber-600">
+                    <PriceDisplay amount={earnings?.pending_balance || 0} originalCurrency="USD" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Platform Fees</div>
+                  <div className="text-base md:text-lg font-semibold text-red-600">
+                    <PriceDisplay amount={earnings?.total_platform_fees || 0} originalCurrency="USD" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Enhanced Withdraw Dialog */}
           <EnhancedWithdrawDialog

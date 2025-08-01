@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -563,41 +564,6 @@ serve(async (req) => {
       logStep('Error updating order status', updateError);
       // Don't throw here as the payment was successful
     }
-
-    // Trigger payment confirmation email in background
-    logStep('Triggering payment confirmation email');
-    const emailPayload = {
-      orderId: order.id,
-      userId: user.id,
-      userEmail: user.email,
-      customerName: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email,
-      orderItems: orderItems.map(item => ({
-        item_id: item.item_id,
-        item_type: item.item_type,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.total_price
-      })),
-      totalAmount: totalAmount,
-      currency: currency.toUpperCase(),
-      paymentMethod: 'Stripe'
-    };
-
-    // Send email in background without waiting
-    EdgeRuntime.waitUntil(
-      supabaseAdmin.functions.invoke('send-payment-success-email', {
-        body: emailPayload
-      }).then(({ error: emailError }) => {
-        if (emailError) {
-          console.error('[CREATE-CHECKOUT] Email sending failed:', emailError);
-        } else {
-          console.log('[CREATE-CHECKOUT] Payment confirmation email sent successfully');
-        }
-      }).catch(emailError => {
-        console.error('[CREATE-CHECKOUT] Email sending error:', emailError);
-      })
-    );
 
     logStep('Checkout session and order processing completed successfully');
 

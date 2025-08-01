@@ -782,7 +782,6 @@ export type Database = {
           thumbnail_url: string | null
           title: string
           updated_at: string | null
-          workplace_id: string | null
         }
         Insert: {
           category: string
@@ -801,7 +800,6 @@ export type Database = {
           thumbnail_url?: string | null
           title: string
           updated_at?: string | null
-          workplace_id?: string | null
         }
         Update: {
           category?: string
@@ -820,17 +818,8 @@ export type Database = {
           thumbnail_url?: string | null
           title?: string
           updated_at?: string | null
-          workplace_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "courses_workplace_id_fkey"
-            columns: ["workplace_id"]
-            isOneToOne: false
-            referencedRelation: "creator_workplaces"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       creator_payouts: {
         Row: {
@@ -885,77 +874,6 @@ export type Database = {
           status?: string
           stripe_payout_id?: string | null
           transaction_id?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      creator_workplace_members: {
-        Row: {
-          created_at: string
-          id: string
-          invited_by: string | null
-          joined_at: string
-          role: Database["public"]["Enums"]["workplace_role"]
-          status: string
-          updated_at: string
-          user_id: string
-          workplace_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          invited_by?: string | null
-          joined_at?: string
-          role?: Database["public"]["Enums"]["workplace_role"]
-          status?: string
-          updated_at?: string
-          user_id: string
-          workplace_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          invited_by?: string | null
-          joined_at?: string
-          role?: Database["public"]["Enums"]["workplace_role"]
-          status?: string
-          updated_at?: string
-          user_id?: string
-          workplace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "creator_workplace_members_workplace_id_fkey"
-            columns: ["workplace_id"]
-            isOneToOne: false
-            referencedRelation: "creator_workplaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      creator_workplaces: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          owner_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          owner_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          owner_id?: string
           updated_at?: string
         }
         Relationships: []
@@ -1218,7 +1136,6 @@ export type Database = {
           start_time: string
           title: string
           updated_at: string | null
-          workplace_id: string | null
         }
         Insert: {
           capacity?: number | null
@@ -1237,7 +1154,6 @@ export type Database = {
           start_time: string
           title: string
           updated_at?: string | null
-          workplace_id?: string | null
         }
         Update: {
           capacity?: number | null
@@ -1256,17 +1172,8 @@ export type Database = {
           start_time?: string
           title?: string
           updated_at?: string | null
-          workplace_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "events_workplace_id_fkey"
-            columns: ["workplace_id"]
-            isOneToOne: false
-            referencedRelation: "creator_workplaces"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       final_exam_answers: {
         Row: {
@@ -3301,56 +3208,6 @@ export type Database = {
           },
         ]
       }
-      workplace_invitations: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          invited_by: string
-          role: Database["public"]["Enums"]["workplace_role"]
-          status: Database["public"]["Enums"]["invitation_status"]
-          token: string
-          updated_at: string
-          workplace_id: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          email: string
-          expires_at?: string
-          id?: string
-          invited_by: string
-          role?: Database["public"]["Enums"]["workplace_role"]
-          status?: Database["public"]["Enums"]["invitation_status"]
-          token: string
-          updated_at?: string
-          workplace_id: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          invited_by?: string
-          role?: Database["public"]["Enums"]["workplace_role"]
-          status?: Database["public"]["Enums"]["invitation_status"]
-          token?: string
-          updated_at?: string
-          workplace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workplace_invitations_workplace_id_fkey"
-            columns: ["workplace_id"]
-            isOneToOne: false
-            referencedRelation: "creator_workplaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -3458,9 +3315,7 @@ export type Database = {
       }
     }
     Enums: {
-      invitation_status: "pending" | "accepted" | "expired" | "cancelled"
       user_role: "user" | "admin"
-      workplace_role: "owner" | "editor" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3588,9 +3443,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      invitation_status: ["pending", "accepted", "expired", "cancelled"],
       user_role: ["user", "admin"],
-      workplace_role: ["owner", "editor", "viewer"],
     },
   },
 } as const
