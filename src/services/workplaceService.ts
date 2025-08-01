@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Workplace {
@@ -71,21 +70,44 @@ export const workplaceService = {
 
   // Get workplace members
   async getWorkplaceMembers(workplaceId: string): Promise<WorkplaceMember[]> {
-    const { data, error } = await supabase
+    // First get the members
+    const { data: members, error: membersError } = await supabase
       .from('creator_workplace_members')
-      .select(`
-        *,
-        profiles (
-          full_name,
-          username
-        )
-      `)
+      .select('*')
       .eq('workplace_id', workplaceId)
       .eq('status', 'active')
       .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    return data || [];
+    if (membersError) throw membersError;
+    if (!members || members.length === 0) return [];
+
+    // Then get the profiles for these members
+    const userIds = members.map(member => member.user_id);
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, username')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      // Return members without profile data if profiles fetch fails
+      return members.map(member => ({ ...member, profiles: undefined }));
+    }
+
+    // Combine members with their profile data
+    const membersWithProfiles = members.map(member => {
+      const profile = profiles?.find(p => p.id === member.user_id);
+      return {
+        ...member,
+        profiles: profile ? {
+          full_name: profile.full_name,
+          username: profile.username,
+          email: undefined // We don't have email in profiles, would need auth.users
+        } : undefined
+      };
+    });
+
+    return membersWithProfiles;
   },
 
   // Invite user to workplace
