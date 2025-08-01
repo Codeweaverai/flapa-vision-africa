@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -70,6 +69,10 @@ import CreatorPayments from '@/pages/creator/CreatorPayments';
 import CreatorPromoCodes from '@/pages/creator/CreatorPromoCodes';
 import CreatorSettings from '@/pages/creator/CreatorSettings';
 import CreatorAttendeeManagement from '@/pages/creator/CreatorAttendeeManagement';
+import CreatorWorkplaces from '@/pages/creator/CreatorWorkplaces';
+
+// Import workplace pages
+import AcceptInvitePage from '@/pages/AcceptInvitePage';
 
 // Import admin pages
 import AdminLogin from '@/pages/admin/AdminLogin';
@@ -176,6 +179,9 @@ function App() {
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/verify" element={<VerifyPage />} />
 
+                  {/* Workplace Routes */}
+                  <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
+
                   {/* Course Routes */}
                   <Route path="/courses" element={<CoursesPage />} />
                   <Route path="/explore-courses" element={<ExploreCoursesPage />} />
@@ -239,6 +245,7 @@ function App() {
                   <Route path="/creator/events/:id/agenda" element={<ProtectedRoute><CreatorEventAgenda /></ProtectedRoute>} />
                   <Route path="/creator/events/:id/speakers" element={<ProtectedRoute><CreatorEventSpeakers /></ProtectedRoute>} />
                   <Route path="/creator/events/:id/tickets" element={<ProtectedRoute><CreatorEventTickets /></ProtectedRoute>} />
+                  <Route path="/creator/workplaces" element={<ProtectedRoute><CreatorWorkplaces /></ProtectedRoute>} />
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
                   <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
