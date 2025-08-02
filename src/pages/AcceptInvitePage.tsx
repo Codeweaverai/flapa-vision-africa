@@ -170,20 +170,59 @@ const AcceptInvitePage = () => {
 
     setAccepting(true);
     try {
+      console.log('Starting invitation acceptance process for:', {
+        invitationId: invitation.id,
+        workplaceId: invitation.workplace_id,
+        userId: user.id,
+        userEmail: user.email
+      });
+
       // Check if user is already a member
       const { data: existingMember } = await supabase
         .from('creator_workplace_members')
-        .select('id')
+        .select('id, status')
         .eq('workplace_id', invitation.workplace_id)
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (existingMember) {
-        toast.error('You are already a member of this workplace');
+        if (existingMember.status === 'active') {
+          toast.error('You are already a member of this workplace');
+        } else {
+          toast.error('You have a pending membership for this workplace');
+        }
         return;
       }
 
-      // Accept the invitation
+      console.log('No existing membership found, proceeding with invitation acceptance');
+
+      // Verify invitation is still valid and pending
+      const { data: currentInvitation } = await supabase
+        .from('creator_workplace_invitations')
+        .select('status, expires_at')
+        .eq('id', invitation.id)
+        .maybeSingle();
+
+      if (!currentInvitation || currentInvitation.status !== 'pending') {
+        toast.error('This invitation is no longer valid');
+        return;
+      }
+
+      if (new Date(currentInvitation.expires_at) < new Date()) {
+        toast.error('This invitation has expired');
+        return;
+      }
+
+      // Accept the invitation by creating membership
+      console.log('Creating workplace membership with data:', {
+        workplace_id: invitation.workplace_id,
+        user_id: user.id,
+        role: invitation.role,
+        status: 'active',
+        joined_at: new Date().toISOString(),
+        invited_by: invitation.invited_by
+      });
+
       const { error: acceptError } = await supabase
         .from('creator_workplace_members')
         .insert({
@@ -191,13 +230,19 @@ const AcceptInvitePage = () => {
           user_id: user.id,
           role: invitation.role as 'owner' | 'editor' | 'viewer',
           status: 'active',
-          joined_at: new Date().toISOString()
+          joined_at: new Date().toISOString(),
+          invited_by: invitation.invited_by
         });
 
-      if (acceptError) throw acceptError;
+      if (acceptError) {
+        console.error('Failed to create membership:', acceptError);
+        throw acceptError;
+      }
 
-      // Update invitation status
-      await supabase
+      console.log('Membership created successfully, updating invitation status');
+
+      // Update invitation status to accepted
+      const { error: updateError } = await supabase
         .from('creator_workplace_invitations')
         .update({ 
           status: 'accepted',
@@ -205,12 +250,26 @@ const AcceptInvitePage = () => {
         })
         .eq('id', invitation.id);
 
+      if (updateError) {
+        console.error('Failed to update invitation status:', updateError);
+        // Don't throw here as the membership was created successfully
+      }
+
       toast.success('Successfully joined the workplace!');
+      console.log('Invitation acceptance completed successfully');
       navigate('/creator/workplaces');
 
     } catch (error: any) {
       console.error('Error accepting invitation:', error);
-      toast.error(error.message || 'Failed to accept invitation');
+      
+      // Provide more specific error messages based on the error
+      if (error.code === '42501') {
+        toast.error('Unable to join workplace. Please ensure you have a valid invitation.');
+      } else if (error.message?.includes('duplicate')) {
+        toast.error('You are already a member of this workplace');
+      } else {
+        toast.error(error.message || 'Failed to accept invitation');
+      }
     } finally {
       setAccepting(false);
     }
