@@ -13,7 +13,7 @@ interface AuthContextType {
   otpRequired: boolean;
   setOtpRequired: (required: boolean) => void;
   verificationType: 'login' | 'registration' | 'inactive' | null;
-  checkOTPRequirement: () => Promise<void>;
+  checkOTPRequirement: (userToCheck?: User) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,13 +29,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Get initial session
     const getInitialSession = async () => {
       const { data: { session: initialSession } } = await supabase.auth.getSession();
+      console.log('Initial session loaded:', initialSession?.user?.id);
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       
       if (initialSession?.user) {
+        // Use setTimeout to defer OTP check and prevent deadlocks
         setTimeout(async () => {
-          await checkOTPRequirement();
-        }, 0);
+          await checkOTPRequirement(initialSession.user);
+        }, 100);
       }
       
       setLoading(false);
@@ -51,11 +53,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session?.user) {
-          // Defer OTP check to prevent potential deadlocks
+          console.log('User signed in, checking OTP requirement');
+          // Use setTimeout to defer OTP check and prevent potential deadlocks
           setTimeout(async () => {
-            await checkOTPRequirement();
-          }, 0);
+            await checkOTPRequirement(session.user);
+          }, 100);
         } else if (event === 'SIGNED_OUT') {
+          console.log('User signed out, clearing OTP state');
           setOtpRequired(false);
           setVerificationType(null);
         }
@@ -67,18 +71,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkOTPRequirement = async () => {
-    if (!user) {
+  const checkOTPRequirement = async (userToCheck?: User) => {
+    const currentUser = userToCheck || user;
+    
+    if (!currentUser) {
       console.log('No user found for OTP check');
       return;
     }
 
     try {
-      console.log('Checking OTP requirement for user:', user.id);
+      console.log('Checking OTP requirement for user:', currentUser.id);
       
       // Check if user needs OTP verification using the database function
       const { data, error } = await supabase.rpc('user_needs_otp_verification', {
-        user_uuid: user.id
+        user_uuid: currentUser.id
       });
 
       if (error) {
@@ -93,11 +99,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('otp_verified, last_activity, created_at')
-          .eq('id', user.id)
+          .eq('id', currentUser.id)
           .maybeSingle();
 
         if (profileError) {
           console.error('Error fetching profile:', profileError);
+          // If profile doesn't exist, treat as new user needing registration verification
+          console.log('No profile found, setting verification type to registration');
+          setVerificationType('registration');
+          setOtpRequired(true);
           return;
         }
 
@@ -106,13 +116,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (!profile.otp_verified && !profile.last_activity) {
             type = 'registration'; // New user
+            console.log('New user detected, needs registration verification');
           } else if (profile.last_activity) {
             const daysSinceActivity = Math.floor(
               (Date.now() - new Date(profile.last_activity).getTime()) / (1000 * 60 * 60 * 24)
             );
             type = daysSinceActivity >= 10 ? 'inactive' : 'login';
+            console.log('Existing user, days since activity:', daysSinceActivity, 'type:', type);
           } else {
             type = 'login';
+            console.log('User needs login verification');
           }
 
           console.log('Setting OTP required with type:', type);
@@ -123,7 +136,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await supabase
             .from('profiles')
             .update({ otp_required: true })
-            .eq('id', user.id);
+            .eq('id', currentUser.id);
+        } else {
+          // No profile exists, create one and set as registration
+          console.log('Creating new profile for user');
+          await supabase
+            .from('profiles')
+            .insert({ 
+              id: currentUser.id,
+              otp_required: true,
+              otp_verified: false 
+            });
+          setVerificationType('registration');
+          setOtpRequired(true);
         }
       } else {
         console.log('OTP not required, updating last activity');
@@ -133,11 +158,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Update last activity
         await supabase
           .from('profiles')
-          .update({ 
+          .upsert({ 
+            id: currentUser.id,
             last_activity: new Date().toISOString(),
             otp_required: false 
-          })
-          .eq('id', user.id);
+          });
       }
     } catch (error) {
       console.error('Error in checkOTPRequirement:', error);
@@ -145,14 +170,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('Attempting sign in for:', email);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    if (error) throw error;
+    if (error) {
+      console.error('Sign in error:', error);
+      throw error;
+    }
+    console.log('Sign in successful');
   };
 
   const signUp = async (email: string, password: string, metadata?: { full_name?: string; username?: string }) => {
+    console.log('Attempting sign up for:', email);
     const signUpOptions: any = {
       email,
       password,
@@ -170,16 +201,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const { error } = await supabase.auth.signUp(signUpOptions);
-    if (error) throw error;
+    if (error) {
+      console.error('Sign up error:', error);
+      throw error;
+    }
+    console.log('Sign up successful');
   };
 
   const signOut = async () => {
+    console.log('Signing out user');
     // Clean up OTP state
     setOtpRequired(false);
     setVerificationType(null);
     
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) {
+      console.error('Sign out error:', error);
+      throw error;
+    }
+    console.log('Sign out successful');
   };
 
   const value = {

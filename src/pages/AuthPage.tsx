@@ -21,7 +21,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/lib/supabaseClient';
 
 const AuthPage = () => {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, otpRequired } = useAuth();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,6 +29,7 @@ const AuthPage = () => {
   const [username, setUsername] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState(false);
   const navigate = useNavigate();
 
   const redirectParam = searchParams.get('redirect');
@@ -43,7 +44,8 @@ const AuthPage = () => {
 
   // Handle post-authentication redirect
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && !otpRequired && authSuccess) {
+      console.log('User authenticated and OTP completed, redirecting...');
       const invitationToken = sessionStorage.getItem('invitation_token');
       
       if (redirectParam === 'accept-invite' && invitationToken) {
@@ -55,10 +57,25 @@ const AuthPage = () => {
       // Default redirect for authenticated users
       navigate('/account');
     }
-  }, [user, loading, redirectParam, navigate]);
+  }, [user, loading, redirectParam, navigate, otpRequired, authSuccess]);
 
-  // Redirect if already authenticated
-  if (!loading && user && !redirectParam) {
+  // Show loading while OTP is being processed
+  if (user && otpRequired) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex justify-center items-center">
+        <div className="text-center text-white">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Email Verification Required</h2>
+          <p className="text-orange-100">
+            Please check your email and complete the verification process.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if already authenticated and no OTP required
+  if (!loading && user && !otpRequired && !redirectParam) {
     return <Navigate to="/account" />;
   }
 
@@ -66,6 +83,7 @@ const AuthPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage(null);
+    setAuthSuccess(false);
     
     // Save email for convenience
     if (email) {
@@ -73,8 +91,11 @@ const AuthPage = () => {
     }
     
     try {
+      console.log('AuthPage: Attempting sign in');
       await signIn(email, password);
-      // Success handling is done in AuthContext and useEffect above
+      console.log('AuthPage: Sign in successful');
+      setAuthSuccess(true);
+      // OTP check and redirection will be handled by useEffect
     } catch (error: any) {
       console.error('Sign in error:', error);
       setErrorMessage(error.message || 'Failed to sign in. Please check your credentials.');
@@ -87,6 +108,7 @@ const AuthPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage(null);
+    setAuthSuccess(false);
     
     // Validate inputs
     if (!fullName || !username || !email || !password) {
@@ -118,8 +140,11 @@ const AuthPage = () => {
     localStorage.setItem('lastAuthEmail', email);
     
     try {
+      console.log('AuthPage: Attempting sign up');
       await signUp(email, password, { full_name: fullName, username });
-      // Success handling is done in AuthContext and useEffect above
+      console.log('AuthPage: Sign up successful');
+      setAuthSuccess(true);
+      // OTP check and redirection will be handled by useEffect
     } catch (error: any) {
       console.error('Sign up error:', error);
       setErrorMessage(error.message || 'Failed to sign up. Please try again.');
@@ -131,6 +156,7 @@ const AuthPage = () => {
   const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
     setErrorMessage(null);
+    setAuthSuccess(false);
     
     try {
       const redirectUrl = redirectParam === 'accept-invite' 
@@ -145,6 +171,7 @@ const AuthPage = () => {
       });
       
       if (error) throw error;
+      console.log('Google sign in initiated');
     } catch (error: any) {
       console.error('Google sign in error:', error);
       setErrorMessage(error.message || 'Failed to sign in with Google.');

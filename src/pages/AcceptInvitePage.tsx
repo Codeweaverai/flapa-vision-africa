@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, Users, Building, AlertCircle } from 'lucide-react';
+import { Loader2, Users, Building, AlertCircle, RefreshCw } from 'lucide-react';
 import OTPVerificationModal from '@/components/auth/OTPVerificationModal';
 
 interface Invitation {
@@ -39,6 +39,7 @@ const AcceptInvitePage = () => {
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const token = searchParams.get('token');
 
@@ -50,7 +51,7 @@ const AcceptInvitePage = () => {
     }
 
     fetchInvitation();
-  }, [token]);
+  }, [token, retryCount]);
 
   const fetchInvitation = async () => {
     if (!token) return;
@@ -59,14 +60,35 @@ const AcceptInvitePage = () => {
     setError(null);
 
     try {
-      console.log('Fetching invitation with token:', token);
+      // Decode the token in case it's URL encoded
+      const decodedToken = decodeURIComponent(token);
+      console.log('Fetching invitation with token:', decodedToken);
+      console.log('Original token:', token);
 
-      // Get the invitation data using maybeSingle() to handle missing records gracefully
-      const { data: invitationData, error: invError } = await supabase
+      // Try with both original and decoded token
+      let invitationData = null;
+      let invError = null;
+
+      // First try with decoded token
+      const { data: decodedData, error: decodedError } = await supabase
         .from('creator_workplace_invitations')
         .select('*')
-        .eq('invitation_token', token)
+        .eq('invitation_token', decodedToken)
         .maybeSingle();
+
+      if (decodedData) {
+        invitationData = decodedData;
+      } else {
+        // If decoded doesn't work, try with original token
+        const { data: originalData, error: originalError } = await supabase
+          .from('creator_workplace_invitations')
+          .select('*')
+          .eq('invitation_token', token)
+          .maybeSingle();
+        
+        invitationData = originalData;
+        invError = originalError || decodedError;
+      }
 
       if (invError) {
         console.error('Invitation lookup error:', invError);
@@ -74,6 +96,16 @@ const AcceptInvitePage = () => {
       }
 
       if (!invitationData) {
+        console.error('No invitation found for token:', token);
+        
+        // Debug: Let's see what tokens exist in the database
+        const { data: debugData } = await supabase
+          .from('creator_workplace_invitations')
+          .select('invitation_token, status, expires_at')
+          .limit(5);
+        
+        console.log('Available tokens in database:', debugData);
+        
         throw new Error('Invalid invitation token - invitation not found');
       }
 
@@ -88,26 +120,36 @@ const AcceptInvitePage = () => {
         throw new Error('This invitation has expired');
       }
 
-      // Get workplace details separately
-      const { data: workplaceData, error: workplaceError } = await supabase
-        .from('creator_workplaces')
-        .select('name, description, owner_id')
-        .eq('id', invitationData.workplace_id)
-        .maybeSingle();
+      // Get workplace details separately with retry logic
+      let workplaceData = null;
+      try {
+        const { data: workplace, error: workplaceError } = await supabase
+          .from('creator_workplaces')
+          .select('name, description, owner_id')
+          .eq('id', invitationData.workplace_id)
+          .maybeSingle();
 
-      if (workplaceError) {
-        console.error('Workplace lookup error:', workplaceError);
+        if (!workplaceError) {
+          workplaceData = workplace;
+        }
+      } catch (workplaceErr) {
+        console.error('Workplace lookup error:', workplaceErr);
       }
 
-      // Get inviter details separately
-      const { data: inviterData, error: inviterError } = await supabase
-        .from('profiles')
-        .select('full_name, username')
-        .eq('id', invitationData.invited_by)
-        .maybeSingle();
+      // Get inviter details separately with retry logic
+      let inviterData = null;
+      try {
+        const { data: inviter, error: inviterError } = await supabase
+          .from('profiles')
+          .select('full_name, username')
+          .eq('id', invitationData.invited_by)
+          .maybeSingle();
 
-      if (inviterError) {
-        console.error('Inviter lookup error:', inviterError);
+        if (!inviterError) {
+          inviterData = inviter;
+        }
+      } catch (inviterErr) {
+        console.error('Inviter lookup error:', inviterErr);
       }
 
       // Combine the data
@@ -123,9 +165,23 @@ const AcceptInvitePage = () => {
     } catch (error: any) {
       console.error('Error fetching invitation:', error);
       setError(error.message || 'Failed to load invitation details');
+      
+      // Implement retry logic for network failures
+      if (retryCount < 3 && error.message.includes('Failed to load')) {
+        console.log(`Retrying invitation fetch, attempt ${retryCount + 1}`);
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+        return;
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(0);
+    fetchInvitation();
   };
 
   const handleAcceptInvitation = async () => {
@@ -190,6 +246,9 @@ const AcceptInvitePage = () => {
         <div className="text-center text-white">
           <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
           <p className="text-lg">Loading invitation details...</p>
+          {retryCount > 0 && (
+            <p className="text-sm mt-2 opacity-80">Retry attempt {retryCount}</p>
+          )}
         </div>
       </div>
     );
@@ -203,9 +262,17 @@ const AcceptInvitePage = () => {
             <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-2">Invalid Invitation</h2>
             <p className="text-muted-foreground mb-6">{error}</p>
-            <Button onClick={() => navigate('/')} variant="outline">
-              Return to Home
-            </Button>
+            <div className="space-y-3">
+              {retryCount < 3 && error.includes('Failed to load') && (
+                <Button onClick={handleRetry} variant="outline" className="w-full">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry Loading
+                </Button>
+              )}
+              <Button onClick={() => navigate('/')} variant="outline">
+                Return to Home
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
