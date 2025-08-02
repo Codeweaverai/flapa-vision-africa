@@ -61,23 +61,20 @@ const AcceptInvitePage = () => {
     try {
       console.log('Fetching invitation with token:', token);
 
-      // Get the invitation data
+      // Get the invitation data using maybeSingle() to handle missing records gracefully
       const { data: invitationData, error: invError } = await supabase
         .from('creator_workplace_invitations')
         .select('*')
         .eq('invitation_token', token)
-        .single();
+        .maybeSingle();
 
       if (invError) {
         console.error('Invitation lookup error:', invError);
-        if (invError.code === 'PGRST116') {
-          throw new Error('Invalid invitation token - invitation not found');
-        }
         throw new Error('Failed to load invitation details');
       }
 
       if (!invitationData) {
-        throw new Error('Invitation not found');
+        throw new Error('Invalid invitation token - invitation not found');
       }
 
       console.log('Invitation data found:', invitationData);
@@ -92,18 +89,26 @@ const AcceptInvitePage = () => {
       }
 
       // Get workplace details separately
-      const { data: workplaceData } = await supabase
+      const { data: workplaceData, error: workplaceError } = await supabase
         .from('creator_workplaces')
         .select('name, description, owner_id')
         .eq('id', invitationData.workplace_id)
-        .single();
+        .maybeSingle();
+
+      if (workplaceError) {
+        console.error('Workplace lookup error:', workplaceError);
+      }
 
       // Get inviter details separately
-      const { data: inviterData } = await supabase
+      const { data: inviterData, error: inviterError } = await supabase
         .from('profiles')
         .select('full_name, username')
         .eq('id', invitationData.invited_by)
-        .single();
+        .maybeSingle();
+
+      if (inviterError) {
+        console.error('Inviter lookup error:', inviterError);
+      }
 
       // Combine the data
       const fullInvitation: Invitation = {
@@ -134,7 +139,7 @@ const AcceptInvitePage = () => {
         .select('id')
         .eq('workplace_id', invitation.workplace_id)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (existingMember) {
         toast.error('You are already a member of this workplace');

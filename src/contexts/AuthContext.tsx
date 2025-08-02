@@ -33,7 +33,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(initialSession?.user ?? null);
       
       if (initialSession?.user) {
-        await checkOTPRequirement();
+        setTimeout(async () => {
+          await checkOTPRequirement();
+        }, 0);
       }
       
       setLoading(false);
@@ -44,10 +46,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session?.user) {
+          // Defer OTP check to prevent potential deadlocks
           setTimeout(async () => {
             await checkOTPRequirement();
           }, 0);
@@ -64,9 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const checkOTPRequirement = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user found for OTP check');
+      return;
+    }
 
     try {
+      console.log('Checking OTP requirement for user:', user.id);
+      
       // Check if user needs OTP verification using the database function
       const { data, error } = await supabase.rpc('user_needs_otp_verification', {
         user_uuid: user.id
@@ -77,13 +86,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      console.log('OTP requirement check result:', data);
+
       if (data === true) {
         // Get user profile to determine verification type
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('otp_verified, last_activity, created_at')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          return;
+        }
 
         if (profile) {
           let type: 'login' | 'registration' | 'inactive';
@@ -99,6 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             type = 'login';
           }
 
+          console.log('Setting OTP required with type:', type);
           setVerificationType(type);
           setOtpRequired(true);
           
@@ -109,6 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .eq('id', user.id);
         }
       } else {
+        console.log('OTP not required, updating last activity');
         setOtpRequired(false);
         setVerificationType(null);
         
