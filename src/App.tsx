@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { CartProvider } from '@/contexts/CartContext';
@@ -47,41 +47,43 @@ function App() {
         <AuthProvider>
           <WorkplaceProvider>
             <CartProvider>
-              <div className="App">
-                <Toaster />
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<AuthPage />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/signin" element={<SigninPage />} />
-                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/verify" element={<VerifyPage />} />
+              <BrowserRouter>
+                <div className="App">
+                  <Toaster />
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<AuthPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/signin" element={<SigninPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/verify" element={<VerifyPage />} />
 
-                  <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-                  <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorLayout><CreatorDashboard /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/creator/courses" element={<ProtectedRoute><CreatorLayout><CreatorCourses /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/creator/events" element={<ProtectedRoute><CreatorLayout><CreatorEvents /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/creator/workplaces" element={<ProtectedRoute><CreatorLayout><CreatorWorkplaces /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/creator/students" element={<ProtectedRoute><CreatorLayout><CreatorStudents /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/creator/payments" element={<ProtectedRoute><CreatorLayout><CreatorPayments /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/creator/analytics" element={<ProtectedRoute><CreatorLayout><CreatorAnalytics /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/creator/settings" element={<ProtectedRoute><CreatorLayout><CreatorSettings /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/event/:eventId" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
-                  <Route path="/course/:courseId" element={<ProtectedRoute><CourseDetailPage /></ProtectedRoute>} />
-                  <Route path="/ticket-verification" element={<ProtectedRoute><TicketVerificationPage /></ProtectedRoute>} />
+                    <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+                    <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorLayout><CreatorDashboard /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/creator/courses" element={<ProtectedRoute><CreatorLayout><CreatorCourses /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/creator/events" element={<ProtectedRoute><CreatorLayout><CreatorEvents /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/creator/workplaces" element={<ProtectedRoute><CreatorLayout><CreatorWorkplaces /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/creator/students" element={<ProtectedRoute><CreatorLayout><CreatorStudents /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/creator/payments" element={<ProtectedRoute><CreatorLayout><CreatorPayments /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/creator/analytics" element={<ProtectedRoute><CreatorLayout><CreatorAnalytics /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/creator/settings" element={<ProtectedRoute><CreatorLayout><CreatorSettings /></CreatorLayout></ProtectedRoute>} />
+                    <Route path="/event/:eventId" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
+                    <Route path="/course/:courseId" element={<ProtectedRoute><CourseDetailPage /></ProtectedRoute>} />
+                    <Route path="/ticket-verification" element={<ProtectedRoute><TicketVerificationPage /></ProtectedRoute>} />
 
-                  <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                  <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-                  <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
-                  <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
-                  <Route path="/admin-login" element={<AdminLogin />} />
-                  
-                  <Route path="/access-denied" element={<AccessDeniedPage />} />
-                </Routes>
-                <PWAComponents />
-              </div>
+                    <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                    <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                    <Route path="/admin/courses" element={<AdminRoute><AdminCourses /></AdminRoute>} />
+                    <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
+                    <Route path="/admin-login" element={<AdminLogin />} />
+                    
+                    <Route path="/access-denied" element={<AccessDeniedPage />} />
+                  </Routes>
+                  <PWAComponents />
+                </div>
+              </BrowserRouter>
             </CartProvider>
           </WorkplaceProvider>
         </AuthProvider>
