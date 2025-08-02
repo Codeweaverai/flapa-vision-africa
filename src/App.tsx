@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { CartProvider } from '@/contexts/CartContext';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -21,8 +22,8 @@ import CreatorStudents from '@/pages/creator/CreatorStudents';
 import CreatorPayments from '@/pages/creator/CreatorPayments';
 import CreatorAnalytics from '@/pages/creator/CreatorAnalytics';
 import CreatorSettings from '@/pages/creator/CreatorSettings';
-import EventDetailsPage from '@/pages/EventDetailsPage';
-import CourseDetailsPage from '@/pages/CourseDetailsPage';
+import EventDetailPage from '@/pages/EventDetailPage';
+import CourseDetailPage from '@/pages/CourseDetailPage';
 import TicketVerificationPage from '@/pages/TicketVerificationPage';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminRoute from '@/components/admin/AdminRoute';
@@ -67,8 +68,8 @@ function App() {
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorLayout><CreatorPayments /></CreatorLayout></ProtectedRoute>} />
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorLayout><CreatorAnalytics /></CreatorLayout></ProtectedRoute>} />
                   <Route path="/creator/settings" element={<ProtectedRoute><CreatorLayout><CreatorSettings /></CreatorLayout></ProtectedRoute>} />
-                  <Route path="/event/:eventId" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
-                  <Route path="/course/:courseId" element={<ProtectedRoute><CourseDetailsPage /></ProtectedRoute>} />
+                  <Route path="/event/:eventId" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
+                  <Route path="/course/:courseId" element={<ProtectedRoute><CourseDetailPage /></ProtectedRoute>} />
                   <Route path="/ticket-verification" element={<ProtectedRoute><TicketVerificationPage /></ProtectedRoute>} />
 
                   <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
