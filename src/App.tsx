@@ -30,20 +30,11 @@ import SigninPage from '@/pages/SigninPage';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import AuthPage from '@/pages/AuthPage';
 import { Toaster } from 'sonner';
-import OTPVerificationModal from '@/components/auth/OTPVerificationModal';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import OTPManager from '@/components/auth/OTPManager';
 
 const queryClient = new QueryClient();
 
 function App() {
-  const { otpRequired, verificationType, user, setOtpRequired } = useAuth();
-
-  const handleOTPVerified = () => {
-    setOtpRequired(false);
-    toast.success('Email verified successfully!');
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -115,15 +106,7 @@ function App() {
               </Routes>
 
               {/* Global OTP Verification Modal */}
-              {otpRequired && user && verificationType && (
-                <OTPVerificationModal
-                  isOpen={otpRequired}
-                  onClose={() => {}}
-                  onVerified={handleOTPVerified}
-                  verificationType={verificationType}
-                  userEmail={user.email || ''}
-                />
-              )}
+              <OTPManager />
             </Router>
           </CartProvider>
         </CurrencyProvider>
