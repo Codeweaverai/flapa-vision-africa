@@ -1,132 +1,131 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Loader2, CheckCircle, XCircle, Building2 } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { Loader2, Users, Building, AlertCircle } from 'lucide-react';
-import OTPVerificationModal from '@/components/auth/OTPVerificationModal';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface Invitation {
+interface InvitationDetails {
   id: string;
-  invitation_token: string;
+  workplace_id: string;
   invited_email: string;
-  role: string;
+  role: 'owner' | 'editor' | 'viewer';
   status: string;
   expires_at: string;
-  workplace_id: string;
-  invited_by: string;
-  created_at: string;
-  workplace?: {
+  workplace: {
     name: string;
     description: string;
-    owner_id: string;
   };
-  inviter?: {
+  invited_by_profile: {
     full_name: string;
     username: string;
   };
 }
 
-const AcceptInvitePage = () => {
+const AcceptInvitePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading, otpRequired, verificationType, setOtpRequired } = useAuth();
-  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const { user } = useAuth();
+  const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  const [accepting, setAccepting] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const token = searchParams.get('token');
 
   useEffect(() => {
-    if (!token) {
-      setError('Invalid invitation link - missing token');
-      setLoading(false);
-      return;
+    if (token) {
+      // Store token for post-auth redirect
+      sessionStorage.setItem('invitation_token', token);
+      fetchInvitation();
+    } else {
+      // Check if we have a stored token from post-auth redirect
+      const storedToken = sessionStorage.getItem('invitation_token');
+      if (storedToken) {
+        fetchInvitationWithToken(storedToken);
+      } else {
+        setError('Invalid invitation link');
+        setLoading(false);
+      }
     }
-
-    fetchInvitation();
   }, [token]);
 
-  const fetchInvitation = async () => {
-    if (!token) return;
-
-    setLoading(true);
-    setError(null);
-
+  const fetchInvitationWithToken = async (invitationToken: string) => {
     try {
-      console.log('Fetching invitation with token:', token);
-
-      // Get the invitation data
-      const { data: invitationData, error: invError } = await supabase
+      const { data, error } = await supabase
         .from('creator_workplace_invitations')
-        .select('*')
-        .eq('invitation_token', token)
+        .select(`
+          id,
+          workplace_id,
+          invited_email,
+          role,
+          status,
+          expires_at,
+          invited_by,
+          workplace:creator_workplaces(name, description)
+        `)
+        .eq('invitation_token', invitationToken)
         .single();
 
-      if (invError) {
-        console.error('Invitation lookup error:', invError);
-        if (invError.code === 'PGRST116') {
-          throw new Error('Invalid invitation token - invitation not found');
+      if (error) throw error;
+
+      if (!data) {
+        setError('Invitation not found');
+        return;
+      }
+
+      if (data.status !== 'pending') {
+        setError(`This invitation has already been ${data.status}`);
+        return;
+      }
+
+      if (new Date(data.expires_at) < new Date()) {
+        setError('This invitation has expired');
+        return;
+      }
+
+      // Fetch the invited_by profile separately
+      let invitedByProfile = { full_name: 'Unknown User', username: 'unknown' };
+      
+      if (data.invited_by) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, username')
+          .eq('id', data.invited_by)
+          .single();
+        
+        if (profileData) {
+          invitedByProfile = {
+            full_name: profileData.full_name || 'Unknown User',
+            username: profileData.username || 'unknown'
+          };
         }
-        throw new Error('Failed to load invitation details');
       }
 
-      if (!invitationData) {
-        throw new Error('Invitation not found');
-      }
-
-      console.log('Invitation data found:', invitationData);
-
-      // Check if invitation is still valid
-      if (invitationData.status !== 'pending') {
-        throw new Error(`This invitation has already been ${invitationData.status}`);
-      }
-
-      if (new Date(invitationData.expires_at) < new Date()) {
-        throw new Error('This invitation has expired');
-      }
-
-      // Get workplace details separately
-      const { data: workplaceData } = await supabase
-        .from('creator_workplaces')
-        .select('name, description, owner_id')
-        .eq('id', invitationData.workplace_id)
-        .single();
-
-      // Get inviter details separately
-      const { data: inviterData } = await supabase
-        .from('profiles')
-        .select('full_name, username')
-        .eq('id', invitationData.invited_by)
-        .single();
-
-      // Combine the data
-      const fullInvitation: Invitation = {
-        ...invitationData,
-        workplace: workplaceData || undefined,
-        inviter: inviterData || undefined
+      const processedData: InvitationDetails = {
+        ...data,
+        role: data.role as 'owner' | 'editor' | 'viewer',
+        invited_by_profile: invitedByProfile
       };
 
-      console.log('Full invitation loaded:', fullInvitation);
-      setInvitation(fullInvitation);
-
+      setInvitation(processedData);
     } catch (error: any) {
       console.error('Error fetching invitation:', error);
-      setError(error.message || 'Failed to load invitation details');
+      setError('Failed to load invitation details');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAcceptInvitation = async () => {
-    if (!invitation || !user) return;
+  const fetchInvitation = () => fetchInvitationWithToken(token!);
 
-    setAccepting(true);
+  const handleAccept = async () => {
+    if (!user || !invitation) return;
+
+    setProcessing(true);
     try {
       // Check if user is already a member
       const { data: existingMember } = await supabase
@@ -141,21 +140,28 @@ const AcceptInvitePage = () => {
         return;
       }
 
-      // Accept the invitation - cast role to proper type
-      const { error: acceptError } = await supabase
+      // Get the invited_by user ID from the invitation
+      const { data: invitationData } = await supabase
+        .from('creator_workplace_invitations')
+        .select('invited_by')
+        .eq('id', invitation.id)
+        .single();
+
+      // Add user to workplace
+      const { error: memberError } = await supabase
         .from('creator_workplace_members')
         .insert({
           workplace_id: invitation.workplace_id,
           user_id: user.id,
-          role: invitation.role as 'owner' | 'editor' | 'viewer',
-          status: 'active',
-          joined_at: new Date().toISOString()
+          role: invitation.role,
+          invited_by: invitationData?.invited_by || null,
+          status: 'active'
         });
 
-      if (acceptError) throw acceptError;
+      if (memberError) throw memberError;
 
       // Update invitation status
-      await supabase
+      const { error: updateError } = await supabase
         .from('creator_workplace_invitations')
         .update({ 
           status: 'accepted',
@@ -163,28 +169,55 @@ const AcceptInvitePage = () => {
         })
         .eq('id', invitation.id);
 
-      toast.success('Successfully joined the workplace!');
-      navigate('/creator/workplaces');
+      if (updateError) throw updateError;
 
+      // Clear stored token
+      sessionStorage.removeItem('invitation_token');
+
+      toast.success('Welcome to the workplace!');
+      navigate('/creator/workplaces');
     } catch (error: any) {
       console.error('Error accepting invitation:', error);
-      toast.error(error.message || 'Failed to accept invitation');
+      toast.error('Failed to accept invitation');
     } finally {
-      setAccepting(false);
+      setProcessing(false);
     }
   };
 
-  const handleOTPVerified = () => {
-    setOtpRequired(false);
-    toast.success('Email verified! You can now accept the invitation.');
+  const handleDecline = async () => {
+    if (!invitation) return;
+
+    setProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('creator_workplace_invitations')
+        .update({ 
+          status: 'declined',
+          declined_at: new Date().toISOString()
+        })
+        .eq('id', invitation.id);
+
+      if (error) throw error;
+
+      // Clear stored token
+      sessionStorage.removeItem('invitation_token');
+
+      toast.success('Invitation declined');
+      navigate('/');
+    } catch (error: any) {
+      console.error('Error declining invitation:', error);
+      toast.error('Failed to decline invitation');
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center">
-        <div className="text-center text-white">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
-          <p className="text-lg">Loading invitation details...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading invitation...</p>
         </div>
       </div>
     );
@@ -192,14 +225,18 @@ const AcceptInvitePage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center p-8">
-            <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Invalid Invitation</h2>
-            <p className="text-muted-foreground mb-6">{error}</p>
-            <Button onClick={() => navigate('/')} variant="outline">
-              Return to Home
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-6 w-6" />
+              Invalid Invitation
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => navigate('/')} className="w-full">
+              Go Home
             </Button>
           </CardContent>
         </Card>
@@ -208,20 +245,21 @@ const AcceptInvitePage = () => {
   }
 
   if (!user) {
-    // Store the invitation token for after login
-    sessionStorage.setItem('invitation_token', token || '');
-    
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center p-8">
-            <Users className="h-16 w-16 text-primary mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Sign In Required</h2>
-            <p className="text-muted-foreground mb-6">
-              You need to sign in to accept this workplace invitation.
-            </p>
-            <Button onClick={() => navigate(`/auth?redirect=accept-invite`)}>
-              Sign In to Accept
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Sign In Required</CardTitle>
+            <CardDescription>
+              You need to sign in to accept this workplace invitation
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => navigate('/auth?redirect=accept-invite')} 
+              className="w-full"
+            >
+              Sign In
             </Button>
           </CardContent>
         </Card>
@@ -230,87 +268,61 @@ const AcceptInvitePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-gradient-to-r from-orange-400 to-purple-500 flex items-center justify-center">
-            <Building className="h-8 w-8 text-white" />
-          </div>
-          <CardTitle className="text-2xl">Workplace Invitation</CardTitle>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <Card className="max-w-md w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-6 w-6 text-primary" />
+            Workplace Invitation
+          </CardTitle>
+          <CardDescription>
+            You've been invited to join a workspace
+          </CardDescription>
         </CardHeader>
-
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           {invitation && (
             <>
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold">{invitation.workplace?.name}</h3>
-                {invitation.workplace?.description && (
-                  <p className="text-muted-foreground">{invitation.workplace.description}</p>
+              <div className="bg-muted p-4 rounded-lg">
+                <h3 className="font-semibold text-lg mb-1">{invitation.workplace.name}</h3>
+                {invitation.workplace.description && (
+                  <p className="text-muted-foreground text-sm mb-2">
+                    {invitation.workplace.description}
+                  </p>
                 )}
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Invited by:</span>
-                  <span className="text-sm">
-                    {invitation.inviter?.full_name || invitation.inviter?.username || 'Unknown'}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Role:</span>
-                  <Badge variant="secondary">{invitation.role}</Badge>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Email:</span>
-                  <span className="text-sm">{invitation.invited_email}</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Expires:</span>
-                  <span className="text-sm">
-                    {new Date(invitation.expires_at).toLocaleDateString()}
+                <div className="flex items-center justify-between text-sm">
+                  <span>Role: <strong>{invitation.role}</strong></span>
+                  <span>
+                    Invited by: <strong>{invitation.invited_by_profile.full_name || invitation.invited_by_profile.username}</strong>
                   </span>
                 </div>
               </div>
 
-              <Button 
-                onClick={handleAcceptInvitation}
-                disabled={accepting || otpRequired}
-                className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-              >
-                {accepting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Accepting...
-                  </>
-                ) : otpRequired ? (
-                  'Complete Email Verification First'
-                ) : (
-                  'Accept Invitation'
-                )}
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={handleAccept} 
+                  disabled={processing}
+                  className="flex-1"
+                >
+                  {processing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Accept
+                </Button>
+                <Button 
+                  onClick={handleDecline} 
+                  disabled={processing}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Decline
+                </Button>
+              </div>
 
-              {otpRequired && (
-                <p className="text-sm text-center text-muted-foreground">
-                  You need to verify your email before accepting this invitation.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground text-center">
+                This invitation expires on {new Date(invitation.expires_at).toLocaleDateString()}
+              </p>
             </>
           )}
         </CardContent>
       </Card>
-
-      {otpRequired && user && verificationType && (
-        <OTPVerificationModal
-          isOpen={otpRequired}
-          onClose={() => {}}
-          onVerified={handleOTPVerified}
-          verificationType={verificationType}
-          userEmail={user.email || ''}
-        />
-      )}
     </div>
   );
 };
