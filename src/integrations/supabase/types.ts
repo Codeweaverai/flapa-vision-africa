@@ -2813,10 +2813,13 @@ export type Database = {
           full_name: string | null
           id: string
           is_creator: boolean | null
+          last_activity: string | null
           mobile_money_details: Json | null
           mobile_money_number: string | null
           mobile_money_operator: string | null
           newsletter_subscribed: boolean | null
+          otp_required: boolean | null
+          otp_verified: boolean | null
           payout_method: string | null
           role: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_account_id: string | null
@@ -2837,10 +2840,13 @@ export type Database = {
           full_name?: string | null
           id: string
           is_creator?: boolean | null
+          last_activity?: string | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
           mobile_money_operator?: string | null
           newsletter_subscribed?: boolean | null
+          otp_required?: boolean | null
+          otp_verified?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_account_id?: string | null
@@ -2861,10 +2867,13 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_creator?: boolean | null
+          last_activity?: string | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
           mobile_money_operator?: string | null
           newsletter_subscribed?: boolean | null
+          otp_required?: boolean | null
+          otp_verified?: boolean | null
           payout_method?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_account_id?: string | null
@@ -3301,6 +3310,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_otp_verifications: {
+        Row: {
+          attempts: number | null
+          created_at: string
+          expires_at: string
+          id: string
+          max_attempts: number | null
+          otp_code: string
+          user_id: string
+          verification_type: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          max_attempts?: number | null
+          otp_code: string
+          user_id: string
+          verification_type: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          max_attempts?: number | null
+          otp_code?: string
+          user_id?: string
+          verification_type?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       video_metadata: {
         Row: {
           content_type: string
@@ -3440,6 +3485,10 @@ export type Database = {
         Args: { workplace_uuid: string }
         Returns: boolean
       }
+      cleanup_expired_otps: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       count_bookings_by_event: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3524,6 +3573,10 @@ export type Database = {
       }
       update_ticket_inventory: {
         Args: { p_ticket_id: string; p_quantity: number }
+        Returns: boolean
+      }
+      user_needs_otp_verification: {
+        Args: { user_uuid: string }
         Returns: boolean
       }
     }
