@@ -60,51 +60,32 @@ const AcceptInvitePage = () => {
     setError(null);
 
     try {
-      // Decode the token in case it's URL encoded
+      // CRITICAL FIX: Always decode the token once and use only decoded version
       const decodedToken = decodeURIComponent(token);
-      console.log('Fetching invitation with token:', decodedToken);
-      console.log('Original token:', token);
+      console.log('Original token from URL:', token);
+      console.log('Decoded token for DB lookup:', decodedToken);
 
-      // Try with both original and decoded token
-      let invitationData = null;
-      let invError = null;
-
-      // First try with decoded token
-      const { data: decodedData, error: decodedError } = await supabase
+      const { data: invitationData, error: invError } = await supabase
         .from('creator_workplace_invitations')
         .select('*')
         .eq('invitation_token', decodedToken)
         .maybeSingle();
 
-      if (decodedData) {
-        invitationData = decodedData;
-      } else {
-        // If decoded doesn't work, try with original token
-        const { data: originalData, error: originalError } = await supabase
-          .from('creator_workplace_invitations')
-          .select('*')
-          .eq('invitation_token', token)
-          .maybeSingle();
-        
-        invitationData = originalData;
-        invError = originalError || decodedError;
-      }
-
       if (invError) {
-        console.error('Invitation lookup error:', invError);
+        console.error('Database query error:', invError);
         throw new Error('Failed to load invitation details');
       }
 
       if (!invitationData) {
-        console.error('No invitation found for token:', token);
+        console.error('No invitation found for decoded token:', decodedToken);
         
-        // Debug: Let's see what tokens exist in the database
-        const { data: debugData } = await supabase
+        // Enhanced debugging: Show what tokens exist
+        const { data: debugTokens } = await supabase
           .from('creator_workplace_invitations')
-          .select('invitation_token, status, expires_at')
+          .select('invitation_token, status, expires_at, invited_email')
           .limit(5);
         
-        console.log('Available tokens in database:', debugData);
+        console.log('Available invitation tokens in database:', debugTokens);
         
         throw new Error('Invalid invitation token - invitation not found');
       }
@@ -120,7 +101,7 @@ const AcceptInvitePage = () => {
         throw new Error('This invitation has expired');
       }
 
-      // Get workplace details separately with retry logic
+      // Get workplace details
       let workplaceData = null;
       try {
         const { data: workplace, error: workplaceError } = await supabase
@@ -129,14 +110,14 @@ const AcceptInvitePage = () => {
           .eq('id', invitationData.workplace_id)
           .maybeSingle();
 
-        if (!workplaceError) {
+        if (!workplaceError && workplace) {
           workplaceData = workplace;
         }
       } catch (workplaceErr) {
         console.error('Workplace lookup error:', workplaceErr);
       }
 
-      // Get inviter details separately with retry logic
+      // Get inviter details
       let inviterData = null;
       try {
         const { data: inviter, error: inviterError } = await supabase
@@ -145,7 +126,7 @@ const AcceptInvitePage = () => {
           .eq('id', invitationData.invited_by)
           .maybeSingle();
 
-        if (!inviterError) {
+        if (!inviterError && inviter) {
           inviterData = inviter;
         }
       } catch (inviterErr) {
@@ -159,19 +140,19 @@ const AcceptInvitePage = () => {
         inviter: inviterData || undefined
       };
 
-      console.log('Full invitation loaded:', fullInvitation);
+      console.log('Full invitation loaded successfully:', fullInvitation);
       setInvitation(fullInvitation);
 
     } catch (error: any) {
       console.error('Error fetching invitation:', error);
       setError(error.message || 'Failed to load invitation details');
       
-      // Implement retry logic for network failures
+      // Retry logic for network failures
       if (retryCount < 3 && error.message.includes('Failed to load')) {
         console.log(`Retrying invitation fetch, attempt ${retryCount + 1}`);
         setTimeout(() => {
           setRetryCount(prev => prev + 1);
-        }, 1000 * (retryCount + 1)); // Exponential backoff
+        }, 1000 * (retryCount + 1));
         return;
       }
     } finally {
@@ -202,7 +183,7 @@ const AcceptInvitePage = () => {
         return;
       }
 
-      // Accept the invitation - cast role to proper type
+      // Accept the invitation
       const { error: acceptError } = await supabase
         .from('creator_workplace_members')
         .insert({

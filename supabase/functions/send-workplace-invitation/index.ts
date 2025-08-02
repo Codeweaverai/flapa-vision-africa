@@ -30,6 +30,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { workplace_id, invited_email, role, invitation_token }: InvitationRequest = await req.json();
 
+    console.log("Processing invitation with token:", invitation_token);
+
     // Get workplace details
     const { data: workplace, error: workplaceError } = await supabase
       .from('creator_workplaces')
@@ -52,8 +54,12 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Inviter not found');
     }
 
-    // Create invitation link
-    const inviteUrl = `${req.headers.get('origin')}/accept-invite?token=${invitation_token}`;
+    // CRITICAL FIX: Encode the token when creating the URL
+    const encodedToken = encodeURIComponent(invitation_token);
+    const origin = req.headers.get('origin') || 'https://skillpulse.cloud';
+    const inviteUrl = `${origin}/accept-invite?token=${encodedToken}`;
+    
+    console.log("Generated invite URL with encoded token:", inviteUrl);
 
     // Send email
     const emailResponse = await resend.emails.send({
