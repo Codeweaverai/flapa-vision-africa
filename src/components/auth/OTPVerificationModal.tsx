@@ -114,7 +114,7 @@ const OTPVerificationModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md" closeButton={false}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-center">
           <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-gradient-to-r from-orange-400 to-purple-500 flex items-center justify-center">
             <Mail className="h-8 w-8 text-white" />

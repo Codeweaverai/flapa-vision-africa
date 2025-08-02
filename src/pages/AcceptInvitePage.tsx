@@ -12,8 +12,8 @@ import OTPVerificationModal from '@/components/auth/OTPVerificationModal';
 
 interface Invitation {
   id: string;
-  token: string;
-  email: string;
+  invitation_token: string;
+  invited_email: string;
   role: string;
   status: string;
   expires_at: string;
@@ -61,11 +61,11 @@ const AcceptInvitePage = () => {
     try {
       console.log('Fetching invitation with token:', token);
 
-      // First, get the basic invitation data
+      // Get the invitation data
       const { data: invitationData, error: invError } = await supabase
         .from('creator_workplace_invitations')
         .select('*')
-        .eq('token', token)
+        .eq('invitation_token', token)
         .single();
 
       if (invError) {
@@ -141,13 +141,13 @@ const AcceptInvitePage = () => {
         return;
       }
 
-      // Accept the invitation
+      // Accept the invitation - cast role to proper type
       const { error: acceptError } = await supabase
         .from('creator_workplace_members')
         .insert({
           workplace_id: invitation.workplace_id,
           user_id: user.id,
-          role: invitation.role,
+          role: invitation.role as 'owner' | 'editor' | 'viewer',
           status: 'active',
           joined_at: new Date().toISOString()
         });
@@ -264,7 +264,7 @@ const AcceptInvitePage = () => {
                 
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Email:</span>
-                  <span className="text-sm">{invitation.email}</span>
+                  <span className="text-sm">{invitation.invited_email}</span>
                 </div>
                 
                 <div className="flex justify-between items-center">

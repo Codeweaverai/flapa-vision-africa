@@ -8,8 +8,8 @@ import { CartProvider } from '@/contexts/CartContext';
 import HomePage from '@/pages/HomePage';
 import CoursesPage from '@/pages/CoursesPage';
 import EventsPage from '@/pages/EventsPage';
-import CourseDetailsPage from '@/pages/CourseDetailsPage';
-import EventDetailsPage from '@/pages/EventDetailsPage';
+import CourseDetailPage from '@/pages/CourseDetailPage';
+import EventDetailPage from '@/pages/EventDetailPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import AccountPage from '@/pages/AccountPage';
@@ -19,10 +19,10 @@ import AdminCourses from '@/pages/admin/AdminCourses';
 import AdminEvents from '@/pages/admin/AdminEvents';
 import AdminUsers from '@/pages/admin/AdminUsers';
 import AdminLogin from '@/pages/admin/AdminLogin';
-import CreateCoursePage from '@/pages/admin/CreateCoursePage';
-import CreateEventPage from '@/pages/admin/CreateEventPage';
-import EditCoursePage from '@/pages/admin/EditCoursePage';
-import EditEventPage from '@/pages/admin/EditEventPage';
+import AdminCourseCreate from '@/pages/admin/AdminCourseCreate';
+import AdminEventCreate from '@/pages/admin/AdminEventCreate';
+import AdminCourseEdit from '@/pages/admin/AdminCourseEdit';
+import AdminEventEdit from '@/pages/admin/AdminEventEdit';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
@@ -55,8 +55,8 @@ function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/courses" element={<CoursesPage />} />
                 <Route path="/events" element={<EventsPage />} />
-                <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
-                <Route path="/events/:eventId" element={<EventDetailsPage />} />
+                <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+                <Route path="/events/:eventId" element={<EventDetailPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -94,22 +94,22 @@ function App() {
                 } />
                 <Route path="/admin/courses/create" element={
                   <AdminRoute>
-                    <CreateCoursePage />
+                    <AdminCourseCreate />
                   </AdminRoute>
                 } />
                 <Route path="/admin/events/create" element={
                   <AdminRoute>
-                    <CreateEventPage />
+                    <AdminEventCreate />
                   </AdminRoute>
                 } />
                 <Route path="/admin/courses/edit/:courseId" element={
                   <AdminRoute>
-                    <EditCoursePage />
+                    <AdminCourseEdit />
                   </AdminRoute>
                 } />
                 <Route path="/admin/events/edit/:eventId" element={
                   <AdminRoute>
-                    <EditEventPage />
+                    <AdminEventEdit />
                   </AdminRoute>
                 } />
               </Routes>
