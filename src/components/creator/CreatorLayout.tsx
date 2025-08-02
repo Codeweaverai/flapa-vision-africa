@@ -1,3 +1,4 @@
+
 import { ReactNode, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -7,7 +8,6 @@ import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign, Buil
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import WorkplaceSelector from '@/components/workplace/WorkplaceSelector';
 
 interface CreatorLayoutProps {
   children: ReactNode;
@@ -106,10 +106,6 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
                     <Rocket className="h-5 w-5 text-primary" />
                   </div>
                   <h2 className="text-xl font-bold">Creator Portal</h2>
-                </div>
-                
-                <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-                  <WorkplaceSelector />
                 </div>
                 
                 <nav className="space-y-1">
