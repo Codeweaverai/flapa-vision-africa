@@ -216,7 +216,7 @@ const ExploreEventsPage = () => {
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
               <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                Explore Courses
+                Explore Events
               </span>
             </h1>
             <p className="text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
