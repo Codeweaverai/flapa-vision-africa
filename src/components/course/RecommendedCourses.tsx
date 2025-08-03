@@ -55,7 +55,7 @@ const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesPro
             .select('*')
             .eq('is_published', true)
             .neq('id', currentCourseId)
-            .limit(3 - data.length)
+            .limit(4 - data.length)
             .order('created_at', { ascending: false });
 
           if (!moreError && moreCourses) {
