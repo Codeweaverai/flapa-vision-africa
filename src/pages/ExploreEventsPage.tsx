@@ -39,7 +39,7 @@ interface Event {
   status: 'upcoming' | 'ongoing' | 'completed';
 }
 
-const EVENTS_PER_PAGE = 6;
+const EVENTS_PER_PAGE = 8;
 
 const ExploreEventsPage = () => {
   const navigate = useNavigate();
