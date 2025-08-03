@@ -265,7 +265,7 @@ const CreatorDashboard = () => {
               <h1 className="text-3xl font-bold mb-2">Creator Dashboard</h1>
               <p className="text-muted-foreground">Welcome back! Here's your performance overview.</p>
             </div>
-            <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
               <Button
                 onClick={() => window.location.href = '/creator/attendees'}
                 variant="outline"
