@@ -37,7 +37,7 @@ const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesPro
           .select('*')
           .eq('is_published', true)
           .neq('id', currentCourseId)
-          .limit(3);
+          .limit(4);
 
         // If we have a category, prioritize courses from the same category
         if (category) {
