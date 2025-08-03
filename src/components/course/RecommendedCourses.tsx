@@ -119,7 +119,7 @@ const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesPro
           Recommended Courses
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {courses.map((course) => (
             <Card key={course.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-purple-200 hover:border-purple-300 overflow-hidden">
               <div className="relative h-48 overflow-hidden">
