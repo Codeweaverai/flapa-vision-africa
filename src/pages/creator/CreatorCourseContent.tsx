@@ -349,7 +349,7 @@ const CreatorCourseContent = () => {
                 </div>
               </div>
             </CardHeader>
-              <CardContent className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+              <CardContent>
               {module.lessons && module.lessons.length > 0 ? (
                 <div className="space-y-3">
                   {module.lessons.map((lesson, lessonIndex) => (
