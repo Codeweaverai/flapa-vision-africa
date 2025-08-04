@@ -305,9 +305,6 @@ const CreatorSettings = () => {
                   )}
                 </div>
               </div>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Updating...' : 'Update Profile'}
-              </Button>
               <Button
             type="submit"
            disabled={isSubmitting}
