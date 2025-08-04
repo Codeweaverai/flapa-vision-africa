@@ -305,10 +305,17 @@ const CreatorSettings = () => {
                   )}
                 </div>
               </div>
-
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Updating...' : 'Update Profile'}
               </Button>
+              <Button
+            type="submit"
+           disabled={isSubmitting}
+           className="bg-gradient-to-r from-orange-500 to-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:from-orange-600 hover:to-purple-700"
+          >
+           {isSubmitting ? 'Updating...' : 'Update Profile'}
+          </Button>
+
             </form>
           </CardContent>
         </Card>
