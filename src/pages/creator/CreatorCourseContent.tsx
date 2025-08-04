@@ -470,12 +470,22 @@ const CreatorCourseContent = () => {
             </CardHeader>
           </Card>
         )}
+          <Tabs defaultValue="modules" className="w-full">
+  <TabsList className="grid w-full grid-cols-2">
+    <TabsTrigger
+      value="modules"
+      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+    >
+      Modules & Lessons
+    </TabsTrigger>
 
-        <Tabs defaultValue="modules" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="modules">Modules & Lessons</TabsTrigger>
-            <TabsTrigger value="final-exam">Final Exam</TabsTrigger>
-          </TabsList>
+    <TabsTrigger
+      value="final-exam"
+      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+    >
+      Final Exam
+    </TabsTrigger>
+     </TabsList>
           
           <TabsContent value="modules">
             <Card>
@@ -490,7 +500,9 @@ const CreatorCourseContent = () => {
                       Organize your course into modules and lessons
                     </CardDescription>
                   </div>
-                  <Button onClick={handleAddModule}>
+                  <Button onClick={handleAddModule}
+                     className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
+                    >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Module
                   </Button>
