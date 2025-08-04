@@ -82,7 +82,7 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       
       <div className="flex items-center gap-2">
         <Button 
-          variant="outline" 
+          className="relative bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white hover:opacity-90 transition-opacity duration-200"
           size="sm" 
           className="relative"
           disabled={uploading}
