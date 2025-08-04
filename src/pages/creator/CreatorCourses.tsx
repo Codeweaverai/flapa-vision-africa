@@ -300,7 +300,7 @@ const CreatorCourses = () => {
                   </Button>
 
                   <Button
-                    variant={course.is_published ? "secondary" : "default"}
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
                     size="sm"
                     className="w-full"
                     onClick={() => handleTogglePublish(course.id, course.is_published)}
