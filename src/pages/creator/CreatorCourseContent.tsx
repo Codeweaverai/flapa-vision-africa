@@ -349,7 +349,7 @@ const CreatorCourseContent = () => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+              <CardContent className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
               {module.lessons && module.lessons.length > 0 ? (
                 <div className="space-y-3">
                   {module.lessons.map((lesson, lessonIndex) => (
@@ -439,7 +439,9 @@ const CreatorCourseContent = () => {
         <h1 className="text-2xl font-bold mb-6">Course Content</h1>
         
         <div className="mb-6">
-          <Button variant="outline" onClick={() => navigate('/creator/courses')}>
+          <Button variant="outline" onClick={() => navigate('/creator/courses')}
+            className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
+            >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Courses
           </Button>
