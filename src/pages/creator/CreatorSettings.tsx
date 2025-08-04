@@ -175,20 +175,16 @@ const CreatorSettings = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
-  <Label htmlFor="avatar">Profile Picture</Label>
-  <div className="flex items-center gap-4">
-    {/* Show current profile image */}
-    {profile.avatar_url ? (
-      <img
-        src={profile.avatar_url}
-        alt="Profile"
-        className="w-16 h-16 rounded-full object-cover border"
-      />
-    ) : (
-      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-sm text-muted-foreground">
-        N/A
-      </div>
-    )}
+<Label htmlFor="avatar">Profile Picture</Label>
+<div className="w-16 h-16 flex items-center justify-center rounded-full border overflow-hidden">
+  {profile.avatar_url && (
+    <img
+      src={profile.avatar_url}
+      alt="Profile"
+      className="w-full h-full object-cover"
+    />
+  )}
+</div>
     
     {/* Upload component */}
     <ProfilePictureUpload
@@ -196,23 +192,6 @@ const CreatorSettings = () => {
     />
   </div>
 </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
