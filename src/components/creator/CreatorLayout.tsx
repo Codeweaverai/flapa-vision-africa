@@ -84,7 +84,7 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
     },
     {
       label: 'Attendee Management',
-      href: '/creator/attendee',
+      href: '/creator/attendees',
       icon: <Calendar className="h-5 w-5 mr-2" />
     },
     {
