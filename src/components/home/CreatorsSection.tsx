@@ -171,7 +171,7 @@ const CreatorsSection = () => {
                       )}
                     </div>
                     {creator.average_rating > 0 && (
-                      <div className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-lg">
+                        <div className="absolute -top-2 -right-2 z-10 bg-white rounded-full p-1 shadow-lg">
                         <div className="flex items-center gap-1 px-2 py-1">
                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                           <span className="text-xs font-semibold text-gray-800">{creator.average_rating}</span>
