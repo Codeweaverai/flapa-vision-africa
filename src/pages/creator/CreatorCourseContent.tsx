@@ -517,10 +517,15 @@ const CreatorCourseContent = () => {
                     <p className="text-muted-foreground mb-4">
                       Start building your course by adding modules
                     </p>
-                    <Button onClick={handleAddModule}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add First Module
-                    </Button>
+                   
+                   <Button 
+                  onClick={handleAddModule}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
+                 >
+                 <Plus className="h-4 w-4 mr-2" />
+                  Add First Module
+                 </Button>
+                    
                   </div>
                 ) : (
                   <EnhancedModuleAccordion modules={modules} />
