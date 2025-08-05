@@ -1,24 +1,23 @@
-
 import { supabase } from '@/lib/supabaseClient';
+import { User } from '@supabase/supabase-js';
 
 export interface Event {
   id: string;
   title: string;
-  description?: string;
-  event_type: string;
+  description: string;
   start_time: string;
   end_time: string;
-  location?: string;
-  online_meeting_link?: string;
-  capacity?: number;
-  is_free: boolean;
-  price?: number;
-  currency?: string;
+  location: string;
+  event_type: string;
   image_url?: string;
+  price?: number;
+  is_free: boolean;
+  currency?: string;
+  capacity?: number;
   creator_id?: string;
-  workplace_id?: string;
   created_at: string;
   updated_at: string;
+  online_meeting_link?: string;
 }
 
 export interface Registration {
@@ -26,107 +25,187 @@ export interface Registration {
   event_id: string;
   user_id: string;
   status: string;
+  payment_status: string;
   created_at: string;
-  updated_at: string;
-  booking_date?: string;
   phone_number?: string;
   mobile_operator?: string;
+  payment_method?: string;
+  payment_id?: string;
 }
 
 export interface MobileOperator {
   id: string;
-  code: string;
   name: string;
+  code: string;
   country: string;
 }
 
-// Valid event types that match the database constraint
 export const VALID_EVENT_TYPES = [
   'webinar',
   'workshop',
   'conference',
-  'seminar',
   'meetup',
+  'seminar',
   'training',
-  'networking',
-  'presentation'
+  'mentorship',
+  'networking'
 ];
 
-export const fetchEvents = async (): Promise<Event[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .order('start_time', { ascending: true });
+export async function fetchPastEvents(limit: number = 10): Promise<Event[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .lt('end_time', new Date().toISOString()) // Past events
+    .order('start_time', { ascending: false })
+    .limit(limit);
 
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    throw error;
-  }
-};
+  if (error) throw error;
+  return data || [];
+}
 
-export const fetchUserRegistrations = async (user: any): Promise<Registration[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('event_bookings')
-      .select('*')
-      .eq('user_id', user.id);
+export async function fetchUpcomingEvents(limit: number = 10): Promise<Event[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .gte('start_time', new Date().toISOString()) // Future events
+    .order('start_time', { ascending: true })
+    .limit(limit);
 
-    if (error) throw error;
-    
-    // Transform event_bookings to match Registration interface
-    const registrations = data?.map((booking) => ({
-      id: booking.id,
-      event_id: booking.event_id,
-      user_id: booking.user_id,
-      status: booking.status || 'pending',
-      created_at: booking.created_at,
-      updated_at: booking.updated_at,
-      booking_date: booking.booking_date,
-      phone_number: booking.phone_number,
-      mobile_operator: booking.mobile_operator
-    })) || [];
+  if (error) throw error;
+  return data || [];
+}
 
-    return registrations;
-  } catch (error) {
-    console.error('Error fetching user registrations:', error);
-    throw error;
-  }
-};
+export async function fetchEvents(): Promise<Event[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .order('start_time', { ascending: true });
 
-export const registerForEvent = async (
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchCreatorEvents(creatorId: string): Promise<Event[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('creator_id', creatorId)
+    .order('start_time', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchEventById(id: string): Promise<Event | null> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchEventAttendeeCount(eventId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('event_bookings')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('status', 'confirmed');
+
+  if (error) throw error;
+  return data?.length || 0;
+}
+
+export async function fetchUserRegistrations(user: User): Promise<Registration[]> {
+  const { data, error } = await supabase
+    .from('event_bookings')
+    .select('*')
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+  
+  return (data || []).map(booking => ({
+    id: booking.id,
+    event_id: booking.event_id,
+    user_id: booking.user_id,
+    status: booking.status || 'pending',
+    payment_status: booking.payment_status || 'pending',
+    created_at: booking.created_at,
+    phone_number: booking.phone_number,
+    mobile_operator: booking.mobile_operator
+  }));
+}
+
+export async function fetchMobileOperators(): Promise<MobileOperator[]> {
+  const { data, error } = await supabase
+    .from('mobile_operators')
+    .select('*')
+    .order('name');
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function registerForEvent(
   event: Event, 
-  user: any, 
+  user: User, 
   phoneNumber?: string, 
   mobileOperator?: string
-): Promise<any> => {
+): Promise<boolean> {
   try {
     const bookingData = {
       event_id: event.id,
       user_id: user.id,
-      status: 'confirmed',
+      status: event.is_free ? 'confirmed' : 'pending',
+      payment_status: event.is_free ? 'completed' : 'pending',
       phone_number: phoneNumber,
       mobile_operator: mobileOperator,
-      booking_date: new Date().toISOString()
+      payment_amount: event.is_free ? 0 : event.price,
+      payment_currency: event.currency || 'USD'
     };
 
     const { data, error } = await supabase
       .from('event_bookings')
-      .insert([bookingData])
+      .insert(bookingData)
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+
+    if (!event.is_free && phoneNumber && mobileOperator) {
+      // For paid events, initiate payment process
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('initiate-payment', {
+        body: {
+          amount: event.price,
+          currency: event.currency || 'USD',
+          phone_number: phoneNumber,
+          mobile_operator: mobileOperator,
+          reference_id: data.id,
+          reference_type: 'event_booking',
+          description: `Registration for ${event.title}`
+        }
+      });
+
+      if (paymentError) throw paymentError;
+      
+      // Payment initiated successfully, user will be redirected
+      if (paymentData?.payment_url) {
+        window.location.href = paymentData.payment_url;
+      }
+    }
+
+    return true;
   } catch (error) {
     console.error('Error registering for event:', error);
     throw error;
   }
-};
+}
 
-export const cancelRegistration = async (registrationId: string, user: any): Promise<boolean> => {
+export async function cancelRegistration(registrationId: string, user: User | null): Promise<boolean> {
+  if (!user) return false;
+
   try {
     const { error } = await supabase
       .from('event_bookings')
@@ -140,39 +219,32 @@ export const cancelRegistration = async (registrationId: string, user: any): Pro
     console.error('Error cancelling registration:', error);
     return false;
   }
-};
+}
 
-export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
-  // Return mock data for now - this would typically come from a database
-  return [
-    { id: '1', code: 'MTN_UG', name: 'MTN Uganda', country: 'UG' },
-    { id: '2', code: 'AIRTEL_UG', name: 'Airtel Uganda', country: 'UG' },
-    { id: '3', code: 'MTN_ZM', name: 'MTN Zambia', country: 'ZM' },
-    { id: '4', code: 'AIRTEL_ZM', name: 'Airtel Zambia', country: 'ZM' }
-  ];
-};
-
-export const createEventWithCreator = async (eventData: Partial<Event>, creatorId: string): Promise<Event | null> => {
+export async function createEventWithCreator(eventData: Partial<Event>, creatorId: string): Promise<Event | null> {
   try {
-    // Ensure event_type is lowercase and valid
-    const processedEventData = {
-      ...eventData,
-      creator_id: creatorId,
-      event_type: eventData.event_type?.toLowerCase(),
-      // Ensure required fields are present
+    // Ensure required fields are present and properly typed
+    const insertData = {
       title: eventData.title || '',
+      description: eventData.description || '',
       start_time: eventData.start_time || new Date().toISOString(),
-      end_time: eventData.end_time || new Date().toISOString()
+      end_time: eventData.end_time || new Date(Date.now() + 3600000).toISOString(), // Default 1 hour later
+      event_type: eventData.event_type || 'webinar',
+      location: eventData.location,
+      image_url: eventData.image_url,
+      price: eventData.price,
+      is_free: eventData.is_free ?? true,
+      currency: eventData.currency,
+      capacity: eventData.capacity,
+      online_meeting_link: eventData.online_meeting_link,
+      creator_id: creatorId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
-
-    // Validate event type
-    if (!VALID_EVENT_TYPES.includes(processedEventData.event_type || '')) {
-      throw new Error(`Invalid event type. Must be one of: ${VALID_EVENT_TYPES.join(', ')}`);
-    }
 
     const { data, error } = await supabase
       .from('events')
-      .insert([processedEventData])
+      .insert(insertData)
       .select()
       .single();
 
@@ -182,4 +254,19 @@ export const createEventWithCreator = async (eventData: Partial<Event>, creatorI
     console.error('Error creating event:', error);
     throw error;
   }
-};
+}
+
+export async function deleteEvent(eventId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    return false;
+  }
+}
