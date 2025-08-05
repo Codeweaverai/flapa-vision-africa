@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -24,25 +23,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { fetchCreatorCourses } from '@/services/courseService';
+import { fetchCreatorCourses, Course } from '@/services/courseService';
 import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail_url: string;
-  price: number;
-  is_free: boolean;
-  is_published: boolean;
-  category: string;
-  difficulty_level: string;
-  duration_minutes: number;
-  created_at: string;
-  updated_at: string;
-  enrollment_count?: number;
-}
 
 const CreatorCourses: React.FC = () => {
   const { user } = useAuth();
