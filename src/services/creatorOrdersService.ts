@@ -134,7 +134,7 @@ export async function fetchCreatorOrderTransactions(
             customer_name: customerName,
             customer_email: customerEmail,
             item_title: itemTitle,
-            item_type: item.item_type,
+            item_type: item.item_type as 'course' | 'event_ticket',
             total_price: item.total_price,
             platform_fee: platformFee,
             creator_earning: creatorEarning,

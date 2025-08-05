@@ -359,6 +359,7 @@ const CreatorPayments = () => {
         open={showWithdrawDialog}
         onOpenChange={setShowWithdrawDialog}
         availableBalance={earnings?.available_balance || 0}
+        currency={earnings?.currency || 'USD'}
         onSuccess={() => {
           setShowWithdrawDialog(false);
           loadEarningsAndPayouts();

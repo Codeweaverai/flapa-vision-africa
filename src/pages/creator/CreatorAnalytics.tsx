@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -103,7 +102,7 @@ const CreatorAnalytics = () => {
           id,
           booking_date,
           user_id,
-          events!event_bookings_event_id_fkey(
+          events!inner(
             title,
             creator_id
           )
@@ -168,7 +167,7 @@ const CreatorAnalytics = () => {
                   .eq('id', item.item_id)
                   .single();
                 
-                if (eventTicket?.events.creator_id === user.id) {
+                if (eventTicket?.events?.creator_id === user.id) {
                   isCreatorContent = true;
                 }
               }
