@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,29 +9,31 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
 const ResetPasswordPage = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetting, setResetting] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Grab access_token from query string (sent in the reset password email link)
-    const token = searchParams.get('access_token');
-    setAccessToken(token);
-  }, [searchParams]);
+    const handleSessionExchange = async () => {
+      const { data, error } = await supabase.auth.exchangeCodeForSession();
+
+      if (error) {
+        toast.error('The reset link is invalid or expired.');
+        console.error(error);
+      } else {
+        toast.success('You may now reset your password.');
+      }
+    };
+
+    handleSessionExchange();
+  }, []);
 
   const validatePassword = (pwd: string) => pwd.length >= 8;
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!accessToken) {
-      toast.error('Invalid or expired password reset link.');
-      return;
-    }
 
     if (!validatePassword(password)) {
       toast.error('Password must be at least 8 characters.');
@@ -47,10 +49,6 @@ const ResetPasswordPage = () => {
 
     const { error } = await supabase.auth.updateUser({
       password,
-    }, {
-      // Use the access token from the URL to authorize the password reset
-      // Supabase client automatically picks token from URL or you can set auth session
-      // But we can rely on the default behavior here if the user clicks the link
     });
 
     if (error) {
@@ -124,4 +122,3 @@ const ResetPasswordPage = () => {
 };
 
 export default ResetPasswordPage;
-
