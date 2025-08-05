@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -67,9 +66,14 @@ const CreatorCourses: React.FC = () => {
     
     try {
       setLoading(true);
-      const result = await fetchCreatorCourses(user.id, ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE);
-      setCourses(result.courses);
-      setTotalCourses(result.total);
+      // Fetch all courses first, then handle pagination locally
+      const allCourses = await fetchCreatorCourses(user.id);
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      const paginatedCourses = allCourses.slice(startIndex, endIndex);
+      
+      setCourses(paginatedCourses);
+      setTotalCourses(allCourses.length);
     } catch (error) {
       console.error('Error loading courses:', error);
       toast({
