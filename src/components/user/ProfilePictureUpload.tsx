@@ -155,15 +155,14 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         className="hidden"
       />
 
-      <Button
-        variant="outline"
-        onClick={triggerFileInput}
-        disabled={uploading}
-        className="flex items-center gap-2"
-      >
-        <Upload className="h-4 w-4" />
-        {uploading ? 'Uploading...' : 'Change Picture'}
-      </Button>
+     <Button
+  onClick={triggerFileInput}
+  disabled={uploading}
+  className="flex items-center gap-2 text-white bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  <Upload className="h-4 w-4" />
+  {uploading ? 'Uploading...' : 'Change Picture'}
+</Button>
     </div>
   );
 };
