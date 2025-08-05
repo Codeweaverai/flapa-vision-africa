@@ -21,6 +21,7 @@ export interface Course {
   modules?: CourseModule[];
   course_preview?: CoursePreview;
   course_learning_outcomes?: LearningOutcome[];
+  enrollment_count?: number;
 }
 
 export interface CourseModule {
