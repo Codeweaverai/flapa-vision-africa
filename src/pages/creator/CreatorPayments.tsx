@@ -524,6 +524,7 @@ const CreatorPayments: React.FC = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Date</TableHead>
+                              <TableHead>Order ID</TableHead>
                               <TableHead>Customer</TableHead>
                               <TableHead>Item</TableHead>
                               <TableHead>Type</TableHead>
@@ -537,7 +538,7 @@ const CreatorPayments: React.FC = () => {
                           <TableBody>
                             {transactions.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                                <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                                   No payment transactions found
                                 </TableCell>
                               </TableRow>
@@ -546,6 +547,9 @@ const CreatorPayments: React.FC = () => {
                                 <TableRow key={transaction.id}>
                                   <TableCell>
                                     {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-mono text-sm">{transaction.order_id?.substring(0, 8) || 'N/A'}</div>
                                   </TableCell>
                                   <TableCell>
                                     <div>{transaction.customer_name || 'Unknown'}</div>

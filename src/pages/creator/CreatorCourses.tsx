@@ -1,342 +1,317 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Plus, BookOpen, Edit, Trash2, Eye, Users, DollarSign, Clock, Star, Play, Percent, Video } from 'lucide-react';
-import { toast } from 'sonner';
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { BookOpen, Clock, DollarSign, Edit, FileText, MoreVertical, Plus, Trash2, Users, BarChart } from 'lucide-react';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
-import PaginationControls from '@/components/creator/PaginationControls';
-import CoursePreviewDialog from '@/components/creator/CoursePreviewDialog';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Badge } from '@/components/ui/badge';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
-const COURSES_PER_PAGE = 6; // 2 rows × 3 cards per row
+import { 
+  fetchCreatorCourses,
+  deleteCourse as deleteCourseService
+} from '@/services/courseService';
 
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  summary: string;
-  thumbnail_url?: string;
-  is_published: boolean;
-  is_free: boolean;
-  price: number;
-  duration_minutes: number;
-  category: string;
-  difficulty_level: string;
-  created_at: string;
-}
+const ITEMS_PER_PAGE = 6;
 
-const CreatorCourses = () => {
+const CreatorCourses: React.FC = () => {
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCourses, setTotalCourses] = useState(0);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
       loadCourses();
     }
-  }, [user]);
-
-  useEffect(() => {
-    setCurrentPage(1); // Reset to first page when search changes
-  }, [searchTerm]);
+  }, [user, currentPage]);
 
   const loadCourses = async () => {
     if (!user) return;
     
-    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCourses(data || []);
+      setLoading(true);
+      // Fetch all courses first, then handle pagination locally
+      const allCourses = await fetchCreatorCourses(user.id);
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      const paginatedCourses = allCourses.slice(startIndex, endIndex);
+      
+      setCourses(paginatedCourses);
+      setTotalCourses(allCourses.length);
     } catch (error) {
       console.error('Error loading courses:', error);
-      toast.error('Failed to load courses');
+      toast({
+        title: "Error",
+        description: "Failed to load courses",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const filteredCourses = courses.filter(course =>
+    course.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleEditCourse = (course: any) => {
+    navigate(`/creator/courses/edit/${course.id}`);
+  };
+
+  const handleManageContent = (courseId: string) => {
+    navigate(`/creator/courses/${courseId}/content`);
+  };
+
+  const handleViewStudents = (courseId: string) => {
+    navigate(`/creator/courses/${courseId}/students`);
+  };
+
+  const handleViewAnalytics = (courseId: string) => {
+    navigate(`/creator/courses/${courseId}/analytics`);
+  };
+
   const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to delete this course?')) {
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', courseId);
-
-      if (error) throw error;
-      
-      await loadCourses();
-      toast.success('Course deleted successfully');
+      await deleteCourseService(courseId);
+      setCourses(courses.filter(course => course.id !== courseId));
+      toast({
+        title: "Course deleted",
+        description: "The course has been successfully deleted.",
+      });
     } catch (error) {
       console.error('Error deleting course:', error);
-      toast.error('Failed to delete course');
+      toast({
+        title: "Error",
+        description: "Failed to delete course",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleTogglePublish = async (courseId: string, isPublished: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ is_published: !isPublished })
-        .eq('id', courseId);
-
-      if (error) throw error;
-      
-      await loadCourses();
-      toast.success(`Course ${!isPublished ? 'published' : 'unpublished'} successfully`);
-    } catch (error) {
-      console.error('Error updating course:', error);
-      toast.error('Failed to update course');
-    }
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
   };
 
-  const handleAddPreview = (course: Course) => {
-    setSelectedCourse(course);
-    setPreviewDialogOpen(true);
-  };
+  const renderPagination = () => {
+    const totalPages = Math.ceil(totalCourses / ITEMS_PER_PAGE);
+    if (totalPages <= 1) return null;
 
-  const filteredCourses = courses.filter(course =>
-    course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.summary.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Pagination logic
-  const totalPages = Math.ceil(filteredCourses.length / COURSES_PER_PAGE);
-  const startIndex = (currentPage - 1) * COURSES_PER_PAGE;
-  const endIndex = startIndex + COURSES_PER_PAGE;
-  const paginatedCourses = filteredCourses.slice(startIndex, endIndex);
-
-  if (loading) {
     return (
-      <CreatorLayout title="My Courses">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </CreatorLayout>
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+              className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+            />
+          </PaginationItem>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <PaginationItem key={page}>
+              <PaginationLink
+                onClick={() => handlePageChange(page)}
+                isActive={currentPage === page}
+                className="cursor-pointer"
+              >
+                {page}
+              </PaginationLink>
+            </PaginationItem>
+          ))}
+          <PaginationItem>
+            <PaginationNext
+              onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     );
-  }
+  };
 
   return (
-    <CreatorLayout title="My Courses">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <p className="text-gray-600">Create and manage your online courses</p>
-        </div>
-        <Button
-          onClick={() => navigate('/creator/courses/create')}
-          className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Course
-        </Button>
-      </div>
-
-      <div className="mb-6">
-        <Input
-          placeholder="Search courses..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
-
-      {filteredCourses.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
-            <div className="mb-4 rounded-full bg-primary/10 p-6">
-              <BookOpen className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle className="mb-2">No courses yet</CardTitle>
-            <p className="text-muted-foreground mb-6">
-              {searchTerm ? 'No courses match your search criteria.' : 'Create your first course to get started'}
-            </p>
-            {!searchTerm && (
-              <Button onClick={() => navigate('/creator/courses/create')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Course
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-8">
-            {paginatedCourses.map((course) => (
-              <Card key={course.id} className="relative overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="relative">
-                  {course.thumbnail_url ? (
-                    <img
-                      src={course.thumbnail_url}
-                      alt={course.title}
-                      className="w-full h-48 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center">
-                      <BookOpen className="h-12 w-12 text-gray-400" />
-                    </div>
-                  )}
-                  
-                  {/* Status Badge */}
-                  <div className="absolute top-3 right-3">
-                    <Badge
-                      variant={course.is_published ? "default" : "secondary"}
-                      className={course.is_published ? "bg-green-500 text-white" : "bg-yellow-500 text-white"}
-                    >
-                      {course.is_published ? "Published" : "Draft"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start mb-2">
-                    <Badge variant="outline" className="text-xs">
-                      {course.category}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {course.difficulty_level}
-                    </Badge>
-                  </div>
-                  
-                  <CardTitle className="text-lg line-clamp-2 mb-2">
-                    {course.title}
-                  </CardTitle>
-                  
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {course.summary || course.description}
-                  </p>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {/* Course Stats */}
-                  <div className="flex justify-between text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{Math.ceil((course.duration_minutes || 0) / 60)}h</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" />
-                      <span>{course.is_free ? "Free" : `$${course.price}`}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 fill-current text-yellow-400" />
-                      <span>4.8</span>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/courses/${course.id}/edit`)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/learning/course-detail/${course.id}`)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Preview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/courses/${course.id}/content`)}
-                    >
-                      <BookOpen className="h-4 w-4 mr-1" />
-                      Content
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/students`)}
-                    >
-                      <Users className="h-4 w-4 mr-1" />
-                      Students
-                    </Button>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleAddPreview(course)}
-                  >
-                    <Video className="h-4 w-4 mr-1" />
-                    Add Preview
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => navigate(`/creator/promo-codes?item_type=course&item_id=${course.id}`)}
-                  >
-                    <Percent className="h-4 w-4 mr-1" />
-                    Promo Codes
-                  </Button>
-
-                  <Button
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleTogglePublish(course.id, course.is_published)}
-                  >
-                    <Play className="h-4 w-4 mr-1" />
-                    {course.is_published ? "Unpublish" : "Publish"}
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleDeleteCourse(course.id)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete Course
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
+    <CreatorLayout>
+      <div className="container mx-auto py-10">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-semibold">Your Courses</h1>
+          <Input
+            type="search"
+            placeholder="Search courses..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="max-w-md"
           />
-        </>
-      )}
+          <Button onClick={() => navigate('/creator/courses/create')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Course
+          </Button>
+        </div>
 
-      <CoursePreviewDialog
-        open={previewDialogOpen}
-        onOpenChange={setPreviewDialogOpen}
-        course={selectedCourse}
-        onPreviewAdded={loadCourses}
-      />
+        {/* Courses List */}
+        <div className="space-y-4">
+          {loading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start space-x-4">
+                      <Skeleton className="w-24 h-16 rounded-lg" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-3/4" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredCourses.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No courses found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery ? 'No courses match your search criteria.' : 'You haven\'t created any courses yet.'}
+                </p>
+                {!searchQuery && (
+                  <Button onClick={() => navigate('/creator/courses/create')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Course
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredCourses.map((course) => (
+                <Card key={course.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-4 flex-1">
+                        <div className="w-24 h-16 bg-gradient-to-br from-purple-100 to-orange-100 rounded-lg flex items-center justify-center overflow-hidden">
+                          {course.thumbnail_url ? (
+                            <img 
+                              src={course.thumbnail_url} 
+                              alt={course.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <BookOpen className="h-8 w-8 text-purple-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-lg truncate">{course.title}</h3>
+                            <Badge variant={course.is_published ? "default" : "secondary"}>
+                              {course.is_published ? 'Published' : 'Draft'}
+                            </Badge>
+                          </div>
+                          <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
+                            {course.description}
+                          </p>
+                          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                            <span className="flex items-center">
+                              <Clock className="h-4 w-4 mr-1" />
+                              {course.duration_minutes} min
+                            </span>
+                            <span className="flex items-center">
+                              <Users className="h-4 w-4 mr-1" />
+                              {course.enrollment_count || 0} enrolled
+                            </span>
+                            <span className="flex items-center">
+                              <DollarSign className="h-4 w-4 mr-1" />
+                              {course.is_free ? 'Free' : `$${course.price}`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditCourse(course)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Course
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleManageContent(course.id)}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Manage Content
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewStudents(course.id)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            View Students
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewAnalytics(course.id)}>
+                            <BarChart className="h-4 w-4 mr-2" />
+                            Analytics
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteCourse(course.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Course
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {renderPagination()}
+      </div>
     </CreatorLayout>
   );
 };
