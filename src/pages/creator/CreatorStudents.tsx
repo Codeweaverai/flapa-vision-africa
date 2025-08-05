@@ -1,81 +1,44 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Users, Mail, BookOpen, Calendar, Search, Send, Check, AlertCircle } from 'lucide-react';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  Users, 
-  Search, 
-  Download, 
-  Mail, 
-  Calendar,
-  BookOpen,
-  Filter,
-  MoreHorizontal 
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
+import { format } from 'date-fns';
 
 interface Student {
   id: string;
   user_id: string;
-  full_name: string;
-  email: string;
-  username: string;
-  enrollment_date?: string;
-  booking_date?: string;
-  course_title?: string;
-  event_title?: string;
-  type: 'course' | 'event';
-  payment_status: string;
+  enrollment_date: string;
+  course_title: string;
+  course_id: string;
+  student_name: string;
+  student_email: string;
+  progress_percentage?: number;
+  is_completed?: boolean;
 }
 
-interface AttendeeExportButtonProps {
-  students: Student[];
-  fileName: string;
-}
-
-const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ students, fileName }) => {
-  const handleExport = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + "Name,Email,Username,Type,Date\n"
-      + students.map(s => `${s.full_name},${s.email},${s.username},${s.type},${s.enrollment_date || s.booking_date}`).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${fileName}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  return (
-    <Button onClick={handleExport} variant="outline">
-      <Download className="h-4 w-4 mr-2" />
-      Export CSV
-    </Button>
-  );
-};
-
-const CreatorStudents: React.FC = () => {
+const CreatorStudents = () => {
   const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'course' | 'event'>('all');
-  const [showBulkModal, setShowBulkModal] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({
+    subject: '',
+    message: ''
+  });
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -88,466 +51,385 @@ const CreatorStudents: React.FC = () => {
 
     try {
       setLoading(true);
-      console.log('Fetching students for creator:', user.id);
-
-      // Get course enrollments
-      const { data: courseEnrollments, error: courseError } = await supabase
+      
+      // Fetch course enrollments for the creator's courses
+      const { data: enrollmentsData, error } = await supabase
         .from('course_enrollments')
         .select(`
           id,
           user_id,
           enrollment_date,
-          payment_status,
+          is_completed,
           courses!inner (
+            id,
             title,
             creator_id
+          ),
+          profiles!inner (
+            full_name,
+            username
           )
         `)
         .eq('courses.creator_id', user.id)
-        .eq('payment_status', 'completed');
+        .order('enrollment_date', { ascending: false });
 
-      if (courseError) {
-        console.error('Error fetching course enrollments:', courseError);
-        toast.error('Failed to load course enrollments');
-      }
+      if (error) throw error;
 
-      // Get event bookings
-      const { data: eventBookings, error: eventError } = await supabase
-        .from('event_bookings')
-        .select(`
-          id,
-          user_id,
-          booking_date,
-          payment_status,
-          events!inner (
-            title,
-            creator_id
-          )
-        `)
-        .eq('events.creator_id', user.id)
-        .eq('payment_status', 'completed');
+      // Get user emails for the students
+      const userIds = enrollmentsData?.map(e => e.user_id) || [];
+      const { data: userEmails } = await supabase.rpc('get_user_emails', { 
+        user_ids: userIds 
+      });
 
-      if (eventError) {
-        console.error('Error fetching event bookings:', eventError);
-        toast.error('Failed to load event bookings');
-      }
+      const studentsWithEmails = enrollmentsData?.map(enrollment => {
+        const userEmail = userEmails?.find(u => u.id === enrollment.user_id);
+        return {
+          id: enrollment.id,
+          user_id: enrollment.user_id,
+          enrollment_date: enrollment.enrollment_date,
+          course_title: enrollment.courses.title,
+          course_id: enrollment.courses.id,
+          student_name: enrollment.profiles?.full_name || enrollment.profiles?.username || 'Unknown Student',
+          student_email: userEmail?.email || 'No email available',
+          is_completed: enrollment.is_completed
+        };
+      }) || [];
 
-      // Get unique user IDs
-      const courseUserIds = courseEnrollments?.map(e => e.user_id) || [];
-      const eventUserIds = eventBookings?.map(b => b.user_id) || [];
-      const allUserIds = [...new Set([...courseUserIds, ...eventUserIds])];
-
-      console.log('Found unique user IDs:', allUserIds.length);
-
-      if (allUserIds.length === 0) {
-        setStudents([]);
-        return;
-      }
-
-      // Use the get_user_emails RPC function to fetch email data
-      const { data: emailData, error: emailError } = await supabase
-        .rpc('get_user_emails', { user_ids: allUserIds });
-
-      if (emailError) {
-        console.error('Error fetching user emails:', emailError);
-        toast.error('Failed to load student emails');
-      }
-
-      // Get user profiles for additional data
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, username')
-        .in('id', allUserIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        toast.error('Failed to load student profiles');
-      }
-
-      console.log('Found profiles:', profiles?.length);
-      console.log('Found email data:', emailData?.length);
-
-      // Combine the data
-      const studentsData: Student[] = [];
-
-      // Add course students
-      if (courseEnrollments) {
-        courseEnrollments.forEach(enrollment => {
-          const profile = profiles?.find(p => p.id === enrollment.user_id);
-          const emailInfo = emailData?.find(e => e.id === enrollment.user_id);
-          
-          if (profile && emailInfo) {
-            studentsData.push({
-              id: enrollment.id,
-              user_id: enrollment.user_id,
-              full_name: profile.full_name || 'Unknown',
-              email: emailInfo.email || '',
-              username: profile.username || '',
-              enrollment_date: enrollment.enrollment_date,
-              course_title: enrollment.courses.title,
-              type: 'course',
-              payment_status: enrollment.payment_status
-            });
-          }
-        });
-      }
-
-      // Add event students
-      if (eventBookings) {
-        eventBookings.forEach(booking => {
-          const profile = profiles?.find(p => p.id === booking.user_id);
-          const emailInfo = emailData?.find(e => e.id === booking.user_id);
-          
-          if (profile && emailInfo) {
-            studentsData.push({
-              id: booking.id,
-              user_id: booking.user_id,
-              full_name: profile.full_name || 'Unknown',
-              email: emailInfo.email || '',
-              username: profile.username || '',
-              booking_date: booking.booking_date,
-              event_title: booking.events.title,
-              type: 'event',
-              payment_status: booking.payment_status
-            });
-          }
-        });
-      }
-
-      console.log('Total students found:', studentsData.length);
-      setStudents(studentsData);
-    } catch (error) {
+      setStudents(studentsWithEmails);
+    } catch (error: any) {
       console.error('Error fetching students:', error);
-      toast.error('Failed to load students');
+      toast.error('Failed to fetch students');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (student.course_title && student.course_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         (student.event_title && student.event_title.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesFilter = filterType === 'all' || student.type === filterType;
-    
-    return matchesSearch && matchesFilter;
-  });
+  const filteredStudents = students.filter(student =>
+    student.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.course_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.student_email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const uniqueStudents = filteredStudents.reduce((acc, current) => {
-    const existingStudent = acc.find(student => student.user_id === current.user_id);
-    if (!existingStudent) {
-      acc.push(current);
-    }
-    return acc;
-  }, [] as Student[]);
-
-  const handleSelectAll = () => {
-    if (selectedStudents.length === uniqueStudents.length) {
-      setSelectedStudents([]);
-    } else {
-      setSelectedStudents(uniqueStudents.map(s => s.user_id));
-    }
-  };
-
-  const handleSelectStudent = (userId: string) => {
-    setSelectedStudents(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
+  const handleSelectStudent = (studentId: string) => {
+    setSelectedStudents(prev =>
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
     );
   };
 
-  // Transform student data to match BulkAnnouncementModal's expected format
-  const transformStudentsForModal = () => {
-    return selectedStudents.map(userId => {
-      const student = uniqueStudents.find(s => s.user_id === userId);
-      if (!student) return null;
-      
-      return {
-        id: student.id,
-        ticket_holder_name: student.full_name,
-        user_id: student.user_id,
-        user_profile: {
-          full_name: student.full_name
-        }
-      };
-    }).filter(Boolean);
+  const handleSelectAll = () => {
+    if (selectedStudents.length === filteredStudents.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filteredStudents.map(s => s.id));
+    }
   };
 
-  const handleAnnouncementSuccess = () => {
-    setShowBulkModal(false);
-    setSelectedStudents([]);
-    toast.success('Announcement sent successfully');
+  const handleSendAnnouncement = async () => {
+    if (!announcementForm.subject.trim() || !announcementForm.message.trim()) {
+      toast.error('Please provide both subject and message');
+      return;
+    }
+
+    if (selectedStudents.length === 0) {
+      toast.error('Please select at least one student');
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      // Get selected students' user IDs
+      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
+      const userIds = selectedStudentData.map(s => s.user_id);
+
+      // Send inbox messages to selected students
+      const inboxPromises = userIds.map(userId =>
+        supabase.from('inbox_messages').insert({
+          sender_id: user?.id,
+          recipient_id: userId,
+          subject: `[Course Announcement] ${announcementForm.subject}`,
+          content: announcementForm.message,
+          message_type: 'announcement'
+        })
+      );
+
+      await Promise.all(inboxPromises);
+
+      // Send email notifications via edge function
+      try {
+        await supabase.functions.invoke('send-student-announcement', {
+          body: {
+            senderUserId: user?.id,
+            subject: announcementForm.subject,
+            message: announcementForm.message,
+            studentUserIds: userIds
+          }
+        });
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
+        toast.warning('Messages sent to inbox, but email delivery may have failed');
+      }
+
+      toast.success(`Announcement sent to ${selectedStudents.length} students successfully!`);
+      setShowAnnouncementModal(false);
+      setAnnouncementForm({ subject: '', message: '' });
+      setSelectedStudents([]);
+    } catch (error) {
+      console.error('Error sending announcement:', error);
+      toast.error('Failed to send announcement. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
+
+  const uniqueCourses = [...new Set(students.map(s => s.course_title))];
+  const totalEnrollments = students.length;
+  const completedEnrollments = students.filter(s => s.is_completed).length;
 
   if (loading) {
     return (
-      <CreatorLayout title="Students & Attendees">
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <CreatorLayout title="My Students">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
         </div>
       </CreatorLayout>
     );
   }
 
   return (
-    <CreatorLayout title="Students & Attendees">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Students & Attendees</h2>
-            <p className="text-muted-foreground">
-              Manage students from your courses and event attendees
-            </p>
-          </div>
-          <div className="flex gap-2">
+    <CreatorLayout title="My Students">
+      {/* Orange-Purple Gradient Background */}
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-gradient-to-r from-orange-500 to-purple-600 rounded-xl text-white">
+            <div>
+              <h1 className="text-2xl font-bold">My Students</h1>
+              <p className="text-orange-100">Manage and communicate with your course enrollments</p>
+            </div>
             <Button
-              onClick={() => setShowBulkModal(true)}
+              onClick={() => setShowAnnouncementModal(true)}
               disabled={selectedStudents.length === 0}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+              className="bg-white/20 hover:bg-white/30 text-white border-white/30"
             >
-              <Mail className="h-4 w-4 mr-2" />
+              <Send className="h-4 w-4 mr-2" />
               Send Announcement ({selectedStudents.length})
             </Button>
-            <AttendeeExportButton
-              students={uniqueStudents}
-              fileName="students-attendees"
-            />
           </div>
-        </div>
 
-        {/* Search and Filter */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search students by name, email, or content..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant={filterType === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilterType('all')}
-              size="sm"
-            >
-              All
-            </Button>
-            <Button
-              variant={filterType === 'course' ? 'default' : 'outline'}
-              onClick={() => setFilterType('course')}
-              size="sm"
-            >
-              <BookOpen className="h-4 w-4 mr-1" />
-              Courses
-            </Button>
-            <Button
-              variant={filterType === 'event' ? 'default' : 'outline'}
-              onClick={() => setFilterType('event')}
-              size="sm"
-            >
-              <Calendar className="h-4 w-4 mr-1" />
-              Events
-            </Button>
-          </div>
-        </div>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-700">Total Students</p>
+                    <p className="text-2xl font-bold text-orange-900">{totalEnrollments}</p>
+                  </div>
+                  <Users className="h-8 w-8 text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700">Completed</p>
+                    <p className="text-2xl font-bold text-purple-900">{completedEnrollments}</p>
+                  </div>
+                  <Check className="h-8 w-8 text-purple-500" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-pink-100">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-pink-700">Active Courses</p>
+                    <p className="text-2xl font-bold text-pink-900">{uniqueCourses.length}</p>
+                  </div>
+                  <BookOpen className="h-8 w-8 text-pink-500" />
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+            <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-amber-700">Completion Rate</p>
+                    <p className="text-2xl font-bold text-amber-900">
+                      {totalEnrollments > 0 ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0}%
+                    </p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-amber-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Search and Actions */}
+          <Card className="border-orange-200 bg-white/70 backdrop-blur-sm">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Total Students</p>
-                  <p className="text-2xl font-bold">{uniqueStudents.length}</p>
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search students, courses, or emails..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="select-all"
+                    checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
+                  <Label htmlFor="select-all" className="text-sm font-medium">
+                    Select All ({filteredStudents.length})
+                  </Label>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Course Enrollments</p>
-                  <p className="text-2xl font-bold">
-                    {students.filter(s => s.type === 'course').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Event Bookings</p>
-                  <p className="text-2xl font-bold">
-                    {students.filter(s => s.type === 'event').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Students List */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>
-                Students List ({uniqueStudents.length})
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSelectAll}
-              >
-                {selectedStudents.length === uniqueStudents.length ? 'Deselect All' : 'Select All'}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {uniqueStudents.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          {/* Students List */}
+          {filteredStudents.length === 0 ? (
+            <Card className="bg-white/70 backdrop-blur-sm">
+              <CardContent className="p-8 text-center">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No students found</h3>
                 <p className="text-muted-foreground">
-                  {searchTerm || filterType !== 'all' 
-                    ? 'No students match your current filters'
-                    : 'You don\'t have any students or attendees yet'
-                  }
+                  {students.length === 0 
+                    ? 'Students will appear here when they enroll in your courses.' 
+                    : 'Try adjusting your search terms.'}
                 </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {uniqueStudents.map((student) => {
-                  const studentCourses = students.filter(s => 
-                    s.user_id === student.user_id && s.type === 'course'
-                  );
-                  const studentEvents = students.filter(s => 
-                    s.user_id === student.user_id && s.type === 'event'
-                  );
-
-                  return (
-                    <div
-                      key={student.user_id}
-                      className={`p-4 border rounded-lg transition-colors ${
-                        selectedStudents.includes(student.user_id)
-                          ? 'bg-primary/5 border-primary'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedStudents.includes(student.user_id)}
-                            onChange={() => handleSelectStudent(student.user_id)}
-                            className="mt-1"
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-white/70 backdrop-blur-sm border-orange-200">
+              <CardHeader className="bg-gradient-to-r from-orange-500/10 to-purple-500/10">
+                <CardTitle className="text-orange-900">Student Enrollments</CardTitle>
+                <CardDescription className="text-orange-700">
+                  Showing {filteredStudents.length} of {students.length} student enrollments
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-orange-100">
+                  {filteredStudents.map((student) => (
+                    <div key={student.id} className="p-4 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <Checkbox
+                            checked={selectedStudents.includes(student.id)}
+                            onCheckedChange={() => handleSelectStudent(student.id)}
                           />
+                          
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-semibold">{student.full_name}</h4>
-                              <Badge variant="outline">
-                                @{student.username}
-                              </Badge>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-900">{student.student_name}</p>
+                              {student.is_completed && (
+                                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Completed
+                                </Badge>
+                              )}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {student.email}
+                            <p className="text-sm text-gray-600">{student.student_email}</p>
+                            <p className="text-sm font-medium text-purple-700">
+                              Enrolled in: {student.course_title}
                             </p>
-                            
-                            {studentCourses.length > 0 && (
-                              <div className="mb-2">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">
-                                  Enrolled Courses ({studentCourses.length}):
-                                </p>
-                                {studentCourses.map((course, index) => (
-                                  <div key={course.id} className="text-xs text-muted-foreground">
-                                    • {course.course_title} 
-                                    {course.enrollment_date && (
-                                      <span className="ml-1">
-                                        - {new Date(course.enrollment_date).toLocaleDateString()}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {studentEvents.length > 0 && (
-                              <div className="mb-2">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">
-                                  Event Bookings ({studentEvents.length}):
-                                </p>
-                                {studentEvents.map((event, index) => (
-                                  <div key={event.id} className="text-xs text-muted-foreground">
-                                    • {event.event_title}
-                                    {event.booking_date && (
-                                      <span className="ml-1">
-                                        - {new Date(event.booking_date).toLocaleDateString()}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            <div className="flex gap-2">
-                              {studentCourses.length > 0 && (
-                                <Badge variant="secondary">
-                                  <BookOpen className="h-3 w-3 mr-1" />
-                                  {studentCourses.length} Course{studentCourses.length > 1 ? 's' : ''}
-                                </Badge>
-                              )}
-                              {studentEvents.length > 0 && (
-                                <Badge variant="secondary">
-                                  <Calendar className="h-3 w-3 mr-1" />
-                                  {studentEvents.length} Event{studentEvents.length > 1 ? 's' : ''}
-                                </Badge>
-                              )}
-                            </div>
                           </div>
                         </div>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => window.open(`mailto:${student.email}`)}
-                            >
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Email
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">
+                            Enrolled: {format(new Date(student.enrollment_date), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        <BulkAnnouncementModal
-          isOpen={showBulkModal}
-          onClose={() => setShowBulkModal(false)}
-          selectedAttendees={selectedStudents}
-          attendeesData={transformStudentsForModal()}
-          eventTitle="Student Announcement"
-        />
+          {/* Announcement Modal */}
+          <Dialog open={showAnnouncementModal} onOpenChange={setShowAnnouncementModal}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Mail className="h-6 w-6 text-orange-600" />
+                  Send Announcement to Students
+                </DialogTitle>
+                <p className="text-sm text-gray-600">
+                  This will send a message to {selectedStudents.length} selected students' inboxes and email addresses.
+                </p>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="subject">Subject</Label>
+                  <Input
+                    id="subject"
+                    placeholder="Enter announcement subject..."
+                    value={announcementForm.subject}
+                    onChange={(e) => setAnnouncementForm(prev => ({ ...prev, subject: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="message">Message</Label>
+                  <Textarea
+                    id="message"
+                    placeholder="Enter your announcement message..."
+                    value={announcementForm.message}
+                    onChange={(e) => setAnnouncementForm(prev => ({ ...prev, message: e.target.value }))}
+                    rows={6}
+                    className="resize-none"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAnnouncementModal(false)}
+                  disabled={sending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSendAnnouncement}
+                  disabled={sending || !announcementForm.subject.trim() || !announcementForm.message.trim()}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                >
+                  {sending ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Sending...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Send className="h-4 w-4" />
+                      Send to {selectedStudents.length} Students
+                    </div>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
     </CreatorLayout>
   );
