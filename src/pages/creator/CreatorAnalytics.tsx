@@ -162,7 +162,7 @@ const CreatorAnalytics = () => {
                 const { data: eventTicket } = await supabase
                   .from('event_tickets')
                   .select(`
-                    events!inner(creator_id)
+                    events!event_tickets_event_id_fkey(creator_id)
                   `)
                   .eq('id', item.item_id)
                   .single();
