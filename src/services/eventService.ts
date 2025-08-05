@@ -21,6 +21,21 @@ export interface Event {
   updated_at: string;
 }
 
+export interface Registration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MobileOperator {
+  code: string;
+  name: string;
+  country: string;
+}
+
 // Valid event types that match the database constraint
 export const VALID_EVENT_TYPES = [
   'webinar',
@@ -33,13 +48,102 @@ export const VALID_EVENT_TYPES = [
   'presentation'
 ];
 
+export const fetchEvents = async (): Promise<Event[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('start_time', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    throw error;
+  }
+};
+
+export const fetchUserRegistrations = async (user: any): Promise<Registration[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching user registrations:', error);
+    throw error;
+  }
+};
+
+export const registerForEvent = async (
+  event: Event, 
+  user: any, 
+  phoneNumber?: string, 
+  mobileOperator?: string
+): Promise<any> => {
+  try {
+    const registrationData = {
+      event_id: event.id,
+      user_id: user.id,
+      status: 'confirmed',
+      phone_number: phoneNumber,
+      mobile_operator: mobileOperator
+    };
+
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .insert([registrationData])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error registering for event:', error);
+    throw error;
+  }
+};
+
+export const cancelRegistration = async (registrationId: string, user: any): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('event_registrations')
+      .update({ status: 'cancelled' })
+      .eq('id', registrationId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error cancelling registration:', error);
+    return false;
+  }
+};
+
+export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
+  // Return mock data for now - this would typically come from a database
+  return [
+    { code: 'MTN_UG', name: 'MTN Uganda', country: 'UG' },
+    { code: 'AIRTEL_UG', name: 'Airtel Uganda', country: 'UG' },
+    { code: 'MTN_ZM', name: 'MTN Zambia', country: 'ZM' },
+    { code: 'AIRTEL_ZM', name: 'Airtel Zambia', country: 'ZM' }
+  ];
+};
+
 export const createEventWithCreator = async (eventData: Partial<Event>, creatorId: string): Promise<Event | null> => {
   try {
     // Ensure event_type is lowercase and valid
     const processedEventData = {
       ...eventData,
       creator_id: creatorId,
-      event_type: eventData.event_type?.toLowerCase()
+      event_type: eventData.event_type?.toLowerCase(),
+      // Ensure required fields are present
+      title: eventData.title || '',
+      start_time: eventData.start_time || new Date().toISOString(),
+      end_time: eventData.end_time || new Date().toISOString()
     };
 
     // Validate event type
