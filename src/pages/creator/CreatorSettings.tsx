@@ -1,47 +1,59 @@
-
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Globe, 
+  Bell, 
+  Shield, 
+  CreditCard, 
+  Settings,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
-
-interface BankAccountDetails {
-  account_name: string;
-  account_number: string;
-  bank_name: string;
-  branch_code: string;
-}
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Profile {
   id: string;
-  username?: string;
-  full_name?: string;
-  bio?: string;
-  avatar_url?: string;
-  is_creator?: boolean;
-  payout_method?: 'stripe' | 'mobile_money' | 'bank';
-  mobile_money_number?: string;
-  bank_account_details?: BankAccountDetails;
+  username: string;
+  full_name: string;
+  bio: string;
+  avatar_url: string;
+  phone: string;
+  location: string;
+  website: string;
+  social_links: any;
+  email_notifications: boolean;
+  push_notifications: boolean;
+  marketing_emails: boolean;
+  profile_visibility: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const CreatorSettings = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bankDetails, setBankDetails] = useState<BankAccountDetails>({
-    account_name: '',
-    account_number: '',
-    bank_name: '',
-    branch_code: ''
-  });
 
   useEffect(() => {
     if (user) {
@@ -59,75 +71,45 @@ const CreatorSettings = () => {
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
-
-      if (data) {
-        const profileData: Profile = {
-          id: data.id,
-          username: data.username,
-          full_name: data.full_name,
-          bio: data.bio,
-          avatar_url: data.avatar_url,
-          is_creator: data.is_creator,
-          payout_method: data.payout_method as 'stripe' | 'mobile_money' | 'bank',
-          mobile_money_number: data.mobile_money_number,
-        };
-
-        setProfile(profileData);
-
-        if (data.bank_account_details && typeof data.bank_account_details === 'object') {
-          setBankDetails(data.bank_account_details as unknown as BankAccountDetails);
-        }
+      if (error) {
+        console.error('Error loading profile:', error);
+        toast.error('Failed to load profile');
+        return;
       }
+
+      console.log('Profile data loaded:', data);
+      setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
       toast.error('Failed to load profile');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setProfile(prev => prev ? { ...prev, [name]: value } : null);
-  };
-
-  const handleBankDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setBankDetails(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePayoutMethodChange = (value: string) => {
-    setProfile(prev => prev ? { 
-      ...prev, 
-      payout_method: value as 'stripe' | 'mobile_money' | 'bank' 
-    } : null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
 
     setIsSubmitting(true);
-
     try {
-      const updateData = {
-        username: profile.username,
-        full_name: profile.full_name,
-        bio: profile.bio,
-        is_creator: profile.is_creator,
-        payout_method: profile.payout_method,
-        mobile_money_number: profile.mobile_money_number,
-        bank_account_details: bankDetails as any,
-        updated_at: new Date().toISOString()
-      };
-
       const { error } = await supabase
         .from('profiles')
-        .update(updateData)
+        .update({
+          username: profile.username,
+          full_name: profile.full_name,
+          bio: profile.bio,
+          phone: profile.phone,
+          location: profile.location,
+          website: profile.website,
+          social_links: profile.social_links,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id);
 
       if (error) throw error;
 
-      toast.success('Profile updated successfully!');
+      toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('Failed to update profile');
@@ -136,26 +118,65 @@ const CreatorSettings = () => {
     }
   };
 
-  const handleAvatarUpload = async (newAvatarUrl: string) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0 || !user) {
+      return;
+    }
+
+    const file = event.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+    const filePath = `profile-pictures/${fileName}`;
+
+    setUploading(true);
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('Profile Pictures')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('Profile Pictures')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+      toast.success('Profile picture updated successfully');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload profile picture');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleNotificationUpdate = async (field: string, value: boolean) => {
     if (!user) return;
 
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ avatar_url: newAvatarUrl })
+        .update({ [field]: value })
         .eq('id', user.id);
 
       if (error) throw error;
 
-      setProfile(prev => prev ? { ...prev, avatar_url: newAvatarUrl } : null);
-      toast.success('Profile picture updated successfully!');
+      setProfile(prev => prev ? { ...prev, [field]: value } : null);
+      toast.success('Notification preferences updated');
     } catch (error) {
-      console.error('Error updating avatar:', error);
-      toast.error('Failed to update profile picture');
+      console.error('Error updating notifications:', error);
+      toast.error('Failed to update notification preferences');
     }
   };
 
-  if (!profile) {
+  if (loading) {
     return (
       <CreatorLayout title="Settings">
         <div className="flex justify-center items-center h-64">
@@ -165,157 +186,260 @@ const CreatorSettings = () => {
     );
   }
 
+  if (!profile) {
+    return (
+      <CreatorLayout title="Settings">
+        <div className="text-center py-8">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Profile not found</h3>
+          <p className="text-muted-foreground">Unable to load your profile settings</p>
+        </div>
+      </CreatorLayout>
+    );
+  }
+
   return (
     <CreatorLayout title="Settings">
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Settings</CardTitle>
-            <CardDescription>Update your profile information and preferences.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <Label htmlFor="avatar">Profile Picture</Label>
-              <ProfilePictureUpload
-                onUploadComplete={handleAvatarUpload}
-              />
-            </div>
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
+          <p className="text-muted-foreground">
+            Manage your account settings and preferences
+          </p>
+        </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={profile.username || ''}
-                    onChange={handleChange}
-                    placeholder="Enter username"
+        <div className="grid gap-6">
+          {/* Profile Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Profile Information
+              </CardTitle>
+              <CardDescription>
+                Update your public profile information
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleProfileUpdate} className="space-y-6">
+                {/* Profile Picture */}
+                <div className="flex items-center space-x-6">
+                  <div className="relative">
+                    {uploading ? (
+                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                        <div className="h-4 w-4 border-t-2 border-primary animate-spin rounded-full" />
+                      </div>
+                    ) : (
+                      <Avatar className="w-16 h-16">
+                        <AvatarImage src={profile.avatar_url} alt="Profile" className="object-cover" />
+                        <AvatarFallback className="text-lg">
+                          {profile.full_name ? profile.full_name.charAt(0).toUpperCase() : profile.username?.charAt(0).toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="relative"
+                      disabled={uploading}
+                    >
+                      <input
+                        type="file"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                      />
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Change Photo'}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      JPG, PNG or GIF. Max size 2MB.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Basic Information */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="full_name">Full Name</Label>
+                    <Input
+                      id="full_name"
+                      value={profile.full_name || ''}
+                      onChange={(e) => setProfile(prev => prev ? { ...prev, full_name: e.target.value } : null)}
+                      placeholder="Your full name"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      value={profile.username || ''}
+                      onChange={(e) => setProfile(prev => prev ? { ...prev, username: e.target.value } : null)}
+                      placeholder="your-username"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={profile.bio || ''}
+                    onChange={(e) => setProfile(prev => prev ? { ...prev, bio: e.target.value } : null)}
+                    placeholder="Tell us about yourself..."
+                    rows={3}
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="full_name">Full Name</Label>
-                  <Input
-                    type="text"
-                    id="full_name"
-                    name="full_name"
-                    value={profile.full_name || ''}
-                    onChange={handleChange}
-                    placeholder="Enter full name"
-                  />
-                </div>
-              </div>
+                {/* Contact Information */}
+                <Separator />
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium">Contact Information</h4>
+                  
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input
+                        id="phone"
+                        value={profile.phone || ''}
+                        onChange={(e) => setProfile(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                        placeholder="+1 (555) 000-0000"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        value={profile.location || ''}
+                        onChange={(e) => setProfile(prev => prev ? { ...prev, location: e.target.value } : null)}
+                        placeholder="City, Country"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  name="bio"
-                  value={profile.bio || ''}
-                  onChange={handleChange}
-                  placeholder="Tell us about yourself"
+                  <div className="space-y-2">
+                    <Label htmlFor="website">Website</Label>
+                    <Input
+                      id="website"
+                      value={profile.website || ''}
+                      onChange={(e) => setProfile(prev => prev ? { ...prev, website: e.target.value } : null)}
+                      placeholder="https://your-website.com"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                >
+                  {isSubmitting ? 'Updating...' : 'Update Profile'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Notification Preferences */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Preferences
+              </CardTitle>
+              <CardDescription>
+                Configure how you receive notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Email Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive notifications via email
+                  </p>
+                </div>
+                <Switch
+                  checked={profile.email_notifications}
+                  onCheckedChange={(checked) => handleNotificationUpdate('email_notifications', checked)}
                 />
               </div>
 
-              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Push Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive push notifications in your browser
+                  </p>
+                </div>
+                <Switch
+                  checked={profile.push_notifications}
+                  onCheckedChange={(checked) => handleNotificationUpdate('push_notifications', checked)}
+                />
+              </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Payout Settings</h3>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="payout_method">Payout Method</Label>
-                    <Select 
-                      value={profile.payout_method || 'stripe'} 
-                      onValueChange={handlePayoutMethodChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select payout method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="stripe">Stripe</SelectItem>
-                        <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                        <SelectItem value="bank">Bank Transfer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Marketing Emails</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive promotional emails and updates
+                  </p>
+                </div>
+                <Switch
+                  checked={profile.marketing_emails}
+                  onCheckedChange={(checked) => handleNotificationUpdate('marketing_emails', checked)}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-                  {profile.payout_method === 'mobile_money' && (
+          {/* Account Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Account Status
+              </CardTitle>
+              <CardDescription>
+                Your account verification and status information
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
                     <div>
-                      <Label htmlFor="mobile_money_number">Mobile Money Number</Label>
-                      <Input
-                        type="text"
-                        id="mobile_money_number"
-                        name="mobile_money_number"
-                        value={profile.mobile_money_number || ''}
-                        onChange={handleChange}
-                        placeholder="Enter mobile money number"
-                      />
+                      <p className="font-medium">Email Verified</p>
+                      <p className="text-sm text-muted-foreground">Your email address is verified</p>
                     </div>
-                  )}
+                  </div>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    Verified
+                  </Badge>
+                </div>
 
-                  {profile.payout_method === 'bank' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="account_name">Account Name</Label>
-                        <Input
-                          type="text"
-                          id="account_name"
-                          name="account_name"
-                          value={bankDetails.account_name}
-                          onChange={handleBankDetailsChange}
-                          placeholder="Account holder name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="account_number">Account Number</Label>
-                        <Input
-                          type="text"
-                          id="account_number"
-                          name="account_number"
-                          value={bankDetails.account_number}
-                          onChange={handleBankDetailsChange}
-                          placeholder="Account number"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="bank_name">Bank Name</Label>
-                        <Input
-                          type="text"
-                          id="bank_name"
-                          name="bank_name"
-                          value={bankDetails.bank_name}
-                          onChange={handleBankDetailsChange}
-                          placeholder="Bank name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="branch_code">Branch Code</Label>
-                        <Input
-                          type="text"
-                          id="branch_code"
-                          name="branch_code"
-                          value={bankDetails.branch_code}
-                          onChange={handleBankDetailsChange}
-                          placeholder="Branch code"
-                        />
-                      </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <User className="h-5 w-5 text-blue-500" />
+                    <div>
+                      <p className="font-medium">Creator Account</p>
+                      <p className="text-sm text-muted-foreground">You can create and sell content</p>
                     </div>
-                  )}
+                  </div>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    Active
+                  </Badge>
                 </div>
               </div>
-              <Button
-            type="submit"
-           disabled={isSubmitting}
-           className="bg-gradient-to-r from-orange-500 to-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:from-orange-600 hover:to-purple-700"
-          >
-           {isSubmitting ? 'Updating...' : 'Update Profile'}
-          </Button>
-
-            </form>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </CreatorLayout>
   );

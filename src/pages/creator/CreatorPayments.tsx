@@ -1,686 +1,606 @@
-
-import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
-import { format } from 'date-fns';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { 
+  DollarSign, 
+  TrendingUp, 
+  Clock, 
+  CreditCard, 
+  Calendar,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Wallet,
+  Receipt,
+  Eye,
+  Filter,
+  Download,
+  ChevronRight,
+  CheckCircle,
+  AlertCircle,
+  Calendar as CalendarIcon,
+  Users,
+  BookOpen,
+  Ticket
+} from 'lucide-react';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import { 
+  fetchCreatorEarnings, 
+  fetchCreatorPaymentTransactions, 
+  requestCreatorPayout,
   fetchCreatorPayouts,
-  fetchCreatorEarnings,
-  fetchCreatorPaymentTransactions
+  type CreatorEarnings,
+  type CreatorPaymentTransaction,
+  type PayoutRequest
 } from '@/services/creatorPaymentService';
-import { 
-  getCreatorPayoutMethod
-} from '@/services/creatorEarningsService';
+import { fetchCreatorOrderTransactions, type CreatorOrderTransaction } from '@/services/creatorOrdersService';
 import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog';
-import PayoutMethodSetupDialog from '@/components/creator/PayoutMethodSetupDialog';
-import PriceDisplay from '@/components/currency/PriceDisplay';
-import { useCurrency } from '@/contexts/CurrencyContext';
-import { supabase } from '@/lib/supabaseClient';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import PawaPayPayoutDialog from '@/components/creator/PawaPayPayoutDialog';
+import StripeAccountManagement from '@/components/creator/StripeAccountManagement';
 
-const ITEMS_PER_PAGE = 10;
-
-const CreatorPayments: React.FC = () => {
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [payouts, setPayouts] = useState<any[]>([]);
-  const [earnings, setEarnings] = useState({
-    available_balance: 0,
-    pending_balance: 0,
-    total_earnings: 0,
-    total_platform_fees: 0,
-    course_revenue: 0,
-    event_revenue: 0
-  });
-
-  // Pagination states
-  const [transactionsPage, setTransactionsPage] = useState(1);
-  const [payoutsPage, setPayoutsPage] = useState(1);
-  const [transactionsTotal, setTransactionsTotal] = useState(0);
-  const [payoutsTotal, setPayoutsTotal] = useState(0);
-
-  const [loadingTransactions, setLoadingTransactions] = useState(true);
-  const [loadingPayouts, setLoadingPayouts] = useState(true);
-  const [loadingEarnings, setLoadingEarnings] = useState(true);
-  const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
-  const [isSetupDialogOpen, setIsSetupDialogOpen] = useState(false);
-  const [payoutMethod, setPayoutMethod] = useState<any>(null);
-  const [profileData, setProfileData] = useState<any>(null);
-  
+const CreatorPayments = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const { convertPrice, currentCurrency } = useCurrency();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [earnings, setEarnings] = useState<CreatorEarnings | null>(null);
+  const [paymentTransactions, setPaymentTransactions] = useState<CreatorOrderTransaction[]>([]);
+  const [payouts, setPayouts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [pawaPayDialogOpen, setPawaPayDialogOpen] = useState(false);
+  const [transactionPage, setTransactionPage] = useState(0);
+  const [payoutPage, setPayoutPage] = useState(0);
+  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [totalPayouts, setTotalPayouts] = useState(0);
   
-  useEffect(() => {
-    if (user) {
-      loadPaymentData();
-      loadPayoutMethod();
-      loadProfileData();
-      
-      // Check URL parameters for Stripe callback
-      const success = searchParams.get('success');
-      const refresh = searchParams.get('refresh');
-      const accountId = searchParams.get('account_id');
-      
-      if (success === 'true' && accountId) {
-        handleStripeOnboardingSuccess(accountId);
-        setSearchParams({});
-      } else if (refresh === 'true') {
-        toast({
-          title: "Account Setup Incomplete",
-          description: "Please complete your Stripe Connect account setup to receive payments.",
-        });
-        setSearchParams({});
-      }
-    }
-  }, [user, searchParams]);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     if (user) {
+      loadEarningsData();
       loadTransactions();
-    }
-  }, [user, transactionsPage]);
-
-  useEffect(() => {
-    if (user) {
       loadPayouts();
     }
-  }, [user, payoutsPage]);
+  }, [user]);
 
-  const loadProfileData = async () => {
+  const loadEarningsData = async () => {
     if (!user) return;
-    
+
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method')
-        .eq('id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
-      setProfileData(data);
-    } catch (error) {
-      console.error('Error loading profile data:', error);
-    }
-  };
-  
-  const handleStripeOnboardingSuccess = async (accountId: string) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          stripe_connect_account_id: accountId,
-          stripe_onboarding_completed: true,
-          default_payout_method: 'stripe'
-        })
-        .eq('id', user?.id);
-
-      if (error) {
-        console.error('Error updating Stripe account:', error);
-        toast({
-          title: "Error",
-          description: "Failed to save Stripe account details",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Stripe Account Connected",
-          description: "Your Stripe Connect account has been set up successfully!",
-        });
-        loadPayoutMethod();
-        loadProfileData();
-      }
-    } catch (error) {
-      console.error('Error handling Stripe onboarding success:', error);
-    }
-  };
-
-  const loadPaymentData = async () => {
-    if (!user) return;
-    
-    try {
-      setLoadingEarnings(true);
-      
       const earningsData = await fetchCreatorEarnings(user.id);
       setEarnings(earningsData);
     } catch (error) {
-      console.error('Error loading payment data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load payment data",
-        variant: "destructive"
-      });
+      console.error('Error loading earnings:', error);
+      toast.error('Failed to load earnings data');
     } finally {
-      setLoadingEarnings(false);
+      setLoading(false);
     }
   };
 
-  const loadTransactions = async () => {
+  const loadTransactions = async (page = 0) => {
     if (!user) return;
-    
+
+    setTransactionsLoading(true);
     try {
-      setLoadingTransactions(true);
-      
-      const offset = (transactionsPage - 1) * ITEMS_PER_PAGE;
-      const { transactions: transactionsData, total } = await fetchCreatorPaymentTransactions(user.id, ITEMS_PER_PAGE, offset);
-      
-      setTransactions(transactionsData);
-      setTransactionsTotal(total);
+      const offset = page * ITEMS_PER_PAGE;
+      const { transactions, total } = await fetchCreatorOrderTransactions(user.id, ITEMS_PER_PAGE, offset);
+      setPaymentTransactions(transactions);
+      setTotalTransactions(total);
+      setTransactionPage(page);
     } catch (error) {
       console.error('Error loading transactions:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load transactions",
-        variant: "destructive"
-      });
+      toast.error('Failed to load payment transactions');
     } finally {
-      setLoadingTransactions(false);
+      setTransactionsLoading(false);
     }
   };
 
-  const loadPayouts = async () => {
+  const loadPayouts = async (page = 0) => {
     if (!user) return;
-    
+
+    setPayoutsLoading(true);
     try {
-      setLoadingPayouts(true);
-      
-      const offset = (payoutsPage - 1) * ITEMS_PER_PAGE;
-      const { payouts: payoutsData, total } = await fetchCreatorPayouts(user.id, ITEMS_PER_PAGE, offset);
-      
-      setPayouts(payoutsData);
-      setPayoutsTotal(total);
+      const offset = page * ITEMS_PER_PAGE;
+      const { payouts: payoutData, total } = await fetchCreatorPayouts(user.id, ITEMS_PER_PAGE, offset);
+      setPayouts(payoutData);
+      setTotalPayouts(total);
+      setPayoutPage(page);
     } catch (error) {
       console.error('Error loading payouts:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load payouts",
-        variant: "destructive"
-      });
+      toast.error('Failed to load payouts');
     } finally {
-      setLoadingPayouts(false);
+      setPayoutsLoading(false);
     }
   };
 
-  const loadPayoutMethod = async () => {
-    if (!user) return;
-    
-    try {
-      const method = await getCreatorPayoutMethod(user.id);
-      setPayoutMethod(method);
-    } catch (error) {
-      console.error('Error loading payout method:', error);
-    }
+  const handleWithdrawSuccess = useCallback(() => {
+    loadEarningsData();
+    loadPayouts();
+    setWithdrawDialogOpen(false);
+    setPawaPayDialogOpen(false);
+  }, []);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>;
-      case 'pending':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+        return 'default';
       case 'processing':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Processing</Badge>;
+        return 'secondary';
+      case 'pending':
+        return 'outline';
       case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
+        return 'destructive';
       default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-  
-  const getPaymentTypeLabel = (type: string) => {
-    switch (type) {
-      case 'course':
-        return 'Course Purchase';
-      case 'event_ticket':
-        return 'Event Registration';
-      case 'consultation':
-        return 'Consultation Booking';
-      default:
-        return type;
+        return 'outline';
     }
   };
 
-  const renderPagination = (currentPage: number, totalItems: number, onPageChange: (page: number) => void) => {
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-    
-    if (totalPages <= 1) return null;
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'processing':
+        return <Clock className="h-4 w-4" />;
+      case 'pending':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'failed':
+        return <AlertCircle className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
+  };
 
+  if (loading || !earnings) {
     return (
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center space-x-6 lg:space-x-8">
-          <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">
-              Page {currentPage} of {totalPages}
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+      <CreatorLayout title="Payments">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      </div>
+      </CreatorLayout>
     );
-  };
+  }
 
-  const renderPayoutMethodInfo = () => {
-    const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
-    const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
+  const availablePercentage = earnings.total_earnings > 0 
+    ? (earnings.available_balance / earnings.total_earnings) * 100 
+    : 0;
 
-    if (!hasStripeSetup && !hasMobileMoneySetup) {
-      return (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>No Payout Method Set Up</AlertTitle>
-          <AlertDescription>
-            Set up a payout method to withdraw your earnings. Choose between Stripe (for USA) or Mobile Money (for African countries).
-          </AlertDescription>
-        </Alert>
-      );
-    }
+  const pendingPercentage = earnings.total_earnings > 0 
+    ? (earnings.pending_balance / earnings.total_earnings) * 100 
+    : 0;
 
-    // Show active payout method based on default_payout_method
-    if (profileData?.default_payout_method === 'stripe' && hasStripeSetup) {
-      return (
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <div className="flex items-center gap-3">
-            <CreditCard className="h-5 w-5 text-blue-600" />
-            <div className="flex-1">
-              <div className="font-medium text-blue-900">Stripe Connect - Connected</div>
-              <div className="text-sm text-blue-700">Bank transfers (2-7 business days)</div>
-              {profileData.stripe_connect_account_id && (
-                <div className="text-xs text-blue-600 mt-1">
-                  Account ID: {profileData.stripe_connect_account_id.substring(0, 16)}...
-                </div>
-              )}
-            </div>
-            <Badge variant="default" className="bg-green-100 text-green-800">
-              Active
-            </Badge>
-          </div>
-        </div>
-      );
-    }
-
-    if (profileData?.default_payout_method === 'mobile_money' && hasMobileMoneySetup) {
-      return (
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-          <div className="flex items-center gap-3">
-            <Smartphone className="h-5 w-5 text-green-600" />
-            <div className="flex-1">
-              <div className="font-medium text-green-900">Mobile Money - Connected</div>
-              <div className="text-sm text-green-700">
-                {profileData.mobile_money_operator} • {profileData.mobile_money_number}
-              </div>
-              <div className="text-xs text-green-600 mt-1">
-                Within 24 hours processing
-              </div>
-            </div>
-            <Badge variant="default" className="bg-green-100 text-green-800">
-              Active
-            </Badge>
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
+  const totalTransactionPages = Math.ceil(totalTransactions / ITEMS_PER_PAGE);
+  const totalPayoutPages = Math.ceil(totalPayouts / ITEMS_PER_PAGE);
 
   return (
-    <CreatorLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-        <div className="space-y-6 p-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Payments & Payouts</h1>
-            <Button
-              variant="outline"
-              onClick={() => setIsSetupDialogOpen(true)}
-              className="flex items-center gap-2"
+    <CreatorLayout title="Payments">
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Payment Dashboard</h2>
+            <p className="text-muted-foreground">
+              Manage your earnings and track payment transactions
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setWithdrawDialogOpen(true)} 
+              disabled={earnings.available_balance <= 0}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
             >
-              <Settings className="h-4 w-4" />
-              Payout Settings
+              <Wallet className="h-4 w-4 mr-2" />
+              Withdraw Funds
             </Button>
           </div>
-
-          {/* Payout Method Status */}
-          {renderPayoutMethodInfo()}
-          
-          {/* Enhanced Balance Cards with Currency Conversion */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
-                ) : (
-                  <div className="text-base md:text-lg font-semibold">
-                    <PriceDisplay amount={earnings.available_balance} originalCurrency="USD" />
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Available for withdrawal (minimum $5.00)
-                </p>
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={() => setIsWithdrawDialogOpen(true)}
-                  disabled={loadingEarnings || earnings.available_balance < 5 || (!profileData?.stripe_connect_account_id && !profileData?.mobile_money_operator)}
-                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Withdraw Funds
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Pending Balance</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
-                ) : (
-                  <div className="text-base md:text-lg font-semibold">
-                    <PriceDisplay amount={earnings.pending_balance} originalCurrency="USD" />
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Funds in 7-day hold period
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
-                ) : (
-                  <div className="text-base md:text-lg font-semibold">
-                    <PriceDisplay amount={earnings.total_earnings} originalCurrency="USD" />
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your share (92% of sales)
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Platform Fees</CardTitle>
-                <Minus className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
-                ) : (
-                  <div className="text-base md:text-lg font-semibold">
-                    <PriceDisplay amount={earnings.total_platform_fees} originalCurrency="USD" />
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Platform fee (8% of sales)
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Revenue Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Course Revenue</CardTitle>
-                <CardDescription>Earnings from course sales</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  <PriceDisplay amount={earnings.course_revenue} originalCurrency="USD" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Event Revenue</CardTitle>
-                <CardDescription>Earnings from event registrations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  <PriceDisplay amount={earnings.event_revenue} originalCurrency="USD" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Payments & Payouts Tabs */}
-          <Tabs defaultValue="transactions" className="w-full">
-            <TabsList>
-              <TabsTrigger value="transactions">Customer Transactions</TabsTrigger>
-              <TabsTrigger value="payouts">Payouts</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="transactions" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Customer Payment Transactions</CardTitle>
-                  <CardDescription>
-                    View all completed payment transactions from customers for your courses and events
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingTransactions ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Customer</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Amount</TableHead>
-                              <TableHead>Your Earning</TableHead>
-                              <TableHead>Platform Fee</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Payout Date</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {transactions.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
-                                  No payment transactions found
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              transactions.map((transaction) => (
-                                <TableRow key={transaction.id}>
-                                  <TableCell>
-                                    {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>{transaction.customer_name || 'Unknown'}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="font-medium">{transaction.item_name}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">
-                                      {getPaymentTypeLabel(transaction.item_type)}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
-                                  </TableCell>
-                                  <TableCell className="font-medium text-green-600">
-                                    <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" />
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground">
-                                    <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" />
-                                  </TableCell>
-                                  <TableCell>
-                                    {getStatusBadge(transaction.payment_status)}
-                                  </TableCell>
-                                  <TableCell>
-                                    {transaction.payout_eligible_date ? 
-                                      format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
-                                      'N/A'
-                                    }
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      {renderPagination(transactionsPage, transactionsTotal, setTransactionsPage)}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="payouts" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payout History</CardTitle>
-                  <CardDescription>
-                    Track your withdrawal requests and their status
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingPayouts ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Amount</TableHead>
-                              <TableHead>Currency</TableHead>
-                              <TableHead>Method</TableHead>
-                              <TableHead>Destination</TableHead>
-                              <TableHead>Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {payouts.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                                  No payout requests found
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              payouts.map((payout) => (
-                                <TableRow key={payout.id}>
-                                  <TableCell>
-                                    {format(new Date(payout.created_at), 'MMM dd, yyyy')}
-                                  </TableCell>
-                                  <TableCell className="font-medium">
-                                    {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
-                                  </TableCell>
-                                  <TableCell>
-                                    {payout.currency?.toUpperCase() || 'USD'}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">
-                                      {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>{payout.destination}</TableCell>
-                                  <TableCell>
-                                    {getStatusBadge(payout.status)}
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      {renderPagination(payoutsPage, payoutsTotal, setPayoutsPage)}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
         </div>
 
-        {/* Enhanced Withdraw Dialog */}
+        {/* Earnings Overview Cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-50" />
+            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+              <Wallet className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent className="relative">
+              <div className="text-2xl font-bold text-green-700">
+                {formatCurrency(earnings.available_balance)}
+              </div>
+              <p className="text-xs text-green-600">
+                Ready for withdrawal
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-orange-100 opacity-50" />
+            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Balance</CardTitle>
+              <Clock className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent className="relative">
+              <div className="text-2xl font-bold text-orange-700">
+                {formatCurrency(earnings.pending_balance)}
+              </div>
+              <p className="text-xs text-orange-600">
+                7-day processing period
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-50" />
+            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent className="relative">
+              <div className="text-2xl font-bold text-blue-700">
+                {formatCurrency(earnings.total_earnings)}
+              </div>
+              <p className="text-xs text-blue-600">
+                All-time earnings
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-50" />
+            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Platform Fees</CardTitle>
+              <Receipt className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent className="relative">
+              <div className="text-2xl font-bold text-purple-700">
+                {formatCurrency(earnings.total_platform_fees)}
+              </div>
+              <p className="text-xs text-purple-600">
+                8% platform fee
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Revenue Breakdown */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Course Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-orange-600">
+                {formatCurrency(earnings.course_revenue)}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                From course enrollments
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Ticket className="h-5 w-5" />
+                Event Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600">
+                {formatCurrency(earnings.event_revenue)}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                From event bookings
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Balance Progress */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Balance Breakdown</CardTitle>
+            <CardDescription>
+              Visual representation of your earnings status
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span>Available ({availablePercentage.toFixed(1)}%)</span>
+                <span>{formatCurrency(earnings.available_balance)}</span>
+              </div>
+              <Progress value={availablePercentage} className="h-2 bg-green-100" />
+            </div>
+            
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span>Pending ({pendingPercentage.toFixed(1)}%)</span>
+                <span>{formatCurrency(earnings.pending_balance)}</span>
+              </div>
+              <Progress value={pendingPercentage} className="h-2 bg-orange-100" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabs for Transactions and Payouts */}
+        <Tabs defaultValue="transactions" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="transactions">Payment Transactions</TabsTrigger>
+            <TabsTrigger value="payouts">Withdrawal History</TabsTrigger>
+            <TabsTrigger value="settings">Payment Settings</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="transactions">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  Customer Payment Transactions
+                </CardTitle>
+                <CardDescription>
+                  View all completed payment transactions from customers for your courses and events
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {transactionsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : paymentTransactions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
+                    <p className="text-muted-foreground">
+                      Payment transactions will appear here once customers purchase your content
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Order ID</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Your Earning</TableHead>
+                          <TableHead>Platform Fee</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Method</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paymentTransactions.map((transaction) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="font-medium font-mono text-sm">
+                              {transaction.order_id.slice(-8).toUpperCase()}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{transaction.customer_name}</div>
+                                <div className="text-sm text-muted-foreground">{transaction.customer_email}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="max-w-[200px]">
+                                <div className="font-medium truncate">{transaction.item_name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Qty: {transaction.quantity}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                {transaction.item_type === 'course' ? (
+                                  <>
+                                    <BookOpen className="h-3 w-3" />
+                                    Course
+                                  </>
+                                ) : (
+                                  <>
+                                    <Ticket className="h-3 w-3" />
+                                    Event
+                                  </>
+                                )}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(transaction.total_amount)}
+                            </TableCell>
+                            <TableCell className="font-medium text-green-600">
+                              {formatCurrency(transaction.creator_earning)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatCurrency(transaction.platform_fee)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1 text-sm">
+                                <CalendarIcon className="h-3 w-3" />
+                                {new Date(transaction.created_at).toLocaleDateString()}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">
+                                {transaction.payment_method}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    {/* Pagination for Transactions */}
+                    {totalTransactionPages > 1 && (
+                      <div className="flex items-center justify-between px-2 py-4">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {transactionPage * ITEMS_PER_PAGE + 1} to {Math.min((transactionPage + 1) * ITEMS_PER_PAGE, totalTransactions)} of {totalTransactions} transactions
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadTransactions(transactionPage - 1)}
+                            disabled={transactionPage === 0}
+                          >
+                            Previous
+                          </Button>
+                          <div className="text-sm">
+                            {transactionPage + 1} of {totalTransactionPages}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadTransactions(transactionPage + 1)}
+                            disabled={transactionPage === totalTransactionPages - 1}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payouts">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ArrowDownLeft className="h-5 w-5" />
+                  Withdrawal History
+                </CardTitle>
+                <CardDescription>
+                  Track all your withdrawal requests and their status
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {payoutsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : payouts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Wallet className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No withdrawals yet</h3>
+                    <p className="text-muted-foreground">
+                      Your withdrawal history will appear here
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Destination</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payouts.map((payout) => (
+                          <TableRow key={payout.id}>
+                            <TableCell>
+                              {new Date(payout.created_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(payout.amount)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {payout.method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getStatusIcon(payout.status)}
+                                <Badge variant={getStatusBadgeVariant(payout.status)}>
+                                  {payout.status}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {payout.destination}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    {/* Pagination for Payouts */}
+                    {totalPayoutPages > 1 && (
+                      <div className="flex items-center justify-between px-2 py-4">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {payoutPage * ITEMS_PER_PAGE + 1} to {Math.min((payoutPage + 1) * ITEMS_PER_PAGE, totalPayouts)} of {totalPayouts} payouts
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadPayouts(payoutPage - 1)}
+                            disabled={payoutPage === 0}
+                          >
+                            Previous
+                          </Button>
+                          <div className="text-sm">
+                            {payoutPage + 1} of {totalPayoutPages}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadPayouts(payoutPage + 1)}
+                            disabled={payoutPage === totalPayoutPages - 1}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <StripeAccountManagement />
+          </TabsContent>
+        </Tabs>
+
+        {/* Dialogs */}
         <EnhancedWithdrawDialog
-          open={isWithdrawDialogOpen}
-          onOpenChange={setIsWithdrawDialogOpen}
+          open={withdrawDialogOpen}
+          onOpenChange={setWithdrawDialogOpen}
           availableBalance={earnings.available_balance}
-          currency={currentCurrency}
-          onSuccess={() => {
-            loadPaymentData();
-            loadPayouts();
-          }}
+          onSuccess={handleWithdrawSuccess}
         />
 
-        {/* Payout Method Setup Dialog */}
-        <PayoutMethodSetupDialog
-          open={isSetupDialogOpen}
-          onOpenChange={setIsSetupDialogOpen}
-          onSuccess={() => {
-            loadPayoutMethod();
-            loadProfileData();
-          }}
+        <PawaPayPayoutDialog
+          open={pawaPayDialogOpen}
+          onOpenChange={setPawaPayDialogOpen}
+          availableBalance={earnings.available_balance}
+          onSuccess={handleWithdrawSuccess}
         />
       </div>
     </CreatorLayout>
