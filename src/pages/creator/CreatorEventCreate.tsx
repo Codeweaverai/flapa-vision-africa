@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { VALID_EVENT_TYPES } from '@/services/eventService';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,18 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Upload, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-// Valid event types from the database constraint
-const VALID_EVENT_TYPES = [
-  'webinar',
-  'workshop', 
-  'conference',
-  'meetup',
-  'seminar',
-  'training',
-  'mentorship',
-  'networking'
-];
 
 interface TicketType {
   id: string;
@@ -136,19 +124,11 @@ const CreatorEventCreate = () => {
       return;
     }
 
-    // Validate required fields
     if (!formData.title || !formData.description || !formData.start_time || !formData.end_time) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    // Validate event type
-    if (!VALID_EVENT_TYPES.includes(formData.event_type)) {
-      toast.error('Please select a valid event type');
-      return;
-    }
-
-    // Validate date/time
     if (new Date(formData.start_time) >= new Date(formData.end_time)) {
       toast.error('End time must be after start time');
       return;
@@ -171,15 +151,14 @@ const CreatorEventCreate = () => {
     setLoading(true);
     
     try {
-      // Create event with proper field mapping
       const eventData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
+        title: formData.title,
+        description: formData.description,
         event_type: formData.event_type,
         start_time: formData.start_time,
         end_time: formData.end_time,
-        location: formData.location?.trim() || null,
-        online_meeting_link: formData.online_meeting_link?.trim() || null,
+        location: formData.location || null,
+        online_meeting_link: formData.online_meeting_link || null,
         capacity: formData.capacity,
         is_free: formData.is_free,
         price: formData.is_free ? 0 : formData.price,
@@ -188,20 +167,13 @@ const CreatorEventCreate = () => {
         creator_id: user.id
       };
 
-      console.log('Creating event with data:', eventData);
-
       const { data: event, error: eventError } = await supabase
         .from('events')
         .insert([eventData])
         .select()
         .single();
 
-      if (eventError) {
-        console.error('Event creation error:', eventError);
-        throw eventError;
-      }
-
-      console.log('Event created successfully:', event);
+      if (eventError) throw eventError;
 
       // Create ticket types if this is not a free event
       if (!formData.is_free && ticketTypes.length > 0) {
@@ -229,17 +201,9 @@ const CreatorEventCreate = () => {
 
       toast.success('Event created successfully');
       navigate('/creator/events');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating event:', error);
-      
-      // Provide more specific error messages
-      if (error?.code === '23514') {
-        toast.error('Please select a valid event type from the dropdown');
-      } else if (error?.message?.includes('violates check constraint')) {
-        toast.error('Please ensure all fields contain valid values');
-      } else {
-        toast.error('Failed to create event. Please check your input and try again.');
-      }
+      toast.error('Failed to create event');
     } finally {
       setLoading(false);
     }
