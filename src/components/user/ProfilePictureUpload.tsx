@@ -9,13 +9,17 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ProfilePictureUploadProps {
   currentImageUrl?: string;
-  onImageUpdate: (url: string) => void;
+  onImageUpdate?: (url: string) => void;
+  onUploadComplete?: (url: string, path: string) => Promise<void>;
+  username?: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
 const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   currentImageUrl,
   onImageUpdate,
+  onUploadComplete,
+  username,
   size = 'lg'
 }) => {
   const [uploading, setUploading] = useState(false);
@@ -84,7 +88,13 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         throw updateError;
       }
 
-      onImageUpdate(publicUrl);
+      // Call the appropriate callback
+      if (onUploadComplete) {
+        await onUploadComplete(publicUrl, filePath);
+      } else if (onImageUpdate) {
+        onImageUpdate(publicUrl);
+      }
+
       toast({
         title: "Profile picture updated",
         description: "Your profile picture has been successfully updated.",
@@ -106,13 +116,20 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     fileInputRef.current?.click();
   };
 
+  const getInitials = () => {
+    if (username) {
+      return username.charAt(0).toUpperCase();
+    }
+    return user?.email?.charAt(0).toUpperCase() || 'U';
+  };
+
   return (
     <div className="flex flex-col items-center space-y-4">
       <div className="relative">
         <Avatar className={sizeClasses[size]}>
           <AvatarImage src={currentImageUrl} alt="Profile picture" />
           <AvatarFallback>
-            {user?.email?.charAt(0).toUpperCase() || 'U'}
+            {getInitials()}
           </AvatarFallback>
         </Avatar>
         <Button
