@@ -169,7 +169,7 @@ const CreatorSettings = () => {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Profile Settings</CardTitle>
+            <CardTitle>Creator Profile Settings</CardTitle>
             <CardDescription>Update your profile information and preferences.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
