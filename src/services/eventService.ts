@@ -28,9 +28,13 @@ export interface Registration {
   status: string;
   created_at: string;
   updated_at: string;
+  booking_date?: string;
+  phone_number?: string;
+  mobile_operator?: string;
 }
 
 export interface MobileOperator {
+  id: string;
   code: string;
   name: string;
   country: string;
@@ -66,12 +70,26 @@ export const fetchEvents = async (): Promise<Event[]> => {
 export const fetchUserRegistrations = async (user: any): Promise<Registration[]> => {
   try {
     const { data, error } = await supabase
-      .from('event_registrations')
+      .from('event_bookings')
       .select('*')
       .eq('user_id', user.id);
 
     if (error) throw error;
-    return data || [];
+    
+    // Transform event_bookings to match Registration interface
+    const registrations = data?.map((booking) => ({
+      id: booking.id,
+      event_id: booking.event_id,
+      user_id: booking.user_id,
+      status: booking.status || 'pending',
+      created_at: booking.created_at,
+      updated_at: booking.updated_at,
+      booking_date: booking.booking_date,
+      phone_number: booking.phone_number,
+      mobile_operator: booking.mobile_operator
+    })) || [];
+
+    return registrations;
   } catch (error) {
     console.error('Error fetching user registrations:', error);
     throw error;
@@ -85,17 +103,18 @@ export const registerForEvent = async (
   mobileOperator?: string
 ): Promise<any> => {
   try {
-    const registrationData = {
+    const bookingData = {
       event_id: event.id,
       user_id: user.id,
       status: 'confirmed',
       phone_number: phoneNumber,
-      mobile_operator: mobileOperator
+      mobile_operator: mobileOperator,
+      booking_date: new Date().toISOString()
     };
 
     const { data, error } = await supabase
-      .from('event_registrations')
-      .insert([registrationData])
+      .from('event_bookings')
+      .insert([bookingData])
       .select()
       .single();
 
@@ -110,7 +129,7 @@ export const registerForEvent = async (
 export const cancelRegistration = async (registrationId: string, user: any): Promise<boolean> => {
   try {
     const { error } = await supabase
-      .from('event_registrations')
+      .from('event_bookings')
       .update({ status: 'cancelled' })
       .eq('id', registrationId)
       .eq('user_id', user.id);
@@ -126,10 +145,10 @@ export const cancelRegistration = async (registrationId: string, user: any): Pro
 export const fetchMobileOperators = async (): Promise<MobileOperator[]> => {
   // Return mock data for now - this would typically come from a database
   return [
-    { code: 'MTN_UG', name: 'MTN Uganda', country: 'UG' },
-    { code: 'AIRTEL_UG', name: 'Airtel Uganda', country: 'UG' },
-    { code: 'MTN_ZM', name: 'MTN Zambia', country: 'ZM' },
-    { code: 'AIRTEL_ZM', name: 'Airtel Zambia', country: 'ZM' }
+    { id: '1', code: 'MTN_UG', name: 'MTN Uganda', country: 'UG' },
+    { id: '2', code: 'AIRTEL_UG', name: 'Airtel Uganda', country: 'UG' },
+    { id: '3', code: 'MTN_ZM', name: 'MTN Zambia', country: 'ZM' },
+    { id: '4', code: 'AIRTEL_ZM', name: 'Airtel Zambia', country: 'ZM' }
   ];
 };
 

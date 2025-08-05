@@ -118,7 +118,7 @@ const RegistrationEditDialog = ({
               </SelectTrigger>
               <SelectContent>
                 {mobileOperators.map((operator) => (
-                  <SelectItem key={operator.id} value={operator.code}>
+                  <SelectItem key={operator.code} value={operator.code}>
                     {operator.name}
                   </SelectItem>
                 ))}
