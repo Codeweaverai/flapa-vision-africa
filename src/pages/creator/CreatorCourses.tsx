@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -26,7 +27,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import CourseForm from '@/components/creator/CourseForm';
 import { Badge } from '@/components/ui/badge';
 import {
   Pagination,
@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/pagination"
 
 import { 
-  fetchAllCreatorCourses,
+  fetchCreatorCourses,
   deleteCourse as deleteCourseService
 } from '@/services/courseService';
 
@@ -67,7 +67,7 @@ const CreatorCourses: React.FC = () => {
     
     try {
       setLoading(true);
-      const { courses: coursesData, total } = await fetchAllCreatorCourses(user.id, ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE);
+      const { courses: coursesData, total } = await fetchCreatorCourses(user.id, ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE);
       setCourses(coursesData);
       setTotalCourses(total);
     } catch (error) {
@@ -91,8 +91,7 @@ const CreatorCourses: React.FC = () => {
   );
 
   const handleEditCourse = (course: any) => {
-    setSelectedCourse(course);
-    setIsCreateDialogOpen(true);
+    navigate(`/creator/courses/edit/${course.id}`);
   };
 
   const handleManageContent = (courseId: string) => {
@@ -142,18 +141,16 @@ const CreatorCourses: React.FC = () => {
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
-              href="#"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+              onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+              className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
             />
           </PaginationItem>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <PaginationItem key={page} active={currentPage === page}>
+            <PaginationItem key={page}>
               <PaginationLink
-                href="#"
                 onClick={() => handlePageChange(page)}
-                isCurrent={currentPage === page}
-                aria-current={currentPage === page ? "page" : undefined}
+                isActive={currentPage === page}
+                className="cursor-pointer"
               >
                 {page}
               </PaginationLink>
@@ -161,9 +158,8 @@ const CreatorCourses: React.FC = () => {
           ))}
           <PaginationItem>
             <PaginationNext
-              href="#"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
             />
           </PaginationItem>
         </PaginationContent>
@@ -183,34 +179,10 @@ const CreatorCourses: React.FC = () => {
             onChange={handleSearchChange}
             className="max-w-md"
           />
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Course
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[625px]">
-              <DialogHeader>
-                <DialogTitle>{selectedCourse ? 'Edit Course' : 'Create New Course'}</DialogTitle>
-                <DialogDescription>
-                  {selectedCourse ? 'Update the course details.' : 'Fill in the details to create a new course.'}
-                </DialogDescription>
-              </DialogHeader>
-              <CourseForm
-                course={selectedCourse}
-                onSuccess={() => {
-                  loadCourses();
-                  setIsCreateDialogOpen(false);
-                  setSelectedCourse(null);
-                }}
-                onCancel={() => {
-                  setIsCreateDialogOpen(false);
-                  setSelectedCourse(null);
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => navigate('/creator/courses/create')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Course
+          </Button>
         </div>
 
         {/* Courses List */}
@@ -241,7 +213,7 @@ const CreatorCourses: React.FC = () => {
                   {searchQuery ? 'No courses match your search criteria.' : 'You haven\'t created any courses yet.'}
                 </p>
                 {!searchQuery && (
-                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Button onClick={() => navigate('/creator/courses/create')}>
                     <Plus className="h-4 w-4 mr-2" />
                     Create Your First Course
                   </Button>
@@ -335,30 +307,6 @@ const CreatorCourses: React.FC = () => {
 
         {/* Pagination */}
         {renderPagination()}
-
-        {/* Create Course Dialog */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="sm:max-w-[625px]">
-            <DialogHeader>
-              <DialogTitle>{selectedCourse ? 'Edit Course' : 'Create New Course'}</DialogTitle>
-              <DialogDescription>
-                {selectedCourse ? 'Update the course details.' : 'Fill in the details to create a new course.'}
-              </DialogDescription>
-            </DialogHeader>
-            <CourseForm
-              course={selectedCourse}
-              onSuccess={() => {
-                loadCourses();
-                setIsCreateDialogOpen(false);
-                setSelectedCourse(null);
-              }}
-              onCancel={() => {
-                setIsCreateDialogOpen(false);
-                setSelectedCourse(null);
-              }}
-            />
-          </DialogContent>
-        </Dialog>
       </div>
     </CreatorLayout>
   );
