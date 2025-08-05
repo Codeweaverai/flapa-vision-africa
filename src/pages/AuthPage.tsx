@@ -400,6 +400,15 @@ const AuthPage = () => {
                         'Create Account'
                       )}
                     </Button>
+                     {/* 👇 Forgot password link below the button */}
+                  <div className="text-right">
+                 <Link
+                to="/forgot-password"
+              className="text-sm text-orange-100 hover:text-white underline"
+              >
+               Forgot your password?
+               </Link>
+              </div>
                   </form>
                 </TabsContent>
               </Tabs>
