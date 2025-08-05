@@ -44,7 +44,6 @@ export async function fetchCreatorOrderTransactions(
           item_id,
           item_type,
           quantity,
-          price,
           total_price
         )
       `)
@@ -105,7 +104,7 @@ export async function fetchCreatorOrderTransactions(
             .from('event_tickets')
             .select(`
               name,
-              events!inner(
+              events!event_tickets_event_id_fkey(
                 title,
                 creator_id
               )
@@ -113,7 +112,7 @@ export async function fetchCreatorOrderTransactions(
             .eq('id', item.item_id)
             .single();
           
-          if (eventTicket && eventTicket.events.creator_id === creatorId) {
+          if (eventTicket && eventTicket.events && eventTicket.events.creator_id === creatorId) {
             isCreatorContent = true;
             itemTitle = `${eventTicket.events.title} - ${eventTicket.name}`;
           }

@@ -356,8 +356,8 @@ const CreatorPayments = () => {
       </div>
 
       <CreatorWithdrawDialog
-        isOpen={showWithdrawDialog}
-        onClose={() => setShowWithdrawDialog(false)}
+        open={showWithdrawDialog}
+        onOpenChange={setShowWithdrawDialog}
         availableBalance={earnings?.available_balance || 0}
         onSuccess={() => {
           setShowWithdrawDialog(false);

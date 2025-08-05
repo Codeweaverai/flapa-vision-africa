@@ -103,7 +103,7 @@ const CreatorAnalytics = () => {
           id,
           booking_date,
           user_id,
-          events!inner(
+          events!event_bookings_event_id_fkey(
             title,
             creator_id
           )
