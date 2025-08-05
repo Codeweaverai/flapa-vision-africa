@@ -31,6 +31,7 @@ const CreatorStudents = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -104,16 +105,21 @@ const CreatorStudents = () => {
         throw profilesError;
       }
 
-      // Get user emails from auth
-      const { data: authUsers } = await supabase.functions.invoke('get-user-emails', {
-        body: { user_ids: allUserIds }
-      });
-
-      const emailMap = new Map();
-      if (authUsers?.users) {
-        authUsers.users.forEach((user: any) => {
-          emailMap.set(user.id, user.email);
+      // Get user emails from auth using the edge function
+      let emailMap = new Map();
+      try {
+        const { data: authUsers } = await supabase.functions.invoke('get-user-emails', {
+          body: { user_ids: allUserIds }
         });
+
+        if (authUsers?.users) {
+          authUsers.users.forEach((user: any) => {
+            emailMap.set(user.id, user.email);
+          });
+        }
+      } catch (emailError) {
+        console.error('Error fetching user emails:', emailError);
+        // Continue without emails if the function fails
       }
 
       // Combine data
@@ -163,6 +169,9 @@ const CreatorStudents = () => {
       });
 
       setStudents(studentsData);
+      
+      // Set all students as selected by default for bulk announcements
+      setSelectedAttendees(studentsData.map(s => s.id));
     } catch (error) {
       console.error('Error loading students:', error);
       toast.error('Failed to load students');
@@ -178,6 +187,16 @@ const CreatorStudents = () => {
     (student.course_title && student.course_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (student.event_title && student.event_title.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // Prepare attendees data for the modal
+  const attendeesData = students.map(student => ({
+    id: student.id,
+    ticket_holder_name: student.full_name,
+    user_id: student.user_id,
+    user_profile: {
+      full_name: student.full_name
+    }
+  }));
 
   if (loading) {
     return (
@@ -295,12 +314,11 @@ const CreatorStudents = () => {
       </div>
 
       <BulkAnnouncementModal
-        open={showAnnouncementModal}
-        onOpenChange={setShowAnnouncementModal}
-        recipientType="all_students"
-        onSuccess={() => {
-          toast.success('Announcement sent successfully');
-        }}
+        isOpen={showAnnouncementModal}
+        onClose={() => setShowAnnouncementModal(false)}
+        selectedAttendees={selectedAttendees}
+        attendeesData={attendeesData}
+        eventTitle="All Students & Attendees"
       />
     </CreatorLayout>
   );
