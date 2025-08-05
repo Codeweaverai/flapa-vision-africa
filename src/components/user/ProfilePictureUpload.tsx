@@ -1,169 +1,107 @@
 
-import React, { useState, useRef } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Upload } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Upload, User } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ProfilePictureUploadProps {
   currentImageUrl?: string;
-  onImageUpdate?: (url: string) => void;
-  onUploadComplete?: (url: string, path: string) => Promise<void>;
   username?: string;
-  size?: 'sm' | 'md' | 'lg';
+  onUploadComplete?: (url: string, path: string) => void;
 }
 
 const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   currentImageUrl,
-  onImageUpdate,
-  onUploadComplete,
   username,
-  size = 'lg'
+  onUploadComplete
 }) => {
-  const [uploading, setUploading] = useState(false);
   const { user } = useAuth();
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [imageUrl, setImageUrl] = useState(currentImageUrl || '');
 
-  const sizeClasses = {
-    sm: 'h-16 w-16',
-    md: 'h-24 w-24',
-    lg: 'h-32 w-32'
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please select an image file.",
-        variant: "destructive"
-      });
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please select an image smaller than 5MB.",
-        variant: "destructive"
-      });
-      return;
-    }
+    const file = event.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `${user?.id}/${fileName}`;
 
     setUploading(true);
     try {
-      // Create unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `profile-pictures/${fileName}`;
+      // Upload the file to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('profile_pictures')
+        .upload(filePath, file, { upsert: true });
+      
+      if (error) throw error;
 
-      // Upload file to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('Profile Pictures')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get public URL
+      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('Profile Pictures')
+        .from('profile_pictures')
         .getPublicUrl(filePath);
-
-      // Update profile with new image URL
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Call the appropriate callback
+      
+      // Update the local state
+      setImageUrl(publicUrl);
+      
+      // If callback function is provided, call it with the new URL
       if (onUploadComplete) {
-        await onUploadComplete(publicUrl, filePath);
-      } else if (onImageUpdate) {
-        onImageUpdate(publicUrl);
+        onUploadComplete(publicUrl, filePath);
       }
 
-      toast({
-        title: "Profile picture updated",
-        description: "Your profile picture has been successfully updated.",
-      });
-
+      toast.success('Profile picture uploaded successfully');
     } catch (error) {
+      toast.error('Error uploading profile picture');
       console.error('Error uploading profile picture:', error);
-      toast({
-        title: "Upload failed",
-        description: "Failed to upload profile picture. Please try again.",
-        variant: "destructive"
-      });
     } finally {
       setUploading(false);
     }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
   };
 
   const getInitials = () => {
     if (username) {
       return username.charAt(0).toUpperCase();
     }
-    return user?.email?.charAt(0).toUpperCase() || 'U';
+    return 'U';
   };
 
   return (
-    <div className="flex flex-col items-center space-y-4">
-      <div className="relative">
-        <Avatar className={sizeClasses[size]}>
-          <AvatarImage src={currentImageUrl} alt="Profile picture" />
-          <AvatarFallback>
-            {getInitials()}
-          </AvatarFallback>
-        </Avatar>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={triggerFileInput}
+    <div className="flex flex-col items-center gap-4">
+      <Avatar className="h-24 w-24">
+        <AvatarImage src={imageUrl} alt="Profile" className="object-cover" />
+        <AvatarFallback>
+          <User className="h-12 w-12 text-muted-foreground" />
+        </AvatarFallback>
+      </Avatar>
+      
+      <div className="flex items-center gap-2">
+        <Button 
+          className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
+          size="sm" 
+          className="relative"
           disabled={uploading}
-          className="absolute bottom-0 right-0 rounded-full p-2 h-8 w-8 bg-background border-2 border-background shadow-md hover:bg-accent"
         >
-          {uploading ? (
-            <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
-          ) : (
-            <Camera className="h-3 w-3" />
-          )}
+          <input
+            type="file"
+            className="absolute inset-0 opacity-0 cursor-pointer"
+            accept="image/png, image/jpeg, image/gif, image/webp"
+            onChange={handleFileChange}
+            disabled={uploading}
+          />
+          <Upload className="h-4 w-4 mr-2" />
+          {uploading ? 'Uploading...' : 'Upload Photo'}
         </Button>
       </div>
-
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept="image/*"
-        className="hidden"
-      />
-
-      <Button
-        variant="outline"
-        onClick={triggerFileInput}
-        disabled={uploading}
-        className="flex items-center gap-2"
-      >
-        <Upload className="h-4 w-4" />
-        {uploading ? 'Uploading...' : 'Change Picture'}
-      </Button>
+      
+      <p className="text-xs text-muted-foreground mt-1">
+        Recommended: Square image, at least 300x300px
+      </p>
     </div>
   );
 };

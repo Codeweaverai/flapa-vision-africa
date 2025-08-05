@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -18,7 +19,6 @@ interface UserSettings {
   website?: string;
   email_notifications?: boolean;
   marketing_emails?: boolean;
-  avatar_url?: string;
 }
 
 const UserSettings: React.FC = () => {
@@ -31,8 +31,7 @@ const UserSettings: React.FC = () => {
     bio: '',
     website: '',
     email_notifications: true,
-    marketing_emails: false,
-    avatar_url: ''
+    marketing_emails: false
   });
 
   useEffect(() => {
@@ -62,7 +61,6 @@ const UserSettings: React.FC = () => {
         full_name: data.full_name || '',
         username: data.username || '',
         bio: data.bio || '',
-        avatar_url: data.avatar_url || '',
         // Provide default values for optional fields that might not exist in the database
         website: '',
         email_notifications: true,
@@ -83,10 +81,6 @@ const UserSettings: React.FC = () => {
 
   const handleSwitchChange = (name: string, checked: boolean) => {
     setSettings(prev => ({ ...prev, [name]: checked }));
-  };
-
-  const handleImageUpdate = async (url: string) => {
-    setSettings(prev => ({ ...prev, avatar_url: url }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -142,10 +136,7 @@ const UserSettings: React.FC = () => {
               <CardDescription>Update your profile picture</CardDescription>
             </CardHeader>
             <CardContent>
-              <ProfilePictureUpload 
-                currentImageUrl={settings.avatar_url}
-                onImageUpdate={handleImageUpdate}
-              />
+              <ProfilePictureUpload />
             </CardContent>
           </Card>
           

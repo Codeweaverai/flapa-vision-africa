@@ -42,6 +42,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
     if (coursesError) {
       console.log('Error fetching creator courses:', coursesError);
+      // Return zero earnings if we can't fetch courses
     }
 
     const courseIds = creatorCourses?.map(c => c.id) || [];
@@ -54,6 +55,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
     if (eventsError) {
       console.log('Error fetching creator events:', eventsError);
+      // Continue with empty array if events fetch fails
     }
 
     const eventIds = creatorEvents?.map(e => e.id) || [];
@@ -84,7 +86,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       };
     }
 
-    // Fetch order items for courses
+    // Fetch order items for courses separately
     let courseOrderItems: any[] = [];
     if (courseIds.length > 0) {
       const { data: courseItems, error: courseError } = await supabase
@@ -99,8 +101,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
             currency,
             payment_status,
             payment_method,
-            created_at,
-            tax_amount
+            created_at
           )
         `)
         .eq('orders.payment_status', 'completed')
@@ -114,7 +115,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
     }
 
-    // Fetch order items for event tickets
+    // Fetch order items for event tickets separately
     let eventOrderItems: any[] = [];
     if (eventTicketIds.length > 0) {
       const { data: eventItems, error: eventError } = await supabase
@@ -129,8 +130,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
             currency,
             payment_status,
             payment_method,
-            created_at,
-            tax_amount
+            created_at
           )
         `)
         .eq('orders.payment_status', 'completed')
@@ -169,15 +169,8 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
     orderItems.forEach(item => {
       const itemTotal = Number(item.total_price);
-      const orderTotal = Number(item.orders.total_amount);
-      const orderTax = Number(item.orders.tax_amount) || 0;
-      
-      // Calculate proportional tax allocation for this item
-      const itemTaxAllocation = orderTotal > 0 ? (itemTotal / orderTotal) * orderTax : 0;
-      
-      // Calculate platform fee and creator earning with tax consideration
       const platformFee = itemTotal * PLATFORM_FEE_RATE;
-      const creatorEarning = Math.max(0, itemTotal - platformFee - itemTaxAllocation);
+      const creatorEarning = itemTotal - platformFee;
       
       totalEarnings += creatorEarning;
       totalPlatformFees += platformFee;
@@ -202,7 +195,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
     });
 
-    // Get completed payouts and subtract from available balance
+    // Get completed payouts and subtract the correct amounts from available balance
     const { data: completedPayouts } = await supabase
       .from('creator_payouts')
       .select('amount, method, mobile_money_details, currency')
@@ -213,14 +206,18 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     
     if (completedPayouts) {
       completedPayouts.forEach(payout => {
+        // For mobile money payouts, use the original USD amount if available
         if (payout.method === 'mobile_money' && payout.mobile_money_details) {
+          // Type assertion with proper checking
           const mobileMoneyDetails = payout.mobile_money_details as any;
           if (mobileMoneyDetails && typeof mobileMoneyDetails === 'object' && mobileMoneyDetails.original_usd_amount) {
             totalPayouts += Number(mobileMoneyDetails.original_usd_amount);
           } else {
+            // Fallback to the amount field if original_usd_amount is not available
             totalPayouts += Number(payout.amount);
           }
         } else {
+          // For Stripe payouts or mobile money payouts without original USD amount, use the amount directly
           totalPayouts += Number(payout.amount);
         }
       });
@@ -238,6 +235,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     };
   } catch (error) {
     console.error('Error calculating creator earnings from orders:', error);
+    // Return zero earnings on error instead of throwing
     return {
       available_balance: 0,
       pending_balance: 0,
@@ -301,7 +299,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       return { transactions: [], total: 0 };
     }
 
-    // Fetch course order items with detailed order information
+    // Fetch course order items
     let courseOrderItems: any[] = [];
     if (courseIds.length > 0) {
       const { data: courseItems, error: courseError } = await supabase
@@ -317,15 +315,14 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             payment_status,
             payment_method,
             created_at,
-            updated_at,
-            tax_amount,
-            stripe_payment_intent_id
+            updated_at
           )
         `)
         .eq('orders.payment_status', 'completed')
         .eq('item_type', 'course')
         .in('item_id', courseIds)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (courseError) {
         console.error('Error fetching course transactions:', courseError);
@@ -334,7 +331,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // Fetch event order items with detailed order information
+    // Fetch event order items
     let eventOrderItems: any[] = [];
     if (eventTicketIds.length > 0) {
       const { data: eventItems, error: eventError } = await supabase
@@ -350,15 +347,14 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             payment_status,
             payment_method,
             created_at,
-            updated_at,
-            tax_amount,
-            stripe_payment_intent_id
+            updated_at
           )
         `)
         .eq('orders.payment_status', 'completed')
         .eq('item_type', 'event_ticket')
         .in('item_id', eventTicketIds)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (eventError) {
         console.error('Error fetching event transactions:', eventError);
@@ -367,41 +363,30 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // Combine and sort by date, then apply pagination
-    const allOrderItems = [...courseOrderItems, ...eventOrderItems]
-      .sort((a, b) => new Date(b.orders.created_at).getTime() - new Date(a.orders.created_at).getTime());
+    // Combine and sort by date
+    const orderItems = [...courseOrderItems, ...eventOrderItems]
+      .sort((a, b) => new Date(b.orders.created_at).getTime() - new Date(a.orders.created_at).getTime())
+      .slice(0, limit);
 
-    const totalCount = allOrderItems.length;
-    const paginatedItems = allOrderItems.slice(offset, offset + limit);
-
-    if (!paginatedItems || paginatedItems.length === 0) {
-      return { transactions: [], total: totalCount };
+    if (!orderItems || orderItems.length === 0) {
+      return { transactions: [], total: 0 };
     }
 
     // Get user profiles for customer names
-    const userIds = [...new Set(paginatedItems.map(item => item.orders.user_id))];
+    const userIds = [...new Set(orderItems.map(item => item.orders.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, username, full_name')
       .in('id', userIds);
 
-    // Process transactions with proper tax calculation
+    // Process transactions
     const creatorTransactions: CreatorTransaction[] = [];
     
-    for (const item of paginatedItems) {
+    for (const item of orderItems) {
       const profile = profiles?.find(p => p.id === item.orders.user_id);
       const itemTotal = Number(item.total_price);
-      const orderTotal = Number(item.orders.total_amount);
-      const orderTax = Number(item.orders.tax_amount) || 0;
-      
-      // Calculate proportional tax allocation for this item
-      const itemTaxAllocation = orderTotal > 0 ? (itemTotal / orderTotal) * orderTax : 0;
-      
-      // Calculate platform fee (8% of item total)
       const platformFee = itemTotal * PLATFORM_FEE_RATE;
-      
-      // Calculate creator earning: item total - platform fee - proportional tax
-      const creatorEarning = itemTotal - platformFee - itemTaxAllocation;
+      const creatorEarning = itemTotal - platformFee;
       
       let itemName = 'Unknown Item';
       let itemType: 'course' | 'event_ticket' = 'course';
@@ -431,17 +416,17 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
         total_amount: itemTotal,
-        creator_earning: Math.max(0, creatorEarning), // Ensure non-negative
+        creator_earning: creatorEarning,
         platform_fee: platformFee,
         payment_status: item.orders.payment_status,
         created_at: item.orders.created_at,
-        order_total: orderTotal,
+        order_total: Number(item.orders.total_amount),
         payout_eligible_date: payoutEligibleDate.toISOString(),
         payment_method: item.orders.payment_method || 'Unknown'
       });
     }
 
-    return { transactions: creatorTransactions, total: totalCount };
+    return { transactions: creatorTransactions, total: creatorTransactions.length };
   } catch (error) {
     console.error('Error fetching creator transactions from orders:', error);
     return { transactions: [], total: 0 };

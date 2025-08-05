@@ -614,7 +614,6 @@ const CreatorAnalytics: React.FC = () => {
                       <div key={index} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{booking.profiles?.username || booking.profiles?.full_name || 'Unknown Attendee'}</p>
-                          <p className="text-sm font-medium leading-none">{booking.attendee_name} </p>
                           <p className="text-sm text-muted-foreground">Event Booking</p>
                         </div>
                         <div className="text-right">

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -135,7 +136,7 @@ const CreatorSettings = () => {
     }
   };
 
-  const handleAvatarUpdate = async (newAvatarUrl: string) => {
+  const handleAvatarUpload = async (newAvatarUrl: string) => {
     if (!user) return;
 
     try {
@@ -176,8 +177,7 @@ const CreatorSettings = () => {
             <div className="space-y-4">
               <Label htmlFor="avatar">Profile Picture</Label>
               <ProfilePictureUpload
-                currentImageUrl={profile?.avatar_url}
-                onImageUpdate={handleAvatarUpdate}
+                onUploadComplete={handleAvatarUpload}
               />
             </div>
 
