@@ -67,9 +67,9 @@ const CreatorCourses: React.FC = () => {
     
     try {
       setLoading(true);
-      const { courses: coursesData, total } = await fetchCreatorCourses(user.id, ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE);
-      setCourses(coursesData);
-      setTotalCourses(total);
+      const result = await fetchCreatorCourses(user.id, ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE);
+      setCourses(result.courses);
+      setTotalCourses(result.total);
     } catch (error) {
       console.error('Error loading courses:', error);
       toast({
