@@ -29,7 +29,7 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
               <TabsList className="grid w-full grid-cols-4 mb-8 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <TabsTrigger value="feed" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <Users className="h-4 w-4" />
-                  <span>Community Feed</span>
+                  <span>Feed</span>
                 </TabsTrigger>
                 <TabsTrigger value="chat" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <MessageCircle className="h-4 w-4" />
@@ -37,7 +37,7 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
                 </TabsTrigger>
                 <TabsTrigger value="courses" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <BookOpen className="h-4 w-4" />
-                  <span>Course Discussions</span>
+                  <span>Discussions</span>
                 </TabsTrigger>
                 <TabsTrigger value="notifications" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                   <Bell className="h-4 w-4" />
