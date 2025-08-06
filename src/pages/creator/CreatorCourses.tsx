@@ -249,6 +249,7 @@ const CreatorCourses = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigate(`/creator/courses/${course.id}/edit`)}
+                      className="bg-green-500 text-red hover:bg-red-700 hover:text-white"
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -275,6 +276,7 @@ const CreatorCourses = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigate(`/creator/students`)}
+                      className="bg-green-500 text-purple hover:bg-purple-700 hover:text-white"
                     >
                       <Users className="h-4 w-4 mr-1" />
                       Students
@@ -286,6 +288,7 @@ const CreatorCourses = () => {
                     size="sm"
                     className="w-full"
                     onClick={() => handleAddPreview(course)}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
                   >
                     <Video className="h-4 w-4 mr-1" />
                     Add Preview
