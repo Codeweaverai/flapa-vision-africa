@@ -62,11 +62,11 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       // Create unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `/${fileName}`;
+      const filePath = `profile-pictures/${fileName}`;
 
       // Upload file to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('Profile Pictures')
+        .from('profile-pictures')
         .upload(filePath, file);
 
       if (uploadError) {
@@ -75,7 +75,7 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('Profile Pictures')
+        .from('profile-pitures')
         .getPublicUrl(filePath);
 
       // Update profile with new image URL
