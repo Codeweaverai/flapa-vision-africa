@@ -83,6 +83,11 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
       icon: <BarChart className="h-5 w-5 mr-2" />
     },
     {
+      label: 'Attendee Management',
+      href: '/creator/attendees',
+      icon: <Calendar className="h-5 w-5 mr-2" />
+    },
+    {
       label: 'Ticket Verification',
       href: '/ticket-verification',
       icon: <Calendar className="h-5 w-5 mr-2" />
@@ -128,11 +133,14 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
                 </nav>
                 
                 <div className="mt-8 pt-4 border-t">
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link to="/account">
-                      Back to My Account
-                    </Link>
-                  </Button>
+                  <Button
+                className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold rounded-md hover:opacity-90 transition-all"
+                  asChild
+                 >
+               <Link to="/account">
+                Back to My Account
+                </Link>
+                </Button>
                 </div>
               </Card>
             </div>

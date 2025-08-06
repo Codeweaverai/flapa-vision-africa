@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -136,7 +135,7 @@ const CreatorSettings = () => {
     }
   };
 
-  const handleAvatarUpload = async (newAvatarUrl: string) => {
+  const handleAvatarUpdate = async (newAvatarUrl: string) => {
     if (!user) return;
 
     try {
@@ -170,14 +169,15 @@ const CreatorSettings = () => {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Profile Settings</CardTitle>
+            <CardTitle>Creator Profile Settings</CardTitle>
             <CardDescription>Update your profile information and preferences.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
               <Label htmlFor="avatar">Profile Picture</Label>
               <ProfilePictureUpload
-                onUploadComplete={handleAvatarUpload}
+                currentImageUrl={profile?.avatar_url}
+                onImageUpdate={handleAvatarUpdate}
               />
             </div>
 
@@ -305,10 +305,14 @@ const CreatorSettings = () => {
                   )}
                 </div>
               </div>
+              <Button
+            type="submit"
+           disabled={isSubmitting}
+           className="bg-gradient-to-r from-orange-500 to-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:from-orange-600 hover:to-purple-700"
+          >
+           {isSubmitting ? 'Updating...' : 'Update Profile'}
+          </Button>
 
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Updating...' : 'Update Profile'}
-              </Button>
             </form>
           </CardContent>
         </Card>

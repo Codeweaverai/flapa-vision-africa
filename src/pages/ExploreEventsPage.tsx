@@ -39,7 +39,7 @@ interface Event {
   status: 'upcoming' | 'ongoing' | 'completed';
 }
 
-const EVENTS_PER_PAGE = 6;
+const EVENTS_PER_PAGE = 8;
 
 const ExploreEventsPage = () => {
   const navigate = useNavigate();
@@ -214,8 +214,10 @@ const ExploreEventsPage = () => {
         <div className="container mx-auto px-4 py-16">
           {/* Header */}
           <div className="text-center mb-16">
-            <h1 className="text-6xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-6">
-              Explore Events
+            <h1 className="text-5xl md:text-6xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Explore Events
+              </span>
             </h1>
             <p className="text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
               Discover amazing events and workshops from talented creators around the world. Join live sessions, network with professionals, and expand your horizons.
