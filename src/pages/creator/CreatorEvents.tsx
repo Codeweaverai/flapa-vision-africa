@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Calendar, MapPin, Users, Edit, Trash2, Eye, UserCheck, CalendarIcon, Ticket, Percent } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, Edit, Trash2, Eye, UserCheck, CalendarIcon, Ticket, Percent, Play } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -14,7 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Event } from '@/services/eventService';
 import PaginationControls from '@/components/creator/PaginationControls';
 
-const EVENTS_PER_PAGE = 6; // 2 rows × 3 cards per row
+const EVENTS_PER_PAGE = 6;
 
 const CreatorEvents = () => {
   const navigate = useNavigate();
@@ -31,12 +30,12 @@ const CreatorEvents = () => {
   }, [user]);
 
   useEffect(() => {
-    setCurrentPage(1); // Reset to first page when search changes
+    setCurrentPage(1);
   }, [searchTerm]);
 
   const loadEvents = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -56,18 +55,12 @@ const CreatorEvents = () => {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to delete this event?')) return;
 
     try {
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', eventId);
-
+      const { error } = await supabase.from('events').delete().eq('id', eventId);
       if (error) throw error;
-      
+
       await loadEvents();
       toast.success('Event deleted successfully');
     } catch (error) {
@@ -76,12 +69,28 @@ const CreatorEvents = () => {
     }
   };
 
+  const handleTogglePublish = async (eventId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({ is_published: !currentStatus })
+        .eq('id', eventId);
+
+      if (error) throw error;
+
+      await loadEvents();
+      toast.success(`Event ${!currentStatus ? 'published' : 'unpublished'} successfully`);
+    } catch (error) {
+      console.error('Error toggling publish status:', error);
+      toast.error('Failed to update publish status');
+    }
+  };
+
   const filteredEvents = events.filter(event =>
     event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     event.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
   const startIndex = (currentPage - 1) * EVENTS_PER_PAGE;
   const endIndex = startIndex + EVENTS_PER_PAGE;
@@ -123,9 +132,7 @@ const CreatorEvents = () => {
   return (
     <CreatorLayout title="My Events">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <p className="text-gray-600">Manage your events and track Attendees</p>
-        </div>
+        <p className="text-gray-600">Manage your events and track Attendees</p>
         <Button
           onClick={() => navigate('/creator/events/create')}
           className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
@@ -200,60 +207,36 @@ const CreatorEvents = () => {
                   <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                     {event.description}
                   </p>
-                  
+
                   <div className="flex items-center gap-2 mb-4">
-                    <Badge variant={event.is_free ? "secondary" : "default"}>
-                      {event.is_free ? "Free" : `$${event.price}`}
+                    <Badge variant={event.is_free ? 'secondary' : 'default'}>
+                      {event.is_free ? 'Free' : `$${event.price}`}
                     </Badge>
                     <Badge variant="outline">{event.event_type}</Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/events/${event.id}/edit`)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/edit`)}>
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/event-detail/${event.id}`)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/event-detail/${event.id}`)}>
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/events/${event.id}/registrations`)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/registrations`)}>
                       <UserCheck className="h-4 w-4 mr-1" />
                       Registrations
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/events/${event.id}/agenda`)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/agenda`)}>
                       <CalendarIcon className="h-4 w-4 mr-1" />
                       Agenda
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/events/${event.id}/speakers`)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/speakers`)}>
                       <Users className="h-4 w-4 mr-1" />
                       Speakers
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/events/${event.id}/tickets`)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/tickets`)}>
                       <Ticket className="h-4 w-4 mr-1" />
                       Tickets
                     </Button>
@@ -267,6 +250,16 @@ const CreatorEvents = () => {
                   >
                     <Percent className="h-4 w-4 mr-1" />
                     Promo Codes
+                  </Button>
+
+                  {/* ✅ Publish / Unpublish Button */}
+                  <Button
+                    className="w-full mt-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
+                    size="sm"
+                    onClick={() => handleTogglePublish(event.id, event.is_published)}
+                  >
+                    <Play className="h-4 w-4 mr-1" />
+                    {event.is_published ? 'Unpublish' : 'Publish'}
                   </Button>
 
                   <Button
@@ -295,3 +288,4 @@ const CreatorEvents = () => {
 };
 
 export default CreatorEvents;
+
