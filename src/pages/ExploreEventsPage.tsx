@@ -62,7 +62,8 @@ const ExploreEventsPage = () => {
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
-        .order('start_time', { ascending: true });
+        .eq('is_published', true)  // This filters for published events
+        .order('start_time', { ascending: false });
 
       if (eventsError) throw eventsError;
 
