@@ -265,6 +265,7 @@ const CreatorCourses = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigate(`/creator/courses/${course.id}/content`)}
+                      className="border-green-500 text-white hover:bg-green-500 hover:text-white"
                     >
                       <BookOpen className="h-4 w-4 mr-1" />
                       Content
