@@ -22,7 +22,7 @@ import CourseDetailPage from '@/pages/CourseDetailPage';
 import CourseEnrollmentPage from '@/pages/CourseEnrollmentPage';
 import MyCoursesPage from '@/pages/MyCoursesPage';
 import LearningPage from '@/pages/LearningPage';
-import CourseLearningPage from '@/pages/learning/CourseLearningPage';
+import CourseLearningPage from '@/pages/CourseLearningPage';
 import CoursePlayerPage from '@/pages/CoursePlayerPage';
 import LessonPage from '@/pages/LessonPage';
 import EventsPage from '@/pages/EventsPage';

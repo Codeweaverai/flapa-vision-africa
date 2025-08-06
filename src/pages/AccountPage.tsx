@@ -241,7 +241,7 @@ const AccountPage = () => {
         <div className="container mx-auto py-8 px-4 max-w-6xl">
           <div className="mb-8">
             <h1 className="text-4xl font-bold mb-4 text-white">My Account</h1>
-            <p className="text-xl text-black/80">
+            <p className="text-xl text-white/80">
               Manage your profile and account settings.
             </p>
           </div>
@@ -315,11 +315,10 @@ const AccountPage = () => {
                           <Badge variant="outline">
                             {user?.email_confirmed_at ? 'Verified Email' : 'Unverified Email'}
                           </Badge>
-                          <Badge
-                          className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white"
-                          >
-                          {profile.is_creator ? 'Creator' : 'User'}
-                           </Badge>
+                          
+                          <Badge variant={profile.is_creator ? 'default' : 'secondary'}>
+                            {profile.is_creator ? 'Creator' : 'User'}
+                          </Badge>
                           
                           {profile.role && profile.role !== 'user' && (
                             <Badge variant="outline">{profile.role}</Badge>
@@ -331,9 +330,7 @@ const AccountPage = () => {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving || loading}
-                  className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
+                <Button onClick={handleSave} disabled={saving || loading}>
                   {saving ? 'Saving...' : 'Save Changes'}
                 </Button>
               </CardFooter>

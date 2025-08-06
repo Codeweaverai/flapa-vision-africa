@@ -317,15 +317,6 @@ const AuthPage = () => {
                         'Sign In'
                       )}
                     </Button>
-                    {/* 👇 Forgot password link below the button */}
-                  <div className="text-center">
-                 <Link
-                to="/forgot-password"
-              className="text-sm text-orange-100 hover:text-white underline"
-              >
-               Forgot your password?
-               </Link>
-              </div>
                   </form>
                 </TabsContent>
                 
@@ -389,11 +380,11 @@ const AuthPage = () => {
                           onChange={(e) => setPassword(e.target.value)}
                           required
                           autoComplete="new-password"
-                          minLength={8}
+                          minLength={6}
                           className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
                         />
                       </div>
-                      <p className="text-xs text-orange-100">Password must be at least 8 characters</p>
+                      <p className="text-xs text-orange-100">Password must be at least 6 characters</p>
                     </div>
                     <Button 
                       type="submit" 
@@ -409,15 +400,6 @@ const AuthPage = () => {
                         'Create Account'
                       )}
                     </Button>
-                     {/* 👇 Forgot password link below the button */}
-                  <div className="text-center">
-                 <Link
-                to="/forgot-password"
-              className="text-sm text-orange-100 hover:text-white underline"
-              >
-               Forgot your password?
-               </Link>
-              </div>
                   </form>
                 </TabsContent>
               </Tabs>

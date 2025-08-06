@@ -3523,10 +3523,6 @@ export type Database = {
         Args: { ticket_id: string }
         Returns: number
       }
-      get_current_user_email: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       get_user_emails: {
         Args: { user_ids: string[] }
         Returns: {

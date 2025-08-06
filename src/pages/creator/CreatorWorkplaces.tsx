@@ -161,9 +161,7 @@ const CreatorWorkplaces: React.FC = () => {
               Manage your collaborative creator workspaces
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}
-             className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-md"
-          >
+          <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Create Workplace
           </Button>
@@ -178,10 +176,7 @@ const CreatorWorkplaces: React.FC = () => {
                 <p className="text-muted-foreground mb-4">
                   Create your first workplace to collaborate with other creators
                 </p>
-                <Button onClick={() => setShowCreateDialog(true)}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-md"
-                  >
-                 
+                <Button onClick={() => setShowCreateDialog(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Your First Workplace
                 </Button>

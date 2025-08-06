@@ -349,7 +349,7 @@ const CreatorCourseContent = () => {
                 </div>
               </div>
             </CardHeader>
-              <CardContent>
+            <CardContent>
               {module.lessons && module.lessons.length > 0 ? (
                 <div className="space-y-3">
                   {module.lessons.map((lesson, lessonIndex) => (
@@ -439,9 +439,7 @@ const CreatorCourseContent = () => {
         <h1 className="text-2xl font-bold mb-6">Course Content</h1>
         
         <div className="mb-6">
-          <Button variant="outline" onClick={() => navigate('/creator/courses')}
-            className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
-            >
+          <Button variant="outline" onClick={() => navigate('/creator/courses')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Courses
           </Button>
@@ -472,22 +470,12 @@ const CreatorCourseContent = () => {
             </CardHeader>
           </Card>
         )}
-          <Tabs defaultValue="modules" className="w-full">
-  <TabsList className="grid w-full grid-cols-2">
-    <TabsTrigger
-      value="modules"
-      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
-    >
-      Modules & Lessons
-    </TabsTrigger>
 
-    <TabsTrigger
-      value="final-exam"
-      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
-    >
-      Final Exam
-    </TabsTrigger>
-     </TabsList>
+        <Tabs defaultValue="modules" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="modules">Modules & Lessons</TabsTrigger>
+            <TabsTrigger value="final-exam">Final Exam</TabsTrigger>
+          </TabsList>
           
           <TabsContent value="modules">
             <Card>
@@ -502,9 +490,7 @@ const CreatorCourseContent = () => {
                       Organize your course into modules and lessons
                     </CardDescription>
                   </div>
-                  <Button onClick={handleAddModule}
-                     className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
-                    >
+                  <Button onClick={handleAddModule}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Module
                   </Button>
@@ -517,15 +503,10 @@ const CreatorCourseContent = () => {
                     <p className="text-muted-foreground mb-4">
                       Start building your course by adding modules
                     </p>
-                   
-                   <Button 
-                  onClick={handleAddModule}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
-                 >
-                 <Plus className="h-4 w-4 mr-2" />
-                  Add First Module
-                 </Button>
-                    
+                    <Button onClick={handleAddModule}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Module
+                    </Button>
                   </div>
                 ) : (
                   <EnhancedModuleAccordion modules={modules} />

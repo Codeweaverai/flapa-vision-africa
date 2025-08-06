@@ -303,7 +303,7 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ eventId, ev
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
           <Download className="h-4 w-4 mr-2" />
-          Export Report
+          Export Comprehensive Report
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

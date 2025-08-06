@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -118,7 +117,7 @@ const CreatorAnalytics: React.FC = () => {
       const courseIds = courses?.map(c => c.id) || [];
       const eventIds = events?.map(e => e.id) || [];
 
-      // Get course enrollments with completed payments and user profiles
+      // Get course enrollments with completed payments
       let allEnrollments: any[] = [];
       let courseReviews: any[] = [];
       
@@ -130,15 +129,10 @@ const CreatorAnalytics: React.FC = () => {
             user_id, 
             enrollment_date,
             payment_status,
-            course_id,
-            profiles!inner (
-              full_name,
-              username
-            )
+            course_id
           `)
           .in('course_id', courseIds)
-          .eq('payment_status', 'completed')
-          .order('enrollment_date', { ascending: false });
+          .eq('payment_status', 'completed');
 
         if (enrollmentsError) {
           console.error('Error fetching enrollments:', enrollmentsError);
@@ -158,7 +152,7 @@ const CreatorAnalytics: React.FC = () => {
         }
       }
 
-      // Get event bookings with completed payments and user profiles
+      // Get event bookings with completed payments
       let allBookings: any[] = [];
       let eventReviews: any[] = [];
       
@@ -171,15 +165,10 @@ const CreatorAnalytics: React.FC = () => {
             booking_date,
             payment_status,
             ticket_quantity,
-            event_id,
-            profiles!inner (
-              full_name,
-              username
-            )
+            event_id
           `)
           .in('event_id', eventIds)
-          .eq('payment_status', 'completed')
-          .order('booking_date', { ascending: false });
+          .eq('payment_status', 'completed');
 
         if (bookingsError) {
           console.error('Error fetching bookings:', bookingsError);
@@ -276,14 +265,22 @@ const CreatorAnalytics: React.FC = () => {
       .sort((a, b) => b.bookings - a.bookings)
       .slice(0, 5) || [];
 
-      // Recent activity - enrollments and bookings already have profile data
+      // Recent activity - get user details for recent enrollments and bookings
       const recentEnrollments = allEnrollments
         .sort((a, b) => new Date(b.enrollment_date).getTime() - new Date(a.enrollment_date).getTime())
-        .slice(0, 10);
+        .slice(0, 10)
+        .map(enrollment => ({
+          ...enrollment,
+          profiles: { username: 'Student', full_name: 'Student' } // Placeholder since we can't access profiles.email
+        }));
 
       const recentBookings = allBookings
         .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
-        .slice(0, 10);
+        .slice(0, 10)
+        .map(booking => ({
+          ...booking,
+          profiles: { username: 'Attendee', full_name: 'Attendee' } // Placeholder since we can't access profiles.email
+        }));
 
       const processedData = {
         totalRevenue: earnings.total_earnings || 0,
@@ -587,7 +584,7 @@ const CreatorAnalytics: React.FC = () => {
                     analyticsData.recentEnrollments.slice(0, 5).map((enrollment, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{enrollment.profiles?.full_name || enrollment.profiles?.username || 'Unknown Student'}</p>
+                          <p className="font-medium">{enrollment.profiles?.username || enrollment.profiles?.full_name || 'Unknown Student'}</p>
                           <p className="text-sm text-muted-foreground">Course Enrollment</p>
                         </div>
                         <div className="text-right">
@@ -616,7 +613,7 @@ const CreatorAnalytics: React.FC = () => {
                     analyticsData.recentBookings.slice(0, 5).map((booking, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{booking.profiles?.full_name || booking.profiles?.username || 'Unknown Attendee'}</p>
+                          <p className="font-medium">{booking.profiles?.username || booking.profiles?.full_name || 'Unknown Attendee'}</p>
                           <p className="text-sm text-muted-foreground">Event Booking</p>
                         </div>
                         <div className="text-right">
