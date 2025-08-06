@@ -84,7 +84,7 @@ const CommunityCoursesPage = () => {
                   >
                     <div>
                       <div className="font-medium">{course.title}</div>
-                      <div className="text-xs text-muted-foreground">{course.category}</div>
+                      <div className="text-xs bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">{course.category}</div>
                     </div>
                   </Button>
                 ))}
