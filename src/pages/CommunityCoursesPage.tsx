@@ -84,7 +84,7 @@ const CommunityCoursesPage = () => {
                   >
                     <div>
                       <div className="font-medium">{course.title}</div>
-                      <div className="text-muted-bg-gradient text-xs px-3 py-1 rounded-full w-fit">{course.category}
+                        <Badge variant="outline" className="text-xs">{course.category} </Badge>
                      </div>
                       </div>
                   </Button>
