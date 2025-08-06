@@ -107,7 +107,13 @@
   .heading-sm {
     @apply text-xl md:text-2xl font-bold tracking-tight;
   }
-  
+  .text-muted-bg-gradient {
+  background: linear-gradient(90deg, #F97316, #8B5CF6); /* orange to purple */
+  color: white;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: initial;
+  background-clip: initial;
+}
   .bg-light-purple {
     @apply bg-[#E9D5FF];
   }
