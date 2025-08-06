@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
@@ -33,11 +32,19 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     lg: 'h-32 w-32'
   };
 
+  const extractFilePathFromUrl = (url: string): string | null => {
+    try {
+      const parts = url.split('/');
+      return parts[parts.length - 1]; // returns the filename.ext
+    } catch {
+      return null;
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Invalid file type",
@@ -47,7 +54,6 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -59,12 +65,24 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
 
     setUploading(true);
     try {
-      // Create unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // Upload file to Supabase Storage
+      // 🧹 Delete previous profile picture if it exists
+      if (currentImageUrl) {
+        const oldFilePath = extractFilePathFromUrl(currentImageUrl);
+        if (oldFilePath) {
+          const { error: deleteError } = await supabase.storage
+            .from('profile-pictures')
+            .remove([oldFilePath]);
+          if (deleteError) {
+            console.warn('Failed to delete old profile picture:', deleteError.message);
+          }
+        }
+      }
+
+      // ⬆️ Upload new image
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('profile-pictures')
         .upload(filePath, file);
@@ -73,12 +91,12 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         throw uploadError;
       }
 
-      // Get public URL
+      // 🌐 Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('profile-pictures')
         .getPublicUrl(filePath);
 
-      // Update profile with new image URL
+      // 📝 Update profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
@@ -88,7 +106,6 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         throw updateError;
       }
 
-      // Call the appropriate callback
       if (onUploadComplete) {
         await onUploadComplete(publicUrl, filePath);
       } else if (onImageUpdate) {
@@ -128,9 +145,7 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       <div className="relative">
         <Avatar className={sizeClasses[size]}>
           <AvatarImage src={currentImageUrl} alt="Profile picture" />
-          <AvatarFallback>
-            {getInitials()}
-          </AvatarFallback>
+          <AvatarFallback>{getInitials()}</AvatarFallback>
         </Avatar>
         <Button
           size="sm"
@@ -155,16 +170,17 @@ const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         className="hidden"
       />
 
-     <Button
-  onClick={triggerFileInput}
-  disabled={uploading}
-  className="flex items-center gap-2 text-white bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
->
-  <Upload className="h-4 w-4" />
-  {uploading ? 'Uploading...' : 'Change Picture'}
-</Button>
+      <Button
+        onClick={triggerFileInput}
+        disabled={uploading}
+        className="flex items-center gap-2 text-white bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Upload className="h-4 w-4" />
+        {uploading ? 'Uploading...' : 'Change Picture'}
+      </Button>
     </div>
   );
 };
 
 export default ProfilePictureUpload;
+
