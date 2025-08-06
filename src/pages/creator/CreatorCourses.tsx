@@ -249,7 +249,7 @@ const CreatorCourses = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigate(`/creator/courses/${course.id}/edit`)}
-                      className="bg-red-500 text-red hover:bg-red-700 hover:text-white"
+                      className="bg-red-500 text-white hover:bg-red-700 hover:text-white"
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -276,7 +276,7 @@ const CreatorCourses = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigate(`/creator/students`)}
-                      className="bg-purple-500 text-purple hover:bg-purple-700 hover:text-white"
+                      className="bg-purple-500 text-white hover:bg-purple-700 hover:text-white"
                     >
                       <Users className="h-4 w-4 mr-1" />
                       Students
