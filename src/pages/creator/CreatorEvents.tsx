@@ -236,7 +236,7 @@ const CreatorEvents = () => {
                       Attendees
                     </Button>
                     <Button 
-                     className="bg-purpl-600 text-white hover:bg-purple-700 transition-colors duration-300 ease-in-out flex items-center" size="sm"
+                     className="bg-purple-600 text-white hover:bg-purple-700 transition-colors duration-300 ease-in-out flex items-center" size="sm"
                       onClick={() => navigate(`/creator/events/${event.id}/agenda`)}
                       >
                       <CalendarIcon className="h-4 w-4 mr-1" />
