@@ -40,7 +40,6 @@ const CreatorEventAgenda = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -53,51 +52,46 @@ const CreatorEventAgenda = () => {
 
   useEffect(() => {
     if (eventId) {
-      loadData();
-    } else {
-      setLoading(false);
-      toast.error('Event ID is missing');
-      navigate('/creator/events');
+      loadAgenda();
+      loadSpeakers();
     }
-  }, [eventId, navigate]);
+  }, [eventId]);
 
-  const loadData = async () => {
+  const loadAgenda = async () => {
     if (!eventId) return;
     
     setLoading(true);
     try {
-      // Load agenda and speakers in parallel
-      const [agendaResult, speakersResult] = await Promise.all([
-        supabase
-          .from('event_agenda')
-          .select('*')
-          .eq('event_id', eventId)
-          .order('start_time', { ascending: true }),
-        supabase
-          .from('keynote_speakers')
-          .select('id, name, title')
-          .eq('event_id', eventId)
-          .order('name', { ascending: true })
-      ]);
+      const { data, error } = await supabase
+        .from('event_agenda')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('start_time', { ascending: true });
 
-      if (agendaResult.error) {
-        console.error('Error loading agenda:', agendaResult.error);
-        toast.error('Failed to load agenda');
-      } else {
-        setAgenda(agendaResult.data || []);
-      }
-
-      if (speakersResult.error) {
-        console.error('Error loading speakers:', speakersResult.error);
-        // Don't show error for speakers as it's not critical
-      } else {
-        setSpeakers(speakersResult.data || []);
-      }
+      if (error) throw error;
+      setAgenda(data || []);
     } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Failed to load event data');
+      console.error('Error loading agenda:', error);
+      toast.error('Failed to load agenda');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSpeakers = async () => {
+    if (!eventId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('keynote_speakers')
+        .select('id, name, title')
+        .eq('event_id', eventId)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setSpeakers(data || []);
+    } catch (error) {
+      console.error('Error loading speakers:', error);
     }
   };
 
@@ -133,17 +127,6 @@ const CreatorEventAgenda = () => {
     e.preventDefault();
     if (!eventId) return;
 
-    if (!formData.title.trim()) {
-      toast.error('Title is required');
-      return;
-    }
-
-    if (!formData.start_time || !formData.end_time) {
-      toast.error('Start time and end time are required');
-      return;
-    }
-
-    setSubmitting(true);
     try {
       const submitData = {
         ...formData,
@@ -170,13 +153,11 @@ const CreatorEventAgenda = () => {
         toast.success('Agenda item created successfully');
       }
 
-      await loadData();
+      await loadAgenda();
       setDialogOpen(false);
     } catch (error) {
       console.error('Error saving agenda item:', error);
       toast.error('Failed to save agenda item');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -191,7 +172,7 @@ const CreatorEventAgenda = () => {
 
       if (error) throw error;
       
-      await loadData();
+      await loadAgenda();
       toast.success('Agenda item deleted successfully');
     } catch (error) {
       console.error('Error deleting agenda item:', error);
@@ -351,8 +332,8 @@ const CreatorEventAgenda = () => {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Processing...' : editingItem ? 'Update' : 'Create'} Item
+                <Button type="submit">
+                  {editingItem ? 'Update' : 'Create'} Item
                 </Button>
               </div>
             </form>
@@ -370,10 +351,14 @@ const CreatorEventAgenda = () => {
             <p className="text-muted-foreground mb-6">
               Create your event schedule
             </p>
-            <Button onClick={handleAddItem}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Item
-            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleAddItem}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Item
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </CardContent>
         </Card>
       ) : (
