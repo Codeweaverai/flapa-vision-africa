@@ -98,7 +98,18 @@ const CreatorCourses: React.FC = () => {
 
       if (fetchError) throw fetchError;
 
-      const { title, description, summary, price, is_free, category, difficulty_level, duration_minutes, thumbnail_url, certificate_enabled } = originalCourse;
+      const { 
+        title, 
+        description, 
+        summary, 
+        price, 
+        is_free, 
+        category, 
+        difficulty_level, 
+        duration_minutes, 
+        thumbnail_url, 
+        certificate_enabled 
+      } = originalCourse;
 
       const { data: newCourse, error: insertError } = await supabase
         .from('courses')
@@ -371,6 +382,10 @@ const CreatorCourses: React.FC = () => {
             course={selectedCourse}
             open={previewDialogOpen}
             onOpenChange={setPreviewDialogOpen}
+            onPreviewAdded={() => {
+              // Optional: Handle preview added event
+              console.log('Preview added for course:', selectedCourse.id);
+            }}
           />
         )}
       </div>

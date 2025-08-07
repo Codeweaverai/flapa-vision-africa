@@ -28,8 +28,8 @@ interface EventData {
 
 const ExploreEventsPage: React.FC = () => {
   const [events, setEvents] = useState<EventData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const navigate = useNavigate();
 
@@ -37,7 +37,7 @@ const ExploreEventsPage: React.FC = () => {
     fetchEvents();
   }, []);
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (): Promise<void> => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -69,7 +69,7 @@ const ExploreEventsPage: React.FC = () => {
 
   const eventTypes = ['all', 'conference', 'workshop', 'webinar', 'meetup', 'seminar'];
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-US', {
       weekday: 'short',
       year: 'numeric',
@@ -78,7 +78,7 @@ const ExploreEventsPage: React.FC = () => {
     });
   };
 
-  const formatTime = (dateString: string) => {
+  const formatTime = (dateString: string): string => {
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit'
