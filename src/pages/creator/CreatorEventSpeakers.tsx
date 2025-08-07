@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -32,6 +31,7 @@ const CreatorEventSpeakers = () => {
   const navigate = useNavigate();
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
   const [formData, setFormData] = useState({
@@ -46,33 +46,67 @@ const CreatorEventSpeakers = () => {
   });
 
   useEffect(() => {
-    if (eventId) {
-      loadSpeakers();
-    }
-  }, [eventId]);
+    const checkAuthAndLoad = async () => {
+      setLoading(true);
+      try {
+        // Check authentication status
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+          throw new Error('Not authenticated');
+        }
+
+        setAuthChecked(true);
+        
+        if (eventId) {
+          await loadSpeakers();
+        }
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        toast.error('Please sign in to manage speakers');
+        navigate('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthAndLoad();
+  }, [eventId, navigate]);
 
   const loadSpeakers = async () => {
     if (!eventId) return;
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from('keynote_speakers')
         .select('*')
         .eq('event_id', eventId)
         .order('order_index', { ascending: true });
 
-      if (error) throw error;
+      if (error && status !== 406) { // 406 is when no rows found
+        throw error;
+      }
+
       setSpeakers(data || []);
     } catch (error) {
       console.error('Error loading speakers:', error);
       toast.error('Failed to load speakers');
+      
+      // Handle JWT errors specifically
+      if (error.message.includes('JWT')) {
+        toast.error('Session expired. Please sign in again.');
+        await supabase.auth.signOut();
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddSpeaker = () => {
+    if (!authChecked) return;
+    
     setEditingSpeaker(null);
     setFormData({
       name: '',
@@ -88,6 +122,8 @@ const CreatorEventSpeakers = () => {
   };
 
   const handleEditSpeaker = (speaker: KeynoteSpeaker) => {
+    if (!authChecked) return;
+    
     setEditingSpeaker(speaker);
     setFormData({
       name: speaker.name,
@@ -104,7 +140,7 @@ const CreatorEventSpeakers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId) return;
+    if (!eventId || !authChecked) return;
 
     try {
       if (editingSpeaker) {
@@ -134,12 +170,12 @@ const CreatorEventSpeakers = () => {
       setDialogOpen(false);
     } catch (error) {
       console.error('Error saving speaker:', error);
-      toast.error('Failed to save speaker');
+      toast.error(`Failed to save speaker: ${error.message}`);
     }
   };
 
   const handleDeleteSpeaker = async (speakerId: string) => {
-    if (!confirm('Are you sure you want to delete this speaker?')) return;
+    if (!authChecked || !confirm('Are you sure you want to delete this speaker?')) return;
     
     try {
       const { error } = await supabase
@@ -189,7 +225,7 @@ const CreatorEventSpeakers = () => {
         <h2 className="text-2xl font-bold">Event Speakers</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={handleAddSpeaker}>
+            <Button onClick={handleAddSpeaker} disabled={!authChecked}>
               <Plus className="h-4 w-4 mr-2" />
               Add Speaker
             </Button>
@@ -290,7 +326,7 @@ const CreatorEventSpeakers = () => {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" disabled={!authChecked}>
                   {editingSpeaker ? 'Update' : 'Create'} Speaker
                 </Button>
               </div>
@@ -311,7 +347,7 @@ const CreatorEventSpeakers = () => {
             </p>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={handleAddSpeaker}>
+                <Button onClick={handleAddSpeaker} disabled={!authChecked}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add First Speaker
                 </Button>
@@ -345,7 +381,12 @@ const CreatorEventSpeakers = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditSpeaker(speaker)}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleEditSpeaker(speaker)}
+                      disabled={!authChecked}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
@@ -353,6 +394,7 @@ const CreatorEventSpeakers = () => {
                       size="sm"
                       className="text-destructive hover:text-destructive"
                       onClick={() => handleDeleteSpeaker(speaker.id)}
+                      disabled={!authChecked}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
