@@ -15,7 +15,6 @@ import ImageUpload from '@/components/ui/image-upload';
 interface KeynoteSpeaker {
   id: string;
   event_id: string;
-  user_id?: string;
   name: string;
   title?: string;
   bio?: string;
@@ -33,6 +32,7 @@ const CreatorEventSpeakers = () => {
   const [eventId, setEventId] = useState<string>('');
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +46,6 @@ const CreatorEventSpeakers = () => {
     twitter_url: '',
     website_url: ''
   });
-  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
 
   // Initialize eventId from URL params
   useEffect(() => {
@@ -58,17 +57,20 @@ const CreatorEventSpeakers = () => {
     setEventId(eventIdParam);
   }, [eventIdParam, navigate]);
 
-  // Check auth and load speakers
   useEffect(() => {
     const checkAuthAndLoad = async () => {
       if (!eventId) return;
+
       setLoading(true);
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
+        // Check authentication
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
           throw new Error('Not authenticated');
         }
-        setCurrentUser({ id: user.id });
+
+        setAuthChecked(true);
         await loadSpeakers();
       } catch (error) {
         console.error('Authentication check failed:', error);
@@ -82,9 +84,9 @@ const CreatorEventSpeakers = () => {
     checkAuthAndLoad();
   }, [eventId, navigate]);
 
-  // Load speakers from supabase
   const loadSpeakers = async () => {
     if (!eventId) return;
+    
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -92,6 +94,7 @@ const CreatorEventSpeakers = () => {
         .select('*')
         .eq('event_id', eventId)
         .order('order_index', { ascending: true });
+
       if (error) throw error;
       setSpeakers(data || []);
     } catch (error) {
@@ -102,7 +105,6 @@ const CreatorEventSpeakers = () => {
     }
   };
 
-  // Open dialog for new speaker
   const handleAddSpeaker = () => {
     setEditingSpeaker(null);
     setFormData({
@@ -118,7 +120,6 @@ const CreatorEventSpeakers = () => {
     setDialogOpen(true);
   };
 
-  // Open dialog for editing speaker
   const handleEditSpeaker = (speaker: KeynoteSpeaker) => {
     setEditingSpeaker(speaker);
     setFormData({
@@ -134,55 +135,37 @@ const CreatorEventSpeakers = () => {
     setDialogOpen(true);
   };
 
-  // Handle form input changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Handle image upload callback
-  const handleImageUpload = (imageUrl: string) => {
-    setFormData(prev => ({ ...prev, image_url: imageUrl }));
-  };
-
-  // Submit create or update speaker
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!formData.name.trim()) {
       toast.error('Speaker name is required');
       return;
     }
+
     if (!eventId) {
       toast.error('Event ID is missing');
-      return;
-    }
-    if (!currentUser) {
-      toast.error('User not authenticated');
       return;
     }
 
     setSubmitting(true);
     try {
       if (editingSpeaker) {
-        // Update speaker with user_id check
         const { error } = await supabase
           .from('keynote_speakers')
-          .update({ ...formData, user_id: currentUser.id })
-          .eq('id', editingSpeaker.id)
-          .eq('user_id', currentUser.id); // double check owner
+          .update(formData)
+          .eq('id', editingSpeaker.id);
 
         if (error) throw error;
         toast.success('Speaker updated successfully');
       } else {
-        // Insert new speaker with user_id & order_index
         const nextOrderIndex = speakers.length > 0 ? Math.max(...speakers.map(s => s.order_index)) + 1 : 0;
-
+        
         const { error } = await supabase
           .from('keynote_speakers')
           .insert({
             ...formData,
             event_id: eventId,
-            user_id: currentUser.id,
             order_index: nextOrderIndex
           });
 
@@ -192,35 +175,40 @@ const CreatorEventSpeakers = () => {
 
       await loadSpeakers();
       setDialogOpen(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving speaker:', error);
-      toast.error(`Failed to save speaker: ${error.message || error}`);
+      toast.error(`Failed to save speaker: ${error.message}`);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Delete speaker
   const handleDeleteSpeaker = async (speakerId: string) => {
     if (!confirm('Are you sure you want to delete this speaker?')) return;
-    if (!currentUser) {
-      toast.error('User not authenticated');
-      return;
-    }
+    
     try {
       const { error } = await supabase
         .from('keynote_speakers')
         .delete()
-        .eq('id', speakerId)
-        .eq('user_id', currentUser.id); // enforce ownership
+        .eq('id', speakerId);
 
       if (error) throw error;
+      
       await loadSpeakers();
       toast.success('Speaker deleted successfully');
     } catch (error) {
       console.error('Error deleting speaker:', error);
       toast.error('Failed to delete speaker');
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageUpload = (imageUrl: string) => {
+    setFormData(prev => ({ ...prev, image_url: imageUrl }));
   };
 
   if (loading) {
@@ -456,5 +444,3 @@ const CreatorEventSpeakers = () => {
 };
 
 export default CreatorEventSpeakers;
-
-
