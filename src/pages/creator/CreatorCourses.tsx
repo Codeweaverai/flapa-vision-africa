@@ -38,6 +38,7 @@ interface Course {
   id: string;
   title: string;
   description: string;
+  summary: string;
   price: number;
   is_free: boolean;
   is_published: boolean;
@@ -47,6 +48,8 @@ interface Course {
   duration_minutes: number;
   created_at: string;
   updated_at: string;
+  certificate_enabled?: boolean;
+  creator_id?: string;
 }
 
 const CreatorCourses: React.FC = () => {
@@ -95,22 +98,24 @@ const CreatorCourses: React.FC = () => {
 
       if (fetchError) throw fetchError;
 
-      const { title, description, price, is_free, category, difficulty_level, duration_minutes, thumbnail_url } = originalCourse;
+      const { title, description, summary, price, is_free, category, difficulty_level, duration_minutes, thumbnail_url, certificate_enabled } = originalCourse;
 
       const { data: newCourse, error: insertError } = await supabase
         .from('courses')
-        .insert([{
+        .insert({
           title: `${title} (Copy)`,
           description,
+          summary: summary || `Copy of ${title}`,
           price,
           is_free,
           category,
           difficulty_level,
           duration_minutes,
           thumbnail_url,
+          certificate_enabled: certificate_enabled || false,
           creator_id: user?.id,
           is_published: false
-        }])
+        })
         .select()
         .single();
 
@@ -320,7 +325,8 @@ const CreatorCourses: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <CoursePublishButton 
-                        course={course} 
+                        courseId={course.id}
+                        isPublished={course.is_published}
                         onStatusChange={fetchCourses} 
                       />
                       <DropdownMenu>
