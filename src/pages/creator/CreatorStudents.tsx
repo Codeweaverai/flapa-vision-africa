@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
+import CreatorAnnouncementModal from '@/components/creator/CreatorAnnouncementModal';
 
 interface Student {
   id: string;
@@ -74,7 +74,7 @@ const CreatorStudents: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'course' | 'event'>('all');
-  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
   useEffect(() => {
@@ -144,13 +144,14 @@ const CreatorStudents: React.FC = () => {
         return;
       }
 
-      // Use the get_user_emails RPC function to fetch email data
+      // Use the updated get_user_emails RPC function 
       const { data: emailData, error: emailError } = await supabase
         .rpc('get_user_emails', { user_ids: allUserIds });
 
       if (emailError) {
         console.error('Error fetching user emails:', emailError);
-        toast.error('Failed to load student emails');
+        // If RPC fails, continue without emails but log the error
+        toast.error('Failed to load some student data, but continuing...');
       }
 
       // Get user profiles for additional data
@@ -171,17 +172,17 @@ const CreatorStudents: React.FC = () => {
       const studentsData: Student[] = [];
 
       // Add course students
-      if (courseEnrollments) {
+      if (courseEnrollments && profiles) {
         courseEnrollments.forEach(enrollment => {
-          const profile = profiles?.find(p => p.id === enrollment.user_id);
+          const profile = profiles.find(p => p.id === enrollment.user_id);
           const emailInfo = emailData?.find(e => e.id === enrollment.user_id);
           
-          if (profile && emailInfo) {
+          if (profile) {
             studentsData.push({
               id: enrollment.id,
               user_id: enrollment.user_id,
               full_name: profile.full_name || 'Unknown',
-              email: emailInfo.email || '',
+              email: emailInfo?.email || 'Email not available',
               username: profile.username || '',
               enrollment_date: enrollment.enrollment_date,
               course_title: enrollment.courses.title,
@@ -193,17 +194,17 @@ const CreatorStudents: React.FC = () => {
       }
 
       // Add event students
-      if (eventBookings) {
+      if (eventBookings && profiles) {
         eventBookings.forEach(booking => {
-          const profile = profiles?.find(p => p.id === booking.user_id);
+          const profile = profiles.find(p => p.id === booking.user_id);
           const emailInfo = emailData?.find(e => e.id === booking.user_id);
           
-          if (profile && emailInfo) {
+          if (profile) {
             studentsData.push({
               id: booking.id,
               user_id: booking.user_id,
               full_name: profile.full_name || 'Unknown',
-              email: emailInfo.email || '',
+              email: emailInfo?.email || 'Email not available',
               username: profile.username || '',
               booking_date: booking.booking_date,
               event_title: booking.events.title,
@@ -260,25 +261,8 @@ const CreatorStudents: React.FC = () => {
     );
   };
 
-  // Transform student data to match BulkAnnouncementModal's expected format
-  const transformStudentsForModal = () => {
-    return selectedStudents.map(userId => {
-      const student = uniqueStudents.find(s => s.user_id === userId);
-      if (!student) return null;
-      
-      return {
-        id: student.id,
-        ticket_holder_name: student.full_name,
-        user_id: student.user_id,
-        user_profile: {
-          full_name: student.full_name
-        }
-      };
-    }).filter(Boolean);
-  };
-
   const handleAnnouncementSuccess = () => {
-    setShowBulkModal(false);
+    setShowAnnouncementModal(false);
     setSelectedStudents([]);
     toast.success('Announcement sent successfully');
   };
@@ -304,7 +288,7 @@ const CreatorStudents: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <Button
-              onClick={() => setShowBulkModal(true)}
+              onClick={() => setShowAnnouncementModal(true)}
               disabled={selectedStudents.length === 0}
               className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
             >
@@ -540,12 +524,12 @@ const CreatorStudents: React.FC = () => {
           </CardContent>
         </Card>
 
-        <BulkAnnouncementModal
-          isOpen={showBulkModal}
-          onClose={() => setShowBulkModal(false)}
-          selectedAttendees={selectedStudents}
-          attendeesData={transformStudentsForModal()}
-          eventTitle="Student Announcement"
+        <CreatorAnnouncementModal
+          isOpen={showAnnouncementModal}
+          onClose={() => setShowAnnouncementModal(false)}
+          selectedStudents={selectedStudents}
+          studentsData={uniqueStudents}
+          onSuccess={handleAnnouncementSuccess}
         />
       </div>
     </CreatorLayout>

@@ -1,113 +1,150 @@
 
-import { useState, useEffect } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import CommunityLayout from '@/components/community/CommunityLayout';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { BookOpen } from 'lucide-react';
-import { Course, fetchPublishedCourses } from '@/services/courseService';
-import CourseDiscussionSection from '@/components/community/CourseDiscussionSection';
+import { Input } from '@/components/ui/input';
+import { BookOpen, Search, Users } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { CourseWithEnrollment } from '@/types/eventTypes';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 const CommunityCoursesPage = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [courses, setCourses] = useState<CourseWithEnrollment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('courses');
-
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
-  }
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const loadCourses = async () => {
-      setLoading(true);
-      const data = await fetchPublishedCourses();
-      setCourses(data);
-      setLoading(false);
-    };
-    
-    loadCourses();
+    fetchCourses();
   }, []);
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    
-    switch (value) {
-      case 'feed':
-        navigate('/community');
-        break;
-      case 'chat':
-        navigate('/community/chat');
-        break;
-      case 'courses':
-        navigate('/community/courses');
-        break;
-      case 'notifications':
-        navigate('/community/notifications');
-        break;
+  const fetchCourses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          course_enrollments!left (
+            id,
+            enrollment_date,
+            completion_date,
+            is_completed,
+            user_id
+          )
+        `)
+        .eq('is_published', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const coursesWithEnrollment = data?.map(course => ({
+        ...course,
+        enrollment: course.course_enrollments?.[0] || null
+      })) || [];
+
+      setCourses(coursesWithEnrollment);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      toast.error('Failed to load courses');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const filteredCourses = courses.filter(course =>
+    course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    course.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
-    <CommunityLayout activeTab={activeTab} onTabChange={handleTabChange}>
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-        <div className="md:col-span-1">
-          <div className="sticky top-24">
-            <h2 className="text-2xl font-bold mb-4">Course Discussions</h2>
-            {loading ? (
-              <Card className="p-8 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-4 text-muted-foreground">Loading courses...</p>
-              </Card>
-            ) : courses.length === 0 ? (
-              <Card className="p-8 text-center">
-                <BookOpen className="h-12 w-12 mx-auto mb-4 text-primary/40" />
-                <h3 className="text-xl font-semibold mb-2">No courses found</h3>
-                <p className="text-muted-foreground">
-                  There are no courses available for discussion
-                </p>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {courses.map((course) => (
-                  <Button 
-                    key={course.id}
-                    variant={selectedCourse?.id === course.id ? "default" : "outline"}
-                    className="w-full justify-start text-left h-auto py-3"
-                    onClick={() => setSelectedCourse(course)}
-                  >
-                    <div>
-                      <div className="font-medium">{course.title}</div>
-                      <Badge variant="outline" className="text-xs mt-1">{course.category}</Badge>
-                     </div>
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="md:col-span-2">
-          {selectedCourse ? (
-            <CourseDiscussionSection courseId={selectedCourse.id} />
-          ) : (
-            <Card className="p-8 text-center">
-              <BookOpen className="h-12 w-12 mx-auto mb-4 text-primary/40" />
-              <h3 className="text-xl font-semibold mb-2">Select a course</h3>
-              <p className="text-muted-foreground">
-                Choose a course from the list to view and participate in discussions
-              </p>
-            </Card>
-          )}
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Community Courses</h1>
+          <p className="text-muted-foreground">
+            Discover and learn from courses created by our community
+          </p>
         </div>
       </div>
-    </CommunityLayout>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search courses..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {filteredCourses.length === 0 ? (
+        <div className="text-center py-12">
+          <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No courses found</h3>
+          <p className="text-muted-foreground">
+            {searchTerm 
+              ? 'No courses match your search criteria'
+              : 'No courses are available yet'
+            }
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCourses.map((course) => (
+            <Card key={course.id} className="hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/courses/${course.id}`)}>
+              <CardHeader>
+                {course.thumbnail_url && (
+                  <img
+                    src={course.thumbnail_url}
+                    alt={course.title}
+                    className="w-full h-48 object-cover rounded-md mb-4"
+                  />
+                )}
+                <div className="flex items-center justify-between">
+                  <Badge variant={course.is_free ? 'secondary' : 'default'}>
+                    {course.is_free ? 'Free' : `$${course.price}`}
+                  </Badge>
+                  {course.difficulty_level && (
+                    <Badge variant="outline">
+                      {course.difficulty_level}
+                    </Badge>
+                  )}
+                </div>
+                <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                  {course.description}
+                </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    <span>{course.duration_minutes} min</span>
+                  </div>
+                  {course.enrollment && (
+                    <Badge variant="secondary">
+                      {course.enrollment.is_completed ? 'Completed' : 'Enrolled'}
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
