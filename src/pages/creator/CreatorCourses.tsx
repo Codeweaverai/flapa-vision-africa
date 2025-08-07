@@ -1,60 +1,74 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import CreatorLayout from '@/components/creator/CreatorLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, BookOpen, Edit, Trash2, Eye, Users, DollarSign, Clock, Star, Play, Percent, Video } from 'lucide-react';
-import { toast } from 'sonner';
-import CreatorLayout from '@/components/creator/CreatorLayout';
+import { 
+  BookOpen, 
+  Plus, 
+  Search, 
+  Edit, 
+  Eye, 
+  Users, 
+  DollarSign,
+  TrendingUp,
+  Calendar,
+  MoreHorizontal,
+  Settings,
+  Copy,
+  Trash2
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/contexts/AuthContext';
-import PaginationControls from '@/components/creator/PaginationControls';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import CoursePublishButton from '@/components/creator/CoursePublishButton';
 import CoursePreviewDialog from '@/components/creator/CoursePreviewDialog';
-
-const COURSES_PER_PAGE = 6; // 2 rows × 3 cards per row
 
 interface Course {
   id: string;
   title: string;
   description: string;
-  summary: string;
-  thumbnail_url?: string;
-  is_published: boolean;
-  is_free: boolean;
   price: number;
-  duration_minutes: number;
+  is_free: boolean;
+  is_published: boolean;
+  thumbnail_url?: string;
   category: string;
   difficulty_level: string;
+  duration_minutes: number;
   created_at: string;
+  updated_at: string;
 }
 
-const CreatorCourses = () => {
-  const navigate = useNavigate();
+const CreatorCourses: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
-      loadCourses();
+      fetchCourses();
     }
   }, [user]);
 
-  useEffect(() => {
-    setCurrentPage(1); // Reset to first page when search changes
-  }, [searchTerm]);
-
-  const loadCourses = async () => {
+  const fetchCourses = async () => {
     if (!user) return;
-    
-    setLoading(true);
+
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('courses')
         .select('*')
@@ -64,10 +78,49 @@ const CreatorCourses = () => {
       if (error) throw error;
       setCourses(data || []);
     } catch (error) {
-      console.error('Error loading courses:', error);
+      console.error('Error fetching courses:', error);
       toast.error('Failed to load courses');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDuplicateCourse = async (courseId: string) => {
+    try {
+      const { data: originalCourse, error: fetchError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { title, description, price, is_free, category, difficulty_level, duration_minutes, thumbnail_url } = originalCourse;
+
+      const { data: newCourse, error: insertError } = await supabase
+        .from('courses')
+        .insert([{
+          title: `${title} (Copy)`,
+          description,
+          price,
+          is_free,
+          category,
+          difficulty_level,
+          duration_minutes,
+          thumbnail_url,
+          creator_id: user?.id,
+          is_published: false
+        }])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      toast.success('Course duplicated successfully');
+      await fetchCourses();
+    } catch (error) {
+      console.error('Error duplicating course:', error);
+      toast.error('Failed to duplicate course');
     }
   };
 
@@ -83,54 +136,29 @@ const CreatorCourses = () => {
         .eq('id', courseId);
 
       if (error) throw error;
-      
-      await loadCourses();
+
       toast.success('Course deleted successfully');
+      await fetchCourses();
     } catch (error) {
       console.error('Error deleting course:', error);
       toast.error('Failed to delete course');
     }
   };
 
-  const handleTogglePublish = async (courseId: string, isPublished: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ is_published: !isPublished })
-        .eq('id', courseId);
-
-      if (error) throw error;
-      
-      await loadCourses();
-      toast.success(`Course ${!isPublished ? 'published' : 'unpublished'} successfully`);
-    } catch (error) {
-      console.error('Error updating course:', error);
-      toast.error('Failed to update course');
-    }
-  };
-
-  const handleAddPreview = (course: Course) => {
-    setSelectedCourse(course);
-    setPreviewDialogOpen(true);
-  };
-
   const filteredCourses = courses.filter(course =>
     course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.summary.toLowerCase().includes(searchTerm.toLowerCase())
+    course.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredCourses.length / COURSES_PER_PAGE);
-  const startIndex = (currentPage - 1) * COURSES_PER_PAGE;
-  const endIndex = startIndex + COURSES_PER_PAGE;
-  const paginatedCourses = filteredCourses.slice(startIndex, endIndex);
+  const publishedCourses = courses.filter(course => course.is_published);
+  const draftCourses = courses.filter(course => !course.is_published);
 
   if (loading) {
     return (
       <CreatorLayout title="My Courses">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </CreatorLayout>
     );
@@ -138,209 +166,208 @@ const CreatorCourses = () => {
 
   return (
     <CreatorLayout title="My Courses">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <p className="text-gray-600">Create and manage your online courses</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">My Courses</h2>
+            <p className="text-muted-foreground">
+              Create and manage your course content
+            </p>
+          </div>
+          <Button onClick={() => navigate('/creator/courses/create')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Course
+          </Button>
         </div>
-        <Button
-          onClick={() => navigate('/creator/courses/create')}
-          className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Course
-        </Button>
-      </div>
 
-      <div className="mb-6">
-        <Input
-          placeholder="Search courses..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Total Courses</p>
+                  <p className="text-2xl font-bold">{courses.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium">Published</p>
+                  <p className="text-2xl font-bold">{publishedCourses.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Edit className="h-5 w-5 text-orange-600" />
+                <div>
+                  <p className="text-sm font-medium">Drafts</p>
+                  <p className="text-2xl font-bold">{draftCourses.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium">Paid Courses</p>
+                  <p className="text-2xl font-bold">
+                    {courses.filter(course => !course.is_free).length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {filteredCourses.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
-            <div className="mb-4 rounded-full bg-primary/10 p-6">
-              <BookOpen className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle className="mb-2">No courses yet</CardTitle>
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search courses..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {/* Courses Grid */}
+        {filteredCourses.length === 0 ? (
+          <div className="text-center py-12">
+            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">
+              {searchTerm ? 'No courses found' : 'No courses yet'}
+            </h3>
             <p className="text-muted-foreground mb-6">
-              {searchTerm ? 'No courses match your search criteria.' : 'Create your first course to get started'}
+              {searchTerm 
+                ? 'No courses match your search criteria'
+                : 'Get started by creating your first course'
+              }
             </p>
             {!searchTerm && (
               <Button onClick={() => navigate('/creator/courses/create')}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create First Course
+                Create Your First Course
               </Button>
             )}
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-8">
-            {paginatedCourses.map((course) => (
-              <Card key={course.id} className="relative overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="relative">
-                  {course.thumbnail_url ? (
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCourses.map((course) => (
+              <Card key={course.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  {course.thumbnail_url && (
                     <img
                       src={course.thumbnail_url}
                       alt={course.title}
-                      className="w-full h-48 object-cover"
+                      className="w-full h-48 object-cover rounded-md mb-4"
                     />
-                  ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center">
-                      <BookOpen className="h-12 w-12 text-gray-400" />
-                    </div>
                   )}
-                  
-                  {/* Status Badge */}
-                  <div className="absolute top-3 right-3">
-                    <Badge
-                      variant={course.is_published ? "default" : "secondary"}
-                      className={course.is_published ? "bg-green-500 text-white" : "bg-yellow-500 text-white"}
-                    >
-                      {course.is_published ? "Published" : "Draft"}
+                  <div className="flex items-center justify-between">
+                    <Badge variant={course.is_published ? 'default' : 'secondary'}>
+                      {course.is_published ? 'Published' : 'Draft'}
+                    </Badge>
+                    <Badge variant={course.is_free ? 'outline' : 'default'}>
+                      {course.is_free ? 'Free' : `$${course.price}`}
                     </Badge>
                   </div>
-                </div>
-
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start mb-2">
+                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="line-clamp-3 mb-4">
+                    {course.description}
+                  </CardDescription>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      <span>{course.duration_minutes} min</span>
+                    </div>
                     <Badge variant="outline" className="text-xs">
-                      {course.category}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
                       {course.difficulty_level}
                     </Badge>
                   </div>
-                  
-                  <CardTitle className="text-lg line-clamp-2 mb-2">
-                    {course.title}
-                  </CardTitle>
-                  
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {course.summary || course.description}
-                  </p>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {/* Course Stats */}
-                  <div className="flex justify-between text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{Math.ceil((course.duration_minutes || 0) / 60)}h</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/creator/courses/${course.id}/edit`)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedCourse(course);
+                          setPreviewDialogOpen(true);
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Preview
+                      </Button>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" />
-                      <span>{course.is_free ? "Free" : `$${course.price}`}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 fill-current text-yellow-400" />
-                      <span>4.8</span>
+                    <div className="flex items-center gap-2">
+                      <CoursePublishButton 
+                        course={course} 
+                        onStatusChange={fetchCourses} 
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/creator/courses/${course.id}/content`)}
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Manage Content
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDuplicateCourse(course.id)}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteCourse(course.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/courses/${course.id}/edit`)}
-                      className="bg-red-500 text-white hover:bg-red-700 hover:text-white"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/learning/course-detail/${course.id}`)}
-                      className="bg-orange-500 text-white hover:bg-orange-700 hover:text-white"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Preview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/courses/${course.id}/content`)}
-                      className="bg-green-500 text-white hover:bg-green-700 hover:text-white"
-                    >
-                      <BookOpen className="h-4 w-4 mr-1" />
-                      Content
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/creator/students`)}
-                      className="bg-purple-500 text-white hover:bg-purple-700 hover:text-white"
-                    >
-                      <Users className="h-4 w-4 mr-1" />
-                      Students
-                    </Button>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleAddPreview(course)}
-                  >
-                    <Video className="h-4 w-4 mr-1" />
-                    Add Preview
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => navigate(`/creator/promo-codes?item_type=course&item_id=${course.id}`)}
-                  >
-                    <Percent className="h-4 w-4 mr-1" />
-                    Promo Codes
-                  </Button>
-
-                  <Button
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleTogglePublish(course.id, course.is_published)}
-                  >
-                    <Play className="h-4 w-4 mr-1" />
-                    {course.is_published ? "Unpublish" : "Publish"}
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleDeleteCourse(course.id)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete Course
-                  </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
+        )}
 
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
+        {selectedCourse && (
+          <CoursePreviewDialog
+            course={selectedCourse}
+            open={previewDialogOpen}
+            onOpenChange={setPreviewDialogOpen}
           />
-        </>
-      )}
-
-      <CoursePreviewDialog
-        open={previewDialogOpen}
-        onOpenChange={setPreviewDialogOpen}
-        course={selectedCourse}
-        onPreviewAdded={loadCourses}
-      />
+        )}
+      </div>
     </CreatorLayout>
   );
 };

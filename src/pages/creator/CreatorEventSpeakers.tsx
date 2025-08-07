@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -164,17 +165,16 @@ const CreatorEventSpeakers = () => {
     setSubmitting(true);
     try {
       if (editingSpeaker) {
-        // Update speaker with user_id check
+        // Update existing speaker
         const { error } = await supabase
           .from('keynote_speakers')
-          .update({ ...formData, user_id: currentUser.id })
-          .eq('id', editingSpeaker.id)
-          .eq('user_id', currentUser.id); // double check owner
+          .update(formData)
+          .eq('id', editingSpeaker.id);
 
         if (error) throw error;
         toast.success('Speaker updated successfully');
       } else {
-        // Insert new speaker with user_id & order_index
+        // Insert new speaker
         const nextOrderIndex = speakers.length > 0 ? Math.max(...speakers.map(s => s.order_index)) + 1 : 0;
 
         const { error } = await supabase
@@ -182,7 +182,6 @@ const CreatorEventSpeakers = () => {
           .insert({
             ...formData,
             event_id: eventId,
-            user_id: currentUser.id,
             order_index: nextOrderIndex
           });
 
@@ -211,8 +210,7 @@ const CreatorEventSpeakers = () => {
       const { error } = await supabase
         .from('keynote_speakers')
         .delete()
-        .eq('id', speakerId)
-        .eq('user_id', currentUser.id); // enforce ownership
+        .eq('id', speakerId);
 
       if (error) throw error;
       await loadSpeakers();
@@ -456,5 +454,3 @@ const CreatorEventSpeakers = () => {
 };
 
 export default CreatorEventSpeakers;
-
-
