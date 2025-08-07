@@ -27,14 +27,14 @@ interface KeynoteSpeaker {
 }
 
 const CreatorEventSpeakers = () => {
-  const { eventId: eventIdParam } = useParams<{ eventId: string }>();
+  const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const [eventId, setEventId] = useState<string>('');
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
+  const [formValid, setFormValid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -47,23 +47,15 @@ const CreatorEventSpeakers = () => {
     website_url: ''
   });
 
-  // Initialize eventId from URL params
+  // Validate form whenever formData changes
   useEffect(() => {
-    if (!eventIdParam) {
-      toast.error('Event ID is missing from URL');
-      navigate('/creator/events');
-      return;
-    }
-    setEventId(eventIdParam);
-  }, [eventIdParam, navigate]);
+    setFormValid(formData.name.trim().length > 0);
+  }, [formData]);
 
   useEffect(() => {
     const checkAuthAndLoad = async () => {
-      if (!eventId) return;
-
       setLoading(true);
       try {
-        // Check authentication
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         
         if (authError || !user) {
@@ -71,7 +63,10 @@ const CreatorEventSpeakers = () => {
         }
 
         setAuthChecked(true);
-        await loadSpeakers();
+        
+        if (eventId) {
+          await loadSpeakers();
+        }
       } catch (error) {
         console.error('Authentication check failed:', error);
         toast.error('Please sign in to manage speakers');
@@ -89,23 +84,34 @@ const CreatorEventSpeakers = () => {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from('keynote_speakers')
         .select('*')
         .eq('event_id', eventId)
         .order('order_index', { ascending: true });
 
-      if (error) throw error;
+      if (error && status !== 406) {
+        throw error;
+      }
+
       setSpeakers(data || []);
     } catch (error) {
       console.error('Error loading speakers:', error);
       toast.error('Failed to load speakers');
+      
+      if (error.message.includes('JWT')) {
+        toast.error('Session expired. Please sign in again.');
+        await supabase.auth.signOut();
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddSpeaker = () => {
+    if (!authChecked) return;
+    
     setEditingSpeaker(null);
     setFormData({
       name: '',
@@ -121,6 +127,8 @@ const CreatorEventSpeakers = () => {
   };
 
   const handleEditSpeaker = (speaker: KeynoteSpeaker) => {
+    if (!authChecked) return;
+    
     setEditingSpeaker(speaker);
     setFormData({
       name: speaker.name,
@@ -137,16 +145,7 @@ const CreatorEventSpeakers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name.trim()) {
-      toast.error('Speaker name is required');
-      return;
-    }
-
-    if (!eventId) {
-      toast.error('Event ID is missing');
-      return;
-    }
+    if (!eventId || !authChecked || !formValid || submitting) return;
 
     setSubmitting(true);
     try {
@@ -184,7 +183,7 @@ const CreatorEventSpeakers = () => {
   };
 
   const handleDeleteSpeaker = async (speakerId: string) => {
-    if (!confirm('Are you sure you want to delete this speaker?')) return;
+    if (!authChecked || !confirm('Are you sure you want to delete this speaker?')) return;
     
     try {
       const { error } = await supabase
@@ -234,7 +233,7 @@ const CreatorEventSpeakers = () => {
         <h2 className="text-2xl font-bold">Event Speakers</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={handleAddSpeaker}>
+            <Button onClick={handleAddSpeaker} disabled={!authChecked}>
               <Plus className="h-4 w-4 mr-2" />
               Add Speaker
             </Button>
@@ -253,7 +252,11 @@ const CreatorEventSpeakers = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name">Speaker Name *</Label>
+                  <Label htmlFor="name">
+                    Speaker Name * {!formData.name.trim() && (
+                      <span className="text-red-500 text-xs">(required)</span>
+                    )}
+                  </Label>
                   <Input
                     id="name"
                     name="name"
@@ -332,10 +335,18 @@ const CreatorEventSpeakers = () => {
               </div>
 
               <div className="flex justify-end gap-4">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setDialogOpen(false)}
+                  disabled={submitting}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting}>
+                <Button 
+                  type="submit" 
+                  disabled={!authChecked || !formValid || submitting}
+                >
                   {submitting ? 'Processing...' : editingSpeaker ? 'Update' : 'Create'} Speaker
                 </Button>
               </div>
@@ -354,10 +365,14 @@ const CreatorEventSpeakers = () => {
             <p className="text-muted-foreground mb-6">
               Add keynote speakers for your event
             </p>
-            <Button onClick={handleAddSpeaker}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Speaker
-            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleAddSpeaker} disabled={!authChecked}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Speaker
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </CardContent>
         </Card>
       ) : (
@@ -390,6 +405,7 @@ const CreatorEventSpeakers = () => {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleEditSpeaker(speaker)}
+                      disabled={!authChecked}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -398,6 +414,7 @@ const CreatorEventSpeakers = () => {
                       size="sm"
                       className="text-destructive hover:text-destructive"
                       onClick={() => handleDeleteSpeaker(speaker.id)}
+                      disabled={!authChecked}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
