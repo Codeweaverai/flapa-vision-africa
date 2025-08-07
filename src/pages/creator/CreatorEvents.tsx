@@ -216,19 +216,29 @@ const CreatorEvents = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/edit`)}>
+                    <Button 
+                       className="bg-red-600 text-white hover:bg-red-700 transition-colors duration-300 ease-in-out flex items-center"
+                      size="sm" onClick={() => navigate(`/creator/events/${event.id}/edit`)}>
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/event-detail/${event.id}`)}>
+                    <Button 
+                       className="bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-300 ease-in-out flex items-center"
+                      size="sm" onClick={() => navigate(`/event-detail/${event.id}`)}>
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/attendees`)}>
+                    <Button 
+                       className="bg-orange-600 text-white hover:bg-orange-700 transition-colors duration-300 ease-in-out flex items-center" size="sm" 
+                      onClick={() => navigate(`/creator/attendees`)}
+                      >
                       <UserCheck className="h-4 w-4 mr-1" />
-                      Manage Attendees
+                      Attendees
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/agenda`)}>
+                    <Button 
+                     className="bg-purpl-600 text-white hover:bg-purple-700 transition-colors duration-300 ease-in-out flex items-center" size="sm"
+                      onClick={() => navigate(`/creator/events/${event.id}/agenda`)}
+                      >
                       <CalendarIcon className="h-4 w-4 mr-1" />
                       Agenda
                     </Button>
@@ -241,7 +251,9 @@ const CreatorEvents = () => {
                     Speakers
                     </Button>
  
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/tickets`)}>
+                    <Button 
+                       className="bg-pink-600 text-white hover:bg-pink-700 transition-colors duration-300 ease-in-out flex items-center"
+                      size="sm" onClick={() => navigate(`/creator/events/${event.id}/tickets`)}>
                       <Ticket className="h-4 w-4 mr-1" />
                       Tickets
                     </Button>
