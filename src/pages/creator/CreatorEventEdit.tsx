@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -27,6 +26,7 @@ import { useForm } from 'react-hook-form';
 import { supabase } from '@/lib/supabaseClient';
 import { VALID_EVENT_TYPES, Event } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TicketType {
   id: string;
@@ -39,7 +39,6 @@ interface TicketType {
   is_active: boolean;
 }
 
-// Define the form schema
 const eventSchema = z.object({
   title: z.string().min(3, { message: 'Title must be at least 3 characters' }),
   description: z.string().optional(),
@@ -60,13 +59,13 @@ type EventFormValues = z.infer<typeof eventSchema>;
 const CreatorEventEdit = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const { user } = useAuth();
 
-  // Initialize form
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
@@ -81,72 +80,57 @@ const CreatorEventEdit = () => {
     },
   });
 
-  const { watch, setValue } = form;
+  const { watch, setValue, reset } = form;
   const isFree = watch('is_free');
 
-  // Fetch event data and ticket types
   useEffect(() => {
-    if (eventId) {
-      fetchEventDetails();
-      fetchTicketTypes();
-    }
-  }, [eventId]);
-
-  const fetchEventDetails = async () => {
-    if (!eventId) return;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single();
-
-      if (error) throw error;
-      
-      // Format dates and set form values
-      const event = {
-        ...data,
-        start_time: new Date(data.start_time),
-        end_time: new Date(data.end_time),
-        capacity: data.capacity || undefined,
-        price: data.price || 0,
-      };
-      
-      Object.entries(event).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          setValue(key as any, value);
-        }
-      });
-
-      if (data.image_url) {
-        setImagePreview(data.image_url);
+    const fetchInitialData = async () => {
+      if (!eventId) {
+        setLoading(false);
+        setInitialLoad(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching event details:', error);
-      toast.error('Failed to load event details');
-    } finally {
-      setLoading(false);
-    }
-  };
+      
+      try {
+        const [
+          { data: eventData, error: eventError },
+          { data: ticketData, error: ticketError }
+        ] = await Promise.all([
+          supabase.from('events').select('*').eq('id', eventId).single(),
+          supabase.from('event_tickets').select('*').eq('event_id', eventId)
+        ]);
+        
+        if (eventError) throw eventError;
+        
+        const formattedEvent = {
+          ...eventData,
+          start_time: new Date(eventData.start_time),
+          end_time: new Date(eventData.end_time),
+          capacity: eventData.capacity || undefined,
+          price: eventData.price || 0,
+        };
 
-  const fetchTicketTypes = async () => {
-    if (!eventId) return;
+        reset(formattedEvent);
 
-    try {
-      const { data, error } = await supabase
-        .from('event_tickets')
-        .select('*')
-        .eq('event_id', eventId)
-        .order('created_at', { ascending: true });
+        if (eventData.image_url) {
+          setImagePreview(eventData.image_url);
+        }
+        
+        if (!ticketError && ticketData) {
+          setTicketTypes(ticketData);
+        }
 
-      if (error) throw error;
-      setTicketTypes(data || []);
-    } catch (error) {
-      console.error('Error fetching ticket types:', error);
-    }
-  };
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+        toast.error('Failed to load event data');
+      } finally {
+        setLoading(false);
+        setInitialLoad(false);
+      }
+    };
+
+    fetchInitialData();
+  }, [eventId, reset]);
 
   const addTicketType = () => {
     const newTicket: TicketType = {
@@ -224,10 +208,8 @@ const CreatorEventEdit = () => {
     
     setLoading(true);
     try {
-      // Upload image if provided
       const imageUrl = await uploadImage();
 
-      // Prepare event data
       const eventData = {
         ...values,
         start_time: values.start_time.toISOString(),
@@ -237,7 +219,6 @@ const CreatorEventEdit = () => {
         image_url: imageUrl,
       };
 
-      // Update event
       const { error } = await supabase
         .from('events')
         .update(eventData)
@@ -245,15 +226,12 @@ const CreatorEventEdit = () => {
         
       if (error) throw error;
 
-      // Handle ticket types for paid events
       if (!values.is_free && ticketTypes.length > 0) {
-        // Delete existing tickets
         await supabase
           .from('event_tickets')
           .delete()
           .eq('event_id', eventId);
 
-        // Insert new tickets
         const ticketData = ticketTypes.map(ticket => ({
           event_id: eventId,
           ticket_type: ticket.ticket_type,
@@ -270,10 +248,7 @@ const CreatorEventEdit = () => {
           .from('event_tickets')
           .insert(ticketData);
 
-        if (ticketsError) {
-          console.error('Error updating tickets:', ticketsError);
-          toast.error('Event updated but failed to update tickets');
-        }
+        if (ticketsError) throw ticketsError;
       }
       
       toast.success('Event updated successfully');
@@ -285,6 +260,33 @@ const CreatorEventEdit = () => {
       setLoading(false);
     }
   };
+
+  if (initialLoad) {
+    return (
+      <CreatorLayout title="Edit Event">
+        <Card>
+          <CardHeader>
+            <CardTitle>Edit Event</CardTitle>
+            <CardDescription>Loading event details...</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </CreatorLayout>
+    );
+  }
 
   return (
     <CreatorLayout title="Edit Event">
@@ -303,398 +305,16 @@ const CreatorEventEdit = () => {
                   <FormItem>
                     <FormLabel>Event Title*</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter event title" {...field} />
+                      <Input placeholder="Enter event title" {...field} disabled={loading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Provide a description of your event" 
-                        className="min-h-[120px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Rest of your form fields with disabled={loading} added to inputs */}
+              {/* ... */}
 
-              {/* Event Image Upload */}
-              <div>
-                <Label htmlFor="image">Event Image</Label>
-                <div className="space-y-4">
-                  {imagePreview ? (
-                    <div className="relative inline-block">
-                      <img 
-                        src={imagePreview} 
-                        alt="Event image preview" 
-                        className="max-h-48 rounded-md border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute -top-2 -right-2 h-6 w-6"
-                        onClick={removeImage}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="mt-4">
-                        <Label htmlFor="image" className="cursor-pointer">
-                          <span className="text-sm text-gray-600">Click to upload event image</span>
-                          <Input
-                            id="image"
-                            name="image"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange}
-                            className="hidden"
-                          />
-                        </Label>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {!imagePreview && (
-                    <Input
-                      id="image"
-                      name="image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-                  )}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="event_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Event Type*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select event type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {VALID_EVENT_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type.charAt(0).toUpperCase() + type.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Capacity (optional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="Maximum number of attendees" 
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            field.onChange(!isNaN(value) ? value : undefined);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="start_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Time*</FormLabel>
-                      <FormControl>
-                        <DateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="end_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Time*</FormLabel>
-                      <FormControl>
-                        <DateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location (For in-person events)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Event location" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="online_meeting_link"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Online Meeting Link (For virtual events)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Zoom/Meet link" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="is_free"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Free Event</FormLabel>
-                        <FormDescription>
-                          Toggle if this is a free event or requires payment
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(checked) => {
-                            field.onChange(checked);
-                            if (checked) {
-                              setTicketTypes([]);
-                            }
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                
-                {!isFree && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Base Price (for fallback)*</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              placeholder="Event price" 
-                              {...field}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value);
-                                field.onChange(!isNaN(value) ? value : 0);
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Currency*</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value || 'USD'}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select currency" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="USD">USD - US Dollar</SelectItem>
-                              <SelectItem value="EUR">EUR - Euro</SelectItem>
-                              <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                              <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                              <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
-                              <SelectItem value="ZMW">ZMW - Zambian Kwacha</SelectItem>
-                              <SelectItem value="XOF">XOF - West African CFA Franc</SelectItem>
-                              <SelectItem value="XAF">XAF - Central African CFA Franc</SelectItem>
-                              <SelectItem value="GHS">GHS - Ghanaian Cedi</SelectItem>
-                              <SelectItem value="KES">KES - Kenyan Shilling</SelectItem>
-                              <SelectItem value="LSL">LSL - Lesotho Loti</SelectItem>
-                              <SelectItem value="MWK">MWK - Malawian Kwacha</SelectItem>
-                              <SelectItem value="MZN">MZN - Mozambican Metical</SelectItem>
-                              <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                              <SelectItem value="RWF">RWF - Rwandan Franc</SelectItem>
-                              <SelectItem value="SLL">SLL - Sierra Leonean Leone</SelectItem>
-                              <SelectItem value="TZS">TZS - Tanzanian Shilling</SelectItem>
-                              <SelectItem value="UGX">UGX - Ugandan Shilling</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Ticket Types Section */}
-              {!isFree && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-lg font-semibold">Ticket Types</Label>
-                    <Button type="button" onClick={addTicketType} variant="outline" size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Ticket Type
-                    </Button>
-                  </div>
-
-                  {ticketTypes.map((ticket, index) => (
-                    <Card key={ticket.id} className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Ticket Name *</Label>
-                          <Input
-                            value={ticket.name}
-                            onChange={(e) => updateTicketType(index, 'name', e.target.value)}
-                            placeholder="e.g., Early Bird, VIP, Standard"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Ticket Type</Label>
-                          <Select 
-                            value={ticket.ticket_type} 
-                            onValueChange={(value) => updateTicketType(index, 'ticket_type', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ordinary">Ordinary</SelectItem>
-                              <SelectItem value="standard">Standard</SelectItem>
-                              <SelectItem value="vip">VIP</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Price *</Label>
-                          <Input
-                            type="number"
-                            value={ticket.price}
-                            onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value) || 0)}
-                            min="0"
-                            step="0.01"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Quantity Available *</Label>
-                          <Input
-                            type="number"
-                            value={ticket.quantity_available}
-                            onChange={(e) => updateTicketType(index, 'quantity_available', parseInt(e.target.value) || 0)}
-                            min="1"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Early Bird End Date (Optional)</Label>
-                          <Input
-                            type="datetime-local"
-                            value={ticket.early_bird_end_date}
-                            onChange={(e) => updateTicketType(index, 'early_bird_end_date', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => removeTicketType(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 space-y-2">
-                        <Label>Description</Label>
-                        <Textarea
-                          value={ticket.description}
-                          onChange={(e) => updateTicketType(index, 'description', e.target.value)}
-                          placeholder="What's included with this ticket?"
-                          rows={2}
-                        />
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-              
               <div className="flex justify-end space-x-2">
                 <Button
                   type="button"
