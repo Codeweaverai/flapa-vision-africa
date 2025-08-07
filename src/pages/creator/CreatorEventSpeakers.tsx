@@ -34,7 +34,6 @@ const CreatorEventSpeakers = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
-  const [formValid, setFormValid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -46,11 +45,6 @@ const CreatorEventSpeakers = () => {
     twitter_url: '',
     website_url: ''
   });
-
-  // Validate form whenever formData changes
-  useEffect(() => {
-    setFormValid(formData.name.trim().length > 0);
-  }, [formData]);
 
   useEffect(() => {
     const checkAuthAndLoad = async () => {
@@ -145,30 +139,47 @@ const CreatorEventSpeakers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId || !authChecked || !formValid || submitting) return;
+    console.log('Submit triggered'); // Debug log
+    if (!eventId || !authChecked || submitting) {
+      console.log('Prevented submit - missing:', { eventId, authChecked, submitting }); // Debug log
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toast.error('Speaker name is required');
+      return;
+    }
 
     setSubmitting(true);
+    console.log('Submitting form data:', formData); // Debug log
+
     try {
       if (editingSpeaker) {
-        const { error } = await supabase
+        console.log('Updating speaker:', editingSpeaker.id); // Debug log
+        const { data, error } = await supabase
           .from('keynote_speakers')
           .update(formData)
-          .eq('id', editingSpeaker.id);
+          .eq('id', editingSpeaker.id)
+          .select();
 
         if (error) throw error;
+        console.log('Update successful:', data); // Debug log
         toast.success('Speaker updated successfully');
       } else {
+        console.log('Creating new speaker'); // Debug log
         const nextOrderIndex = speakers.length > 0 ? Math.max(...speakers.map(s => s.order_index)) + 1 : 0;
         
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('keynote_speakers')
           .insert({
             ...formData,
             event_id: eventId,
             order_index: nextOrderIndex
-          });
+          })
+          .select();
 
         if (error) throw error;
+        console.log('Create successful:', data); // Debug log
         toast.success('Speaker created successfully');
       }
 
@@ -253,9 +264,7 @@ const CreatorEventSpeakers = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">
-                    Speaker Name * {!formData.name.trim() && (
-                      <span className="text-red-500 text-xs">(required)</span>
-                    )}
+                    Speaker Name *
                   </Label>
                   <Input
                     id="name"
@@ -339,13 +348,11 @@ const CreatorEventSpeakers = () => {
                   type="button" 
                   variant="outline" 
                   onClick={() => setDialogOpen(false)}
-                  disabled={submitting}
                 >
                   Cancel
                 </Button>
                 <Button 
-                  type="submit" 
-                  disabled={!authChecked || !formValid || submitting}
+                  type="submit"
                 >
                   {submitting ? 'Processing...' : editingSpeaker ? 'Update' : 'Create'} Speaker
                 </Button>
