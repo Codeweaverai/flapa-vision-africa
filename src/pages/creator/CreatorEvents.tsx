@@ -224,18 +224,23 @@ const CreatorEvents = () => {
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/registrations`)}>
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/attendees`)}>
                       <UserCheck className="h-4 w-4 mr-1" />
-                      Registrations
+                      Manage Attendees
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/agenda`)}>
                       <CalendarIcon className="h-4 w-4 mr-1" />
                       Agenda
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/speakers`)}>
-                      <Users className="h-4 w-4 mr-1" />
-                      Speakers
+                       <Button
+                    className="bg-green-600 text-white hover:bg-green-700 transition-colors duration-300 ease-in-out flex items-center"
+                    size="sm"
+                    onClick={() => navigate(`/creator/events/${event.id}/speakers`)}
+                    >
+                    <Users className="h-4 w-4 mr-1" />
+                    Speakers
                     </Button>
+ 
                     <Button variant="outline" size="sm" onClick={() => navigate(`/creator/events/${event.id}/tickets`)}>
                       <Ticket className="h-4 w-4 mr-1" />
                       Tickets
