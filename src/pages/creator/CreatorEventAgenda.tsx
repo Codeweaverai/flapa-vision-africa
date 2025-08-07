@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -33,11 +32,13 @@ interface Speaker {
 }
 
 const CreatorEventAgenda = () => {
-  const { eventId } = useParams<{ eventId: string }>();
+  const { eventId: eventIdParam } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
+  const [eventId, setEventId] = useState<string>('');
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
   const [formData, setFormData] = useState({
@@ -50,17 +51,49 @@ const CreatorEventAgenda = () => {
     session_type: 'presentation'
   });
 
+  // Initialize eventId from URL params
   useEffect(() => {
-    if (eventId) {
-      loadAgenda();
-      loadSpeakers();
+    if (!eventIdParam) {
+      toast.error('Event ID is missing from URL');
+      navigate('/creator/events');
+      return;
     }
-  }, [eventId]);
+    setEventId(eventIdParam);
+  }, [eventIdParam, navigate]);
+
+  useEffect(() => {
+    const checkAuthAndLoad = async () => {
+      if (!eventId) return;
+
+      setLoading(true);
+      try {
+        // Check authentication
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+          throw new Error('Not authenticated');
+        }
+
+        setAuthChecked(true);
+        await Promise.all([loadAgenda(), loadSpeakers()]);
+      } catch (error) {
+        console.error('Initialization error:', error);
+        toast.error('Failed to load data');
+        if (error.message.includes('JWT')) {
+          await supabase.auth.signOut();
+          navigate('/login');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthAndLoad();
+  }, [eventId, navigate]);
 
   const loadAgenda = async () => {
     if (!eventId) return;
     
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('event_agenda')
@@ -73,8 +106,7 @@ const CreatorEventAgenda = () => {
     } catch (error) {
       console.error('Error loading agenda:', error);
       toast.error('Failed to load agenda');
-    } finally {
-      setLoading(false);
+      throw error;
     }
   };
 
@@ -92,6 +124,8 @@ const CreatorEventAgenda = () => {
       setSpeakers(data || []);
     } catch (error) {
       console.error('Error loading speakers:', error);
+      toast.error('Failed to load speakers');
+      throw error;
     }
   };
 
@@ -125,7 +159,10 @@ const CreatorEventAgenda = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId) return;
+    if (!eventId) {
+      toast.error('Event ID is missing');
+      return;
+    }
 
     try {
       const submitData = {
@@ -157,7 +194,7 @@ const CreatorEventAgenda = () => {
       setDialogOpen(false);
     } catch (error) {
       console.error('Error saving agenda item:', error);
-      toast.error('Failed to save agenda item');
+      toast.error(`Failed to save agenda item: ${error.message}`);
     }
   };
 
@@ -351,14 +388,10 @@ const CreatorEventAgenda = () => {
             <p className="text-muted-foreground mb-6">
               Create your event schedule
             </p>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={handleAddItem}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Item
-                </Button>
-              </DialogTrigger>
-            </Dialog>
+            <Button onClick={handleAddItem}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Item
+            </Button>
           </CardContent>
         </Card>
       ) : (
