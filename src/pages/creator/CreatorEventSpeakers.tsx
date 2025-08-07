@@ -34,6 +34,8 @@ const CreatorEventSpeakers = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
+  const [formValid, setFormValid] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -45,11 +47,15 @@ const CreatorEventSpeakers = () => {
     website_url: ''
   });
 
+  // Validate form whenever formData changes
+  useEffect(() => {
+    setFormValid(formData.name.trim().length > 0);
+  }, [formData]);
+
   useEffect(() => {
     const checkAuthAndLoad = async () => {
       setLoading(true);
       try {
-        // Check authentication status
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         
         if (authError || !user) {
@@ -84,7 +90,7 @@ const CreatorEventSpeakers = () => {
         .eq('event_id', eventId)
         .order('order_index', { ascending: true });
 
-      if (error && status !== 406) { // 406 is when no rows found
+      if (error && status !== 406) {
         throw error;
       }
 
@@ -93,7 +99,6 @@ const CreatorEventSpeakers = () => {
       console.error('Error loading speakers:', error);
       toast.error('Failed to load speakers');
       
-      // Handle JWT errors specifically
       if (error.message.includes('JWT')) {
         toast.error('Session expired. Please sign in again.');
         await supabase.auth.signOut();
@@ -140,8 +145,9 @@ const CreatorEventSpeakers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId || !authChecked) return;
+    if (!eventId || !authChecked || !formValid || submitting) return;
 
+    setSubmitting(true);
     try {
       if (editingSpeaker) {
         const { error } = await supabase
@@ -171,6 +177,8 @@ const CreatorEventSpeakers = () => {
     } catch (error) {
       console.error('Error saving speaker:', error);
       toast.error(`Failed to save speaker: ${error.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -244,7 +252,11 @@ const CreatorEventSpeakers = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name">Speaker Name *</Label>
+                  <Label htmlFor="name">
+                    Speaker Name * {!formData.name.trim() && (
+                      <span className="text-red-500 text-xs">(required)</span>
+                    )}
+                  </Label>
                   <Input
                     id="name"
                     name="name"
@@ -323,11 +335,19 @@ const CreatorEventSpeakers = () => {
               </div>
 
               <div className="flex justify-end gap-4">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setDialogOpen(false)}
+                  disabled={submitting}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!authChecked}>
-                  {editingSpeaker ? 'Update' : 'Create'} Speaker
+                <Button 
+                  type="submit" 
+                  disabled={!authChecked || !formValid || submitting}
+                >
+                  {submitting ? 'Processing...' : editingSpeaker ? 'Update' : 'Create'} Speaker
                 </Button>
               </div>
             </form>
