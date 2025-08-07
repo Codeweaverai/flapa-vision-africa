@@ -4,19 +4,14 @@ import { toast } from 'sonner';
 
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/lib/supabaseClient';
+import { Checkbox } from '@/components/ui/checkbox';
+import { supabase } from '@/lib/supabase';
 
-export default function CreatorEventEditPage() {
+const CreatorEventEditPage = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
 
@@ -24,18 +19,16 @@ export default function CreatorEventEditPage() {
     title: '',
     description: '',
     location: '',
-    date: '',
-    time: '',
-    price: '',
-    capacity: ''
+    start_date: '',
+    end_date: '',
+    is_published: false,
   });
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Prefill form with existing event data
   useEffect(() => {
     const fetchEvent = async () => {
-      setIsLoading(true);
+      setLoading(true);
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -43,155 +36,149 @@ export default function CreatorEventEditPage() {
         .single();
 
       if (error) {
-        toast.error('Failed to load event data');
+        toast.error('Failed to fetch event');
         console.error(error);
-      } else if (data) {
+      } else {
         setFormData({
           title: data.title || '',
           description: data.description || '',
           location: data.location || '',
-          date: data.date || '',
-          time: data.time || '',
-          price: data.price || '',
-          capacity: data.capacity || ''
+          start_date: data.start_date ? data.start_date.substring(0, 16) : '',
+          end_date: data.end_date ? data.end_date.substring(0, 16) : '',
+          is_published: data.is_published || false,
         });
       }
 
-      setIsLoading(false);
+      setLoading(false);
     };
 
     if (eventId) fetchEvent();
   }, [eventId]);
 
-  // Handle input change
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
-  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
 
     const { error } = await supabase
       .from('events')
       .update({
-        ...formData
+        ...formData,
+        start_date: new Date(formData.start_date).toISOString(),
+        end_date: new Date(formData.end_date).toISOString(),
       })
       .eq('id', eventId);
 
+    setLoading(false);
+
     if (error) {
       toast.error('Failed to update event');
-      console.error(error);
     } else {
-      toast.success('Event updated successfully!');
+      toast.success('Event updated successfully');
       navigate('/creator/events');
     }
-
-    setIsLoading(false);
   };
 
   return (
     <CreatorLayout>
-      <div className="max-w-4xl mx-auto py-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit Event</CardTitle>
-            <CardDescription>Update your event details below</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+      <Card className="w-full max-w-3xl mx-auto">
+        <CardHeader>
+          <CardTitle>Edit Event</CardTitle>
+          <CardDescription>Update the event details below.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                placeholder="Event Title"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Event Description"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                placeholder="Event Location"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="start_date">Start Date & Time</Label>
                 <Input
-                  id="title"
-                  name="title"
-                  value={formData.title}
+                  id="start_date"
+                  name="start_date"
+                  type="datetime-local"
+                  value={formData.start_date}
                   onChange={handleChange}
                   required
                 />
               </div>
+
               <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  rows={4}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="end_date">End Date & Time</Label>
                 <Input
-                  id="location"
-                  name="location"
-                  value={formData.location}
+                  id="end_date"
+                  name="end_date"
+                  type="datetime-local"
+                  value={formData.end_date}
                   onChange={handleChange}
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="date">Date</Label>
-                  <Input
-                    id="date"
-                    name="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="time">Time</Label>
-                  <Input
-                    id="time"
-                    name="time"
-                    type="time"
-                    value={formData.time}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="price">Price (USD)</Label>
-                  <Input
-                    id="price"
-                    name="price"
-                    type="number"
-                    value={formData.price}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="capacity">Capacity</Label>
-                  <Input
-                    id="capacity"
-                    name="capacity"
-                    type="number"
-                    value={formData.capacity}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Updating...' : 'Update Event'}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_published"
+                name="is_published"
+                checked={formData.is_published}
+                onCheckedChange={(checked) =>
+                  setFormData((prev) => ({ ...prev, is_published: checked }))
+                }
+              />
+              <Label htmlFor="is_published">Publish Event</Label>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Saving...' : 'Save Changes'}
               </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </CreatorLayout>
   );
-}
-export default CreatorEventEdit;
+};
+
+export default CreatorEventEditPage;
