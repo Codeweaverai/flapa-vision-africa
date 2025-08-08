@@ -327,13 +327,13 @@ const CreatorAttendeeManagement: React.FC = () => {
                         </Button>
                       )}
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open('/ticket-verification', '_blank')}
-                        className="flex items-center gap-2"
-                      >
-                        <QrCode className="h-4 w-4" />
-                        Scan Tickets
+                   variant="outline"
+             size="sm"
+              onClick={() => window.open('/ticket-verification', '_blank')}
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-sm hover:shadow-md"
+                 >
+                <QrCode className="h-4 w-4" />
+                   Scan Tickets
                       </Button>
                       <AttendeeExportButton 
                         eventId={selectedEvent} 
