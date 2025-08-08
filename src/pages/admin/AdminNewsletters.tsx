@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Table, 
   TableBody, 
@@ -16,6 +17,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -46,7 +48,11 @@ import {
   Eye,
   Edit,
   Trash2,
-  Info
+  Info,
+  BookOpen,
+  ShoppingCart,
+  Sparkles,
+  Palette
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -61,26 +67,29 @@ interface Newsletter {
   total_recipients: number;
   successful_sends: number;
   failed_sends: number;
+  template_id?: string;
 }
 
-interface AuthUser {
+interface NewsletterTemplate {
   id: string;
-  email: string;
-  email_confirmed_at: string | null;
-  raw_user_meta_data?: {
-    full_name?: string;
-    display_name?: string;
-    username?: string;
-  };
+  name: string;
+  description: string;
+  category: string;
+  subject_template: string;
+  body_html_template: string;
+  placeholders: string[];
+  is_active: boolean;
 }
 
 const AdminNewsletters = () => {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
+  const [templates, setTemplates] = useState<NewsletterTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedNewsletter, setSelectedNewsletter] = useState<Newsletter | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<NewsletterTemplate | null>(null);
   const [recipientCount, setRecipientCount] = useState(0);
   
   // Form state
@@ -92,6 +101,7 @@ const AdminNewsletters = () => {
 
   useEffect(() => {
     fetchNewsletters();
+    fetchTemplates();
   }, []);
 
   const fetchNewsletters = async () => {
@@ -110,6 +120,37 @@ const AdminNewsletters = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('newsletter_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      
+      const transformedData: NewsletterTemplate[] = (data || []).map(template => ({
+        ...template,
+        placeholders: Array.isArray(template.placeholders) 
+          ? template.placeholders 
+          : typeof template.placeholders === 'string'
+          ? JSON.parse(template.placeholders)
+          : []
+      }));
+      
+      setTemplates(transformedData);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+    }
+  };
+
+  const handleSelectTemplate = (template: NewsletterTemplate) => {
+    setSelectedTemplate(template);
+    setSubject(template.subject_template);
+    setBodyHtml(template.body_html_template);
   };
 
   const handleRecipientCountChange = (count: number) => {
@@ -135,6 +176,7 @@ const AdminNewsletters = () => {
         body_html: bodyHtml.trim(),
         status,
         scheduled_at: status === 'scheduled' ? scheduledAt : null,
+        template_id: selectedTemplate?.id || null,
         created_by: (await supabase.auth.getUser()).data.user?.id
       };
 
@@ -219,6 +261,19 @@ const AdminNewsletters = () => {
     setBodyHtml('');
     setScheduledAt('');
     setSelectedNewsletter(null);
+    setSelectedTemplate(null);
+  };
+
+  const getCategoryIcon = (category: string) => {
+    const icons = {
+      general: Users,
+      course: BookOpen,
+      event: Calendar,
+      promotional: ShoppingCart,
+      engagement: Sparkles
+    };
+    const Icon = icons[category as keyof typeof icons] || Users;
+    return <Icon className="h-4 w-4" />;
   };
 
   const getStatusColor = (status: string) => {
@@ -283,6 +338,43 @@ const AdminNewsletters = () => {
           Includes all users (both verified and unverified users, regular users and creators)
         </p>
       </div>
+
+      {/* Template Selection */}
+      {!isEdit && (
+        <div className="space-y-4">
+          <Label>Choose a Template (Optional)</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+            {templates.map((template) => (
+              <div
+                key={template.id}
+                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                  selectedTemplate?.id === template.id
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onClick={() => handleSelectTemplate(template)}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {getCategoryIcon(template.category)}
+                  <h4 className="font-medium text-sm">{template.name}</h4>
+                </div>
+                <p className="text-xs text-muted-foreground">{template.description}</p>
+                <Badge variant="outline" className="mt-2 text-xs">
+                  {template.category}
+                </Badge>
+              </div>
+            ))}
+          </div>
+          {selectedTemplate && (
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <Palette className="h-4 w-4 inline mr-1" />
+                Using template: <strong>{selectedTemplate.name}</strong>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="subject">Subject</Label>
@@ -440,6 +532,7 @@ const AdminNewsletters = () => {
                   <TableRow>
                     <TableHead>Subject</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Template</TableHead>
                     <TableHead>Scheduled</TableHead>
                     <TableHead>Recipients</TableHead>
                     <TableHead>Success Rate</TableHead>
@@ -450,7 +543,7 @@ const AdminNewsletters = () => {
                 <TableBody>
                   {newsletters.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                         No newsletters found. Create your first newsletter!
                       </TableCell>
                     </TableRow>
@@ -467,6 +560,16 @@ const AdminNewsletters = () => {
                               {newsletter.status.toUpperCase()}
                             </span>
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {newsletter.template_id ? (
+                            <Badge variant="outline" className="text-xs">
+                              <Palette className="h-3 w-3 mr-1" />
+                              Template
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">Custom</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {newsletter.scheduled_at ? (
