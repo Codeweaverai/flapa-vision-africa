@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
@@ -210,10 +211,10 @@ const ExploreEventsPage = () => {
 
                 {event.profiles && (
                   <div className="mt-4 flex items-center">
-                    {event.profiles?.avatar_url && (
+                    {event.profiles.avatar_url && (
                       <img
                         src={event.profiles.avatar_url}
-                        alt={event.profiles?.full_name || 'Unknown Creator'}
+                        alt={event.profiles.full_name || 'Unknown Creator'}
                         className="w-6 h-6 rounded-full mr-2"
                       />
                     )}
