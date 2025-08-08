@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -20,27 +21,21 @@ import NotFoundPage from "@/pages/NotFoundPage";
 import ProfilePage from "@/pages/ProfilePage";
 import SettingsPage from "@/pages/SettingsPage";
 import CheckoutPage from "@/pages/CheckoutPage";
-import SuccessPage from "@/pages/SuccessPage";
-import CancelPage from "@/pages/CancelPage";
+import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
+import PaymentCancelPage from "@/pages/PaymentCancelPage";
 import ExploreCoursesPage from "@/pages/ExploreCoursesPage";
-import CourseDetailsPage from "@/pages/CourseDetailsPage";
-import CourseContentPage from "@/pages/CourseContentPage";
+import CourseDetailPage from "@/pages/CourseDetailPage";
+import CoursePlayerPage from "@/pages/CoursePlayerPage";
 import ExploreEventsPage from "@/pages/ExploreEventsPage";
-import EventDetailsPage from "@/pages/EventDetailsPage";
-import RegistrationSuccessPage from "@/pages/RegistrationSuccessPage";
-import RegistrationCancelPage from "@/pages/RegistrationCancelPage";
-import ConsultationsPage from "@/pages/ConsultationsPage";
+import EventDetailPage from "@/pages/EventDetailPage";
+import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
+import PaymentCancelPage from "@/pages/PaymentCancelPage";
 import SpeakingPage from "@/pages/SpeakingPage";
-import CareersPage from "@/pages/CareersPage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
-import EmailConfirmationPage from "@/pages/EmailConfirmationPage";
-import EmailConfirmationSuccessPage from "@/pages/EmailConfirmationSuccessPage";
-import EmailConfirmationCancelPage from "@/pages/EmailConfirmationCancelPage";
-import CreateCoursePage from "@/pages/CreateCoursePage";
-import CreateEventPage from "@/pages/CreateEventPage";
+import VerifyPage from "@/pages/VerifyPage";
 import MediaPage from "@/pages/MediaPage";
 
 // Admin Pages
@@ -98,27 +93,22 @@ function App() {
                   <Route path="/register" element={<Layout><RegisterPage /></Layout>} />
                   <Route path="/forgot-password" element={<Layout><ForgotPasswordPage /></Layout>} />
                   <Route path="/reset-password" element={<Layout><ResetPasswordPage /></Layout>} />
-                  <Route path="/email-confirmation" element={<Layout><EmailConfirmationPage /></Layout>} />
-                  <Route path="/email-confirmation/success" element={<Layout><EmailConfirmationSuccessPage /></Layout>} />
-                  <Route path="/email-confirmation/cancel" element={<Layout><EmailConfirmationCancelPage /></Layout>} />
+                  <Route path="/verify" element={<Layout><VerifyPage /></Layout>} />
 
                   {/* Protected Routes */}
                   <Route path="/profile" element={<ProtectedRoute><Layout><ProfilePage /></Layout></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
                   <Route path="/checkout" element={<ProtectedRoute><Layout><CheckoutPage /></Layout></ProtectedRoute>} />
-                  <Route path="/success" element={<ProtectedRoute><Layout><SuccessPage /></Layout></ProtectedRoute>} />
-                  <Route path="/cancel" element={<ProtectedRoute><Layout><CancelPage /></Layout></ProtectedRoute>} />
+                  <Route path="/payment/success" element={<ProtectedRoute><Layout><PaymentSuccessPage /></Layout></ProtectedRoute>} />
+                  <Route path="/payment/cancel" element={<ProtectedRoute><Layout><PaymentCancelPage /></Layout></ProtectedRoute>} />
                   <Route path="/courses" element={<Layout><ExploreCoursesPage /></Layout>} />
-                  <Route path="/courses/:id" element={<Layout><CourseDetailsPage /></Layout>} />
-                  <Route path="/courses/:id/content" element={<ProtectedRoute><Layout><CourseContentPage /></Layout></ProtectedRoute>} />
+                  <Route path="/courses/:id" element={<Layout><CourseDetailPage /></Layout>} />
+                  <Route path="/courses/:id/learn" element={<ProtectedRoute><Layout><CoursePlayerPage /></Layout></ProtectedRoute>} />
                   <Route path="/events" element={<Layout><ExploreEventsPage /></Layout>} />
-                  <Route path="/events/:id" element={<Layout><EventDetailsPage /></Layout>} />
-                  <Route path="/events/:id/success" element={<ProtectedRoute><Layout><RegistrationSuccessPage /></Layout></ProtectedRoute>} />
-                  <Route path="/events/:id/cancel" element={<ProtectedRoute><Layout><RegistrationCancelPage /></Layout></ProtectedRoute>} />
-                  <Route path="/consultations" element={<Layout><ConsultationsPage /></Layout>} />
+                  <Route path="/events/:id" element={<Layout><EventDetailPage /></Layout>} />
+                  <Route path="/events/:id/success" element={<ProtectedRoute><Layout><PaymentSuccessPage /></Layout></ProtectedRoute>} />
+                  <Route path="/events/:id/cancel" element={<ProtectedRoute><Layout><PaymentCancelPage /></Layout></ProtectedRoute>} />
                   <Route path="/speaking" element={<Layout><SpeakingPage /></Layout>} />
-                  <Route path="/create-course" element={<ProtectedRoute><Layout><CreateCoursePage /></Layout></ProtectedRoute>} />
-                  <Route path="/create-event" element={<ProtectedRoute><Layout><CreateEventPage /></Layout></ProtectedRoute>} />
                   <Route path="/media" element={<ProtectedRoute><Layout><MediaPage /></Layout></ProtectedRoute>} />
 
                   {/* Admin Routes */}

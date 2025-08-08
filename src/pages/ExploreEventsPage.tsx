@@ -177,7 +177,7 @@ const ExploreEventsPage = () => {
                   </Badge>
                   <PriceDisplay 
                     amount={event.price || 0} 
-                    currency={event.currency || 'USD'} 
+                    originalCurrency={(event.currency as any) || 'USD'} 
                     className="font-semibold"
                   />
                 </div>
@@ -214,12 +214,12 @@ const ExploreEventsPage = () => {
                     {event.profiles.avatar_url && (
                       <img
                         src={event.profiles.avatar_url}
-                        alt={event.profiles.full_name}
+                        alt={event.profiles.full_name || 'Unknown Creator'}
                         className="w-6 h-6 rounded-full mr-2"
                       />
                     )}
                     <span className="text-sm text-muted-foreground">
-                      By {event.profiles.full_name}
+                      By {event.profiles.full_name || 'Unknown Creator'}
                     </span>
                   </div>
                 )}
