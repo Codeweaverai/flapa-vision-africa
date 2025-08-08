@@ -1,531 +1,500 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, MapPin, DollarSign, Users, Star, Filter, Search, ChevronDown } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BookOpen, Clock, Search, Filter, Star, Users, TrendingUp, Play } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { VALID_CATEGORIES } from '@/services/courseService';
+import { formatDate } from '@/lib/utils';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import Layout from '@/components/layout/Layout';
 
-const COURSES_PER_LOAD = 20;
-
-interface Course {
+interface Event {
   id: string;
   title: string;
   description: string;
-  summary: string;
-  thumbnail_url?: string;
-  is_free: boolean;
-  price: number;
-  duration_minutes: number;
-  category: string;
-  difficulty_level: string;
-  created_at: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  image_url: string;
+  event_type: string;
   creator_id: string;
-  // Populated fields
+  capacity?: number;
+  creator_name: string;
+  event_tickets: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity_available: number;
+    quantity_sold: number;
+  }>;
   reviews: {
     avg_rating: number;
     total_reviews: number;
-    positive_percentage: number;
   };
-  lessons_count: number;
-  students_count: number;
+  status: 'upcoming' | 'ongoing' | 'completed';
 }
 
-const ExploreCoursesPage = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [displayedCourses, setDisplayedCourses] = useState<Course[]>([]);
+const EVENTS_PER_PAGE = 8;
+
+const ExploreEventsPage = () => {
+  const navigate = useNavigate();
+  const { currentCurrency } = useCurrency();
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
-  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
-  const [priceFilter, setPriceFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
-  const [hasMoreCourses, setHasMoreCourses] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('date');
+  const [displayCount, setDisplayCount] = useState(EVENTS_PER_PAGE);
 
   useEffect(() => {
-    loadCourses();
+    fetchEvents();
   }, []);
 
-  useEffect(() => {
-    applyFiltersAndSort();
-  }, [courses, searchTerm, selectedCategory, selectedDifficulty, priceFilter, sortBy]);
-
-  useEffect(() => {
-    // Update URL params when filters change
-    const params = new URLSearchParams();
-    if (searchTerm) params.set('search', searchTerm);
-    if (selectedCategory !== 'all') params.set('category', selectedCategory);
-    setSearchParams(params);
-  }, [searchTerm, selectedCategory, setSearchParams]);
-
-  const loadCourses = async () => {
+  const fetchEvents = async () => {
     try {
-      setLoading(true);
-      
-      // Fetch published courses
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
+      // Fetch all events (not just upcoming)
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
         .select('*')
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
+        .eq('is_published', true)  // This filters for published events
+        .order('start_time', { ascending: false });
 
-      if (coursesError) throw coursesError;
+      if (eventsError) throw eventsError;
 
-      if (!coursesData || coursesData.length === 0) {
-        setCourses([]);
+      if (!eventsData || eventsData.length === 0) {
+        setEvents([]);
         setLoading(false);
         return;
       }
 
-      // Enhance courses with real data
-      const enhancedCourses = await Promise.all(
-        coursesData.map(async (course) => {
-          // Get course reviews
-          const { data: reviews } = await supabase
-            .from('course_reviews')
+      // Get creator profiles
+      const creatorIds = [...new Set(eventsData.map(event => event.creator_id).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, full_name')
+        .in('id', creatorIds);
+
+      // Get event tickets
+      const eventIds = eventsData.map(event => event.id);
+      const { data: tickets } = await supabase
+        .from('event_tickets')
+        .select('id, name, price, quantity_available, quantity_sold, event_id')
+        .in('event_id', eventIds);
+
+      // Fetch reviews for each event
+      const eventsWithData = await Promise.all(
+        eventsData.map(async (event) => {
+          const { data: reviews, error: reviewsError } = await supabase
+            .from('event_reviews')
             .select('rating')
-            .eq('course_id', course.id);
+            .eq('event_id', event.id);
+
+          if (reviewsError) {
+            console.error('Error fetching reviews:', reviewsError);
+          }
 
           const totalReviews = reviews?.length || 0;
           const avgRating = totalReviews > 0 
             ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
             : 0;
-          const positiveReviews = reviews?.filter(review => review.rating >= 4).length || 0;
-          const positivePercentage = totalReviews > 0 ? (positiveReviews / totalReviews) * 100 : 0;
 
-          // Get lessons count
-          const { data: modules } = await supabase
-            .from('course_modules')
-            .select('id, lessons:lessons(id)')
-            .eq('course_id', course.id);
+          const eventProfile = profiles?.find(p => p.id === event.creator_id);
+          const eventTickets = tickets?.filter(t => t.event_id === event.id) || [];
 
-          const lessonsCount = modules?.reduce((total, module) => {
-            return total + (module.lessons?.length || 0);
-          }, 0) || 0;
-
-          // Get students count
-          const { data: enrollments } = await supabase
-            .from('course_enrollments')
-            .select('id')
-            .eq('course_id', course.id)
-            .eq('payment_status', 'completed');
-
-          const studentsCount = enrollments?.length || 0;
+          // Determine event status
+          const now = new Date();
+          const startTime = new Date(event.start_time);
+          const endTime = new Date(event.end_time);
+          let status: 'upcoming' | 'ongoing' | 'completed';
+          
+          if (now < startTime) status = 'upcoming';
+          else if (now >= startTime && now <= endTime) status = 'ongoing';
+          else status = 'completed';
 
           return {
-            ...course,
+            ...event,
+            creator_name: eventProfile?.full_name || eventProfile?.username || 'Unknown Creator',
+            event_tickets: eventTickets,
             reviews: {
               avg_rating: avgRating,
-              total_reviews: totalReviews,
-              positive_percentage: positivePercentage
+              total_reviews: totalReviews
             },
-            lessons_count: lessonsCount,
-            students_count: studentsCount
+            status
           };
         })
       );
 
-      setCourses(enhancedCourses);
+      setEvents(eventsWithData);
     } catch (error) {
-      console.error('Error loading courses:', error);
-      setCourses([]);
+      console.error('Error fetching events:', error);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFiltersAndSort = () => {
-    let filtered = [...courses];
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         event.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || event.event_type === filterType;
+    const matchesStatus = filterStatus === 'all' || event.status === filterStatus;
+    return matchesSearch && matchesType && matchesStatus;
+  });
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(course =>
-        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.summary?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Category filter
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(course => 
-        course.category.toLowerCase() === selectedCategory.toLowerCase()
-      );
-    }
-
-    // Difficulty filter
-    if (selectedDifficulty !== 'all') {
-      filtered = filtered.filter(course => course.difficulty_level === selectedDifficulty);
-    }
-
-    // Price filter
-    if (priceFilter === 'free') {
-      filtered = filtered.filter(course => course.is_free);
-    } else if (priceFilter === 'paid') {
-      filtered = filtered.filter(course => !course.is_free);
-    }
-
-    // Sort courses
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
     switch (sortBy) {
-      case 'newest':
-        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        break;
-      case 'oldest':
-        filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        break;
+      case 'date':
+        return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
       case 'title':
-        filtered.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      case 'price-low':
-        filtered.sort((a, b) => (a.is_free ? 0 : a.price) - (b.is_free ? 0 : b.price));
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => (b.is_free ? 0 : b.price) - (a.is_free ? 0 : a.price));
-        break;
+        return a.title.localeCompare(b.title);
+      case 'price':
+        const aMinPrice = Math.min(...a.event_tickets.map(t => t.price));
+        const bMinPrice = Math.min(...b.event_tickets.map(t => t.price));
+        return aMinPrice - bMinPrice;
+      case 'rating':
+        return b.reviews.avg_rating - a.reviews.avg_rating;
       default:
-        break;
+        return 0;
     }
+  });
 
-    // Reset displayed courses and show first batch
-    const firstBatch = filtered.slice(0, COURSES_PER_LOAD);
-    setDisplayedCourses(firstBatch);
-    setHasMoreCourses(filtered.length > COURSES_PER_LOAD);
+  const displayedEvents = sortedEvents.slice(0, displayCount);
+  const hasMore = displayCount < sortedEvents.length;
+
+  const getMinPrice = (tickets: Event['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return Math.min(...tickets.map(t => t.price));
   };
 
-  const loadMoreCourses = async () => {
-    setLoadingMore(true);
-    
-    // Get the filtered courses again
-    let filtered = [...courses];
-    
-    if (searchTerm) {
-      filtered = filtered.filter(course =>
-        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.summary?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(course => 
-        course.category.toLowerCase() === selectedCategory.toLowerCase()
-      );
-    }
-
-    if (selectedDifficulty !== 'all') {
-      filtered = filtered.filter(course => course.difficulty_level === selectedDifficulty);
-    }
-
-    if (priceFilter === 'free') {
-      filtered = filtered.filter(course => course.is_free);
-    } else if (priceFilter === 'paid') {
-      filtered = filtered.filter(course => !course.is_free);
-    }
-
-    // Apply sorting
-    switch (sortBy) {
-      case 'newest':
-        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        break;
-      case 'oldest':
-        filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        break;
-      case 'title':
-        filtered.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      case 'price-low':
-        filtered.sort((a, b) => (a.is_free ? 0 : a.price) - (b.is_free ? 0 : b.price));
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => (b.is_free ? 0 : b.price) - (a.is_free ? 0 : a.price));
-        break;
-      default:
-        break;
-    }
-
-    const currentCount = displayedCourses.length;
-    const nextBatch = filtered.slice(currentCount, currentCount + COURSES_PER_LOAD);
-    
-    setDisplayedCourses(prev => [...prev, ...nextBatch]);
-    setHasMoreCourses(filtered.length > currentCount + COURSES_PER_LOAD);
-    setLoadingMore(false);
+  const getTotalCapacity = (tickets: Event['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_available, 0);
   };
+
+  const getSoldTickets = (tickets: Event['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_sold, 0);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'upcoming':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Upcoming</Badge>;
+      case 'ongoing':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Live Now</Badge>;
+      case 'completed':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Completed</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const loadMore = () => {
+    setDisplayCount(prev => prev + EVENTS_PER_PAGE);
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+          <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-200 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600"></div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          {/* Hero Section */}
-          <div className="text-center mb-12">
+    <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-16">
+          {/* Header */}
+          <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
               <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                Explore Courses
+                Explore Events
               </span>
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Discover a wide range of courses to enhance your skills and advance your career. Find the perfect course to accelerate your learning journey.
+            <p className="text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+              Discover amazing events and workshops from talented creators around the world. Join live sessions, network with professionals, and expand your horizons.
             </p>
           </div>
 
-          {/* Enhanced Filters */}
-          <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl border-0 mb-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              <div className="relative lg:col-span-2">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          {/* Search and Filters */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/20 mb-12">
+            <div className="flex flex-col lg:flex-row gap-6">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
-                  placeholder="Search courses, topics, or skills..."
+                  placeholder="Search for events, topics, or creators..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-12 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                  className="pl-12 h-14 text-lg bg-white/80 border-gray-200 rounded-xl focus:bg-white transition-colors"
                 />
               </div>
               
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-orange-500 rounded-xl">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {VALID_CATEGORIES.map((category) => (
-                    <SelectItem key={category} value={category.toLowerCase()}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-orange-500 rounded-xl">
-                  <SelectValue placeholder="Difficulty" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  <SelectItem value="Beginner">Beginner</SelectItem>
-                  <SelectItem value="Intermediate">Intermediate</SelectItem>
-                  <SelectItem value="Advanced">Advanced</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={priceFilter} onValueChange={setPriceFilter}>
-                <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-orange-500 rounded-xl">
-                  <SelectValue placeholder="Price" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Prices</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-orange-500 rounded-xl">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest First</SelectItem>
-                  <SelectItem value="oldest">Oldest First</SelectItem>
-                  <SelectItem value="title">Title A-Z</SelectItem>
-                  <SelectItem value="price-low">Price: Low to High</SelectItem>
-                  <SelectItem value="price-high">Price: High to Low</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="min-w-[180px]">
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger className="h-14 bg-white/80 border-gray-200 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-gray-500" />
+                        <SelectValue placeholder="Event Type" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="workshop">Workshop</SelectItem>
+                      <SelectItem value="conference">Conference</SelectItem>
+                      <SelectItem value="webinar">Webinar</SelectItem>
+                      <SelectItem value="seminar">Seminar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="min-w-[180px]">
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="h-14 bg-white/80 border-gray-200 rounded-xl">
+                      <SelectValue placeholder="Event Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Events</SelectItem>
+                      <SelectItem value="upcoming">Upcoming</SelectItem>
+                      <SelectItem value="ongoing">Live Now</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="min-w-[160px]">
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="h-14 bg-white/80 border-gray-200 rounded-xl">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date">Date</SelectItem>
+                      <SelectItem value="title">Title</SelectItem>
+                      <SelectItem value="price">Price</SelectItem>
+                      <SelectItem value="rating">Rating</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Results count and info */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <p className="text-gray-600 font-medium">
-                {loading 
-                  ? 'Loading...' 
-                  : `${displayedCourses.length} course${displayedCourses.length !== 1 ? 's' : ''} found`
-                }
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-500">
-                Showing {displayedCourses.length} of {courses.length}
+            <div className="mt-6 flex flex-wrap gap-4 text-sm text-gray-600">
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-100 border border-blue-200 rounded"></div>
+                Upcoming Events
+              </span>
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-100 border border-green-200 rounded"></div>
+                Live Now
+              </span>
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded"></div>
+                Completed
               </span>
             </div>
           </div>
 
-          {/* Courses Grid */}
-          {loading ? (
-            <div className="flex justify-center my-16">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500"></div>
-            </div>
-          ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
-
-              {displayedCourses.map((course) => (
-                <Card 
-                  key={course.id} 
-                  className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden group hover:scale-105"
-                >
-                  <div className="relative">
-                    {course.thumbnail_url ? (
-                      <img
-                        src={course.thumbnail_url}
-                        alt={course.title}
-                        className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-gradient-to-r from-orange-200 to-purple-200 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-500">
-                        <BookOpen className="h-16 w-16 text-white/80" />
-                      </div>
-                    )}
-                    
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    
-                    {/* Price Badge */}
-                    <div className="absolute top-3 right-3">
-                      {course.is_free ? (
-                        <Badge className="bg-green-500 text-white border-0 shadow-lg">
-                          Free
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 shadow-lg">
-                          <PriceDisplay amount={course.price} originalCurrency="USD" />
-                        </Badge>
-                      )}
+          {/* Results Summary */}
+          <div className="mb-8">
+            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 border border-white/30">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {sortedEvents.length} Events Found
+                  </h3>
+                  <p className="text-gray-600 mt-1">
+                    Showing {Math.min(displayCount, sortedEvents.length)} of {sortedEvents.length} results
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="flex gap-6 text-sm">
+                    <div>
+                      <span className="font-semibold text-blue-600">
+                        {sortedEvents.filter(e => e.status === 'upcoming').length}
+                      </span>
+                      <span className="text-gray-500 ml-1">Upcoming</span>
                     </div>
-                    
-                    {/* Category Badge */}
-                    <div className="absolute bottom-3 left-3">
-                      <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm border-0">
-                        {course.category}
-                      </Badge>
+                    <div>
+                      <span className="font-semibold text-green-600">
+                        {sortedEvents.filter(e => e.status === 'ongoing').length}
+                      </span>
+                      <span className="text-gray-500 ml-1">Live</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-600">
+                        {sortedEvents.filter(e => e.status === 'completed').length}
+                      </span>
+                      <span className="text-gray-500 ml-1">Completed</span>
                     </div>
                   </div>
-
-                  <CardHeader className="pb-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <Badge variant="outline" className="border-purple-300 text-purple-600">
-                        {course.difficulty_level}
-                      </Badge>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="font-medium">
-                          {course.reviews.avg_rating > 0 ? course.reviews.avg_rating.toFixed(1) : '4.8'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <CardTitle className="line-clamp-2 text-lg group-hover:text-orange-600 transition-colors duration-300">
-                      {course.title}
-                    </CardTitle>
-                    
-                    <p className="text-sm text-gray-600 line-clamp-3">
-                      {course.summary}
-                    </p>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    {/* Course Stats */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-orange-500" />
-                        <span className="text-gray-600">
-                          {Math.ceil((course.duration_minutes || 0) / 60)}h
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-purple-500" />
-                        <span className="text-gray-600">
-                          {course.students_count > 0 ? `${course.students_count}` : '1.2k'} students
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-green-500" />
-                        <span className="text-gray-600">
-                          {course.reviews.positive_percentage > 0 
-                            ? `${Math.round(course.reviews.positive_percentage)}%` 
-                            : '95%'
-                          } positive
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-blue-500" />
-                        <span className="text-gray-600">
-                          {course.lessons_count > 0 ? course.lessons_count : '12'} lessons
-                        </span>
-                      </div>
-                    </div>
-
-                    <Button 
-                      asChild 
-                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group"
-                    >
-                      <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
-                        <Play className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
-                        View Course
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {/* No Results State */}
-          {displayedCourses.length === 0 && !loading && (
-            <div className="text-center py-16">
-              <div className="bg-gradient-to-r from-orange-100 to-purple-100 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
-                <BookOpen className="h-12 w-12 text-orange-500" />
+                </div>
               </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-800">No courses found</h3>
-              <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                Try adjusting your filters or search terms to discover amazing courses.
-              </p>
+            </div>
+          </div>
+
+          {/* Events Grid */}
+          {sortedEvents.length === 0 ? (
+            <div className="text-center py-20 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/30">
+              <div className="mb-6">
+                <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">No Events Found</h3>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  We couldn't find any events matching your criteria. Try adjusting your search or filters.
+                </p>
+              </div>
               <Button 
                 onClick={() => {
                   setSearchTerm('');
-                  setSelectedCategory('all');
-                  setSelectedDifficulty('all');
-                  setPriceFilter('all');
+                  setFilterType('all');
+                  setFilterStatus('all');
                 }}
-                variant="outline"
-                className="border-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
               >
-                Clear All Filters
+                Clear Filters
               </Button>
             </div>
-          )}
+          ) : (
+            <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
+                {displayedEvents.map((event) => (
+                  <Card key={event.id} className="group overflow-hidden hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:scale-[1.02]">
+                    <div onClick={() => navigate(`/events/${event.id}`)}>
+                      {/* Event Image */}
+                      <div className="relative h-56 overflow-hidden">
+                        {event.image_url ? (
+                          <img
+                            src={event.image_url}
+                            alt={event.title}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-orange-200 to-purple-300 flex items-center justify-center">
+                            <Calendar className="h-12 w-12 text-white" />
+                          </div>
+                        )}
+                        
+                        {/* Status and Type Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between">
+                          {getStatusBadge(event.status)}
+                          <Badge className="bg-white/90 text-gray-700 border-white/50 backdrop-blur-sm">
+                            {event.event_type}
+                          </Badge>
+                        </div>
 
-          {/* Load More Button */}
-          {hasMoreCourses && displayedCourses.length > 0 && (
-            <div className="flex justify-center mt-12">
-              <Button
-                onClick={loadMoreCourses}
-                disabled={loadingMore}
-                size="lg"
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              >
-                {loadingMore ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Loading More...
-                  </>
-                ) : (
-                  'Load More Courses'
-                )}
-              </Button>
-            </div>
+                        {/* Event Date Overlay */}
+                        <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {formatDate(event.start_time)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
+                          {event.title}
+                        </CardTitle>
+                        
+                        {/* Creator */}
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <div className="w-6 h-6 bg-gradient-to-r from-orange-400 to-purple-500 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-semibold text-white">
+                              {event.creator_name.charAt(0)}
+                            </span>
+                          </div>
+                          <span>by {event.creator_name}</span>
+                        </div>
+
+                        <p className="text-gray-600 line-clamp-2 text-sm leading-relaxed">
+                          {event.description}
+                        </p>
+                        
+                        {/* Reviews */}
+                        {event.reviews && event.reviews.total_reviews > 0 && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-4 w-4 ${
+                                    i < Math.round(event.reviews?.avg_rating || 0)
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-sm text-gray-600">
+                              {event.reviews.avg_rating.toFixed(1)} ({event.reviews.total_reviews} review{event.reviews.total_reviews !== 1 ? 's' : ''})
+                            </span>
+                          </div>
+                        )}
+                      </CardHeader>
+
+                      <CardContent className="space-y-4">
+                        {/* Event Details */}
+                        {event.location && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <MapPin className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                            <span className="truncate">{event.location}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                          <span>{getSoldTickets(event.event_tickets)}/{getTotalCapacity(event.event_tickets)} registered</span>
+                        </div>
+                      </CardContent>
+
+                      <CardFooter className="flex justify-between items-center pt-4 border-t border-gray-100">
+                        <div className="flex items-center">
+                          <DollarSign className="h-4 w-4 mr-1 text-orange-500" />
+                          <span className="font-bold text-xl text-gray-900">
+                            <PriceDisplay amount={getMinPrice(event.event_tickets)} originalCurrency="USD" />
+                          </span>
+                          {event.event_tickets.length > 1 && (
+                            <span className="text-sm text-gray-500 ml-1">+</span>
+                          )}
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg"
+                        >
+                          {event.status === 'completed' ? 'View Event' : 'Register Now'}
+                        </Button>
+                      </CardFooter>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="text-center">
+                  <Button
+                    onClick={loadMore}
+                    size="lg"
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-12 py-4 text-lg shadow-xl"
+                  >
+                    Load More Events
+                    <ChevronDown className="ml-2 h-5 w-5" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
-      </Layout>
-    </div>
+      </div>
+    </Layout>
   );
 };
 
-export default ExploreCoursesPage;
+export default ExploreEventsPage;
