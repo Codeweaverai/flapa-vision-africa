@@ -223,10 +223,23 @@ const CreatorCourses = () => {
       )}
 
       <CoursePreviewDialog
-        course={selectedCourse}
+        course={selectedCourse ? {
+          id: selectedCourse.id,
+          title: selectedCourse.title,
+          description: selectedCourse.description,
+          summary: selectedCourse.summary || selectedCourse.description,
+          thumbnail_url: selectedCourse.thumbnail_url,
+          is_published: selectedCourse.is_published,
+          is_free: selectedCourse.is_free,
+          price: selectedCourse.price,
+          duration_minutes: selectedCourse.duration_minutes,
+          category: selectedCourse.category,
+          difficulty_level: selectedCourse.difficulty_level,
+          created_at: selectedCourse.created_at
+        } : null}
         open={previewOpen}
         onOpenChange={setPreviewOpen}
-        onPreviewAdded={() => {
+        onPreviewAdded={async () => {
           console.log('Preview added for course:', selectedCourse?.id);
         }}
       />

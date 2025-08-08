@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar, MapPin, Users, Clock, Search, SortAsc } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
-import { PriceDisplay } from '@/components/currency/PriceDisplay';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Creator {
   full_name: string;
@@ -51,7 +50,7 @@ const ExploreEventsPage = () => {
         .from('events')
         .select(`
           *,
-          profiles!creator_id (
+          profiles!events_creator_id_fkey (
             full_name,
             avatar_url
           )
@@ -60,16 +59,39 @@ const ExploreEventsPage = () => {
         .gte('start_time', new Date().toISOString())
         .order('start_time', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        // Fallback query without profiles join
+        const { data: eventsData, error: eventsError } = await supabase
+          .from('events')
+          .select('*')
+          .eq('is_published', true)
+          .gte('start_time', new Date().toISOString())
+          .order('start_time', { ascending: true });
+
+        if (eventsError) throw eventsError;
+
+        const transformedEvents: Event[] = (eventsData || []).map(event => ({
+          ...event,
+          profiles: {
+            full_name: 'Unknown Creator',
+            avatar_url: undefined
+          }
+        }));
+
+        setEvents(transformedEvents);
+        return;
+      }
 
       // Transform data to match expected interface
       const transformedEvents: Event[] = (data || []).map(event => ({
         ...event,
-        profiles: event.profiles ? {
+        profiles: event.profiles && typeof event.profiles === 'object' && 'full_name' in event.profiles ? {
           full_name: event.profiles.full_name || 'Unknown Creator',
           avatar_url: event.profiles.avatar_url
         } : {
-          full_name: 'Unknown Creator'
+          full_name: 'Unknown Creator',
+          avatar_url: undefined
         }
       }));
 
@@ -200,7 +222,7 @@ const ExploreEventsPage = () => {
                   ) : (
                     <PriceDisplay 
                       amount={event.price} 
-                      currency={event.currency}
+                      originalCurrency={event.currency as any}
                       className="font-bold text-primary"
                     />
                   )}
