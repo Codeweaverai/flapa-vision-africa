@@ -340,7 +340,7 @@ const EventDetailPage = () => {
           {/* Back Button */}
           <Button 
            variant="ghost"
-          onClick={() => navigate('/events')}
+          onClick={() => navigate('/explore-events')}
             className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white hover:text-white/90 transition-all duration-300 shadow-lg hover:shadow-xl"
             >
             <ArrowLeft className="h-4 w-4 mr-2" />
