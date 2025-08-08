@@ -301,10 +301,14 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ eventId, ev
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" />
-          Export Report
-        </Button>
+        <Button 
+  variant="outline"
+  size="sm"
+  className="flex items-center bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-sm hover:shadow-md"
+   >
+  <Download className="h-4 w-4 mr-2" />
+  Export Report
+   </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={exportToCSV}>
