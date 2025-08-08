@@ -221,7 +221,7 @@ const CreatorEventSpeakers = () => {
   }
 
   return (
-    <CreatorLayout title="Event Speakers">
+    <CreatorLayout title="Event Speakers & Performers">
       <div className="mb-6">
         <Button variant="outline" onClick={() => navigate('/creator/events')}
           className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white hover:text-white/90 transition-all duration-300 shadow-lg hover:shadow-xl"
@@ -369,7 +369,9 @@ const CreatorEventSpeakers = () => {
             </p>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={handleAddSpeaker} disabled={!authChecked}>
+                <Button onClick={handleAddSpeaker} disabled={!authChecked}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
+                  >
                   <Plus className="h-4 w-4 mr-2" />
                   Add First Speaker
                 </Button>
