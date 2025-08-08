@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
@@ -73,8 +72,8 @@ const ExploreEventsPage = () => {
                    typeof profiles === 'object' && 
                    profiles !== null &&
                    'full_name' in profiles ? {
-            full_name: (profiles as any).full_name || 'Unknown Creator',
-            avatar_url: (profiles as any).avatar_url
+            full_name: (profiles as any)?.full_name || 'Unknown Creator',
+            avatar_url: (profiles as any)?.avatar_url
           } : {
             full_name: 'Unknown Creator',
             avatar_url: undefined
@@ -211,10 +210,10 @@ const ExploreEventsPage = () => {
 
                 {event.profiles && (
                   <div className="mt-4 flex items-center">
-                    {event.profiles.avatar_url && (
+                    {event.profiles?.avatar_url && (
                       <img
                         src={event.profiles.avatar_url}
-                        alt={event.profiles.full_name || 'Unknown Creator'}
+                        alt={event.profiles?.full_name || 'Unknown Creator'}
                         className="w-6 h-6 rounded-full mr-2"
                       />
                     )}
