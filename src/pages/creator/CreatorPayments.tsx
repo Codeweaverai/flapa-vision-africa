@@ -368,13 +368,13 @@ const CreatorPayments: React.FC = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Payments & Payouts</h1>
             <Button
-              variant="outline"
+             variant="outline"
               onClick={() => setIsSetupDialogOpen(true)}
-              className="flex items-center gap-2"
-            >
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-md hover:shadow-lg"
+             >
               <Settings className="h-4 w-4" />
-              Payout Settings
-            </Button>
+               Payout Settings
+               </Button>
           </div>
 
           {/* Payout Method Status */}
