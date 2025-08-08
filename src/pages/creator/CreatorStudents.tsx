@@ -61,10 +61,14 @@ const AttendeeExportButton: React.FC<AttendeeExportButtonProps> = ({ students, f
   };
 
   return (
-    <Button onClick={handleExport} variant="outline">
-      <Download className="h-4 w-4 mr-2" />
-      Export CSV
-    </Button>
+    <Button 
+  onClick={handleExport} 
+  variant="outline"
+  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow hover:shadow-md"
+>
+  <Download className="h-4 w-4 mr-2" />
+  Export CSV
+</Button>
   );
 };
 
@@ -315,12 +319,17 @@ const CreatorStudents: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <Button
-              variant={filterType === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilterType('all')}
-              size="sm"
-            >
+            variant={filterType === 'all' ? 'default' : 'outline'}
+             onClick={() => setFilterType('all')}
+             size="sm"
+             className={
+            filterType === 'all' 
+               ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
+             : "hover:bg-accent"
+              }
+              >
               All
-            </Button>
+              </Button>
             <Button
               variant={filterType === 'course' ? 'default' : 'outline'}
               onClick={() => setFilterType('course')}
