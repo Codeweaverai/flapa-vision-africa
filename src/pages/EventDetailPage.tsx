@@ -339,13 +339,13 @@ const EventDetailPage = () => {
         <div className="container mx-auto px-4 py-8">
           {/* Back Button */}
           <Button 
-            variant="ghost" 
-            onClick={() => navigate('/events')}
-            className="mb-6"
-          >
+           variant="ghost"
+          onClick={() => navigate('/events')}
+            className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white hover:text-white/90 transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Events
-          </Button>
+           Back to Events
+            </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
@@ -422,7 +422,7 @@ const EventDetailPage = () => {
                   <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-orange-100 to-purple-100">
                     <TabsTrigger value="description">Description</TabsTrigger>
                     <TabsTrigger value="agenda">Agenda</TabsTrigger>
-                    <TabsTrigger value="speakers">Speakers</TabsTrigger>
+                    <TabsTrigger value="speakers">Spotlight Voices</TabsTrigger>
                     <TabsTrigger value="reviews">Reviews</TabsTrigger>
                   </TabsList>
                   
