@@ -852,6 +852,90 @@ const EventDetailPage = () => {
                   </CardContent>
                 </Card>
               )}
+              {/* NEW FAQ Card */}
+              <Card className="shadow-lg border-0 bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-purple-600">
+                    <HelpCircle className="h-5 w-5" />
+                    Event FAQs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Accordion type="single" collapsible>
+                    <AccordionItem 
+                      value="item-1" 
+                      className="border border-orange-100 rounded-lg overflow-hidden mb-3 bg-white"
+                    >
+                      <AccordionTrigger className="px-4 py-3 hover:bg-orange-50 transition-colors font-medium text-gray-800">
+                        <div className="flex items-center gap-2">
+                          <Circle className="h-3 w-3 text-orange-500" />
+                          What should I bring to the event?
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 py-3 bg-gradient-to-r from-orange-50 to-purple-50 text-gray-700">
+                        Please bring your ticket (digital or printed), a valid ID, and any materials specified in your confirmation email. 
+                        For tech events, we recommend bringing your laptop.
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem 
+                      value="item-2" 
+                      className="border border-orange-100 rounded-lg overflow-hidden mb-3 bg-white"
+                    >
+                      <AccordionTrigger className="px-4 py-3 hover:bg-orange-50 transition-colors font-medium text-gray-800">
+                        <div className="flex items-center gap-2">
+                          <Circle className="h-3 w-3 text-purple-500" />
+                          Is there parking available?
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 py-3 bg-gradient-to-r from-orange-50 to-purple-50 text-gray-700">
+                        Yes! We have complimentary parking in the venue garage. Enter from 3rd Street. 
+                        Additional paid parking is available across the street at the City Center Garage.
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem 
+                      value="item-3" 
+                      className="border border-orange-100 rounded-lg overflow-hidden mb-3 bg-white"
+                    >
+                      <AccordionTrigger className="px-4 py-3 hover:bg-orange-50 transition-colors font-medium text-gray-800">
+                        <div className="flex items-center gap-2">
+                          <Circle className="h-3 w-3 text-pink-500" />
+                          What's the refund policy?
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 py-3 bg-gradient-to-r from-orange-50 to-purple-50 text-gray-700">
+                        Full refunds available up to 7 days before the event. 50% refund between 7-2 days before. 
+                        No refunds within 48 hours of the event start time.
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem 
+                      value="item-4" 
+                      className="border border-orange-100 rounded-lg overflow-hidden bg-white"
+                    >
+                      <AccordionTrigger className="px-4 py-3 hover:bg-orange-50 transition-colors font-medium text-gray-800">
+                        <div className="flex items-center gap-2">
+                          <Circle className="h-3 w-3 text-amber-500" />
+                          Will food be provided?
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 py-3 bg-gradient-to-r from-orange-50 to-purple-50 text-gray-700">
+                        Light refreshments will be served during breaks. For full-day events, lunch is included. 
+                        Please notify us of any dietary restrictions in your account settings.
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
+                  <Button 
+                    className="w-full mt-4 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                    onClick={() => navigate('/contact')}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Contact Event Support
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
