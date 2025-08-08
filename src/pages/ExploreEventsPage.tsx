@@ -72,8 +72,8 @@ const ExploreEventsPage = () => {
                    typeof profiles === 'object' && 
                    profiles !== null &&
                    'full_name' in profiles ? {
-            full_name: (profiles as any)?.full_name || 'Unknown Creator',
-            avatar_url: (profiles as any)?.avatar_url
+            full_name: (profiles as any).full_name || 'Unknown Creator',
+            avatar_url: (profiles as any).avatar_url
           } : {
             full_name: 'Unknown Creator',
             avatar_url: undefined
