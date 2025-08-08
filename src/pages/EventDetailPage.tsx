@@ -31,6 +31,8 @@ import {
   ExternalLink,
   Twitter,
   ArrowRight
+  HelpCircle, 
+  Circle 
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
