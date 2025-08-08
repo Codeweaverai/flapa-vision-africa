@@ -381,11 +381,15 @@ const Navbar = () => {
                 </div>
                 <div className="h-px bg-border my-2" />
                 {!user && (
-                  <Button asChild>
-                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
-                      Sign In
-                    </Link>
-                  </Button>
+                 <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow hover:shadow-md">
+  <Link 
+    to="/auth" 
+    onClick={() => setIsMenuOpen(false)}
+    className="flex items-center justify-center w-full h-full px-4 py-2"
+  >
+    Sign In
+  </Link>
+</Button>
                 )}
               </nav>
             </SheetContent>
