@@ -13,6 +13,7 @@ import { Plus, Eye, Palette, BookOpen, Calendar, ShoppingCart, Users, Sparkles }
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NewsletterTemplate {
   id: string;
@@ -47,6 +48,7 @@ interface Event {
 
 const EnhancedNewsletterForm = () => {
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const preselectedTemplateId = searchParams.get('template');
   
   const [templates, setTemplates] = useState<NewsletterTemplate[]>([]);
@@ -91,7 +93,18 @@ const EnhancedNewsletterForm = () => {
         .order('name');
 
       if (error) throw error;
-      setTemplates(data || []);
+      
+      // Transform the data to match our interface
+      const transformedData: NewsletterTemplate[] = (data || []).map(template => ({
+        ...template,
+        placeholders: Array.isArray(template.placeholders) 
+          ? template.placeholders 
+          : typeof template.placeholders === 'string'
+          ? JSON.parse(template.placeholders)
+          : []
+      }));
+      
+      setTemplates(transformedData);
     } catch (error) {
       console.error('Error loading templates:', error);
     }
@@ -200,11 +213,19 @@ const EnhancedNewsletterForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+    
     try {
       const newsletterData = {
-        ...formData,
+        subject: formData.subject,
+        body_html: formData.content,
         template_id: selectedTemplate?.id || null,
-        status: formData.send_immediately ? 'sending' : 'draft'
+        status: formData.send_immediately ? 'sending' : 'draft',
+        created_by: user.id,
+        scheduled_at: formData.scheduled_time ? new Date(formData.scheduled_time).toISOString() : null
       };
 
       const { error } = await supabase

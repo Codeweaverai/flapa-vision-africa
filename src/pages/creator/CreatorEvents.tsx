@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Plus, Edit, Trash2, Copy, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { CoursePublishButton } from '@/components/creator/CoursePublishButton';
 
 interface Event {
   id: string;
@@ -31,10 +32,10 @@ interface Event {
 
 const CreatorEvents = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const { user } = useAuth();
 
   useEffect(() => {
     loadEvents();
@@ -77,7 +78,6 @@ const CreatorEvents = () => {
         event_type: event.event_type,
         image_url: event.image_url,
         creator_id: user.id
-        // Remove is_published as it doesn't exist in the events table
       };
 
       const { error } = await supabase

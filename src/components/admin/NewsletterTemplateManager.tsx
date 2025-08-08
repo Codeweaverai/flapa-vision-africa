@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,7 +56,18 @@ const NewsletterTemplateManager = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTemplates(data || []);
+      
+      // Transform the data to match our interface
+      const transformedData: NewsletterTemplate[] = (data || []).map(template => ({
+        ...template,
+        placeholders: Array.isArray(template.placeholders) 
+          ? template.placeholders 
+          : typeof template.placeholders === 'string'
+          ? JSON.parse(template.placeholders)
+          : []
+      }));
+      
+      setTemplates(transformedData);
     } catch (error) {
       console.error('Error loading templates:', error);
       toast.error('Failed to load templates');

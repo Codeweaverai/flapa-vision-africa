@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ interface Course {
   creator_id: string;
   is_published: boolean;
   certificate_enabled?: boolean;
+  created_at: string;
 }
 
 const CreatorCourses = () => {
@@ -71,7 +73,7 @@ const CreatorCourses = () => {
       const duplicatedCourse = {
         title: `${course.title} (Copy)`,
         description: course.description,
-        summary: course.summary || course.description.substring(0, 200) + '...', // Add summary field
+        summary: course.summary || course.description.substring(0, 200) + '...',
         price: course.price,
         is_free: course.is_free,
         category: course.category,
@@ -80,7 +82,7 @@ const CreatorCourses = () => {
         thumbnail_url: course.thumbnail_url,
         creator_id: user.id,
         is_published: false,
-        certificate_enabled: course.certificate_enabled || false // Add certificate_enabled
+        certificate_enabled: course.certificate_enabled || false
       };
 
       const { error } = await supabase
@@ -187,6 +189,7 @@ const CreatorCourses = () => {
                   <div className="flex gap-2">
                     <CoursePublishButton 
                       courseId={course.id}
+                      isPublished={course.is_published}
                       onStatusChange={handleStatusChange} 
                     />
                     <Button
@@ -224,7 +227,6 @@ const CreatorCourses = () => {
         open={previewOpen}
         onOpenChange={setPreviewOpen}
         onPreviewAdded={() => {
-          // Handle preview added if needed
           console.log('Preview added for course:', selectedCourse?.id);
         }}
       />
