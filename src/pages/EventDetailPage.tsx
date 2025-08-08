@@ -721,10 +721,10 @@ const EventDetailPage = () => {
               )}
             </div>
 
-            {/* Sidebar */}
+            {/* Sidebar - Removed sticky positioning */}
             <div className="space-y-6">
               {/* Registration Card */}
-              <Card className="shadow-lg sticky top-8">
+              <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Ticket className="h-5 w-5" />
@@ -820,37 +820,38 @@ const EventDetailPage = () => {
                   </div>
                 </CardContent>
               </Card>
-              {/* Creator Profile Card (Below Event Stats) */}
-        {creator && (
-       <Card className="shadow-lg">
-    <CardHeader>
-      <CardTitle>Event Creator</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="flex items-start gap-4 mb-4">
-        <Avatar className="h-16 w-16">
-          <AvatarImage src={creator.avatar_url} />
-          <AvatarFallback>
-            {creator.full_name?.charAt(0) || 'C'}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1">
-          <h4 className="font-semibold text-lg">{creator.full_name}</h4>
-          {creator.bio && (
-            <p className="text-gray-600 text-sm mt-1">{creator.bio}</p>
-          )}
-        </div>
-      </div>
 
-      <Button
-        onClick={() => navigate(`/creator-profile/${creator.id}`)}
-        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold"
-      >
-        View Creator Profile
-      </Button>
-    </CardContent>
-          </Card>
-         )}
+              {/* Creator Profile Card */}
+              {creator && (
+                <Card className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Event Creator</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-start gap-4 mb-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={creator.avatar_url} />
+                        <AvatarFallback>
+                          {creator.full_name?.charAt(0) || 'C'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-lg">{creator.full_name}</h4>
+                        {creator.bio && (
+                          <p className="text-gray-600 text-sm mt-1">{creator.bio}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => navigate(`/creator-profile/${creator.id}`)}
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold"
+                    >
+                      View Creator Profile
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
