@@ -28,8 +28,6 @@ import CourseDetailPage from "@/pages/CourseDetailPage";
 import CoursePlayerPage from "@/pages/CoursePlayerPage";
 import ExploreEventsPage from "@/pages/ExploreEventsPage";
 import EventDetailPage from "@/pages/EventDetailPage";
-import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
-import PaymentCancelPage from "@/pages/PaymentCancelPage";
 import SpeakingPage from "@/pages/SpeakingPage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";

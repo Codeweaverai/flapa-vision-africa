@@ -219,7 +219,7 @@ const ExploreEventsPage = () => {
                       />
                     )}
                     <span className="text-sm text-muted-foreground">
-                      By {event.profiles.full_name || 'Unknown Creator'}
+                      By {event.profiles?.full_name || 'Unknown Creator'}
                     </span>
                   </div>
                 )}
