@@ -422,7 +422,7 @@ const EventDetailPage = () => {
                   <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-orange-100 to-purple-100">
                     <TabsTrigger value="description">Description</TabsTrigger>
                     <TabsTrigger value="agenda">Agenda</TabsTrigger>
-                    <TabsTrigger value="speakers">Speakers</TabsTrigger>
+                    <TabsTrigger value="speakers">Spotlight Voices</TabsTrigger>
                     <TabsTrigger value="reviews">Reviews</TabsTrigger>
                   </TabsList>
                   
@@ -458,7 +458,7 @@ const EventDetailPage = () => {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="Spotlight Voices" className="p-6">
+                  <TabsContent value="Speakers" className="p-6">
                     {event.keynote_speakers && event.keynote_speakers.length > 0 ? (
                       <div className="grid grid-cols-1 gap-6">
                         {event.keynote_speakers.map((speaker) => (
