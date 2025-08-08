@@ -319,33 +319,47 @@ const CreatorStudents: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <Button
-            variant={filterType === 'all' ? 'default' : 'outline'}
-             onClick={() => setFilterType('all')}
-             size="sm"
-             className={
-            filterType === 'all' 
-               ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
-             : "hover:bg-accent"
-              }
-              >
-              All
-              </Button>
-            <Button
-              variant={filterType === 'course' ? 'default' : 'outline'}
-              onClick={() => setFilterType('course')}
-              size="sm"
-            >
-              <BookOpen className="h-4 w-4 mr-1" />
-              Courses
-            </Button>
-            <Button
-              variant={filterType === 'event' ? 'default' : 'outline'}
-              onClick={() => setFilterType('event')}
-              size="sm"
-            >
-              <Calendar className="h-4 w-4 mr-1" />
-              Events
-            </Button>
+    variant={filterType === 'all' ? 'default' : 'outline'}
+    onClick={() => setFilterType('all')}
+    size="sm"
+    className={
+      filterType === 'all'
+        ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
+        : "hover:bg-accent"
+    }
+  >
+    All
+  </Button>
+
+  {/* Courses Button */}
+  <Button
+    variant={filterType === 'course' ? 'default' : 'outline'}
+    onClick={() => setFilterType('course')}
+    size="sm"
+    className={
+      filterType === 'course'
+        ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
+        : "hover:bg-accent"
+    }
+  >
+    <BookOpen className="h-4 w-4 mr-1" />
+    Courses
+  </Button>
+
+  {/* Events Button */}
+  <Button
+    variant={filterType === 'event' ? 'default' : 'outline'}
+    onClick={() => setFilterType('event')}
+    size="sm"
+    className={
+      filterType === 'event'
+        ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
+        : "hover:bg-accent"
+    }
+  >
+    <Calendar className="h-4 w-4 mr-1" />
+    Events
+  </Button>
           </div>
         </div>
 
