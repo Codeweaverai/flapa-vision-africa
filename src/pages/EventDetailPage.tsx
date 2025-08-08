@@ -30,9 +30,7 @@ import {
   MessageSquare,
   ExternalLink,
   Twitter,
-  ArrowRight,
-  HelpCircle, 
-  Circle 
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
