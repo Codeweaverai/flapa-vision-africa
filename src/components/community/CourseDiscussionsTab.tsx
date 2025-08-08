@@ -83,12 +83,9 @@ const CourseDiscussionsTab: React.FC = () => {
 
   const fetchCoursePosts = async () => {
     if (!selectedCourse) return;
-    
     setPostsLoading(true);
+
     try {
-      console.log('Fetching posts for course:', selectedCourse);
-      
-      // Updated query to use proper foreign key relationships
       const { data, error } = await supabase
         .from('community_posts')
         .select(`
@@ -99,32 +96,22 @@ const CourseDiscussionsTab: React.FC = () => {
         .eq('course_id', selectedCourse)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching posts:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Fetched posts:', data);
-
-      // Process the data to get likes and comments counts
       const postsWithCounts = await Promise.all(
         (data || []).map(async (post: any) => {
           try {
             const [likesResult, commentsResult, userLikeResult] = await Promise.all([
-              supabase
-                .from('post_likes')
-                .select('id')
-                .eq('post_id', post.id),
-              supabase
-                .from('post_comments')
-                .select('id')
-                .eq('post_id', post.id),
-              user ? supabase
-                .from('post_likes')
-                .select('id')
-                .eq('post_id', post.id)
-                .eq('user_id', user.id)
-                .maybeSingle() : Promise.resolve({ data: null })
+              supabase.from('post_likes').select('id').eq('post_id', post.id),
+              supabase.from('post_comments').select('id').eq('post_id', post.id),
+              user
+                ? supabase
+                    .from('post_likes')
+                    .select('id')
+                    .eq('post_id', post.id)
+                    .eq('user_id', user.id)
+                    .maybeSingle()
+                : Promise.resolve({ data: null })
             ]);
 
             return {
@@ -159,7 +146,6 @@ const CourseDiscussionsTab: React.FC = () => {
         })
       );
 
-      console.log('Processed posts with counts:', postsWithCounts);
       setPosts(postsWithCounts);
     } catch (error) {
       console.error('Error fetching course posts:', error);
@@ -177,8 +163,6 @@ const CourseDiscussionsTab: React.FC = () => {
     }
 
     try {
-      console.log('Creating post:', { title: newPost.title, content: newPost.content, course_id: selectedCourse });
-      
       const { data, error } = await supabase
         .from('community_posts')
         .insert({
@@ -190,15 +174,11 @@ const CourseDiscussionsTab: React.FC = () => {
         .select()
         .single();
 
-      if (error) {
-        console.error('Error creating post:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Post created successfully:', data);
       setNewPost({ title: '', content: '' });
       toast.success('Post created successfully!');
-      fetchCoursePosts(); // Refresh posts
+      fetchCoursePosts();
     } catch (error) {
       console.error('Error creating post:', error);
       toast.error('Failed to create post');
@@ -218,14 +198,10 @@ const CourseDiscussionsTab: React.FC = () => {
       } else {
         await supabase
           .from('post_likes')
-          .insert({
-            post_id: postId,
-            user_id: user.id,
-            like_type: 'like'
-          });
+          .insert({ post_id: postId, user_id: user.id, like_type: 'like' });
       }
 
-      fetchCoursePosts(); // Refresh to update counts
+      fetchCoursePosts();
     } catch (error) {
       console.error('Error toggling like:', error);
       toast.error('Failed to update like');
@@ -247,7 +223,7 @@ const CourseDiscussionsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Course Search and Selection */}
+      {/* Course Search */}
       <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
         <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
           <CardTitle className="flex items-center gap-2">
@@ -266,14 +242,14 @@ const CourseDiscussionsTab: React.FC = () => {
                 className="pl-10"
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-64 overflow-y-auto">
               {filteredCourses.map((course) => (
                 <Card
                   key={course.id}
                   className={`cursor-pointer transition-all hover:shadow-md ${
-                    selectedCourse === course.id 
-                      ? 'ring-2 ring-orange-500 bg-gradient-to-r from-orange-50 to-purple-50' 
+                    selectedCourse === course.id
+                      ? 'ring-2 ring-orange-500 bg-gradient-to-r from-orange-50 to-purple-50'
                       : 'hover:bg-gray-50'
                   }`}
                   onClick={() => setSelectedCourse(course.id)}
@@ -304,7 +280,7 @@ const CourseDiscussionsTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Create Post Form */}
+      {/* Create Post */}
       {selectedCourse && user && (
         <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
           <CardHeader>
