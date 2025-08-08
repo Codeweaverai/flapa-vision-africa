@@ -458,7 +458,7 @@ const EventDetailPage = () => {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="speakers" className="p-6">
+                  <TabsContent value="Spotlight Voices" className="p-6">
                     {event.keynote_speakers && event.keynote_speakers.length > 0 ? (
                       <div className="grid grid-cols-1 gap-6">
                         {event.keynote_speakers.map((speaker) => (
