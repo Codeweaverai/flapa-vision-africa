@@ -30,7 +30,7 @@ import {
   MessageSquare,
   ExternalLink,
   Twitter,
-  ArrowRight
+  ArrowRight,
   HelpCircle, 
   Circle 
 } from 'lucide-react';
