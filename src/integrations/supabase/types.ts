@@ -1262,6 +1262,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_free: boolean | null
+          is_published: boolean | null
           location: string | null
           online_meeting_link: string | null
           price: number | null
@@ -1281,6 +1282,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_free?: boolean | null
+          is_published?: boolean | null
           location?: string | null
           online_meeting_link?: string | null
           price?: number | null
@@ -1300,6 +1302,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_free?: boolean | null
+          is_published?: boolean | null
           location?: string | null
           online_meeting_link?: string | null
           price?: number | null
@@ -1946,6 +1949,7 @@ export type Database = {
           title: string | null
           twitter_url: string | null
           updated_at: string
+          user_id: string | null
           website_url: string | null
         }
         Insert: {
@@ -1961,6 +1965,7 @@ export type Database = {
           title?: string | null
           twitter_url?: string | null
           updated_at?: string
+          user_id?: string | null
           website_url?: string | null
         }
         Update: {
@@ -1976,6 +1981,7 @@ export type Database = {
           title?: string | null
           twitter_url?: string | null
           updated_at?: string
+          user_id?: string | null
           website_url?: string | null
         }
         Relationships: [
@@ -2460,6 +2466,51 @@ export type Database = {
           },
         ]
       }
+      newsletter_templates: {
+        Row: {
+          body_html_template: string
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          placeholders: Json | null
+          subject_template: string
+          thumbnail_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          body_html_template: string
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          placeholders?: Json | null
+          subject_template: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body_html_template?: string
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          placeholders?: Json | null
+          subject_template?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       newsletters: {
         Row: {
           body_html: string
@@ -2472,6 +2523,7 @@ export type Database = {
           status: string
           subject: string
           successful_sends: number | null
+          template_id: string | null
           total_recipients: number | null
           updated_at: string
         }
@@ -2486,6 +2538,7 @@ export type Database = {
           status?: string
           subject: string
           successful_sends?: number | null
+          template_id?: string | null
           total_recipients?: number | null
           updated_at?: string
         }
@@ -2500,10 +2553,19 @@ export type Database = {
           status?: string
           subject?: string
           successful_sends?: number | null
+          template_id?: string | null
           total_recipients?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "newsletters_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "newsletter_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
