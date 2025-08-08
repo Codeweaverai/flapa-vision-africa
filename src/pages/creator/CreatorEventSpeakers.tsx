@@ -235,7 +235,9 @@ const CreatorEventSpeakers = () => {
         <h2 className="text-2xl font-bold">Event Speakers</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={handleAddSpeaker} disabled={!authChecked}>
+            <Button onClick={handleAddSpeaker} disabled={!authChecked}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
+              >
               <Plus className="h-4 w-4 mr-2" />
               Add Speaker
             </Button>
