@@ -86,7 +86,10 @@ const ExploreEventsPage = () => {
       // Transform data to match expected interface
       const transformedEvents: Event[] = (data || []).map(event => ({
         ...event,
-        profiles: event.profiles && typeof event.profiles === 'object' && 'full_name' in event.profiles ? {
+        profiles: event.profiles && 
+                 typeof event.profiles === 'object' && 
+                 event.profiles !== null &&
+                 'full_name' in event.profiles ? {
           full_name: event.profiles.full_name || 'Unknown Creator',
           avatar_url: event.profiles.avatar_url
         } : {
