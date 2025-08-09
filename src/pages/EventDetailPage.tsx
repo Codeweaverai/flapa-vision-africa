@@ -436,7 +436,7 @@ const EventDetailPage = () => {
                     {event.event_agenda && event.event_agenda.length > 0 ? (
                       <div className="space-y-4">
                         {event.event_agenda.map((item) => (
-                          <div key={item.id} className="border-l-4 border-gradient-to-b from-orange-500 to-purple-600 pl-4 bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-r-lg">
+                          <div key={item.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg border">
                             <div className="flex items-center gap-2 mb-1">
                               <Clock className="h-4 w-4 text-orange-600" />
                               <span className="text-sm font-medium text-orange-700">
