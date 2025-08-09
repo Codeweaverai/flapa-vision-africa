@@ -333,8 +333,14 @@ const Navbar = () => {
           ) : (
             <>
               <CurrencySwitcher />
-              <Button asChild>
-                <Link to="/auth">Sign In</Link>
+              
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow hover:shadow-md">
+               <Link 
+                to="/auth"
+                 className="flex items-center justify-center w-full h-full px-4 py-2"
+                >
+                Sign In
+                </Link>
               </Button>
             </>
           )}
