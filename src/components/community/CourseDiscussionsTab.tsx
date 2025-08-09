@@ -1,33 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Heart, MessageCircle, Share2, Plus, Search, Clock, TrendingUp, Users } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { MessageCircle, Share2, Heart, Search, BookOpen, Calendar, Plus, Send } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/lib/supabaseClient';
 
-interface CommunityPost {
+interface Course {
   id: string;
   title: string;
-  content: string;
-  created_at: string;
-  user_id: string;
-  course_id?: string;
-  profiles?: {
-    id: string;
-    username?: string;
-    full_name?: string;
-    avatar_url?: string;
-  };
-  comments?: Comment[];
-  comments_count?: number;
-  likes_count?: number;
+  description: string;
+  thumbnail_url?: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  image_url?: string;
+  start_time: string;
 }
 
 interface Comment {
@@ -35,8 +31,7 @@ interface Comment {
   content: string;
   created_at: string;
   user_id: string;
-  post_id: string;
-  profiles?: {
+  profiles: {
     id: string;
     username?: string;
     full_name?: string;
@@ -44,19 +39,46 @@ interface Comment {
   };
 }
 
+interface CommunityPost {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  course_id?: string;
+  event_id?: string;
+  profiles: {
+    id: string;
+    username?: string;
+    full_name?: string;
+    avatar_url?: string;
+  };
+  comments: Comment[];
+  comments_count: number;
+  likes_count: number;
+  emoji_reactions: Record<string, number>;
+}
+
 const CourseDiscussionsTab = () => {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [newPostDialog, setNewPostDialog] = useState(false);
+  const [contentType, setContentType] = useState<'all' | 'course' | 'event'>('all');
+  const [selectedContent, setSelectedContent] = useState<string>('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [commentDialogs, setCommentDialogs] = useState<Record<string, boolean>>({});
-  const [newPostData, setNewPostData] = useState({
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
+  
+  const [formData, setFormData] = useState({
     title: '',
     content: '',
-    course_id: ''
+    content_type: 'course' as 'course' | 'event',
+    content_id: ''
   });
-  const [newComments, setNewComments] = useState<Record<string, string>>({});
 
   useEffect(() => {
     initializeData();
@@ -64,13 +86,17 @@ const CourseDiscussionsTab = () => {
 
   const initializeData = async () => {
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
       
-      await loadPosts();
+      await Promise.all([
+        loadPosts(),
+        loadCourses(),
+        loadEvents()
+      ]);
     } catch (error) {
-      console.error('Error initializing data:', error);
+      console.error('Error initializing:', error);
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -78,31 +104,38 @@ const CourseDiscussionsTab = () => {
 
   const loadPosts = async () => {
     try {
-      // Get posts first
-      const { data: postsData, error: postsError } = await supabase
+      const { data, error } = await supabase
         .from('community_posts')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (
+            id,
+            username,
+            full_name,
+            avatar_url
+          )
+        `)
         .order('created_at', { ascending: false });
 
-      if (postsError) throw postsError;
-
-      // Get profiles for post authors
-      const userIds = [...new Set(postsData?.map(post => post.user_id) || [])];
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, avatar_url')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error loading profiles:', profilesError);
+      if (error) {
+        console.error('Error loading posts:', error);
+        return;
       }
 
-      // Load comments and comment authors for each post
+      // Load comments for each post separately
       const postsWithComments = await Promise.all(
-        (postsData || []).map(async (post) => {
+        (data || []).map(async (post) => {
           const { data: comments, error: commentsError } = await supabase
             .from('post_comments')
-            .select('id, content, created_at, user_id, post_id')
+            .select(`
+              *,
+              profiles:user_id (
+                id,
+                username,
+                full_name,
+                avatar_url
+              )
+            `)
             .eq('post_id', post.id)
             .order('created_at', { ascending: true });
 
@@ -110,34 +143,11 @@ const CourseDiscussionsTab = () => {
             console.error('Error loading comments:', commentsError);
           }
 
-          // Get comment author profiles
-          const commentUserIds = [...new Set(comments?.map(comment => comment.user_id) || [])];
-          const { data: commentProfiles } = await supabase
-            .from('profiles')
-            .select('id, username, full_name, avatar_url')
-            .in('id', commentUserIds);
-
-          const commentsWithProfiles = (comments || []).map(comment => ({
-            ...comment,
-            profiles: (commentProfiles || []).find(profile => profile.id === comment.user_id) || {
-              id: comment.user_id,
-              username: 'Unknown User',
-              full_name: 'Unknown User',
-              avatar_url: null
-            }
-          }));
-
           return {
             ...post,
-            profiles: (profiles || []).find(profile => profile.id === post.user_id) || {
-              id: post.user_id,
-              username: 'Unknown User',
-              full_name: 'Unknown User',
-              avatar_url: null
-            },
-            comments: commentsWithProfiles,
-            comments_count: commentsWithProfiles.length,
-            likes_count: Math.floor(Math.random() * 20) // Placeholder for now
+            comments: comments || [],
+            comments_count: comments?.length || 0,
+            likes_count: 0, // You can implement likes later
           };
         })
       );
@@ -145,39 +155,81 @@ const CourseDiscussionsTab = () => {
       setPosts(postsWithComments);
     } catch (error) {
       console.error('Error loading posts:', error);
-      toast.error('Failed to load discussions');
+    }
+  };
+
+  const loadCourses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('id, title, description, thumbnail_url')
+        .eq('is_published', true)
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Error loading courses:', error);
+        return;
+      }
+
+      setCourses(data || []);
+    } catch (error) {
+      console.error('Error loading courses:', error);
+    }
+  };
+
+  const loadEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, title, description, image_url, start_time')
+        .eq('is_published', true)
+        .order('start_time', { ascending: true });
+
+      if (error) {
+        console.error('Error loading events:', error);
+        return;
+      }
+
+      setEvents(data || []);
+    } catch (error) {
+      console.error('Error loading events:', error);
     }
   };
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
-      toast.error('Please sign in to create posts');
+      toast.error('Please log in to create a post');
       return;
     }
 
-    if (!newPostData.title.trim() || !newPostData.content.trim()) {
-      toast.error('Please fill in all fields');
+    if (!formData.title.trim() || !formData.content.trim()) {
+      toast.error('Title and content are required');
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      const postData = {
+        title: formData.title.trim(),
+        content: formData.content.trim(),
+        user_id: currentUser.id,
+        course_id: formData.content_type === 'course' ? formData.content_id : null,
+        event_id: formData.content_type === 'event' ? formData.content_id : null
+      };
+
+      const { error } = await supabase
         .from('community_posts')
-        .insert({
-          title: newPostData.title.trim(),
-          content: newPostData.content.trim(),
-          user_id: currentUser.id,
-          course_id: newPostData.course_id || null
-        })
-        .select()
-        .single();
+        .insert(postData);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating post:', error);
+        toast.error('Failed to create post');
+        return;
+      }
 
-      toast.success('Post created successfully!');
-      setNewPostDialog(false);
-      setNewPostData({ title: '', content: '', course_id: '' });
+      toast.success('Post created successfully');
+      setDialogOpen(false);
+      setFormData({ title: '', content: '', content_type: 'course', content_id: '' });
       await loadPosts();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -187,13 +239,13 @@ const CourseDiscussionsTab = () => {
 
   const handleAddComment = async (postId: string) => {
     if (!currentUser) {
-      toast.error('Please sign in to comment');
+      toast.error('Please log in to comment');
       return;
     }
 
-    const commentContent = newComments[postId]?.trim();
-    if (!commentContent) {
-      toast.error('Please enter a comment');
+    const commentText = newComment[postId]?.trim();
+    if (!commentText) {
+      toast.error('Comment cannot be empty');
       return;
     }
 
@@ -201,16 +253,20 @@ const CourseDiscussionsTab = () => {
       const { error } = await supabase
         .from('post_comments')
         .insert({
-          content: commentContent,
           post_id: postId,
-          user_id: currentUser.id
+          user_id: currentUser.id,
+          content: commentText
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding comment:', error);
+        toast.error('Failed to add comment');
+        return;
+      }
 
-      toast.success('Comment added successfully!');
-      setNewComments(prev => ({ ...prev, [postId]: '' }));
+      setNewComment(prev => ({ ...prev, [postId]: '' }));
       setCommentDialogs(prev => ({ ...prev, [postId]: false }));
+      toast.success('Comment added successfully');
       await loadPosts();
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -218,268 +274,334 @@ const CourseDiscussionsTab = () => {
     }
   };
 
-  const openCommentDialog = (postId: string) => {
-    setCommentDialogs(prev => ({ ...prev, [postId]: true }));
+  const toggleCommentDialog = (postId: string) => {
+    setCommentDialogs(prev => ({ 
+      ...prev, 
+      [postId]: !prev[postId] 
+    }));
   };
 
-  const closeCommentDialog = (postId: string) => {
-    setCommentDialogs(prev => ({ ...prev, [postId]: false }));
+  const handleShare = async (post: CommunityPost) => {
+    try {
+      await navigator.share({
+        title: post.title,
+        text: post.content,
+        url: window.location.href
+      });
+    } catch (error) {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard');
+    }
   };
 
-  const filteredPosts = posts.filter(post =>
-    post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPosts = posts.filter(post => {
+    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         post.content.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (contentType === 'course') {
+      return matchesSearch && post.course_id;
+    } else if (contentType === 'event') {
+      return matchesSearch && post.event_id;
+    }
+    
+    return matchesSearch;
+  });
 
-  const getUserDisplayName = (profile: any) => {
-    return profile?.full_name || profile?.username || 'Anonymous User';
-  };
-
-  const getUserInitials = (profile: any) => {
-    const name = getUserDisplayName(profile);
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const getContentBadge = (post: CommunityPost) => {
+    if (post.course_id) {
+      const course = courses.find(c => c.id === post.course_id);
+      return (
+        <Badge className="bg-gradient-to-r from-blue-100 to-purple-100 text-purple-800 border-purple-200">
+          <BookOpen className="h-3 w-3 mr-1" />
+          {course ? course.title : 'Course'}
+        </Badge>
+      );
+    } else if (post.event_id) {
+      const event = events.find(e => e.id === post.event_id);
+      return (
+        <Badge className="bg-gradient-to-r from-orange-100 to-purple-100 text-orange-800 border-orange-200">
+          <Calendar className="h-3 w-3 mr-1" />
+          {event ? event.title : 'Event'}
+        </Badge>
+      );
+    }
+    return null;
   };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Course Discussions</h2>
-          <p className="text-muted-foreground">Join conversations about courses and share knowledge</p>
-        </div>
-        
-        <Dialog open={newPostDialog} onOpenChange={setNewPostDialog}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-              <Plus className="h-4 w-4 mr-2" />
-              New Discussion
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Start a New Discussion</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreatePost} className="space-y-4">
-              <div>
-                <Label htmlFor="title">Discussion Title</Label>
+      {/* Search and Filter Section */}
+      <Card className="border border-gray-200">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <Label htmlFor="search" className="text-gray-700 font-medium">Search Discussions</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  id="title"
-                  value={newPostData.title}
-                  onChange={(e) => setNewPostData(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="What would you like to discuss?"
-                  required
+                  id="search"
+                  placeholder="Search posts, courses, or events..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 border-gray-200 focus:border-orange-500"
                 />
               </div>
-              <div>
-                <Label htmlFor="content">Content</Label>
-                <Textarea
-                  id="content"
-                  value={newPostData.content}
-                  onChange={(e) => setNewPostData(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Share your thoughts, questions, or insights..."
-                  rows={6}
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => setNewPostDialog(false)}>
-                  Cancel
+            </div>
+            
+            <div>
+              <Label htmlFor="contentType" className="text-gray-700 font-medium">Content Type</Label>
+              <Select value={contentType} onValueChange={(value: any) => setContentType(value)}>
+                <SelectTrigger className="w-40 border-gray-200 focus:border-purple-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Content</SelectItem>
+                  <SelectItem value="course">Courses Only</SelectItem>
+                  <SelectItem value="event">Events Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Discussion
                 </Button>
-                <Button type="submit" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                  Create Discussion
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                    Create New Discussion
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreatePost} className="space-y-4">
+                  <div>
+                    <Label htmlFor="title" className="text-gray-700 font-medium">Discussion Title *</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="What would you like to discuss?"
+                      className="border-gray-200 focus:border-orange-500"
+                      required
+                    />
+                  </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-        <Input
-          placeholder="Search discussions..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="content_type" className="text-gray-700 font-medium">Discussion Type</Label>
+                      <Select 
+                        value={formData.content_type} 
+                        onValueChange={(value: 'course' | 'event') => 
+                          setFormData(prev => ({ ...prev, content_type: value, content_id: '' }))
+                        }
+                      >
+                        <SelectTrigger className="border-gray-200 focus:border-purple-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="course">Course Discussion</SelectItem>
+                          <SelectItem value="event">Event Discussion</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <MessageCircle className="h-8 w-8 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold">{posts.length}</p>
-                <p className="text-sm text-muted-foreground">Total Discussions</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Users className="h-8 w-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold">{new Set(posts.map(p => p.user_id)).size}</p>
-                <p className="text-sm text-muted-foreground">Active Contributors</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <TrendingUp className="h-8 w-8 text-purple-600" />
-              <div>
-                <p className="text-2xl font-bold">{posts.reduce((sum, p) => sum + (p.comments?.length || 0), 0)}</p>
-                <p className="text-sm text-muted-foreground">Total Comments</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                    <div>
+                      <Label htmlFor="content_id" className="text-gray-700 font-medium">
+                        Select {formData.content_type === 'course' ? 'Course' : 'Event'}
+                      </Label>
+                      <Select 
+                        value={formData.content_id} 
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, content_id: value }))}
+                      >
+                        <SelectTrigger className="border-gray-200 focus:border-orange-500">
+                          <SelectValue placeholder={`Choose ${formData.content_type}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {formData.content_type === 'course' 
+                            ? courses.map((course) => (
+                                <SelectItem key={course.id} value={course.id}>
+                                  {course.title}
+                                </SelectItem>
+                              ))
+                            : events.map((event) => (
+                                <SelectItem key={event.id} value={event.id}>
+                                  {event.title}
+                                </SelectItem>
+                              ))
+                          }
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-      {/* Posts */}
+                  <div>
+                    <Label htmlFor="content" className="text-gray-700 font-medium">Discussion Content *</Label>
+                    <Textarea
+                      id="content"
+                      value={formData.content}
+                      onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="Share your thoughts, questions, or insights..."
+                      className="min-h-24 border-gray-200 focus:border-purple-500"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="border-gray-300 text-gray-700">
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
+                      Create Discussion
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Posts List */}
       <div className="space-y-4">
         {filteredPosts.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No discussions found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery ? 'Try adjusting your search terms' : 'Be the first to start a discussion!'}
+          <Card className="border-dashed border-2 border-gray-200">
+            <CardContent className="pt-8 pb-10 text-center">
+              <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-600 mb-2">No discussions found</h3>
+              <p className="text-gray-500">
+                {searchQuery 
+                  ? `No discussions match "${searchQuery}"`
+                  : 'Be the first to start a discussion!'
+                }
               </p>
-              {!searchQuery && (
-                <Button onClick={() => setNewPostDialog(true)}>
-                  Start Discussion
-                </Button>
-              )}
             </CardContent>
           </Card>
         ) : (
           filteredPosts.map((post) => (
-            <Card key={post.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
+            <Card key={post.id} className="border border-gray-200 hover:shadow-lg transition-shadow duration-200">
+              <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={post.profiles?.avatar_url} />
-                      <AvatarFallback>{getUserInitials(post.profiles)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <CardTitle className="text-lg">{post.title}</CardTitle>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{getUserDisplayName(post.profiles)}</span>
-                        <span>•</span>
-                        <Clock className="h-3 w-3" />
-                        <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                  <div className="flex items-center space-x-3">
+                    {post.profiles?.avatar_url ? (
+                      <img
+                        src={post.profiles.avatar_url}
+                        alt={post.profiles.full_name || post.profiles.username}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-purple-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
+                        {(post.profiles?.full_name || post.profiles?.username || 'U').charAt(0).toUpperCase()}
                       </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {post.profiles?.full_name || post.profiles?.username || 'Anonymous User'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(post.created_at).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
-                  {post.course_id && (
-                    <Badge variant="secondary">Course Discussion</Badge>
-                  )}
+                  {getContentBadge(post)}
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground mb-4 whitespace-pre-wrap">{post.content}</p>
+                <h3 className="text-lg font-semibold mb-2 text-gray-800">{post.title}</h3>
+                <p className="text-gray-700 mb-4">{post.content}</p>
                 
-                <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-red-600">
+                <div className="flex items-center gap-4 pt-3 border-t border-gray-200">
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-purple-700 hover:bg-purple-50">
                     <Heart className="h-4 w-4 mr-2" />
                     {post.likes_count || 0}
                   </Button>
                   
-                  <Dialog 
-                    open={commentDialogs[post.id] || false} 
-                    onOpenChange={(open) => open ? openCommentDialog(post.id) : closeCommentDialog(post.id)}
-                  >
+                  <Dialog open={commentDialogs[post.id]} onOpenChange={(open) => toggleCommentDialog(post.id)}>
                     <DialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-muted-foreground hover:text-blue-600"
-                      >
+                      <Button variant="ghost" size="sm" className="text-gray-600 hover:text-orange-700 hover:bg-orange-50">
                         <MessageCircle className="h-4 w-4 mr-2" />
                         {post.comments_count || 0}
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Comments on "{post.title}"</DialogTitle>
+                        <DialogTitle className="text-lg font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                          Comments on "{post.title}"
+                        </DialogTitle>
                       </DialogHeader>
+                      
                       <div className="space-y-4">
                         {/* Existing Comments */}
-                        {post.comments && post.comments.length > 0 && (
-                          <div className="space-y-3">
-                            {post.comments.map((comment) => (
-                              <div key={comment.id} className="flex gap-3 p-3 bg-muted/50 rounded-lg">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={comment.profiles?.avatar_url} />
-                                  <AvatarFallback>{getUserInitials(comment.profiles)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium text-sm">{getUserDisplayName(comment.profiles)}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm">{comment.content}</p>
-                                </div>
+                        {post.comments?.map((comment) => (
+                          <div key={comment.id} className="flex space-x-3 p-3 bg-gray-50 rounded-lg">
+                            {comment.profiles?.avatar_url ? (
+                              <img
+                                src={comment.profiles.avatar_url}
+                                alt={comment.profiles.full_name || comment.profiles.username}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
+                                {(comment.profiles?.full_name || comment.profiles?.username || 'U').charAt(0).toUpperCase()}
                               </div>
-                            ))}
+                            )}
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-800">
+                                {comment.profiles?.full_name || comment.profiles?.username || 'Anonymous User'}
+                              </p>
+                              <p className="text-gray-700 mt-1">{comment.content}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {new Date(comment.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
-                        )}
-                        
+                        )) || []}
+
                         {/* Add New Comment */}
-                        {currentUser ? (
-                          <div className="space-y-3 pt-4 border-t">
-                            <Textarea
-                              placeholder="Add a comment..."
-                              value={newComments[post.id] || ''}
-                              onChange={(e) => setNewComments(prev => ({ ...prev, [post.id]: e.target.value }))}
-                              rows={3}
-                            />
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => closeCommentDialog(post.id)}
-                              >
-                                Cancel
-                              </Button>
-                              <Button 
-                                size="sm"
+                        {currentUser && (
+                          <div className="flex space-x-3 p-4 border-t border-gray-200">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
+                              {(currentUser.user_metadata?.full_name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1">
+                              <Textarea
+                                placeholder="Add your comment..."
+                                value={newComment[post.id] || ''}
+                                onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                className="mb-2 border-gray-200 focus:border-purple-500"
+                                rows={2}
+                              />
+                              <Button
                                 onClick={() => handleAddComment(post.id)}
-                                disabled={!newComments[post.id]?.trim()}
+                                size="sm"
+                                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
                               >
-                                Add Comment
+                                <Send className="h-3 w-3 mr-2" />
+                                Post Comment
                               </Button>
                             </div>
                           </div>
-                        ) : (
-                          <p className="text-center text-muted-foreground py-4">
-                            Please sign in to add comments
-                          </p>
                         )}
                       </div>
                     </DialogContent>
                   </Dialog>
                   
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-green-600">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleShare(post)}
+                    className="text-gray-600 hover:text-orange-700 hover:bg-orange-50"
+                  >
                     <Share2 className="h-4 w-4 mr-2" />
                     Share
                   </Button>
