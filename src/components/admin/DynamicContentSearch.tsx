@@ -26,9 +26,7 @@ interface Course {
   thumbnail_url?: string;
   category: string;
   creator_id: string;
-  profiles?: {
-    full_name: string;
-  };
+  creator_name?: string;
 }
 
 interface Event {
@@ -43,9 +41,7 @@ interface Event {
   image_url?: string;
   event_type: string;
   creator_id: string;
-  profiles?: {
-    full_name: string;
-  };
+  creator_name?: string;
 }
 
 interface DynamicContentSearchProps {
@@ -81,34 +77,58 @@ const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onSelectCon
         if (error) throw error;
         setCreators(data || []);
       } else if (activeTab === 'courses') {
-        const { data, error } = await supabase
+        const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
-          .select(`
-            *,
-            profiles:creator_id (
-              full_name
-            )
-          `)
+          .select('*')
           .eq('is_published', true)
           .limit(10)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        setCourses(data || []);
+        if (coursesError) throw coursesError;
+
+        // Get creator names for courses
+        const coursesWithCreators = await Promise.all(
+          (coursesData || []).map(async (course) => {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', course.creator_id)
+              .single();
+            
+            return {
+              ...course,
+              creator_name: creatorData?.full_name || 'Unknown'
+            };
+          })
+        );
+
+        setCourses(coursesWithCreators);
       } else if (activeTab === 'events') {
-        const { data, error } = await supabase
+        const { data: eventsData, error: eventsError } = await supabase
           .from('events')
-          .select(`
-            *,
-            profiles:creator_id (
-              full_name
-            )
-          `)
+          .select('*')
           .limit(10)
           .order('start_time', { ascending: false });
 
-        if (error) throw error;
-        setEvents(data || []);
+        if (eventsError) throw eventsError;
+
+        // Get creator names for events
+        const eventsWithCreators = await Promise.all(
+          (eventsData || []).map(async (event) => {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', event.creator_id)
+              .single();
+            
+            return {
+              ...event,
+              creator_name: creatorData?.full_name || 'Unknown'
+            };
+          })
+        );
+
+        setEvents(eventsWithCreators);
       }
     } catch (error) {
       console.error('Error loading content:', error);
@@ -131,34 +151,58 @@ const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onSelectCon
         if (error) throw error;
         setCreators(data || []);
       } else if (activeTab === 'courses') {
-        const { data, error } = await supabase
+        const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
-          .select(`
-            *,
-            profiles:creator_id (
-              full_name
-            )
-          `)
+          .select('*')
           .eq('is_published', true)
           .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
           .limit(20);
 
-        if (error) throw error;
-        setCourses(data || []);
+        if (coursesError) throw coursesError;
+
+        // Get creator names for courses
+        const coursesWithCreators = await Promise.all(
+          (coursesData || []).map(async (course) => {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', course.creator_id)
+              .single();
+            
+            return {
+              ...course,
+              creator_name: creatorData?.full_name || 'Unknown'
+            };
+          })
+        );
+
+        setCourses(coursesWithCreators);
       } else if (activeTab === 'events') {
-        const { data, error } = await supabase
+        const { data: eventsData, error: eventsError } = await supabase
           .from('events')
-          .select(`
-            *,
-            profiles:creator_id (
-              full_name
-            )
-          `)
+          .select('*')
           .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
           .limit(20);
 
-        if (error) throw error;
-        setEvents(data || []);
+        if (eventsError) throw eventsError;
+
+        // Get creator names for events
+        const eventsWithCreators = await Promise.all(
+          (eventsData || []).map(async (event) => {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', event.creator_id)
+              .single();
+            
+            return {
+              ...event,
+              creator_name: creatorData?.full_name || 'Unknown'
+            };
+          })
+        );
+
+        setEvents(eventsWithCreators);
       }
     } catch (error) {
       console.error('Error searching content:', error);
@@ -198,7 +242,7 @@ const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onSelectCon
             }
             <div style="flex: 1;">
               <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.title}</h3>
-              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.profiles?.full_name || 'Unknown'}</p>
+              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.creator_name || 'Unknown'}</p>
               <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
                 <span style="background: #ddd6fe; color: #7c3aed; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${content.category}</span>
                 <span style="font-weight: 600; color: #059669;">${content.is_free ? 'Free' : `$${content.price}`}</span>
@@ -223,7 +267,7 @@ const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onSelectCon
             }
             <div style="flex: 1;">
               <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.title}</h3>
-              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.profiles?.full_name || 'Unknown'}</p>
+              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.creator_name || 'Unknown'}</p>
               <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
                 <span style="background: #ddd6fe; color: #7c3aed; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${content.event_type}</span>
                 <span style="font-weight: 600; color: #059669;">${content.is_free ? 'Free' : `$${content.price || 'TBA'}`}</span>
@@ -307,7 +351,7 @@ const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onSelectCon
                 <div className="flex-1">
                   <h3 className="font-semibold line-clamp-1">{course.title}</h3>
                   <p className="text-sm text-muted-foreground">
-                    by {course.profiles?.full_name || 'Unknown'}
+                    by {course.creator_name || 'Unknown'}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-xs">{course.category}</Badge>
@@ -353,7 +397,7 @@ const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onSelectCon
                 <div className="flex-1">
                   <h3 className="font-semibold line-clamp-1">{event.title}</h3>
                   <p className="text-sm text-muted-foreground">
-                    by {event.profiles?.full_name || 'Unknown'}
+                    by {event.creator_name || 'Unknown'}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-xs">{event.event_type}</Badge>
