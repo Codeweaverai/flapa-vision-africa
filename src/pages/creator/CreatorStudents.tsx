@@ -363,46 +363,57 @@ const CreatorStudents: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Total Students</p>
-                  <p className="text-2xl font-bold">{uniqueStudents.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Course Enrollments</p>
-                  <p className="text-2xl font-bold">
-                    {students.filter(s => s.type === 'course').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Event Bookings</p>
-                  <p className="text-2xl font-bold">
-                    {students.filter(s => s.type === 'event').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+       {/* Stats */}
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  {/* Total Students Card */}
+  <Card>
+    <CardContent className="p-4">
+      <div className="flex items-center gap-2">
+        <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-full">
+          <Users className="h-5 w-5 text-white" />
         </div>
+        <div>
+          <p className="text-sm font-medium">Total Students</p>
+          <p className="text-2xl font-bold">{uniqueStudents.length}</p>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+
+  {/* Course Enrollments Card */}
+  <Card>
+    <CardContent className="p-4">
+      <div className="flex items-center gap-2">
+        <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-full">
+          <BookOpen className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-medium">Course Enrollments</p>
+          <p className="text-2xl font-bold">
+            {students.filter(s => s.type === 'course').length}
+          </p>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+
+  {/* Event Bookings Card */}
+  <Card>
+    <CardContent className="p-4">
+      <div className="flex items-center gap-2">
+        <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-full">
+          <Calendar className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-medium">Event Bookings</p>
+          <p className="text-2xl font-bold">
+            {students.filter(s => s.type === 'event').length}
+          </p>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+</div>
 
         {/* Students List */}
         <Card>
