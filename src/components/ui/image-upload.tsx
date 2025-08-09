@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient'; // Make sure this points to your Supabase instance
 
 interface ImageUploadProps {
   onImageUpload: (imageUrl: string) => void;
@@ -37,20 +37,40 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     }
 
     setUploading(true);
-    
+
     try {
-      // Create a preview URL
+      // Create a preview URL for the UI
       const objectUrl = URL.createObjectURL(file);
       setPreviewImage(objectUrl);
-      
-      // For demo purposes, we'll use a placeholder URL
-      // In a real app, you would upload to your storage service
-      const mockImageUrl = `https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face`;
-      
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      onImageUpload(mockImageUrl);
+
+      // Create a unique file name to avoid overwrites
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `public/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('speaker-images') // bucket name
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Failed to upload image');
+        setPreviewImage(currentImage || '');
+        return;
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('speaker-images')
+        .getPublicUrl(filePath);
+
+      const publicUrl = publicUrlData.publicUrl;
+      onImageUpload(publicUrl);
+
       toast.success('Image uploaded successfully');
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -115,3 +135,4 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
 };
 
 export default ImageUpload;
+
