@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -132,6 +132,8 @@ const CreatorEventSpeakers = () => {
     e.preventDefault();
     if (!eventId || !currentUser || submitting) return;
 
+    console.log('Starting form submission...', { eventId, currentUser: currentUser?.id, formData });
+
     if (!formData.name.trim()) {
       toast.error('Speaker name is required');
       return;
@@ -147,15 +149,17 @@ const CreatorEventSpeakers = () => {
         .eq('id', eventId)
         .single();
 
+      console.log('Event verification:', { eventData, eventError });
+
       if (eventError || !eventData) {
+        console.error('Event not found or error:', eventError);
         toast.error('Event not found or access denied');
-        setSubmitting(false);
         return;
       }
 
       if (eventData.creator_id !== currentUser.id) {
+        console.error('Permission denied:', { eventCreator: eventData.creator_id, currentUser: currentUser.id });
         toast.error('You do not have permission to add speakers to this event');
-        setSubmitting(false);
         return;
       }
 
@@ -172,35 +176,47 @@ const CreatorEventSpeakers = () => {
         user_id: currentUser.id
       };
 
+      console.log('Speaker data to submit:', speakerData);
+
       if (editingSpeaker) {
-        const { error } = await supabase
+        console.log('Updating existing speaker:', editingSpeaker.id);
+        const { data: updateData, error } = await supabase
           .from('keynote_speakers')
           .update(speakerData)
-          .eq('id', editingSpeaker.id);
+          .eq('id', editingSpeaker.id)
+          .select();
+
+        console.log('Update response:', { updateData, error });
 
         if (error) {
-          console.error('Update error:', error);
-          toast.error('Failed to update speaker');
-        } else {
-          toast.success('Speaker updated successfully');
-        }
+          console.error('Update error details:', error);
+          toast.error(`Failed to update speaker: ${error.message}`);
+          return;
+        } 
+        toast.success('Speaker updated successfully');
       } else {
+        console.log('Creating new speaker...');
         const nextOrderIndex = speakers.length > 0 ? Math.max(...speakers.map(s => s.order_index)) + 1 : 0;
         const insertData = {
           ...speakerData,
           order_index: nextOrderIndex
         };
         
-        const { error } = await supabase
+        console.log('Insert data:', insertData);
+
+        const { data: insertResult, error } = await supabase
           .from('keynote_speakers')
-          .insert(insertData);
+          .insert(insertData)
+          .select();
+
+        console.log('Insert response:', { insertResult, error });
 
         if (error) {
-          console.error('Insert error:', error);
-          toast.error('Failed to add speaker');
-        } else {
-          toast.success('Speaker added successfully');
+          console.error('Insert error details:', error);
+          toast.error(`Failed to add speaker: ${error.message}`);
+          return;
         }
+        toast.success('Speaker added successfully');
       }
 
       await loadSpeakers();
@@ -217,7 +233,7 @@ const CreatorEventSpeakers = () => {
       });
     } catch (error) {
       console.error('Error saving speaker:', error);
-      toast.error('Failed to save speaker');
+      toast.error(`Failed to save speaker: ${error}`);
     } finally {
       setSubmitting(false);
     }
@@ -292,6 +308,9 @@ const CreatorEventSpeakers = () => {
               <DialogTitle className="text-xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
                 {editingSpeaker ? 'Edit Speaker' : 'Add Speaker'}
               </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                {editingSpeaker ? 'Update the speaker information below.' : 'Add a new speaker to your event by filling out the form below.'}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <ImageUpload

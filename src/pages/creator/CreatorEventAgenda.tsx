@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,6 +48,7 @@ const CreatorEventAgenda = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -59,15 +60,35 @@ const CreatorEventAgenda = () => {
   });
 
   useEffect(() => {
-    if (!eventId) {
-      navigate('/creator/events');
-      return;
-    }
-    loadData();
+    const initializeData = async () => {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError) {
+          console.error('Auth error:', authError);
+          toast.error('Authentication required');
+          navigate('/login');
+          return;
+        }
+        
+        setCurrentUser(user);
+        
+        if (eventId && user) {
+          await loadData();
+        }
+      } catch (error) {
+        console.error('Error initializing:', error);
+        toast.error('Failed to initialize');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeData();
   }, [eventId, navigate]);
 
   const loadData = async () => {
-    setLoading(true);
+    if (!eventId) return;
+    
     try {
       const [agendaResponse, speakersResponse] = await Promise.all([
         supabase
@@ -90,16 +111,23 @@ const CreatorEventAgenda = () => {
           .order('name', { ascending: true })
       ]);
 
-      if (agendaResponse.error) throw agendaResponse.error;
-      if (speakersResponse.error) throw speakersResponse.error;
+      if (agendaResponse.error) {
+        console.error('Agenda error:', agendaResponse.error);
+        toast.error('Failed to load agenda');
+        return;
+      }
+      
+      if (speakersResponse.error) {
+        console.error('Speakers error:', speakersResponse.error);
+        toast.error('Failed to load speakers');
+        return;
+      }
 
       setAgenda(agendaResponse.data || []);
       setSpeakers(speakersResponse.data || []);
     } catch (error) {
       console.error('Error loading data:', error);
-      toast.error('Failed to load agenda data');
-    } finally {
-      setLoading(false);
+      toast.error('Failed to load event data');
     }
   };
 
@@ -133,7 +161,7 @@ const CreatorEventAgenda = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId || submitting) return;
+    if (!eventId || !currentUser || submitting) return;
 
     if (!formData.title.trim()) {
       toast.error('Title is required');
@@ -275,7 +303,7 @@ const CreatorEventAgenda = () => {
               <CardTitle className="mb-3 text-2xl bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 No agenda items yet
               </CardTitle>
-              <p className="text-muted-foreground mb-8 max-w-md">
+              <p className="text-gray-600 mb-8 max-w-md">
                 Create a detailed schedule for your event to help attendees plan their day
               </p>
               <Button onClick={handleAddItem}
@@ -297,7 +325,7 @@ const CreatorEventAgenda = () => {
                         <Badge className={`${getSessionTypeColor(item.session_type)} font-medium px-3 py-1`}>
                           {item.session_type.charAt(0).toUpperCase() + item.session_type.slice(1)}
                         </Badge>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-gradient-to-r from-orange-100 to-purple-100 px-3 py-1 rounded-full">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 bg-gradient-to-r from-orange-100 to-purple-100 px-3 py-1 rounded-full">
                           <Clock className="h-4 w-4" />
                           <span className="font-medium">
                             {format(parseISO(item.start_time), 'HH:mm')} - {format(parseISO(item.end_time), 'HH:mm')}
@@ -310,7 +338,7 @@ const CreatorEventAgenda = () => {
                       </h3>
                       
                       {item.description && (
-                        <p className="text-muted-foreground mb-4 leading-relaxed">{item.description}</p>
+                        <p className="text-gray-600 mb-4 leading-relaxed">{item.description}</p>
                       )}
                       
                       <div className="flex items-center gap-6 text-sm">
@@ -365,6 +393,9 @@ const CreatorEventAgenda = () => {
               <DialogTitle className="text-xl bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 {editingItem ? 'Edit Agenda Item' : 'Add New Agenda Item'}
               </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                {editingItem ? 'Update the details of this agenda item.' : 'Create a new item for your event schedule.'}
+              </DialogDescription>
             </DialogHeader>
             
             <form onSubmit={handleSubmit} className="space-y-4">
