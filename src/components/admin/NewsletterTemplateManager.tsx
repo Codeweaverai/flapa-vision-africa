@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -210,13 +209,17 @@ const NewsletterTemplateManager = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectDynamicContent = (content: any, type: 'creator' | 'course' | 'event') => {
-    const contentHtml = generateContentHtml(content, type);
+  const handleSelectDynamicContent = (content: any[]) => {
+    let contentHtml = '';
+    content.forEach(item => {
+      contentHtml += generateContentHtml(item, item.type) + '\n\n';
+    });
+    
     setFormData(prev => ({
       ...prev,
       body_html_template: prev.body_html_template + '\n\n' + contentHtml
     }));
-    toast.success(`${type} content added to template`);
+    toast.success(`${content.length} items added to template`);
   };
 
   const generateContentHtml = (content: any, type: 'creator' | 'course' | 'event') => {
@@ -571,7 +574,7 @@ const NewsletterTemplateManager = () => {
                     Search and select dynamic content to automatically add to your template. 
                     This will generate HTML blocks with working links and buttons.
                   </p>
-                  <DynamicContentSearch onSelectContent={handleSelectDynamicContent} />
+                  <DynamicContentSearch onContentSelect={handleSelectDynamicContent} />
                 </div>
               </TabsContent>
               
