@@ -2,523 +2,464 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Plus, Eye, Palette, BookOpen, Calendar, ShoppingCart, Users, Sparkles } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Plus, Send, Eye, Save, Search, X, ExternalLink, Users, BookOpen, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
-import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import DynamicContentSearch from './DynamicContentSearch';
 
 interface NewsletterTemplate {
   id: string;
   name: string;
-  description: string;
-  category: string;
-  subject_template: string;
-  body_html_template: string;
-  placeholders: string[];
+  subject: string;
+  body_html: string;
+  template_type: string;
 }
 
-interface Course {
+interface DynamicContent {
   id: string;
   title: string;
   description: string;
-  thumbnail_url?: string;
-  price: number;
-  is_free: boolean;
-  difficulty_level: string;
-  duration_minutes: number;
-}
-
-interface Event {
-  id: string;
-  title: string;
-  description: string;
+  type: 'course' | 'event' | 'creator';
   image_url?: string;
-  location?: string;
-  start_time: string;
-  price: number;
+  link_url?: string;
+  creator_name?: string;
+  price?: number;
+  date?: string;
 }
 
 const EnhancedNewsletterForm = () => {
-  const [searchParams] = useSearchParams();
-  const { user } = useAuth();
-  const preselectedTemplateId = searchParams.get('template');
-  
   const [templates, setTemplates] = useState<NewsletterTemplate[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<NewsletterTemplate | null>(null);
-  const [selectedCourses, setSelectedCourses] = useState<Course[]>([]);
-  const [selectedEvents, setSelectedEvents] = useState<Event[]>([]);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [contentSelectionOpen, setContentSelectionOpen] = useState(false);
-  const [contentType, setContentType] = useState<'courses' | 'events'>('courses');
-
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [formData, setFormData] = useState({
     subject: '',
-    content: '',
-    send_immediately: false,
-    scheduled_time: '',
-    target_audience: 'all'
+    body_html: '',
+    template_type: 'general'
   });
+  const [selectedContent, setSelectedContent] = useState<DynamicContent[]>([]);
+  const [showContentSearch, setShowContentSearch] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
     loadTemplates();
-    loadCourses();
-    loadEvents();
   }, []);
-
-  useEffect(() => {
-    if (preselectedTemplateId && templates.length > 0) {
-      const template = templates.find(t => t.id === preselectedTemplateId);
-      if (template) {
-        handleSelectTemplate(template);
-      }
-    }
-  }, [preselectedTemplateId, templates]);
 
   const loadTemplates = async () => {
     try {
       const { data, error } = await supabase
         .from('newsletter_templates')
         .select('*')
-        .eq('is_active', true)
-        .order('name');
+        .order('name', { ascending: true });
 
       if (error) throw error;
-      
-      // Transform the data to match our interface
-      const transformedData: NewsletterTemplate[] = (data || []).map(template => ({
-        ...template,
-        placeholders: Array.isArray(template.placeholders) 
-          ? template.placeholders 
-          : typeof template.placeholders === 'string'
-          ? JSON.parse(template.placeholders)
-          : []
-      }));
-      
-      setTemplates(transformedData);
+      setTemplates(data || []);
     } catch (error) {
       console.error('Error loading templates:', error);
+      toast.error('Failed to load templates');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loadCourses = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('is_published', true)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setCourses(data || []);
-    } catch (error) {
-      console.error('Error loading courses:', error);
-    }
-  };
-
-  const loadEvents = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .gte('start_time', new Date().toISOString())
-        .order('start_time', { ascending: true })
-        .limit(10);
-
-      if (error) throw error;
-      setEvents(data || []);
-    } catch (error) {
-      console.error('Error loading events:', error);
-    }
-  };
-
-  const handleSelectTemplate = (template: NewsletterTemplate) => {
+  const handleTemplateSelect = (template: NewsletterTemplate) => {
     setSelectedTemplate(template);
-    setFormData(prev => ({
-      ...prev,
-      subject: template.subject_template,
-      content: template.body_html_template
-    }));
+    setFormData({
+      subject: template.subject,
+      body_html: template.body_html,
+      template_type: template.template_type
+    });
   };
 
-  const generateCourseCards = (courses: Course[]) => {
-    return courses.map(course => `
-      <div style="border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; overflow: hidden;">
-        ${course.thumbnail_url ? `<img src="${course.thumbnail_url}" alt="${course.title}" style="width: 100%; height: 150px; object-fit: cover;">` : ''}
-        <div style="padding: 20px;">
-          <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 18px;">${course.title}</h3>
-          <p style="margin: 0 0 15px 0; color: #6b7280; font-size: 14px;">${course.description.substring(0, 120)}...</p>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="background-color: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${course.difficulty_level}</span>
-            <span style="font-weight: bold; color: #f97316;">${course.is_free ? 'FREE' : '$' + course.price}</span>
+  const handleContentSelect = (content: DynamicContent[]) => {
+    setSelectedContent(content);
+    // Auto-generate content blocks
+    generateContentBlocks(content);
+  };
+
+  const generateContentBlocks = (content: DynamicContent[]) => {
+    let htmlBlocks = '';
+
+    // Group content by type
+    const courses = content.filter(c => c.type === 'course');
+    const events = content.filter(c => c.type === 'event');
+    const creators = content.filter(c => c.type === 'creator');
+
+    // Generate course blocks
+    if (courses.length > 0) {
+      htmlBlocks += `
+        <div style="margin: 30px 0;">
+          <h2 style="color: #ea580c; font-size: 24px; font-weight: bold; margin-bottom: 20px; text-align: center;">
+            🎓 Featured Courses
+          </h2>
+          <div style="display: grid; gap: 20px;">
+            ${courses.map(course => `
+              <div style="border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #fef3e2 0%, #f3e8ff 100%);">
+                <div style="padding: 20px;">
+                  <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #7c3aed;">
+                    ${course.title}
+                  </h3>
+                  <p style="color: #6b7280; margin-bottom: 15px; line-height: 1.5;">
+                    ${course.description}
+                  </p>
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <span style="color: #ea580c; font-weight: bold; font-size: 16px;">
+                      ${course.price ? `$${course.price}` : 'Free'}
+                    </span>
+                    <a href="${course.link_url || `https://skillpulse.cloud/courses/${course.id}`}" 
+                       style="background: linear-gradient(135deg, #ea580c 0%, #7c3aed 100%); color: white; padding: 8px 16px; text-decoration: none; border-radius: 8px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px;">
+                      Enroll Now →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
           </div>
-          <a href="https://skillpulse.cloud/courses/${course.id}" style="display: block; background-color: #f97316; color: white; text-decoration: none; padding: 10px; text-align: center; border-radius: 6px; margin-top: 15px;">Enroll Now</a>
         </div>
-      </div>
-    `).join('');
-  };
-
-  const generateEventCards = (events: Event[]) => {
-    return events.map(event => `
-      <div style="border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; overflow: hidden;">
-        ${event.image_url ? `<img src="${event.image_url}" alt="${event.title}" style="width: 100%; height: 150px; object-fit: cover;">` : ''}
-        <div style="padding: 20px;">
-          <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 18px;">${event.title}</h3>
-          <p style="margin: 0 0 15px 0; color: #6b7280; font-size: 14px;">${event.description.substring(0, 120)}...</p>
-          <div style="margin-bottom: 15px;">
-            <div style="margin-bottom: 5px; font-size: 14px; color: #6b7280;">📅 ${new Date(event.start_time).toLocaleDateString()}</div>
-            ${event.location ? `<div style="margin-bottom: 5px; font-size: 14px; color: #6b7280;">📍 ${event.location}</div>` : ''}
-            <div style="font-weight: bold; color: #3b82f6;">$${event.price}</div>
-          </div>
-          <a href="https://skillpulse.cloud/events/${event.id}" style="display: block; background-color: #3b82f6; color: white; text-decoration: none; padding: 10px; text-align: center; border-radius: 6px;">Register Now</a>
-        </div>
-      </div>
-    `).join('');
-  };
-
-  const insertContent = (type: 'courses' | 'events') => {
-    let content = '';
-    if (type === 'courses' && selectedCourses.length > 0) {
-      content = generateCourseCards(selectedCourses);
-    } else if (type === 'events' && selectedEvents.length > 0) {
-      content = generateEventCards(selectedEvents);
+      `;
     }
 
-    setFormData(prev => ({
-      ...prev,
-      content: prev.content.replace(
-        type === 'courses' ? '{{course_cards}}' : '{{event_cards}}',
-        content
-      )
-    }));
+    // Generate event blocks
+    if (events.length > 0) {
+      htmlBlocks += `
+        <div style="margin: 30px 0;">
+          <h2 style="color: #7c3aed; font-size: 24px; font-weight: bold; margin-bottom: 20px; text-align: center;">
+            📅 Upcoming Events
+          </h2>
+          <div style="display: grid; gap: 20px;">
+            ${events.map(event => `
+              <div style="border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #f3e8ff 0%, #fef3e2 100%);">
+                <div style="padding: 20px;">
+                  <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #ea580c;">
+                    ${event.title}
+                  </h3>
+                  <p style="color: #6b7280; margin-bottom: 15px; line-height: 1.5;">
+                    ${event.description}
+                  </p>
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <span style="color: #7c3aed; font-weight: bold;">
+                      ${event.date ? new Date(event.date).toLocaleDateString() : 'Date TBA'}
+                    </span>
+                    <a href="${event.link_url || `https://skillpulse.cloud/events/${event.id}`}" 
+                       style="background: linear-gradient(135deg, #7c3aed 0%, #ea580c 100%); color: white; padding: 8px 16px; text-decoration: none; border-radius: 8px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px;">
+                      Register Now →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
 
-    setContentSelectionOpen(false);
-    toast.success(`${type === 'courses' ? 'Course' : 'Event'} cards inserted successfully`);
+    // Generate creator blocks
+    if (creators.length > 0) {
+      htmlBlocks += `
+        <div style="margin: 30px 0;">
+          <h2 style="color: #059669; font-size: 24px; font-weight: bold; margin-bottom: 20px; text-align: center;">
+            👥 Featured Creators
+          </h2>
+          <div style="display: grid; gap: 20px;">
+            ${creators.map(creator => `
+              <div style="border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #ecfdf5 0%, #fef3e2 100%);">
+                <div style="padding: 20px;">
+                  <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #059669;">
+                    ${creator.title}
+                  </h3>
+                  <p style="color: #6b7280; margin-bottom: 15px; line-height: 1.5;">
+                    ${creator.description}
+                  </p>
+                  <div style="text-align: right;">
+                    <a href="${creator.link_url || `https://skillpulse.cloud/creators/${creator.id}`}" 
+                       style="background: linear-gradient(135deg, #059669 0%, #ea580c 100%); color: white; padding: 8px 16px; text-decoration: none; border-radius: 8px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px;">
+                      Follow Creator →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // Insert content blocks into template
+    if (htmlBlocks) {
+      const updatedBody = formData.body_html + htmlBlocks;
+      setFormData(prev => ({
+        ...prev,
+        body_html: updatedBody
+      }));
+    }
   };
 
-  const handlePreview = () => {
-    setPreviewOpen(true);
+  const removeContentItem = (contentId: string) => {
+    setSelectedContent(prev => prev.filter(item => item.id !== contentId));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user) {
-      toast.error('User not authenticated');
+  const handleSendNewsletter = async () => {
+    if (!formData.subject.trim()) {
+      toast.error('Subject is required');
       return;
     }
-    
+
+    if (!formData.body_html.trim()) {
+      toast.error('Email content is required');
+      return;
+    }
+
+    setSending(true);
     try {
-      const newsletterData = {
-        subject: formData.subject,
-        body_html: formData.content,
-        template_id: selectedTemplate?.id || null,
-        status: formData.send_immediately ? 'sending' : 'draft',
-        created_by: user.id,
-        scheduled_at: formData.scheduled_time ? new Date(formData.scheduled_time).toISOString() : null
-      };
-
-      const { error } = await supabase
+      // First create the newsletter record
+      const { data: newsletter, error: createError } = await supabase
         .from('newsletters')
-        .insert([newsletterData]);
+        .insert({
+          subject: formData.subject,
+          body_html: formData.body_html,
+          template_type: formData.template_type,
+          status: 'draft'
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (createError) throw createError;
 
-      toast.success(
-        formData.send_immediately 
-          ? 'Newsletter is being sent!' 
-          : 'Newsletter saved as draft'
-      );
+      // Then send it via edge function
+      const { error: sendError } = await supabase.functions.invoke('send-newsletter-now', {
+        body: { newsletterId: newsletter.id }
+      });
+
+      if (sendError) throw sendError;
+
+      toast.success('Newsletter sent successfully!');
+      
+      // Reset form
+      setFormData({
+        subject: '',
+        body_html: '',
+        template_type: 'general'
+      });
+      setSelectedContent([]);
+      setSelectedTemplate(null);
+
     } catch (error) {
-      console.error('Error saving newsletter:', error);
-      toast.error('Failed to save newsletter');
+      console.error('Error sending newsletter:', error);
+      toast.error('Failed to send newsletter: ' + error.message);
+    } finally {
+      setSending(false);
     }
   };
 
-  const getCategoryIcon = (category: string) => {
-    const icons = {
-      general: Users,
-      course: BookOpen,
-      event: Calendar,
-      promotional: ShoppingCart,
-      engagement: Sparkles
-    };
-    const Icon = icons[category as keyof typeof icons] || Users;
-    return <Icon className="h-4 w-4" />;
+  const handleSaveAsDraft = async () => {
+    try {
+      const { error } = await supabase
+        .from('newsletters')
+        .insert({
+          subject: formData.subject,
+          body_html: formData.body_html,
+          template_type: formData.template_type,
+          status: 'draft'
+        });
+
+      if (error) throw error;
+      toast.success('Newsletter saved as draft');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast.error('Failed to save draft');
+    }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Create Newsletter</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handlePreview} disabled={!formData.content}>
-            <Eye className="h-4 w-4 mr-2" />
-            Preview
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Template Selection */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Choose Template
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedTemplate?.id === template.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={() => handleSelectTemplate(template)}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {getCategoryIcon(template.category)}
-                    <h4 className="font-medium text-sm">{template.name}</h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{template.description}</p>
-                  <Badge variant="outline" className="mt-2 text-xs">
-                    {template.category}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Newsletter Form */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Newsletter Content</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="subject">Subject Line *</Label>
-                  <Input
-                    id="subject"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleChange}
-                    placeholder="Enter newsletter subject"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="content">Newsletter Content *</Label>
-                  <div className="flex gap-2 mb-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setContentType('courses');
-                        setContentSelectionOpen(true);
-                      }}
-                    >
-                      <BookOpen className="h-4 w-4 mr-1" />
-                      Insert Courses
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setContentType('events');
-                        setContentSelectionOpen(true);
-                      }}
-                    >
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Insert Events
-                    </Button>
-                  </div>
-                  <Textarea
-                    id="content"
-                    name="content"
-                    value={formData.content}
-                    onChange={handleChange}
-                    rows={20}
-                    className="font-mono text-sm"
-                    placeholder="Newsletter HTML content..."
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="target_audience">Target Audience</Label>
-                    <Select 
-                      value={formData.target_audience} 
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, target_audience: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Users</SelectItem>
-                        <SelectItem value="students">Students Only</SelectItem>
-                        <SelectItem value="creators">Creators Only</SelectItem>
-                        <SelectItem value="inactive">Inactive Users</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="scheduled_time">Schedule (Optional)</Label>
-                    <Input
-                      id="scheduled_time"
-                      name="scheduled_time"
-                      type="datetime-local"
-                      value={formData.scheduled_time}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="send_immediately"
-                    checked={formData.send_immediately}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, send_immediately: checked }))}
-                  />
-                  <Label htmlFor="send_immediately">Send Immediately</Label>
-                </div>
-
-                <div className="flex justify-end gap-4">
-                  <Button type="button" variant="outline">
-                    Save Draft
-                  </Button>
-                  <Button type="submit">
-                    {formData.send_immediately ? 'Send Newsletter' : 'Schedule Newsletter'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Content Selection Dialog */}
-      <Dialog open={contentSelectionOpen} onOpenChange={setContentSelectionOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Select {contentType === 'courses' ? 'Courses' : 'Events'} to Include
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {contentType === 'courses' 
-              ? courses.map((course) => (
-                  <Card key={course.id} className={`cursor-pointer transition-colors ${
-                    selectedCourses.some(c => c.id === course.id) 
-                      ? 'border-primary bg-primary/5' 
-                      : 'hover:border-primary/50'
-                  }`}
-                  onClick={() => {
-                    if (selectedCourses.some(c => c.id === course.id)) {
-                      setSelectedCourses(prev => prev.filter(c => c.id !== course.id));
-                    } else {
-                      setSelectedCourses(prev => [...prev, course]);
-                    }
-                  }}>
-                    <CardContent className="p-4">
-                      {course.thumbnail_url && (
-                        <img src={course.thumbnail_url} alt={course.title} className="w-full h-32 object-cover rounded mb-2" />
-                      )}
-                      <h4 className="font-medium">{course.title}</h4>
-                      <p className="text-sm text-muted-foreground">{course.description.substring(0, 100)}...</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <Badge variant="outline">{course.difficulty_level}</Badge>
-                        <span className="font-bold">{course.is_free ? 'FREE' : `$${course.price}`}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              : events.map((event) => (
-                  <Card key={event.id} className={`cursor-pointer transition-colors ${
-                    selectedEvents.some(e => e.id === event.id) 
-                      ? 'border-primary bg-primary/5' 
-                      : 'hover:border-primary/50'
-                  }`}
-                  onClick={() => {
-                    if (selectedEvents.some(e => e.id === event.id)) {
-                      setSelectedEvents(prev => prev.filter(e => e.id !== event.id));
-                    } else {
-                      setSelectedEvents(prev => [...prev, event]);
-                    }
-                  }}>
-                    <CardContent className="p-4">
-                      {event.image_url && (
-                        <img src={event.image_url} alt={event.title} className="w-full h-32 object-cover rounded mb-2" />
-                      )}
-                      <h4 className="font-medium">{event.title}</h4>
-                      <p className="text-sm text-muted-foreground">{event.description.substring(0, 100)}...</p>
-                      <div className="text-sm text-muted-foreground mt-2">
-                        <div>📅 {new Date(event.start_time).toLocaleDateString()}</div>
-                        {event.location && <div>📍 {event.location}</div>}
-                        <div className="font-bold text-primary">${event.price}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-            }
+    <div className="space-y-6">
+      {/* Template Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Choose Template
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {templates.map((template) => (
+              <Card 
+                key={template.id} 
+                className={`cursor-pointer transition-all duration-200 ${
+                  selectedTemplate?.id === template.id 
+                    ? 'ring-2 ring-primary bg-primary/5' 
+                    : 'hover:shadow-md'
+                }`}
+                onClick={() => handleTemplateSelect(template)}
+              >
+                <CardContent className="p-4">
+                  <h3 className="font-medium mb-2">{template.name}</h3>
+                  <p className="text-sm text-muted-foreground mb-3">{template.subject}</p>
+                  <Badge variant="secondary">{template.template_type}</Badge>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => setContentSelectionOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => insertContent(contentType)}>
-              Insert Selected ({contentType === 'courses' ? selectedCourses.length : selectedEvents.length})
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
 
-      {/* Preview Dialog */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Newsletter Preview</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Subject Line</Label>
-              <div className="p-3 bg-muted rounded">{formData.subject}</div>
+      {/* Dynamic Content Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Dynamic Content
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowContentSearch(!showContentSearch)}
+              className="ml-auto"
+            >
+              {showContentSearch ? 'Hide Search' : 'Add Content'}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {showContentSearch && (
+            <div className="mb-6">
+              <DynamicContentSearch onContentSelect={handleContentSelect} />
             </div>
+          )}
+          
+          {selectedContent.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="font-medium">Selected Content:</h4>
+              <div className="grid gap-3">
+                {selectedContent.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-3">
+                      {item.type === 'course' && <BookOpen className="h-4 w-4 text-blue-600" />}
+                      {item.type === 'event' && <Calendar className="h-4 w-4 text-green-600" />}
+                      {item.type === 'creator' && <Users className="h-4 w-4 text-purple-600" />}
+                      <div>
+                        <p className="font-medium">{item.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.creator_name && `by ${item.creator_name}`}
+                          {item.price && ` • $${item.price}`}
+                          {item.date && ` • ${new Date(item.date).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeContentItem(item.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Newsletter Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Newsletter</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>Email Content</Label>
-              <div 
-                className="border rounded p-4 bg-white"
-                dangerouslySetInnerHTML={{ __html: formData.content }}
+              <Label htmlFor="subject">Subject</Label>
+              <Input
+                id="subject"
+                value={formData.subject}
+                onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+                placeholder="Newsletter subject line..."
               />
             </div>
+            <div>
+              <Label htmlFor="template_type">Type</Label>
+              <Select 
+                value={formData.template_type}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, template_type: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="course_promotion">Course Promotion</SelectItem>
+                  <SelectItem value="event_announcement">Event Announcement</SelectItem>
+                  <SelectItem value="weekly_digest">Weekly Digest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="body_html">Email Content</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPreviewMode(!previewMode)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {previewMode ? 'Edit' : 'Preview'}
+              </Button>
+            </div>
+            
+            {previewMode ? (
+              <div 
+                className="border rounded-lg p-4 min-h-[300px] bg-white"
+                dangerouslySetInnerHTML={{ __html: formData.body_html }}
+              />
+            ) : (
+              <Textarea
+                id="body_html"
+                value={formData.body_html}
+                onChange={(e) => setFormData(prev => ({ ...prev, body_html: e.target.value }))}
+                placeholder="Write your newsletter content here..."
+                className="min-h-[300px]"
+              />
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <Button
+          onClick={handleSendNewsletter}
+          disabled={sending}
+          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+        >
+          <Send className="h-4 w-4 mr-2" />
+          {sending ? 'Sending...' : 'Send Newsletter'}
+        </Button>
+        
+        <Button
+          variant="outline"
+          onClick={handleSaveAsDraft}
+        >
+          <Save className="h-4 w-4 mr-2" />
+          Save as Draft
+        </Button>
+      </div>
     </div>
   );
 };

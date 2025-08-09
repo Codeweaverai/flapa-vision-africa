@@ -25,6 +25,7 @@ interface KeynoteSpeaker {
   twitter_url?: string;
   website_url?: string;
   order_index: number;
+  user_id?: string;
 }
 
 const CreatorEventSpeakers = () => {
@@ -32,11 +33,9 @@ const CreatorEventSpeakers = () => {
   const navigate = useNavigate();
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
-  const [formValid, setFormValid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -49,75 +48,49 @@ const CreatorEventSpeakers = () => {
     website_url: ''
   });
 
-  // Validate form whenever formData changes
   useEffect(() => {
-    setFormValid(formData.name.trim().length > 0);
-  }, [formData]);
-
-  useEffect(() => {
-    const checkAuthAndLoad = async () => {
-      setLoading(true);
+    const initializeData = async () => {
       try {
+        // Get current user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
         
-        if (authError || !user) {
-          console.error('Authentication error:', authError);
-          toast.error('Please sign in to manage speakers');
-          navigate('/login');
-          return;
-        }
-
         setCurrentUser(user);
-        setAuthChecked(true);
         
-        if (eventId) {
+        if (eventId && user) {
           await loadSpeakers();
         }
       } catch (error) {
-        console.error('Authentication check failed:', error);
-        toast.error('Please sign in to manage speakers');
+        console.error('Error initializing:', error);
+        toast.error('Authentication required');
         navigate('/login');
       } finally {
         setLoading(false);
       }
     };
 
-    checkAuthAndLoad();
+    initializeData();
   }, [eventId, navigate]);
 
   const loadSpeakers = async () => {
     if (!eventId) return;
     
     try {
-      console.log('Loading speakers for event:', eventId);
       const { data, error } = await supabase
         .from('keynote_speakers')
         .select('*')
         .eq('event_id', eventId)
         .order('order_index', { ascending: true });
 
-      if (error) {
-        console.error('Error loading speakers:', error);
-        throw error;
-      }
-
-      console.log('Loaded speakers:', data);
+      if (error) throw error;
       setSpeakers(data || []);
     } catch (error) {
       console.error('Error loading speakers:', error);
       toast.error('Failed to load speakers');
-      
-      if (error.message?.includes('JWT')) {
-        toast.error('Session expired. Please sign in again.');
-        await supabase.auth.signOut();
-        navigate('/login');
-      }
     }
   };
 
   const handleAddSpeaker = () => {
-    if (!authChecked) return;
-    
     setEditingSpeaker(null);
     setFormData({
       name: '',
@@ -133,8 +106,6 @@ const CreatorEventSpeakers = () => {
   };
 
   const handleEditSpeaker = (speaker: KeynoteSpeaker) => {
-    if (!authChecked) return;
-    
     setEditingSpeaker(speaker);
     setFormData({
       name: speaker.name,
@@ -151,22 +122,32 @@ const CreatorEventSpeakers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId || !authChecked || !formValid || submitting || !currentUser) return;
+    if (!eventId || !currentUser || submitting) return;
+
+    // Validate required fields
+    if (!formData.name.trim()) {
+      toast.error('Speaker name is required');
+      return;
+    }
 
     setSubmitting(true);
+    
     try {
-      console.log('Submitting speaker with data:', formData);
-      console.log('Current user:', currentUser);
-      console.log('Event ID:', eventId);
-
       const speakerData = {
-        ...formData,
+        name: formData.name.trim(),
+        title: formData.title.trim() || null,
+        bio: formData.bio.trim() || null,
+        image_url: formData.image_url || null,
+        speaking_topic: formData.speaking_topic.trim() || null,
+        linkedin_url: formData.linkedin_url.trim() || null,
+        twitter_url: formData.twitter_url.trim() || null,
+        website_url: formData.website_url.trim() || null,
         event_id: eventId,
-        // Note: Not including user_id as it's not required by the table schema
+        user_id: currentUser.id
       };
 
       if (editingSpeaker) {
-        console.log('Updating speaker:', editingSpeaker.id);
+        // Update existing speaker
         const { data, error } = await supabase
           .from('keynote_speakers')
           .update(speakerData)
@@ -174,47 +155,45 @@ const CreatorEventSpeakers = () => {
           .select()
           .single();
 
-        if (error) {
-          console.error('Update error:', error);
-          throw error;
-        }
-        console.log('Speaker updated:', data);
+        if (error) throw error;
         toast.success('Speaker updated successfully');
       } else {
+        // Create new speaker
         const nextOrderIndex = speakers.length > 0 ? Math.max(...speakers.map(s => s.order_index)) + 1 : 0;
         const insertData = {
           ...speakerData,
           order_index: nextOrderIndex
         };
         
-        console.log('Creating speaker with data:', insertData);
         const { data, error } = await supabase
           .from('keynote_speakers')
           .insert(insertData)
           .select()
           .single();
 
-        if (error) {
-          console.error('Insert error:', error);
-          console.error('Error details:', error.message, error.details, error.hint);
-          throw error;
-        }
-        console.log('Speaker created:', data);
-        toast.success('Speaker created successfully');
+        if (error) throw error;
+        toast.success('Speaker added successfully');
       }
 
+      // Reload speakers and close dialog
       await loadSpeakers();
       setDialogOpen(false);
+      setFormData({
+        name: '',
+        title: '',
+        bio: '',
+        image_url: '',
+        speaking_topic: '',
+        linkedin_url: '',
+        twitter_url: '',
+        website_url: ''
+      });
     } catch (error) {
       console.error('Error saving speaker:', error);
-      
-      // More specific error messages
       if (error.message?.includes('row-level security')) {
         toast.error('Permission denied. Please check if you own this event.');
       } else if (error.message?.includes('foreign key')) {
-        toast.error('Invalid event ID. Please check the event exists.');
-      } else if (error.message?.includes('not null')) {
-        toast.error('Please fill in all required fields.');
+        toast.error('Invalid event. Please refresh and try again.');
       } else {
         toast.error(`Failed to save speaker: ${error.message}`);
       }
@@ -224,7 +203,7 @@ const CreatorEventSpeakers = () => {
   };
 
   const handleDeleteSpeaker = async (speakerId: string) => {
-    if (!authChecked || !confirm('Are you sure you want to delete this speaker?')) return;
+    if (!confirm('Are you sure you want to delete this speaker?')) return;
     
     try {
       const { error } = await supabase
@@ -276,7 +255,7 @@ const CreatorEventSpeakers = () => {
         <h2 className="text-2xl font-bold">Event Speakers</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={handleAddSpeaker} disabled={!authChecked}
+            <Button onClick={handleAddSpeaker}
               className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -298,9 +277,7 @@ const CreatorEventSpeakers = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">
-                    Speaker Name * {!formData.name.trim() && (
-                      <span className="text-red-500 text-xs">(required)</span>
-                    )}
+                    Speaker Name *
                   </Label>
                   <Input
                     id="name"
@@ -390,7 +367,8 @@ const CreatorEventSpeakers = () => {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={!authChecked || !formValid || submitting}
+                  disabled={submitting || !formData.name.trim()}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                 >
                   {submitting ? 'Processing...' : editingSpeaker ? 'Update' : 'Create'} Speaker
                 </Button>
@@ -410,16 +388,12 @@ const CreatorEventSpeakers = () => {
             <p className="text-muted-foreground mb-6">
               Add keynote speakers for your event
             </p>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={handleAddSpeaker} disabled={!authChecked}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Speaker
-                </Button>
-              </DialogTrigger>
-            </Dialog>
+            <Button onClick={handleAddSpeaker}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Speaker
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -452,7 +426,6 @@ const CreatorEventSpeakers = () => {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleEditSpeaker(speaker)}
-                      disabled={!authChecked}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -461,7 +434,6 @@ const CreatorEventSpeakers = () => {
                       size="sm"
                       className="text-destructive hover:text-destructive"
                       onClick={() => handleDeleteSpeaker(speaker.id)}
-                      disabled={!authChecked}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
