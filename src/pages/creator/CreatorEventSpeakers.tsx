@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -49,26 +48,49 @@ const CreatorEventSpeakers = () => {
   });
 
   useEffect(() => {
+    console.log('Component mounted or eventId changed', { eventId });
+    
     const initializeData = async () => {
+      console.log('Initializing data...');
       try {
+        console.log('Attempting to get current user...');
         const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
         if (authError) {
-          console.error('Auth error:', authError);
+          console.error('Authentication error details:', {
+            code: authError.code,
+            message: authError.message,
+            name: authError.name,
+            stack: authError.stack
+          });
           toast.error('Authentication required');
           navigate('/login');
           return;
         }
         
+        console.log('Current user retrieved:', { 
+          id: user?.id, 
+          email: user?.email,
+          session: await supabase.auth.getSession()
+        });
         setCurrentUser(user);
         
         if (eventId && user) {
+          console.log('Loading speakers for event:', eventId);
           await loadSpeakers();
+        } else {
+          console.warn('Missing eventId or user:', { eventId, user });
         }
       } catch (error) {
-        console.error('Error initializing:', error);
+        console.error('Initialization error:', {
+          error,
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
         toast.error('Failed to initialize');
       } finally {
         setLoading(false);
+        console.log('Initialization complete');
       }
     };
 
@@ -76,29 +98,53 @@ const CreatorEventSpeakers = () => {
   }, [eventId, navigate]);
 
   const loadSpeakers = async () => {
-    if (!eventId) return;
+    if (!eventId) {
+      console.warn('loadSpeakers called without eventId');
+      return;
+    }
+    
+    console.log('Loading speakers for event:', eventId);
     
     try {
-      const { data, error } = await supabase
+      const { data, error, count, status, statusText } = await supabase
         .from('keynote_speakers')
         .select('*')
         .eq('event_id', eventId)
         .order('order_index', { ascending: true });
 
+      console.log('Speakers query response:', {
+        data,
+        error,
+        count,
+        status,
+        statusText
+      });
+
       if (error) {
-        console.error('Error loading speakers:', error);
+        console.error('Speakers query error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         toast.error('Failed to load speakers');
         return;
       }
       
+      console.log('Setting speakers data:', data);
       setSpeakers(data || []);
     } catch (error) {
-      console.error('Error loading speakers:', error);
+      console.error('Error in loadSpeakers:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       toast.error('Failed to load speakers');
     }
   };
 
   const handleAddSpeaker = () => {
+    console.log('Add speaker button clicked');
     setEditingSpeaker(null);
     setFormData({
       name: '',
@@ -111,9 +157,11 @@ const CreatorEventSpeakers = () => {
       website_url: ''
     });
     setDialogOpen(true);
+    console.log('Dialog opened for new speaker');
   };
 
   const handleEditSpeaker = (speaker: KeynoteSpeaker) => {
+    console.log('Edit speaker button clicked for:', speaker.id);
     setEditingSpeaker(speaker);
     setFormData({
       name: speaker.name,
@@ -126,39 +174,69 @@ const CreatorEventSpeakers = () => {
       website_url: speaker.website_url || ''
     });
     setDialogOpen(true);
+    console.log('Dialog opened for editing speaker:', speaker.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId || !currentUser || submitting) return;
+    console.log('Form submission initiated');
+    
+    console.log('Current form state:', {
+      eventId,
+      currentUser: currentUser?.id,
+      submitting,
+      formData
+    });
 
-    console.log('Starting form submission...', { eventId, currentUser: currentUser?.id, formData });
+    if (!eventId || !currentUser || submitting) {
+      console.warn('Submission prevented due to:', {
+        missingEventId: !eventId,
+        missingUser: !currentUser,
+        alreadySubmitting: submitting
+      });
+      return;
+    }
 
     if (!formData.name.trim()) {
+      console.warn('Validation failed: name is empty');
       toast.error('Speaker name is required');
       return;
     }
 
+    console.log('Form validation passed, starting submission...');
     setSubmitting(true);
-    
+
     try {
-      // First, verify the user owns this event
-      const { data: eventData, error: eventError } = await supabase
+      console.log('Verifying event ownership...');
+      const { data: eventData, error: eventError, count, status } = await supabase
         .from('events')
         .select('creator_id')
         .eq('id', eventId)
         .single();
 
-      console.log('Event verification:', { eventData, eventError });
+      console.log('Event verification response:', {
+        eventData,
+        eventError,
+        count,
+        status
+      });
 
       if (eventError || !eventData) {
-        console.error('Event not found or error:', eventError);
+        console.error('Event verification failed:', {
+          error: eventError,
+          eventExists: !!eventData,
+          status
+        });
         toast.error('Event not found or access denied');
         return;
       }
 
       if (eventData.creator_id !== currentUser.id) {
-        console.error('Permission denied:', { eventCreator: eventData.creator_id, currentUser: currentUser.id });
+        console.error('Permission denied:', {
+          eventCreator: eventData.creator_id,
+          currentUser: currentUser.id,
+          isMatch: eventData.creator_id === currentUser.id
+        });
         toast.error('You do not have permission to add speakers to this event');
         return;
       }
@@ -176,23 +254,35 @@ const CreatorEventSpeakers = () => {
         user_id: currentUser.id
       };
 
-      console.log('Speaker data to submit:', speakerData);
+      console.log('Prepared speaker data:', speakerData);
 
       if (editingSpeaker) {
         console.log('Updating existing speaker:', editingSpeaker.id);
-        const { data: updateData, error } = await supabase
+        const { data: updateData, error, count, status } = await supabase
           .from('keynote_speakers')
           .update(speakerData)
           .eq('id', editingSpeaker.id)
           .select();
 
-        console.log('Update response:', { updateData, error });
+        console.log('Update operation response:', {
+          updateData,
+          error,
+          count,
+          status
+        });
 
         if (error) {
-          console.error('Update error details:', error);
+          console.error('Update failed:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          });
           toast.error(`Failed to update speaker: ${error.message}`);
           return;
         } 
+        
+        console.log('Speaker updated successfully:', updateData);
         toast.success('Speaker updated successfully');
       } else {
         console.log('Creating new speaker...');
@@ -202,24 +292,39 @@ const CreatorEventSpeakers = () => {
           order_index: nextOrderIndex
         };
         
-        console.log('Insert data:', insertData);
+        console.log('Insert data with order index:', insertData);
 
-        const { data: insertResult, error } = await supabase
+        const { data: insertResult, error, count, status } = await supabase
           .from('keynote_speakers')
           .insert(insertData)
           .select();
 
-        console.log('Insert response:', { insertResult, error });
+        console.log('Insert operation response:', {
+          insertResult,
+          error,
+          count,
+          status
+        });
 
         if (error) {
-          console.error('Insert error details:', error);
+          console.error('Insert failed:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          });
           toast.error(`Failed to add speaker: ${error.message}`);
           return;
         }
+        
+        console.log('Speaker created successfully:', insertResult);
         toast.success('Speaker added successfully');
       }
 
+      console.log('Reloading speakers list...');
       await loadSpeakers();
+      
+      console.log('Closing dialog and resetting form...');
       setDialogOpen(false);
       setFormData({
         name: '',
@@ -232,46 +337,75 @@ const CreatorEventSpeakers = () => {
         website_url: ''
       });
     } catch (error) {
-      console.error('Error saving speaker:', error);
-      toast.error(`Failed to save speaker: ${error}`);
+      console.error('Unexpected error in handleSubmit:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      toast.error(`Failed to save speaker: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
+      console.log('Submission process complete');
       setSubmitting(false);
     }
   };
 
   const handleDeleteSpeaker = async (speakerId: string) => {
-    if (!confirm('Are you sure you want to delete this speaker?')) return;
+    if (!confirm('Are you sure you want to delete this speaker?')) {
+      console.log('Delete operation cancelled by user');
+      return;
+    }
+    
+    console.log('Deleting speaker:', speakerId);
     
     try {
-      const { error } = await supabase
+      const { error, count, status } = await supabase
         .from('keynote_speakers')
         .delete()
         .eq('id', speakerId);
 
+      console.log('Delete operation response:', {
+        error,
+        count,
+        status
+      });
+
       if (error) {
-        console.error('Delete error:', error);
+        console.error('Delete failed:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         toast.error('Failed to delete speaker');
         return;
       }
       
+      console.log('Speaker deleted successfully, reloading list...');
       await loadSpeakers();
       toast.success('Speaker deleted successfully');
     } catch (error) {
-      console.error('Error deleting speaker:', error);
+      console.error('Error in handleDeleteSpeaker:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       toast.error('Failed to delete speaker');
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    console.log('Form field changed:', { name, value });
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleImageUpload = (imageUrl: string) => {
+    console.log('Image uploaded:', imageUrl);
     setFormData(prev => ({ ...prev, image_url: imageUrl }));
   };
 
   if (loading) {
+    console.log('Rendering loading state');
     return (
       <CreatorLayout title="Event Speakers">
         <div className="flex justify-center items-center h-64">
@@ -280,6 +414,14 @@ const CreatorEventSpeakers = () => {
       </CreatorLayout>
     );
   }
+
+  console.log('Rendering component with current state:', {
+    speakers,
+    currentUser,
+    dialogOpen,
+    editingSpeaker,
+    formData
+  });
 
   return (
     <CreatorLayout title="Event Speakers & Performers">
@@ -411,7 +553,10 @@ const CreatorEventSpeakers = () => {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setDialogOpen(false)}
+                  onClick={() => {
+                    console.log('Cancel button clicked');
+                    setDialogOpen(false);
+                  }}
                   disabled={submitting}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
@@ -422,7 +567,15 @@ const CreatorEventSpeakers = () => {
                   disabled={submitting || !formData.name.trim()}
                   className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Processing...' : editingSpeaker ? 'Update Speaker' : 'Create Speaker'}
+                  {submitting ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : editingSpeaker ? 'Update Speaker' : 'Create Speaker'}
                 </Button>
               </div>
             </form>
