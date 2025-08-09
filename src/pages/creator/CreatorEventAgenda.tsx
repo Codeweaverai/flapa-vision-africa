@@ -39,7 +39,7 @@ interface Speaker {
 }
 
 const CreatorEventAgenda = () => {
-  const { eventId } = useParams<{ eventId: string }>();
+  const { id: eventId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
