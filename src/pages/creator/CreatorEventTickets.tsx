@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -92,10 +91,17 @@ const CreatorEventTickets = () => {
       description: ticket.description || '',
       price: ticket.price,
       quantity_available: ticket.quantity_available,
-      early_bird_end_date: ticket.early_bird_end_date || '',
+      early_bird_end_date: ticket.early_bird_end_date ? formatDateForInput(ticket.early_bird_end_date) : '',
       is_active: ticket.is_active
     });
     setDialogOpen(true);
+  };
+
+  // Helper function to format date for datetime-local input
+  const formatDateForInput = (dateString: string) => {
+    const date = new Date(dateString);
+    const isoString = date.toISOString();
+    return isoString.substring(0, isoString.length - 1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,10 +109,23 @@ const CreatorEventTickets = () => {
     if (!eventId) return;
 
     try {
+      // Prepare the data for Supabase
+      const ticketData = {
+        ...formData,
+        // Convert empty string to null for dates
+        early_bird_end_date: formData.early_bird_end_date 
+          ? new Date(formData.early_bird_end_date).toISOString() 
+          : null,
+        // Ensure price is a number
+        price: Number(formData.price),
+        // Ensure quantity is a number
+        quantity_available: Number(formData.quantity_available)
+      };
+
       if (editingTicket) {
         const { error } = await supabase
           .from('event_tickets')
-          .update(formData)
+          .update(ticketData)
           .eq('id', editingTicket.id);
 
         if (error) throw error;
@@ -115,7 +134,7 @@ const CreatorEventTickets = () => {
         const { error } = await supabase
           .from('event_tickets')
           .insert({
-            ...formData,
+            ...ticketData,
             event_id: eventId,
             quantity_sold: 0
           });
@@ -128,7 +147,7 @@ const CreatorEventTickets = () => {
       setDialogOpen(false);
     } catch (error) {
       console.error('Error saving ticket:', error);
-      toast.error('Failed to save ticket');
+      toast.error(`Failed to save ticket: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
