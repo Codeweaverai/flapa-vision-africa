@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { MessageCircle, Share2, Heart, Search, BookOpen, Calendar, Plus, Send } from 'lucide-react';
+import { MessageCircle, Share2, Heart, Search, BookOpen, Calendar, Plus, Send, Reply } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -31,12 +31,16 @@ interface Comment {
   content: string;
   created_at: string;
   user_id: string;
+  post_id: string;
+  parent_id?: string;
+  emoji_reactions?: any;
   profiles: {
     id: string;
     username?: string;
     full_name?: string;
     avatar_url?: string;
   };
+  replies?: Comment[];
 }
 
 interface CommunityPost {
@@ -72,6 +76,7 @@ const CourseDiscussionsTab = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [commentDialogs, setCommentDialogs] = useState<Record<string, boolean>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
+  const [replyingTo, setReplyingTo] = useState<Record<string, string | null>>({});
   
   const [formData, setFormData] = useState({
     title: '',
@@ -104,7 +109,8 @@ const CourseDiscussionsTab = () => {
 
   const loadPosts = async () => {
     try {
-      const { data, error } = await supabase
+      // First, get posts with their user profiles
+      const { data: postsData, error: postsError } = await supabase
         .from('community_posts')
         .select(`
           *,
@@ -117,40 +123,70 @@ const CourseDiscussionsTab = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error loading posts:', error);
+      if (postsError) {
+        console.error('Error loading posts:', postsError);
         return;
       }
 
-      // Load comments for each post separately
-      const postsWithComments = await Promise.all(
-        (data || []).map(async (post) => {
-          const { data: comments, error: commentsError } = await supabase
-            .from('post_comments')
-            .select(`
-              *,
-              profiles:user_id (
-                id,
-                username,
-                full_name,
-                avatar_url
-              )
-            `)
-            .eq('post_id', post.id)
-            .order('created_at', { ascending: true });
+      if (!postsData) {
+        setPosts([]);
+        return;
+      }
 
-          if (commentsError) {
-            console.error('Error loading comments:', commentsError);
-          }
+      // Then get comments separately
+      const { data: commentsData, error: commentsError } = await supabase
+        .from('post_comments')
+        .select('*')
+        .order('created_at', { ascending: true });
 
-          return {
-            ...post,
-            comments: comments || [],
-            comments_count: comments?.length || 0,
-            likes_count: 0, // You can implement likes later
-          };
-        })
+      if (commentsError) {
+        console.error('Error loading comments:', commentsError);
+      }
+
+      // Get unique user IDs from comments
+      const commentUserIds = [...new Set(commentsData?.map(comment => comment.user_id) || [])];
+      
+      // Fetch profiles for comment users
+      const { data: commentProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .in('id', commentUserIds);
+
+      if (profilesError) {
+        console.error('Error loading comment profiles:', profilesError);
+      }
+
+      // Create a profile map
+      const profileMap = new Map(
+        (commentProfiles || []).map(profile => [profile.id, profile])
       );
+
+      // Group comments by post and attach profiles
+      const commentsByPost = (commentsData || []).reduce((acc, comment) => {
+        if (!acc[comment.post_id]) {
+          acc[comment.post_id] = [];
+        }
+        acc[comment.post_id].push({
+          ...comment,
+          profiles: profileMap.get(comment.user_id) || {
+            id: comment.user_id,
+            username: 'Unknown User',
+            full_name: 'Unknown User',
+            avatar_url: null
+          },
+          replies: []
+        });
+        return acc;
+      }, {} as Record<string, Comment[]>);
+
+      // Combine posts with comments
+      const postsWithComments = postsData.map(post => ({
+        ...post,
+        comments: commentsByPost[post.id] || [],
+        comments_count: (commentsByPost[post.id] || []).length,
+        likes_count: 0,
+        emoji_reactions: post.emoji_reactions || {}
+      }));
 
       setPosts(postsWithComments);
     } catch (error) {
@@ -237,7 +273,7 @@ const CourseDiscussionsTab = () => {
     }
   };
 
-  const handleAddComment = async (postId: string) => {
+  const handleAddComment = async (postId: string, parentId?: string) => {
     if (!currentUser) {
       toast.error('Please log in to comment');
       return;
@@ -255,7 +291,8 @@ const CourseDiscussionsTab = () => {
         .insert({
           post_id: postId,
           user_id: currentUser.id,
-          content: commentText
+          content: commentText,
+          parent_id: parentId || null
         });
 
       if (error) {
@@ -265,7 +302,7 @@ const CourseDiscussionsTab = () => {
       }
 
       setNewComment(prev => ({ ...prev, [postId]: '' }));
-      setCommentDialogs(prev => ({ ...prev, [postId]: false }));
+      setReplyingTo(prev => ({ ...prev, [postId]: null }));
       toast.success('Comment added successfully');
       await loadPosts();
     } catch (error) {
@@ -289,10 +326,14 @@ const CourseDiscussionsTab = () => {
         url: window.location.href
       });
     } catch (error) {
-      // Fallback to clipboard
       navigator.clipboard.writeText(window.location.href);
       toast.success('Link copied to clipboard');
     }
+  };
+
+  const startReply = (postId: string, commentId: string, username: string) => {
+    setReplyingTo(prev => ({ ...prev, [postId]: commentId }));
+    setNewComment(prev => ({ ...prev, [postId]: `@${username} ` }));
   };
 
   const filteredPosts = posts.filter(post => {
@@ -543,26 +584,39 @@ const CourseDiscussionsTab = () => {
                       <div className="space-y-4">
                         {/* Existing Comments */}
                         {post.comments?.map((comment) => (
-                          <div key={comment.id} className="flex space-x-3 p-3 bg-gray-50 rounded-lg">
-                            {comment.profiles?.avatar_url ? (
-                              <img
-                                src={comment.profiles.avatar_url}
-                                alt={comment.profiles.full_name || comment.profiles.username}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
-                                {(comment.profiles?.full_name || comment.profiles?.username || 'U').charAt(0).toUpperCase()}
+                          <div key={comment.id} className="space-y-2">
+                            <div className="flex space-x-3 p-3 bg-gray-50 rounded-lg">
+                              {comment.profiles?.avatar_url ? (
+                                <img
+                                  src={comment.profiles.avatar_url}
+                                  alt={comment.profiles.full_name || comment.profiles.username}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
+                                  {(comment.profiles?.full_name || comment.profiles?.username || 'U').charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {comment.profiles?.full_name || comment.profiles?.username || 'Anonymous User'}
+                                  </p>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => startReply(post.id, comment.id, comment.profiles?.username || 'User')}
+                                    className="text-xs text-gray-500 hover:text-orange-600"
+                                  >
+                                    <Reply className="h-3 w-3 mr-1" />
+                                    Reply
+                                  </Button>
+                                </div>
+                                <p className="text-gray-700 mt-1">{comment.content}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {new Date(comment.created_at).toLocaleDateString()}
+                                </p>
                               </div>
-                            )}
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-800">
-                                {comment.profiles?.full_name || comment.profiles?.username || 'Anonymous User'}
-                              </p>
-                              <p className="text-gray-700 mt-1">{comment.content}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {new Date(comment.created_at).toLocaleDateString()}
-                              </p>
                             </div>
                           </div>
                         )) || []}
@@ -574,20 +628,33 @@ const CourseDiscussionsTab = () => {
                               {(currentUser.user_metadata?.full_name || 'U').charAt(0).toUpperCase()}
                             </div>
                             <div className="flex-1">
+                              {replyingTo[post.id] && (
+                                <div className="mb-2 text-sm text-gray-600 bg-orange-50 px-2 py-1 rounded">
+                                  <span className="font-medium">Replying to comment</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setReplyingTo(prev => ({ ...prev, [post.id]: null }))}
+                                    className="ml-2 h-auto p-0 text-xs text-orange-600"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              )}
                               <Textarea
-                                placeholder="Add your comment..."
+                                placeholder={replyingTo[post.id] ? "Write your reply..." : "Add your comment..."}
                                 value={newComment[post.id] || ''}
                                 onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
                                 className="mb-2 border-gray-200 focus:border-purple-500"
                                 rows={2}
                               />
                               <Button
-                                onClick={() => handleAddComment(post.id)}
+                                onClick={() => handleAddComment(post.id, replyingTo[post.id] || undefined)}
                                 size="sm"
                                 className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
                               >
                                 <Send className="h-3 w-3 mr-2" />
-                                Post Comment
+                                {replyingTo[post.id] ? 'Post Reply' : 'Post Comment'}
                               </Button>
                             </div>
                           </div>
