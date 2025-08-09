@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ const CreatorEventSpeakers = () => {
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
   const [formValid, setFormValid] = useState(false);
@@ -59,9 +61,13 @@ const CreatorEventSpeakers = () => {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         
         if (authError || !user) {
-          throw new Error('Not authenticated');
+          console.error('Authentication error:', authError);
+          toast.error('Please sign in to manage speakers');
+          navigate('/login');
+          return;
         }
 
+        setCurrentUser(user);
         setAuthChecked(true);
         
         if (eventId) {
@@ -82,30 +88,30 @@ const CreatorEventSpeakers = () => {
   const loadSpeakers = async () => {
     if (!eventId) return;
     
-    setLoading(true);
     try {
-      const { data, error, status } = await supabase
+      console.log('Loading speakers for event:', eventId);
+      const { data, error } = await supabase
         .from('keynote_speakers')
         .select('*')
         .eq('event_id', eventId)
         .order('order_index', { ascending: true });
 
-      if (error && status !== 406) {
+      if (error) {
+        console.error('Error loading speakers:', error);
         throw error;
       }
 
+      console.log('Loaded speakers:', data);
       setSpeakers(data || []);
     } catch (error) {
       console.error('Error loading speakers:', error);
       toast.error('Failed to load speakers');
       
-      if (error.message.includes('JWT')) {
+      if (error.message?.includes('JWT')) {
         toast.error('Session expired. Please sign in again.');
         await supabase.auth.signOut();
         navigate('/login');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -145,30 +151,55 @@ const CreatorEventSpeakers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventId || !authChecked || !formValid || submitting) return;
+    if (!eventId || !authChecked || !formValid || submitting || !currentUser) return;
 
     setSubmitting(true);
     try {
-      if (editingSpeaker) {
-        const { error } = await supabase
-          .from('keynote_speakers')
-          .update(formData)
-          .eq('id', editingSpeaker.id);
+      console.log('Submitting speaker with data:', formData);
+      console.log('Current user:', currentUser);
+      console.log('Event ID:', eventId);
 
-        if (error) throw error;
+      const speakerData = {
+        ...formData,
+        event_id: eventId,
+        // Note: Not including user_id as it's not required by the table schema
+      };
+
+      if (editingSpeaker) {
+        console.log('Updating speaker:', editingSpeaker.id);
+        const { data, error } = await supabase
+          .from('keynote_speakers')
+          .update(speakerData)
+          .eq('id', editingSpeaker.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
+        console.log('Speaker updated:', data);
         toast.success('Speaker updated successfully');
       } else {
         const nextOrderIndex = speakers.length > 0 ? Math.max(...speakers.map(s => s.order_index)) + 1 : 0;
+        const insertData = {
+          ...speakerData,
+          order_index: nextOrderIndex
+        };
         
-        const { error } = await supabase
+        console.log('Creating speaker with data:', insertData);
+        const { data, error } = await supabase
           .from('keynote_speakers')
-          .insert({
-            ...formData,
-            event_id: eventId,
-            order_index: nextOrderIndex
-          });
+          .insert(insertData)
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error);
+          console.error('Error details:', error.message, error.details, error.hint);
+          throw error;
+        }
+        console.log('Speaker created:', data);
         toast.success('Speaker created successfully');
       }
 
@@ -176,7 +207,17 @@ const CreatorEventSpeakers = () => {
       setDialogOpen(false);
     } catch (error) {
       console.error('Error saving speaker:', error);
-      toast.error(`Failed to save speaker: ${error.message}`);
+      
+      // More specific error messages
+      if (error.message?.includes('row-level security')) {
+        toast.error('Permission denied. Please check if you own this event.');
+      } else if (error.message?.includes('foreign key')) {
+        toast.error('Invalid event ID. Please check the event exists.');
+      } else if (error.message?.includes('not null')) {
+        toast.error('Please fill in all required fields.');
+      } else {
+        toast.error(`Failed to save speaker: ${error.message}`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -225,7 +266,7 @@ const CreatorEventSpeakers = () => {
       <div className="mb-6">
         <Button variant="outline" onClick={() => navigate('/creator/events')}
           className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white hover:text-white/90 transition-all duration-300 shadow-lg hover:shadow-xl"
-          >
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Events
         </Button>
@@ -237,7 +278,7 @@ const CreatorEventSpeakers = () => {
           <DialogTrigger asChild>
             <Button onClick={handleAddSpeaker} disabled={!authChecked}
               className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
-              >
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Speaker
             </Button>
@@ -373,7 +414,7 @@ const CreatorEventSpeakers = () => {
               <DialogTrigger asChild>
                 <Button onClick={handleAddSpeaker} disabled={!authChecked}
                   className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
-                  >
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add First Speaker
                 </Button>

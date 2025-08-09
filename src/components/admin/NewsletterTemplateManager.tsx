@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,9 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Edit, Trash2, Eye, Copy, Mail, Palette } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Edit, Trash2, Eye, Copy, Mail, Palette, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import DynamicContentSearch from './DynamicContentSearch';
 
 interface NewsletterTemplate {
   id: string;
@@ -28,6 +31,7 @@ interface NewsletterTemplate {
 const NewsletterTemplateManager = () => {
   const [templates, setTemplates] = useState<NewsletterTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<NewsletterTemplate | null>(null);
@@ -57,7 +61,6 @@ const NewsletterTemplateManager = () => {
 
       if (error) throw error;
       
-      // Transform the data to match our interface
       const transformedData: NewsletterTemplate[] = (data || []).map(template => ({
         ...template,
         placeholders: Array.isArray(template.placeholders) 
@@ -83,9 +86,9 @@ const NewsletterTemplateManager = () => {
       description: '',
       category: 'general',
       subject_template: '',
-      body_html_template: '',
+      body_html_template: getDefaultTemplate(),
       thumbnail_url: '',
-      placeholders: '',
+      placeholders: 'course.title, course.price, event.date, creator.name',
       is_active: true
     });
     setDialogOpen(true);
@@ -207,6 +210,144 @@ const NewsletterTemplateManager = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleSelectDynamicContent = (content: any, type: 'creator' | 'course' | 'event') => {
+    const contentHtml = generateContentHtml(content, type);
+    setFormData(prev => ({
+      ...prev,
+      body_html_template: prev.body_html_template + '\n\n' + contentHtml
+    }));
+    toast.success(`${type} content added to template`);
+  };
+
+  const generateContentHtml = (content: any, type: 'creator' | 'course' | 'event') => {
+    const baseUrl = 'https://skillpulse.cloud';
+    
+    if (type === 'creator') {
+      return `
+        <div style="margin: 20px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
+          <div style="display: flex; align-items: center; margin-bottom: 15px;">
+            ${content.avatar_url ? 
+              `<img src="${content.avatar_url}" alt="${content.full_name}" style="width: 60px; height: 60px; border-radius: 50%; margin-right: 15px;">` : 
+              `<div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 15px;">${content.full_name?.charAt(0) || 'U'}</div>`
+            }
+            <div>
+              <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.full_name || content.username}</h3>
+              <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 14px;">@${content.username}</p>
+            </div>
+          </div>
+          ${content.bio ? `<p style="margin: 10px 0; color: #4b5563; line-height: 1.5;">${content.bio}</p>` : ''}
+          <a href="${baseUrl}/creator/profile/${content.id}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">View Profile</a>
+        </div>
+      `;
+    } else if (type === 'course') {
+      return `
+        <div style="margin: 20px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
+          <div style="display: flex; margin-bottom: 15px;">
+            ${content.thumbnail_url ? 
+              `<img src="${content.thumbnail_url}" alt="${content.title}" style="width: 120px; height: 80px; object-fit: cover; border-radius: 6px; margin-right: 15px;">` : 
+              `<div style="width: 120px; height: 80px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 15px;"><span style="color: white; font-size: 24px;">📚</span></div>`
+            }
+            <div style="flex: 1;">
+              <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.title}</h3>
+              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.profiles?.full_name || 'Unknown'}</p>
+              <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                <span style="background: #ddd6fe; color: #7c3aed; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${content.category}</span>
+                <span style="font-weight: 600; color: #059669;">${content.is_free ? 'Free' : `$${content.price}`}</span>
+              </div>
+            </div>
+          </div>
+          <p style="margin: 10px 0; color: #4b5563; line-height: 1.5;">${content.description?.substring(0, 150)}${content.description?.length > 150 ? '...' : ''}</p>
+          <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <a href="${baseUrl}/course/${content.id}" style="padding: 10px 20px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">View Course</a>
+            <a href="${baseUrl}/course/${content.id}/enroll" style="padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">Enroll Now</a>
+          </div>
+        </div>
+      `;
+    } else if (type === 'event') {
+      const startDate = new Date(content.start_time);
+      return `
+        <div style="margin: 20px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
+          <div style="display: flex; margin-bottom: 15px;">
+            ${content.image_url ? 
+              `<img src="${content.image_url}" alt="${content.title}" style="width: 120px; height: 80px; object-fit: cover; border-radius: 6px; margin-right: 15px;">` : 
+              `<div style="width: 120px; height: 80px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 15px;"><span style="color: white; font-size: 24px;">📅</span></div>`
+            }
+            <div style="flex: 1;">
+              <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.title}</h3>
+              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.profiles?.full_name || 'Unknown'}</p>
+              <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                <span style="background: #ddd6fe; color: #7c3aed; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${content.event_type}</span>
+                <span style="font-weight: 600; color: #059669;">${content.is_free ? 'Free' : `$${content.price || 'TBA'}`}</span>
+              </div>
+              <div style="color: #6b7280; font-size: 14px;">
+                <div>📅 ${startDate.toLocaleDateString()} at ${startDate.toLocaleTimeString()}</div>
+                ${content.location ? `<div>📍 ${content.location}</div>` : ''}
+              </div>
+            </div>
+          </div>
+          <p style="margin: 10px 0; color: #4b5563; line-height: 1.5;">${content.description?.substring(0, 150)}${content.description?.length > 150 ? '...' : ''}</p>
+          <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <a href="${baseUrl}/events/${content.id}" style="padding: 10px 20px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">View Event</a>
+            <a href="${baseUrl}/events/${content.id}" style="padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">Register</a>
+          </div>
+        </div>
+      `;
+    }
+    return '';
+  };
+
+  const getDefaultTemplate = () => {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: white;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #f59e0b, #8b5cf6); padding: 40px 20px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">SkillPulse Newsletter</h1>
+            <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Stay updated with the latest courses and events</p>
+        </div>
+        
+        <!-- Content -->
+        <div style="padding: 40px 20px;">
+            <h2 style="color: #1f2937; margin-bottom: 20px;">Hello {{full_name}}!</h2>
+            <p style="color: #4b5563; line-height: 1.6; margin-bottom: 20px;">
+                We're excited to share some amazing updates with you. Check out what's new on SkillPulse!
+            </p>
+            
+            <!-- Dynamic content will be inserted here -->
+            
+            <p style="color: #4b5563; line-height: 1.6; margin-top: 30px;">
+                Thanks for being part of the SkillPulse community!
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="color: #6b7280; margin: 0; font-size: 14px;">
+                © 2024 SkillPulse. All rights reserved.
+            </p>
+            <p style="color: #6b7280; margin: 10px 0 0 0; font-size: 12px;">
+                If you no longer wish to receive these emails, you can 
+                <a href="{{unsubscribe_url}}" style="color: #8b5cf6;">unsubscribe</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+    `.trim();
+  };
+
+  const filteredTemplates = templates.filter(template =>
+    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    template.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -217,13 +358,24 @@ const NewsletterTemplateManager = () => {
         </Button>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search templates..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-8"
+        />
+      </div>
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {templates.map((template) => (
+          {filteredTemplates.map((template) => (
             <Card key={template.id} className="relative">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -303,113 +455,136 @@ const NewsletterTemplateManager = () => {
 
       {/* Template Form Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingTemplate ? 'Edit Template' : 'Create New Template'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Template Name *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                />
+          
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList>
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="dynamic">Dynamic Content</TabsTrigger>
+            </TabsList>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <TabsContent value="basic" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="name">Template Name *</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Select 
+                      value={formData.category} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General</SelectItem>
+                        <SelectItem value="course">Course</SelectItem>
+                        <SelectItem value="event">Event</SelectItem>
+                        <SelectItem value="promotional">Promotional</SelectItem>
+                        <SelectItem value="engagement">Engagement</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    placeholder="Brief description of what this template is for"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="subject_template">Subject Template *</Label>
+                  <Input
+                    id="subject_template"
+                    name="subject_template"
+                    value={formData.subject_template}
+                    onChange={handleChange}
+                    placeholder="e.g., 🎉 New Course: {{course.title}} is Live!"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="placeholders">Available Placeholders</Label>
+                  <Input
+                    id="placeholders"
+                    name="placeholders"
+                    value={formData.placeholders}
+                    onChange={handleChange}
+                    placeholder="e.g., course.title, course.price, event.date"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Comma-separated list of placeholders available in this template
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="is_active"
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                  />
+                  <Label htmlFor="is_active">Active</Label>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="content" className="space-y-4">
+                <div>
+                  <Label htmlFor="body_html_template">HTML Body Template *</Label>
+                  <Textarea
+                    id="body_html_template"
+                    name="body_html_template"
+                    value={formData.body_html_template}
+                    onChange={handleChange}
+                    rows={20}
+                    className="font-mono text-sm"
+                    placeholder="HTML template with placeholders like {{course.title}}"
+                    required
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="dynamic" className="space-y-4">
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Search and select dynamic content to automatically add to your template. 
+                    This will generate HTML blocks with working links and buttons.
+                  </p>
+                  <DynamicContentSearch onSelectContent={handleSelectDynamicContent} />
+                </div>
+              </TabsContent>
+              
+              <div className="flex justify-end gap-4 pt-4 border-t">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {editingTemplate ? 'Update' : 'Create'} Template
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Select 
-                  value={formData.category} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">General</SelectItem>
-                    <SelectItem value="course">Course</SelectItem>
-                    <SelectItem value="event">Event</SelectItem>
-                    <SelectItem value="promotional">Promotional</SelectItem>
-                    <SelectItem value="engagement">Engagement</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Input
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Brief description of what this template is for"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="subject_template">Subject Template *</Label>
-              <Input
-                id="subject_template"
-                name="subject_template"
-                value={formData.subject_template}
-                onChange={handleChange}
-                placeholder="e.g., 🎉 New Course: {{course.title}} is Live!"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="body_html_template">HTML Body Template *</Label>
-              <Textarea
-                id="body_html_template"
-                name="body_html_template"
-                value={formData.body_html_template}
-                onChange={handleChange}
-                rows={15}
-                className="font-mono text-sm"
-                placeholder="HTML template with placeholders like {{course.title}}"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="placeholders">Available Placeholders</Label>
-              <Input
-                id="placeholders"
-                name="placeholders"
-                value={formData.placeholders}
-                onChange={handleChange}
-                placeholder="e.g., course.title, course.price, event.date"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Comma-separated list of placeholders available in this template
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
-              />
-              <Label htmlFor="is_active">Active</Label>
-            </div>
-
-            <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {editingTemplate ? 'Update' : 'Create'} Template
-              </Button>
-            </div>
-          </form>
+            </form>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

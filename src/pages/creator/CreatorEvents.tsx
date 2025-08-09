@@ -1,48 +1,60 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Calendar, MapPin, Users, Edit, Trash2, Eye, UserCheck, CalendarIcon, Ticket, Percent, Play } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, Trash2, Eye, Calendar, Users, DollarSign, Search, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/contexts/AuthContext';
-import { Event } from '@/services/eventService';
-import PaginationControls from '@/components/creator/PaginationControls';
 
-const EVENTS_PER_PAGE = 6;
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  event_type: string;
+  location: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  price: number;
+  currency: string;
+  image_url?: string;
+  online_meeting_link?: string;
+  is_free: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 const CreatorEvents = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
-    if (user) {
-      loadEvents();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+    loadEvents();
+  }, []);
 
   const loadEvents = async () => {
-    if (!user) return;
-
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please sign in to view your events');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('creator_id', user.id)
-        .order('start_time', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setEvents(data || []);
@@ -58,248 +70,250 @@ const CreatorEvents = () => {
     if (!confirm('Are you sure you want to delete this event?')) return;
 
     try {
-      const { error } = await supabase.from('events').delete().eq('id', eventId);
-      if (error) throw error;
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventId);
 
-      await loadEvents();
+      if (error) throw error;
+      
       toast.success('Event deleted successfully');
+      await loadEvents();
     } catch (error) {
       console.error('Error deleting event:', error);
       toast.error('Failed to delete event');
     }
   };
 
-  const handleTogglePublish = async (eventId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('events')
-        .update({ is_published: !currentStatus })
-        .eq('id', eventId);
-
-      if (error) throw error;
-
-      await loadEvents();
-      toast.success(`Event ${!currentStatus ? 'published' : 'unpublished'} successfully`);
-    } catch (error) {
-      console.error('Error toggling publish status:', error);
-      toast.error('Failed to update publish status');
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         event.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (statusFilter === 'upcoming') {
+      return matchesSearch && new Date(event.start_time) > new Date();
+    } else if (statusFilter === 'past') {
+      return matchesSearch && new Date(event.start_time) < new Date();
     }
-  };
+    
+    return matchesSearch;
+  });
 
-  const filteredEvents = events.filter(event =>
-    event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
-  const startIndex = (currentPage - 1) * EVENTS_PER_PAGE;
-  const endIndex = startIndex + EVENTS_PER_PAGE;
-  const paginatedEvents = filteredEvents.slice(startIndex, endIndex);
-
-  const getEventStatus = (event: Event) => {
-    const now = new Date();
-    const startTime = new Date(event.start_time);
-    const endTime = new Date(event.end_time);
-
-    if (now < startTime) return 'upcoming';
-    if (now >= startTime && now <= endTime) return 'ongoing';
-    return 'completed';
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'upcoming':
-        return <Badge className="bg-blue-100 text-blue-800">Upcoming</Badge>;
-      case 'ongoing':
-        return <Badge className="bg-green-100 text-green-800">Ongoing</Badge>;
-      case 'completed':
-        return <Badge className="bg-gray-100 text-gray-800">Completed</Badge>;
-      default:
-        return null;
-    }
-  };
-
-  if (loading) {
-    return (
-      <CreatorLayout title="My Events">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </CreatorLayout>
-    );
-  }
+  const upcomingEvents = events.filter(e => new Date(e.start_time) > new Date());
+  const pastEvents = events.filter(e => new Date(e.start_time) < new Date());
 
   return (
     <CreatorLayout title="My Events">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <p className="text-gray-600">Manage your events and track Attendees</p>
-        <Button
-          onClick={() => navigate('/creator/events/create')}
-          className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Event
-        </Button>
-      </div>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold">Event Management</h2>
+            <p className="text-muted-foreground">Create and manage your events</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => navigate('/creator/events/create')}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Event
+            </Button>
+          </div>
+        </div>
 
-      <div className="mb-6">
-        <Input
-          placeholder="Search events..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-full">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Total Events</p>
+                  <p className="text-2xl font-bold">{events.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {filteredEvents.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
-            <div className="mb-4 rounded-full bg-primary/10 p-6">
-              <Calendar className="h-8 w-8 text-primary" />
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-full">
+                  <Eye className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Upcoming</p>
+                  <p className="text-2xl font-bold">{upcomingEvents.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-full">
+                  <DollarSign className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Revenue</p>
+                  <p className="text-2xl font-bold">
+                    ${events.reduce((sum, event) => sum + (event.price || 0), 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search events..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
             </div>
-            <CardTitle className="mb-2">No events yet</CardTitle>
-            <p className="text-muted-foreground mb-6">
-              {searchTerm ? 'No events match your search criteria.' : 'Create your first event to get started'}
-            </p>
-            {!searchTerm && (
-              <Button onClick={() => navigate('/creator/events/create')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Event
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-            {paginatedEvents.map((event) => (
-              <Card key={event.id} className="relative overflow-hidden">
-                {event.image_url && (
-                  <div className="h-48 bg-cover bg-center" style={{ backgroundImage: `url(${event.image_url})` }} />
-                )}
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-lg line-clamp-1">{event.title}</CardTitle>
-                        {getStatusBadge(getEventStatus(event))}
-                      </div>
-                      <div className="flex items-center text-sm text-muted-foreground mb-2">
-                        <Calendar className="w-4 h-4 mr-1" />
-                        {format(parseISO(event.start_time), 'MMM d, yyyy')}
+          </div>
+          <div className="flex gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Events</SelectItem>
+                <SelectItem value="upcoming">Upcoming</SelectItem>
+                <SelectItem value="past">Past</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Events Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
+              <div className="mb-4 rounded-full bg-primary/10 p-6">
+                <Calendar className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="mb-2">No events found</CardTitle>
+              <p className="text-muted-foreground mb-6">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'Try adjusting your search or filters'
+                  : 'Create your first event to get started'
+                }
+              </p>
+              {!searchTerm && statusFilter === 'all' && (
+                <Button
+                  onClick={() => navigate('/creator/events/create')}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Event
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEvents.map((event) => (
+              <Card key={event.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="aspect-video bg-gradient-to-br from-orange-100 to-purple-100 relative">
+                  {event.image_url ? (
+                    <img
+                      src={event.image_url}
+                      alt={event.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Calendar className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <Badge variant={new Date(event.start_time) > new Date() ? "default" : "secondary"}>
+                      {new Date(event.start_time) > new Date() ? "Upcoming" : "Past"}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg line-clamp-1">{event.title}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {event.description}
+                    </p>
+                    
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">
+                        {event.is_free ? 'Free' : `${event.currency || '$'}${event.price}`}
+                      </span>
+                      <Badge variant="outline">{event.event_type}</Badge>
+                    </div>
+                    
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>{format(new Date(event.start_time), 'MMM dd, yyyy')}</span>
                       </div>
                       {event.location && (
-                        <div className="flex items-center text-sm text-muted-foreground mb-2">
-                          <MapPin className="w-4 h-4 mr-1" />
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
                           <span className="line-clamp-1">{event.location}</span>
                         </div>
                       )}
                       {event.capacity && (
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Users className="w-4 h-4 mr-1" />
-                          {event.capacity} capacity
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          <span>Max {event.capacity} attendees</span>
                         </div>
                       )}
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                    {event.description}
-                  </p>
-
-                  <div className="flex items-center gap-2 mb-4">
-                    <Badge variant={event.is_free ? 'secondary' : 'default'}>
-                      {event.is_free ? 'Free' : `$${event.price}`}
-                    </Badge>
-                    <Badge variant="outline">{event.event_type}</Badge>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                       className="bg-red-600 text-white hover:bg-red-700 transition-colors duration-300 ease-in-out flex items-center"
-                      size="sm" onClick={() => navigate(`/creator/events/${event.id}/edit`)}>
+                  
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/creator/events/${event.id}/edit`)}
+                      className="flex-1"
+                    >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    <Button 
-                       className="bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-300 ease-in-out flex items-center"
-                      size="sm" onClick={() => navigate(`/event-detail/${event.id}`)}>
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                    <Button 
-                       className="bg-orange-600 text-white hover:bg-orange-700 transition-colors duration-300 ease-in-out flex items-center" size="sm" 
-                      onClick={() => navigate(`/creator/attendees`)}
-                      >
-                      <UserCheck className="h-4 w-4 mr-1" />
-                      Attendees
-                    </Button>
-                    <Button 
-                     className="bg-purple-600 text-white hover:bg-purple-700 transition-colors duration-300 ease-in-out flex items-center" size="sm"
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => navigate(`/creator/events/${event.id}/agenda`)}
-                      >
-                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      className="flex-1"
+                    >
                       Agenda
                     </Button>
-                       <Button
-                    className="bg-green-600 text-white hover:bg-green-700 transition-colors duration-300 ease-in-out flex items-center"
-                    size="sm"
-                    onClick={() => navigate(`/creator/events/${event.id}/speakers`)}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteEvent(event.id)}
+                      className="text-destructive hover:text-destructive"
                     >
-                    <Users className="h-4 w-4 mr-1" />
-                    Speakers
-                    </Button>
- 
-                    <Button 
-                       className="bg-pink-600 text-white hover:bg-pink-700 transition-colors duration-300 ease-in-out flex items-center"
-                      size="sm" onClick={() => navigate(`/creator/events/${event.id}/tickets`)}>
-                      <Ticket className="h-4 w-4 mr-1" />
-                      Tickets
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => navigate(`/creator/promo-codes?item_type=event&item_id=${event.id}`)}
-                  >
-                    <Percent className="h-4 w-4 mr-1" />
-                    Promo Codes
-                  </Button>
-
-                  {/* ✅ Publish / Unpublish Button */}
-                  <Button
-                    className="w-full mt-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
-                    size="sm"
-                    onClick={() => handleTogglePublish(event.id, event.is_published)}
-                  >
-                    <Play className="h-4 w-4 mr-1" />
-                    {event.is_published ? 'Unpublish' : 'Publish'}
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => handleDeleteEvent(event.id)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete Event
-                  </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
-
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
-        </>
-      )}
+        )}
+      </div>
     </CreatorLayout>
   );
 };

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,17 +50,10 @@ const CreatorEventAgenda = () => {
     session_type: 'presentation'
   });
 
-  useEffect(() => {
-    if (eventId) {
-      loadAgenda();
-      loadSpeakers();
-    }
-  }, [eventId]);
-
-  const loadAgenda = async () => {
+  // Use useCallback to prevent useEffect dependencies from changing on every render
+  const loadAgenda = useCallback(async () => {
     if (!eventId) return;
     
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('event_agenda')
@@ -73,12 +66,10 @@ const CreatorEventAgenda = () => {
     } catch (error) {
       console.error('Error loading agenda:', error);
       toast.error('Failed to load agenda');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [eventId]);
 
-  const loadSpeakers = async () => {
+  const loadSpeakers = useCallback(async () => {
     if (!eventId) return;
     
     try {
@@ -93,7 +84,23 @@ const CreatorEventAgenda = () => {
     } catch (error) {
       console.error('Error loading speakers:', error);
     }
-  };
+  }, [eventId]);
+
+  // Load data only once when component mounts or eventId changes
+  useEffect(() => {
+    const loadData = async () => {
+      if (!eventId) return;
+      
+      setLoading(true);
+      try {
+        await Promise.all([loadAgenda(), loadSpeakers()]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [eventId, loadAgenda, loadSpeakers]);
 
   const handleAddItem = () => {
     setEditingItem(null);
