@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,7 @@ interface AgendaItem {
   description?: string;
   start_time: string;
   end_time: string;
-  speaker_id?: string;
+  speaker_id?: string | null;
   location?: string;
   session_type: string;
   order_index: number;
@@ -54,11 +53,12 @@ const CreatorEventAgenda = () => {
     description: '',
     start_time: '',
     end_time: '',
-    speaker_id: '',
+    speaker_id: 'none', // FIX: Changed from '' to 'none'
     location: '',
     session_type: 'presentation'
   });
 
+  // Load initial data
   useEffect(() => {
     const initializeData = async () => {
       try {
@@ -138,7 +138,7 @@ const CreatorEventAgenda = () => {
       description: '',
       start_time: '',
       end_time: '',
-      speaker_id: '',
+      speaker_id: 'none', // FIX: Changed from '' to 'none'
       location: '',
       session_type: 'presentation'
     });
@@ -152,7 +152,7 @@ const CreatorEventAgenda = () => {
       description: item.description || '',
       start_time: format(parseISO(item.start_time), "yyyy-MM-dd'T'HH:mm"),
       end_time: format(parseISO(item.end_time), "yyyy-MM-dd'T'HH:mm"),
-      speaker_id: item.speaker_id || '',
+      speaker_id: item.speaker_id || 'none', // FIX: Changed from '' to 'none'
       location: item.location || '',
       session_type: item.session_type
     });
@@ -181,7 +181,7 @@ const CreatorEventAgenda = () => {
         description: formData.description.trim() || null,
         start_time: formData.start_time,
         end_time: formData.end_time,
-        speaker_id: formData.speaker_id || null,
+        speaker_id: formData.speaker_id === 'none' ? null : formData.speaker_id, // FIX: Convert 'none' to null
         location: formData.location.trim() || null,
         session_type: formData.session_type,
         event_id: eventId
@@ -482,7 +482,7 @@ const CreatorEventAgenda = () => {
                       <SelectValue placeholder="Select a speaker..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No speaker</SelectItem>
+                      <SelectItem value="none">No speaker</SelectItem> {/* FIX: Changed from "" to "none" */}
                       {speakers.map((speaker) => (
                         <SelectItem key={speaker.id} value={speaker.id}>
                           {speaker.name}{speaker.title && ` (${speaker.title})`}
