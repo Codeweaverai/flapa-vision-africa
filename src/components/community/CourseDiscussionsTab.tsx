@@ -179,13 +179,15 @@ const CourseDiscussionsTab = () => {
         return acc;
       }, {} as Record<string, Comment[]>);
 
-      // Combine posts with comments
-      const postsWithComments = postsData.map(post => ({
+      // Combine posts with comments and ensure proper typing
+      const postsWithComments: CommunityPost[] = postsData.map(post => ({
         ...post,
         comments: commentsByPost[post.id] || [],
         comments_count: (commentsByPost[post.id] || []).length,
         likes_count: 0,
-        emoji_reactions: post.emoji_reactions || {}
+        emoji_reactions: (post.emoji_reactions && typeof post.emoji_reactions === 'object' && !Array.isArray(post.emoji_reactions)) 
+          ? post.emoji_reactions as Record<string, number>
+          : {}
       }));
 
       setPosts(postsWithComments);
