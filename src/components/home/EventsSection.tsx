@@ -153,7 +153,7 @@ const EventsSection = () => {
                     asChild 
                     className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 rounded-lg h-8 font-semibold text-xs group"
                   >
-                    <Link to={`/event/${event.id}`} className="flex items-center justify-center gap-1">
+                    <Link to={`/events/${event.id}`} className="flex items-center justify-center gap-1">
                       View Details
                       <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform duration-200" />
                     </Link>
