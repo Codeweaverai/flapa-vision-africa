@@ -513,14 +513,13 @@ const CreatorEventAgenda = () => {
                   disabled={submitting}
                 >
                   Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={submitting}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                >
-                  {submitting ? 'Processing...' : editingItem ? 'Update' : 'Create'} Item
-                </Button>
+                </Button> 
+               <Button 
+               type="submit" 
+               className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+               >
+              {submitting ? 'Processing...' : editingItem ? 'Update' : 'Create'} Item
+             </Button>
               </div>
             </form>
           </DialogContent>
