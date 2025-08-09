@@ -16,9 +16,12 @@ import DynamicContentSearch from './DynamicContentSearch';
 interface NewsletterTemplate {
   id: string;
   name: string;
-  subject: string;
-  body_html: string;
-  template_type: string;
+  body_html_template: string;
+  subject_template: string;
+  category: string;
+  description?: string;
+  is_active: boolean;
+  created_by: string;
 }
 
 interface DynamicContent {
@@ -41,7 +44,7 @@ const EnhancedNewsletterForm = () => {
   const [formData, setFormData] = useState({
     subject: '',
     body_html: '',
-    template_type: 'general'
+    created_by: ''
   });
   const [selectedContent, setSelectedContent] = useState<DynamicContent[]>([]);
   const [showContentSearch, setShowContentSearch] = useState(false);
@@ -49,13 +52,22 @@ const EnhancedNewsletterForm = () => {
 
   useEffect(() => {
     loadTemplates();
+    getCurrentUser();
   }, []);
+
+  const getCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setFormData(prev => ({ ...prev, created_by: user.id }));
+    }
+  };
 
   const loadTemplates = async () => {
     try {
       const { data, error } = await supabase
         .from('newsletter_templates')
         .select('*')
+        .eq('is_active', true)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -70,11 +82,11 @@ const EnhancedNewsletterForm = () => {
 
   const handleTemplateSelect = (template: NewsletterTemplate) => {
     setSelectedTemplate(template);
-    setFormData({
-      subject: template.subject,
-      body_html: template.body_html,
-      template_type: template.template_type
-    });
+    setFormData(prev => ({
+      ...prev,
+      subject: template.subject_template,
+      body_html: template.body_html_template
+    }));
   };
 
   const handleContentSelect = (content: DynamicContent[]) => {
@@ -223,7 +235,7 @@ const EnhancedNewsletterForm = () => {
         .insert({
           subject: formData.subject,
           body_html: formData.body_html,
-          template_type: formData.template_type,
+          created_by: formData.created_by,
           status: 'draft'
         })
         .select()
@@ -241,17 +253,17 @@ const EnhancedNewsletterForm = () => {
       toast.success('Newsletter sent successfully!');
       
       // Reset form
-      setFormData({
+      setFormData(prev => ({
         subject: '',
         body_html: '',
-        template_type: 'general'
-      });
+        created_by: prev.created_by
+      }));
       setSelectedContent([]);
       setSelectedTemplate(null);
 
     } catch (error) {
       console.error('Error sending newsletter:', error);
-      toast.error('Failed to send newsletter: ' + error.message);
+      toast.error('Failed to send newsletter: ' + (error as any).message);
     } finally {
       setSending(false);
     }
@@ -264,7 +276,7 @@ const EnhancedNewsletterForm = () => {
         .insert({
           subject: formData.subject,
           body_html: formData.body_html,
-          template_type: formData.template_type,
+          created_by: formData.created_by,
           status: 'draft'
         });
 
@@ -308,8 +320,8 @@ const EnhancedNewsletterForm = () => {
               >
                 <CardContent className="p-4">
                   <h3 className="font-medium mb-2">{template.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">{template.subject}</p>
-                  <Badge variant="secondary">{template.template_type}</Badge>
+                  <p className="text-sm text-muted-foreground mb-3">{template.description}</p>
+                  <Badge variant="secondary">{template.category}</Badge>
                 </CardContent>
               </Card>
             ))}
@@ -380,33 +392,14 @@ const EnhancedNewsletterForm = () => {
           <CardTitle>Create Newsletter</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="subject">Subject</Label>
-              <Input
-                id="subject"
-                value={formData.subject}
-                onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
-                placeholder="Newsletter subject line..."
-              />
-            </div>
-            <div>
-              <Label htmlFor="template_type">Type</Label>
-              <Select 
-                value={formData.template_type}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, template_type: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="general">General</SelectItem>
-                  <SelectItem value="course_promotion">Course Promotion</SelectItem>
-                  <SelectItem value="event_announcement">Event Announcement</SelectItem>
-                  <SelectItem value="weekly_digest">Weekly Digest</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label htmlFor="subject">Subject</Label>
+            <Input
+              id="subject"
+              value={formData.subject}
+              onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+              placeholder="Newsletter subject line..."
+            />
           </div>
 
           <div>

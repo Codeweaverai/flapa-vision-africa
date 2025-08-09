@@ -78,44 +78,31 @@ const CourseDiscussionsTab = () => {
 
   const loadPosts = async () => {
     try {
-      const { data, error } = await supabase
+      // Get posts first
+      const { data: postsData, error: postsError } = await supabase
         .from('community_posts')
-        .select(`
-          id,
-          title,
-          content,
-          created_at,
-          user_id,
-          course_id,
-          profiles:user_id (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (postsError) throw postsError;
 
-      // Load comments for each post
+      // Get profiles for post authors
+      const userIds = [...new Set(postsData?.map(post => post.user_id) || [])];
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError);
+      }
+
+      // Load comments and comment authors for each post
       const postsWithComments = await Promise.all(
-        (data || []).map(async (post) => {
+        (postsData || []).map(async (post) => {
           const { data: comments, error: commentsError } = await supabase
             .from('post_comments')
-            .select(`
-              id,
-              content,
-              created_at,
-              user_id,
-              post_id,
-              profiles:user_id (
-                id,
-                username,
-                full_name,
-                avatar_url
-              )
-            `)
+            .select('id, content, created_at, user_id, post_id')
             .eq('post_id', post.id)
             .order('created_at', { ascending: true });
 
@@ -123,10 +110,33 @@ const CourseDiscussionsTab = () => {
             console.error('Error loading comments:', commentsError);
           }
 
+          // Get comment author profiles
+          const commentUserIds = [...new Set(comments?.map(comment => comment.user_id) || [])];
+          const { data: commentProfiles } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url')
+            .in('id', commentUserIds);
+
+          const commentsWithProfiles = (comments || []).map(comment => ({
+            ...comment,
+            profiles: (commentProfiles || []).find(profile => profile.id === comment.user_id) || {
+              id: comment.user_id,
+              username: 'Unknown User',
+              full_name: 'Unknown User',
+              avatar_url: null
+            }
+          }));
+
           return {
             ...post,
-            comments: comments || [],
-            comments_count: comments?.length || 0,
+            profiles: (profiles || []).find(profile => profile.id === post.user_id) || {
+              id: post.user_id,
+              username: 'Unknown User',
+              full_name: 'Unknown User',
+              avatar_url: null
+            },
+            comments: commentsWithProfiles,
+            comments_count: commentsWithProfiles.length,
             likes_count: Math.floor(Math.random() * 20) // Placeholder for now
           };
         })
@@ -188,27 +198,13 @@ const CourseDiscussionsTab = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('post_comments')
         .insert({
           content: commentContent,
           post_id: postId,
           user_id: currentUser.id
-        })
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          post_id,
-          profiles:user_id (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        `)
-        .single();
+        });
 
       if (error) throw error;
 
@@ -415,7 +411,6 @@ const CourseDiscussionsTab = () => {
                         variant="ghost" 
                         size="sm" 
                         className="text-muted-foreground hover:text-blue-600"
-                        onClick={() => openCommentDialog(post.id)}
                       >
                         <MessageCircle className="h-4 w-4 mr-2" />
                         {post.comments_count || 0}

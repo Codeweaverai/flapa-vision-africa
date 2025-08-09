@@ -1,20 +1,28 @@
-
 import React, { useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, User, BookOpen, Calendar, ExternalLink } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { Search, BookOpen, Calendar, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-interface Creator {
+interface DynamicContent {
   id: string;
-  full_name: string;
-  username: string;
-  avatar_url?: string;
-  bio?: string;
+  title: string;
+  description: string;
+  type: 'course' | 'event' | 'creator';
+  image_url?: string;
+  link_url?: string;
+  creator_name?: string;
+  price?: number;
+  date?: string;
+}
+
+interface DynamicContentSearchProps {
+  onContentSelect: (content: DynamicContent[]) => void;
 }
 
 interface Course {
@@ -22,11 +30,8 @@ interface Course {
   title: string;
   description: string;
   price: number;
-  is_free: boolean;
-  thumbnail_url?: string;
-  category: string;
-  creator_id: string;
   creator_name?: string;
+  is_published: boolean;
 }
 
 interface Event {
@@ -34,453 +39,336 @@ interface Event {
   title: string;
   description: string;
   start_time: string;
-  end_time: string;
-  location?: string;
   price?: number;
-  is_free: boolean;
-  image_url?: string;
-  event_type: string;
-  creator_id: string;
   creator_name?: string;
+  is_published: boolean;
 }
 
-interface DynamicContentSearchProps {
-  onSelectContent: (content: any, type: 'creator' | 'course' | 'event') => void;
+interface Creator {
+  id: string;
+  full_name?: string;
+  username?: string;
+  bio?: string;
 }
 
-const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onSelectContent }) => {
-  const [creators, setCreators] = useState<Creator[]>([]);
+const DynamicContentSearch: React.FC<DynamicContentSearchProps> = ({ onContentSelect }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [contentType, setContentType] = useState<'all' | 'course' | 'event' | 'creator'>('all');
   const [courses, setCourses] = useState<Course[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [creators, setCreators] = useState<Creator[]>([]);
+  const [selectedItems, setSelectedItems] = useState<DynamicContent[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'creators' | 'courses' | 'events'>('creators');
 
-  useEffect(() => {
-    if (searchQuery.length > 2) {
-      searchContent();
-    } else {
-      loadInitialContent();
-    }
-  }, [searchQuery, activeTab]);
-
-  const loadInitialContent = async () => {
-    setLoading(true);
+  const searchCourses = async () => {
     try {
-      if (activeTab === 'creators') {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, username, avatar_url, bio')
-          .limit(10)
-          .order('created_at', { ascending: false });
+      const { data: coursesData, error } = await supabase
+        .from('courses')
+        .select('id, title, description, price, creator_id, is_published')
+        .eq('is_published', true)
+        .ilike('title', `%${searchQuery}%`)
+        .limit(10);
 
-        if (error) throw error;
-        setCreators(data || []);
-      } else if (activeTab === 'courses') {
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('is_published', true)
-          .limit(10)
-          .order('created_at', { ascending: false });
+      if (error) throw error;
 
-        if (coursesError) throw coursesError;
+      // Get creator names separately
+      const coursesWithCreators = await Promise.all(
+        (coursesData || []).map(async (course) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, username')
+            .eq('id', course.creator_id)
+            .single();
+          
+          return {
+            ...course,
+            creator_name: profile?.full_name || profile?.username || 'Unknown Creator'
+          };
+        })
+      );
 
-        // Get creator names for courses
-        const coursesWithCreators = await Promise.all(
-          (coursesData || []).map(async (course) => {
-            const { data: creatorData } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', course.creator_id)
-              .single();
-            
-            return {
-              ...course,
-              creator_name: creatorData?.full_name || 'Unknown'
-            };
-          })
-        );
-
-        setCourses(coursesWithCreators);
-      } else if (activeTab === 'events') {
-        const { data: eventsData, error: eventsError } = await supabase
-          .from('events')
-          .select('*')
-          .limit(10)
-          .order('start_time', { ascending: false });
-
-        if (eventsError) throw eventsError;
-
-        // Get creator names for events
-        const eventsWithCreators = await Promise.all(
-          (eventsData || []).map(async (event) => {
-            const { data: creatorData } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', event.creator_id)
-              .single();
-            
-            return {
-              ...event,
-              creator_name: creatorData?.full_name || 'Unknown'
-            };
-          })
-        );
-
-        setEvents(eventsWithCreators);
-      }
+      setCourses(coursesWithCreators);
     } catch (error) {
-      console.error('Error loading content:', error);
-      toast.error('Failed to load content');
-    } finally {
-      setLoading(false);
+      console.error('Error searching courses:', error);
     }
   };
 
-  const searchContent = async () => {
-    setLoading(true);
+  const searchEvents = async () => {
     try {
-      if (activeTab === 'creators') {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, username, avatar_url, bio')
-          .or(`full_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
-          .limit(20);
+      const { data: eventsData, error } = await supabase
+        .from('events')
+        .select('id, title, description, start_time, price, creator_id, is_published')
+        .eq('is_published', true)
+        .ilike('title', `%${searchQuery}%`)
+        .limit(10);
 
-        if (error) throw error;
-        setCreators(data || []);
-      } else if (activeTab === 'courses') {
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('is_published', true)
-          .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
-          .limit(20);
+      if (error) throw error;
 
-        if (coursesError) throw coursesError;
+      // Get creator names separately
+      const eventsWithCreators = await Promise.all(
+        (eventsData || []).map(async (event) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, username')
+            .eq('id', event.creator_id)
+            .single();
+          
+          return {
+            ...event,
+            creator_name: profile?.full_name || profile?.username || 'Unknown Creator'
+          };
+        })
+      );
 
-        // Get creator names for courses
-        const coursesWithCreators = await Promise.all(
-          (coursesData || []).map(async (course) => {
-            const { data: creatorData } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', course.creator_id)
-              .single();
-            
-            return {
-              ...course,
-              creator_name: creatorData?.full_name || 'Unknown'
-            };
-          })
-        );
-
-        setCourses(coursesWithCreators);
-      } else if (activeTab === 'events') {
-        const { data: eventsData, error: eventsError } = await supabase
-          .from('events')
-          .select('*')
-          .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
-          .limit(20);
-
-        if (eventsError) throw eventsError;
-
-        // Get creator names for events
-        const eventsWithCreators = await Promise.all(
-          (eventsData || []).map(async (event) => {
-            const { data: creatorData } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', event.creator_id)
-              .single();
-            
-            return {
-              ...event,
-              creator_name: creatorData?.full_name || 'Unknown'
-            };
-          })
-        );
-
-        setEvents(eventsWithCreators);
-      }
+      setEvents(eventsWithCreators);
     } catch (error) {
-      console.error('Error searching content:', error);
-      toast.error('Failed to search content');
-    } finally {
-      setLoading(false);
+      console.error('Error searching events:', error);
     }
   };
 
-  const generateContentHtml = (content: any, type: 'creator' | 'course' | 'event') => {
-    const baseUrl = 'https://skillpulse.cloud';
+  const searchCreators = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, bio')
+        .or(`full_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
+        .limit(10);
+
+      if (error) throw error;
+      setCreators(data || []);
+    } catch (error) {
+      console.error('Error searching creators:', error);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
     
-    if (type === 'creator') {
-      return `
-        <div style="margin: 20px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
-          <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            ${content.avatar_url ? 
-              `<img src="${content.avatar_url}" alt="${content.full_name}" style="width: 60px; height: 60px; border-radius: 50%; margin-right: 15px;">` : 
-              `<div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 15px;">${content.full_name?.charAt(0) || 'U'}</div>`
-            }
-            <div>
-              <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.full_name || content.username}</h3>
-              <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 14px;">@${content.username}</p>
-            </div>
-          </div>
-          ${content.bio ? `<p style="margin: 10px 0; color: #4b5563; line-height: 1.5;">${content.bio}</p>` : ''}
-          <a href="${baseUrl}/creator/profile/${content.id}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">View Profile</a>
-        </div>
-      `;
-    } else if (type === 'course') {
-      return `
-        <div style="margin: 20px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
-          <div style="display: flex; margin-bottom: 15px;">
-            ${content.thumbnail_url ? 
-              `<img src="${content.thumbnail_url}" alt="${content.title}" style="width: 120px; height: 80px; object-fit: cover; border-radius: 6px; margin-right: 15px;">` : 
-              `<div style="width: 120px; height: 80px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 15px;"><span style="color: white; font-size: 24px;">📚</span></div>`
-            }
-            <div style="flex: 1;">
-              <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.title}</h3>
-              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.creator_name || 'Unknown'}</p>
-              <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                <span style="background: #ddd6fe; color: #7c3aed; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${content.category}</span>
-                <span style="font-weight: 600; color: #059669;">${content.is_free ? 'Free' : `$${content.price}`}</span>
-              </div>
-            </div>
-          </div>
-          <p style="margin: 10px 0; color: #4b5563; line-height: 1.5;">${content.description?.substring(0, 150)}${content.description?.length > 150 ? '...' : ''}</p>
-          <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <a href="${baseUrl}/course/${content.id}" style="padding: 10px 20px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">View Course</a>
-            <a href="${baseUrl}/course/${content.id}/enroll" style="padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">Enroll Now</a>
-          </div>
-        </div>
-      `;
-    } else if (type === 'event') {
-      const startDate = new Date(content.start_time);
-      return `
-        <div style="margin: 20px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
-          <div style="display: flex; margin-bottom: 15px;">
-            ${content.image_url ? 
-              `<img src="${content.image_url}" alt="${content.title}" style="width: 120px; height: 80px; object-fit: cover; border-radius: 6px; margin-right: 15px;">` : 
-              `<div style="width: 120px; height: 80px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 15px;"><span style="color: white; font-size: 24px;">📅</span></div>`
-            }
-            <div style="flex: 1;">
-              <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${content.title}</h3>
-              <p style="margin: 8px 0; color: #6b7280; font-size: 14px;">by ${content.creator_name || 'Unknown'}</p>
-              <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                <span style="background: #ddd6fe; color: #7c3aed; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${content.event_type}</span>
-                <span style="font-weight: 600; color: #059669;">${content.is_free ? 'Free' : `$${content.price || 'TBA'}`}</span>
-              </div>
-              <div style="color: #6b7280; font-size: 14px;">
-                <div>📅 ${startDate.toLocaleDateString()} at ${startDate.toLocaleTimeString()}</div>
-                ${content.location ? `<div>📍 ${content.location}</div>` : ''}
-              </div>
-            </div>
-          </div>
-          <p style="margin: 10px 0; color: #4b5563; line-height: 1.5;">${content.description?.substring(0, 150)}${content.description?.length > 150 ? '...' : ''}</p>
-          <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <a href="${baseUrl}/events/${content.id}" style="padding: 10px 20px; background: linear-gradient(135deg, #f59e0b, #8b5cf6); color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">View Event</a>
-            <a href="${baseUrl}/events/${content.id}" style="padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">Register</a>
-          </div>
-        </div>
-      `;
+    setLoading(true);
+    try {
+      if (contentType === 'all' || contentType === 'course') {
+        await searchCourses();
+      }
+      if (contentType === 'all' || contentType === 'event') {
+        await searchEvents();
+      }
+      if (contentType === 'all' || contentType === 'creator') {
+        await searchCreators();
+      }
+    } catch (error) {
+      console.error('Error during search:', error);
+      toast.error('Search failed');
+    } finally {
+      setLoading(false);
     }
-    return '';
   };
 
-  const renderCreators = () => (
-    <div className="space-y-4">
-      {creators.map((creator) => (
-        <Card key={creator.id} className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {creator.avatar_url ? (
-                  <img
-                    src={creator.avatar_url}
-                    alt={creator.full_name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-                    {creator.full_name?.charAt(0) || 'U'}
-                  </div>
-                )}
-                <div>
-                  <h3 className="font-semibold">{creator.full_name || creator.username}</h3>
-                  <p className="text-sm text-muted-foreground">@{creator.username}</p>
-                  {creator.bio && (
-                    <p className="text-xs text-muted-foreground line-clamp-1">{creator.bio}</p>
-                  )}
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => onSelectContent(creator, 'creator')}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+  const addToSelected = (item: Course | Event | Creator, type: 'course' | 'event' | 'creator') => {
+    const dynamicContent: DynamicContent = {
+      id: item.id,
+      title: type === 'creator' 
+        ? (item as Creator).full_name || (item as Creator).username || 'Unnamed Creator'
+        : (item as Course | Event).title,
+      description: type === 'creator' 
+        ? (item as Creator).bio || 'Creator profile'
+        : (item as Course | Event).description,
+      type,
+      creator_name: type !== 'creator' ? (item as Course | Event).creator_name : undefined,
+      price: type !== 'creator' ? (item as Course | Event).price : undefined,
+      date: type === 'event' ? (item as Event).start_time : undefined
+    };
 
-  const renderCourses = () => (
-    <div className="space-y-4">
-      {courses.map((course) => (
-        <Card key={course.id} className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex justify-between">
-              <div className="flex gap-3 flex-1">
-                {course.thumbnail_url ? (
-                  <img
-                    src={course.thumbnail_url}
-                    alt={course.title}
-                    className="w-16 h-12 object-cover rounded"
-                  />
-                ) : (
-                  <div className="w-16 h-12 bg-gradient-to-br from-orange-400 to-purple-600 rounded flex items-center justify-center">
-                    <BookOpen className="h-6 w-6 text-white" />
-                  </div>
-                )}
-                <div className="flex-1">
-                  <h3 className="font-semibold line-clamp-1">{course.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    by {course.creator_name || 'Unknown'}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-xs">{course.category}</Badge>
-                    <span className="text-sm font-semibold text-green-600">
-                      {course.is_free ? 'Free' : `$${course.price}`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => onSelectContent(course, 'course')}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+    if (!selectedItems.find(selected => selected.id === item.id && selected.type === type)) {
+      const newSelected = [...selectedItems, dynamicContent];
+      setSelectedItems(newSelected);
+    }
+  };
 
-  const renderEvents = () => (
-    <div className="space-y-4">
-      {events.map((event) => (
-        <Card key={event.id} className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex justify-between">
-              <div className="flex gap-3 flex-1">
-                {event.image_url ? (
-                  <img
-                    src={event.image_url}
-                    alt={event.title}
-                    className="w-16 h-12 object-cover rounded"
-                  />
-                ) : (
-                  <div className="w-16 h-12 bg-gradient-to-br from-orange-400 to-purple-600 rounded flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                )}
-                <div className="flex-1">
-                  <h3 className="font-semibold line-clamp-1">{event.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    by {event.creator_name || 'Unknown'}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-xs">{event.event_type}</Badge>
-                    <span className="text-sm font-semibold text-green-600">
-                      {event.is_free ? 'Free' : `$${event.price || 'TBA'}`}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(event.start_time).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => onSelectContent(event, 'event')}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+  const removeFromSelected = (itemId: string, type: string) => {
+    const newSelected = selectedItems.filter(item => !(item.id === itemId && item.type === type));
+    setSelectedItems(newSelected);
+  };
+
+  const handleConfirmSelection = () => {
+    onContentSelect(selectedItems);
+    toast.success(`Selected ${selectedItems.length} items for newsletter`);
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-4">
-        <Label htmlFor="content-search">Search Dynamic Content</Label>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="content-search"
-            placeholder="Search creators, courses, or events..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Button
-          variant={activeTab === 'creators' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setActiveTab('creators')}
-        >
-          <User className="h-4 w-4 mr-1" />
-          Creators
-        </Button>
-        <Button
-          variant={activeTab === 'courses' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setActiveTab('courses')}
-        >
-          <BookOpen className="h-4 w-4 mr-1" />
-          Courses
-        </Button>
-        <Button
-          variant={activeTab === 'events' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setActiveTab('events')}
-        >
-          <Calendar className="h-4 w-4 mr-1" />
-          Events
-        </Button>
-      </div>
-
-      <div className="max-h-96 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center items-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Search Dynamic Content
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="search">Search Query</Label>
+              <Input
+                id="search"
+                placeholder="Search for courses, events, or creators..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+            </div>
+            <div>
+              <Label htmlFor="type">Content Type</Label>
+              <Select value={contentType} onValueChange={(value: any) => setContentType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Content</SelectItem>
+                  <SelectItem value="course">Courses Only</SelectItem>
+                  <SelectItem value="event">Events Only</SelectItem>
+                  <SelectItem value="creator">Creators Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        ) : (
-          <>
-            {activeTab === 'creators' && renderCreators()}
-            {activeTab === 'courses' && renderCourses()}
-            {activeTab === 'events' && renderEvents()}
-          </>
-        )}
-      </div>
+          
+          <Button onClick={handleSearch} disabled={loading} className="w-full">
+            <Search className="h-4 w-4 mr-2" />
+            {loading ? 'Searching...' : 'Search Content'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Search Results */}
+      {(courses.length > 0 || events.length > 0 || creators.length > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Search Results</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Courses Results */}
+            {courses.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Courses ({courses.length})
+                </h4>
+                <div className="grid gap-2">
+                  {courses.map((course) => (
+                    <div key={course.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{course.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          by {course.creator_name} • ${course.price || 0}
+                        </p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => addToSelected(course, 'course')}
+                        disabled={selectedItems.some(item => item.id === course.id && item.type === 'course')}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Events Results */}
+            {events.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Events ({events.length})
+                </h4>
+                <div className="grid gap-2">
+                  {events.map((event) => (
+                    <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{event.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          by {event.creator_name} • {new Date(event.start_time).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => addToSelected(event, 'event')}
+                        disabled={selectedItems.some(item => item.id === event.id && item.type === 'event')}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Creators Results */}
+            {creators.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Creators ({creators.length})
+                </h4>
+                <div className="grid gap-2">
+                  {creators.map((creator) => (
+                    <div key={creator.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{creator.full_name || creator.username}</p>
+                        <p className="text-sm text-muted-foreground">{creator.bio || 'Creator profile'}</p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => addToSelected(creator, 'creator')}
+                        disabled={selectedItems.some(item => item.id === creator.id && item.type === 'creator')}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Selected Items */}
+      {selectedItems.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Selected Items ({selectedItems.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {selectedItems.map((item) => (
+              <div key={`${item.id}-${item.type}`} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                <div className="flex items-center gap-2">
+                  {item.type === 'course' && <BookOpen className="h-4 w-4 text-blue-600" />}
+                  {item.type === 'event' && <Calendar className="h-4 w-4 text-green-600" />}
+                  {item.type === 'creator' && <Users className="h-4 w-4 text-purple-600" />}
+                  <div>
+                    <p className="font-medium">{item.title}</p>
+                    <Badge variant="secondary" className="text-xs">{item.type}</Badge>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeFromSelected(item.id, item.type)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            
+            <div className="pt-4">
+              <Button onClick={handleConfirmSelection} className="w-full">
+                Add {selectedItems.length} Items to Newsletter
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
