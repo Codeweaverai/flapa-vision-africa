@@ -38,6 +38,17 @@ import VideoTranscripts from '@/components/course/VideoTranscripts';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
 
+// Debounce utility function
+function debounce(func: (...args: any[]) => void, delay: number) {
+  let timeoutId: NodeJS.Timeout;
+  return function(...args: any[]) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      func.apply(this, args);
+    }, delay);
+  };
+}
+
 interface Course {
   id?: string;
   title: string;
@@ -187,6 +198,7 @@ const CourseLearningPage = () => {
   const [hasPassedExam, setHasPassedExam] = useState(false);
   const [canRetakeExam, setCanRetakeExam] = useState(false);
   const [showFinalExamModal, setShowFinalExamModal] = useState(false);
+  const [completedThresholds, setCompletedThresholds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (courseId) {
@@ -252,6 +264,15 @@ const CourseLearningPage = () => {
       );
       
       setModules(modulesWithLessons);
+
+      // Auto-select first lesson if enrolled and modules exist
+      if (enrollment?.payment_status === 'completed' && modulesWithLessons.length > 0) {
+        const firstLesson = modulesWithLessons[0]?.lessons?.[0];
+        if (firstLesson) {
+          setSelectedLesson(firstLesson);
+          setCurrentLessonId(firstLesson.id);
+        }
+      }
 
       const { count: enrolledCount, error: enrollCountError } = await supabase
         .from('course_enrollments')
@@ -369,6 +390,13 @@ const CourseLearningPage = () => {
       if (error) throw error;
       const completedIds = completedData?.map(item => item.lesson_id) || [];
       setCompletedLessons(completedIds);
+      
+      // Initialize the thresholds for completed lessons
+      const thresholds = completedIds.reduce((acc, id) => {
+        acc[id] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+      setCompletedThresholds(thresholds);
     } catch (error) {
       console.error('Error fetching completed lessons:', error);
     }
@@ -471,29 +499,43 @@ const CourseLearningPage = () => {
     setSelectedLesson(lesson);
   };
 
+  const debouncedProgressUpdate = debounce(async (lessonId: string, enrollmentId: string) => {
+    try {
+      await supabase
+        .from('lesson_progress')
+        .upsert({
+          enrollment_id: enrollmentId,
+          lesson_id: lessonId,
+          is_completed: true,
+          completion_date: new Date().toISOString()
+        }, {
+          onConflict: 'enrollment_id,lesson_id'
+        });
+      
+      fetchCompletedLessons();
+      const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
+      const completedCount = [...new Set([...completedLessons, lessonId])].length;
+      const progressPercentage = Math.round((completedCount / totalLessons) * 100);
+      updateCourseProgress(progressPercentage);
+    } catch (error) {
+      console.error('Error updating lesson progress:', error);
+    }
+  }, 2000); // 2 second debounce
+
   const handleVideoProgress = (progress: { played: number, playedSeconds: number, loaded: number, loadedSeconds: number }) => {
     setCurrentVideoTime(progress.playedSeconds);
     
     if (progress.playedSeconds > 0 && selectedLesson && enrollment) {
       const watchPercentage = progress.played * 100;
-      if (watchPercentage > 80) {
-        supabase
-          .from('lesson_progress')
-          .upsert({
-            enrollment_id: enrollment.id,
-            lesson_id: selectedLesson.id,
-            is_completed: true,
-            completion_date: new Date().toISOString()
-          }, {
-            onConflict: 'enrollment_id,lesson_id'
-          })
-          .then(() => {
-            fetchCompletedLessons();
-            const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
-            const completedCount = completedLessons.length + 1;
-            const progressPercentage = Math.round((completedCount / totalLessons) * 100);
-            updateCourseProgress(progressPercentage);
-          });
+      
+      // Only proceed if we haven't already marked this lesson complete
+      if (watchPercentage > 80 && !completedThresholds[selectedLesson.id]) {
+        // Update local state immediately
+        setCompletedThresholds(prev => ({ ...prev, [selectedLesson.id]: true }));
+        setCompletedLessons(prev => [...new Set([...prev, selectedLesson.id])]);
+        
+        // Debounce the backend update
+        debouncedProgressUpdate(selectedLesson.id, enrollment.id);
       }
     }
   };
@@ -506,15 +548,9 @@ const CourseLearningPage = () => {
     navigate(`/course/${courseId}/results`);
   };
 
-  const enrolledUser = enrollment && enrollment.payment_status === 'completed';
-  const progressPercentage = progress?.progress_percentage || 0;
-  const isNotComplete = progressPercentage < 100;
-  const hasLessons = modules.some(module => module.lessons.length > 0);
-
   const handleExamComplete = (result: any) => {
     setShowExamModal(false);
     
-    // Convert result to match ExamResult interface
     const examResult: ExamResult = {
       id: result.id || '',
       passed: result.passed,
@@ -529,9 +565,13 @@ const CourseLearningPage = () => {
     setCanRetakeExam(!result.passed);
     setShowFinalExamModal(true);
     
-    // Refresh course data to get updated exam status
     fetchCourseData();
   };
+
+  const enrolledUser = enrollment && enrollment.payment_status === 'completed';
+  const progressPercentage = progress?.progress_percentage || 0;
+  const isNotComplete = progressPercentage < 100;
+  const hasLessons = modules.some(module => module.lessons.length > 0);
 
   if (loading) {
     return (
@@ -954,4 +994,3 @@ const CourseLearningPage = () => {
 };
 
 export default CourseLearningPage;
-
