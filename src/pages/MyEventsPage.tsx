@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -6,10 +5,12 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar, MapPin, Users, Eye, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import TicketDisplay from '@/components/tickets/TicketDisplay';
 
 interface Event {
   id: string;
@@ -37,6 +38,9 @@ const MyEventsPage = () => {
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
+  const [tickets, setTickets] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -71,6 +75,113 @@ const MyEventsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewTickets = async (event: Event) => {
+    setSelectedEvent(event);
+    
+    try {
+      const { data: ticketsData, error } = await supabase
+        .from('generated_tickets')
+        .select(`
+          *,
+          booking:event_bookings!generated_tickets_booking_id_fkey (
+            booking_code,
+            event:events (
+              title,
+              start_time,
+              end_time,
+              location,
+              image_url,
+              description
+            )
+          )
+        `)
+        .eq('event_id', event.id)
+        .eq('user_id', user?.id);
+
+      if (error) {
+        console.error('Error fetching tickets:', error);
+        const mockTickets = event.event_bookings.map((booking, index) => ({
+          id: `${event.id}-${index}`,
+          ticket_code: booking.booking_code,
+          ticket_holder_name: 'Event Attendee',
+          qr_code_data: JSON.stringify({
+            booking_code: booking.booking_code,
+            event_title: event.title,
+            ticket_quantity: booking.ticket_quantity
+          }),
+          ticket_status: booking.status,
+          booking: {
+            booking_code: booking.booking_code,
+            event: {
+              title: event.title,
+              start_time: event.start_time,
+              end_time: event.end_time,
+              location: event.location,
+              image_url: event.image_url,
+              description: event.description
+            },
+            event_ticket: {
+              name: 'General Admission',
+              ticket_type: 'standard'
+            }
+          }
+        }));
+        setTickets(mockTickets);
+      } else {
+        const transformedTickets = ticketsData?.map(ticket => ({
+          ...ticket,
+          booking: {
+            booking_code: ticket.booking?.booking_code || event.event_bookings[0]?.booking_code,
+            event: ticket.booking?.event || {
+              title: event.title,
+              start_time: event.start_time,
+              end_time: event.end_time,
+              location: event.location,
+              image_url: event.image_url,
+              description: event.description
+            },
+            event_ticket: {
+              name: 'General Admission',
+              ticket_type: 'standard'
+            }
+          }
+        })) || [];
+        setTickets(transformedTickets);
+      }
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      const fallbackTickets = event.event_bookings.map((booking, index) => ({
+        id: `${event.id}-${index}`,
+        ticket_code: booking.booking_code,
+        ticket_holder_name: 'Event Attendee',
+        qr_code_data: JSON.stringify({
+          booking_code: booking.booking_code,
+          event_title: event.title,
+          ticket_quantity: booking.ticket_quantity
+        }),
+        ticket_status: booking.status,
+        booking: {
+          booking_code: booking.booking_code,
+          event: {
+            title: event.title,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            location: event.location,
+            image_url: event.image_url,
+            description: event.description
+          },
+          event_ticket: {
+            name: 'General Admission',
+            ticket_type: 'standard'
+          }
+        }
+      }));
+      setTickets(fallbackTickets);
+    }
+    
+    setTicketDialogOpen(true);
   };
 
   const getEventStatus = (event: Event) => {
@@ -170,12 +281,14 @@ const MyEventsPage = () => {
                               View Event
                             </Button>
                           </Link>
-                          <Link to="/my-orders" className="flex-1">
-                            <Button size="sm" className="w-full bg-gradient-to-r from-orange-500 to-purple-600">
-                              <Download className="h-4 w-4 mr-2" />
-                              View Tickets
-                            </Button>
-                          </Link>
+                          <Button 
+                            size="sm" 
+                            className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600"
+                            onClick={() => handleViewTickets(event)}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            View Tickets
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -185,6 +298,24 @@ const MyEventsPage = () => {
             )}
           </div>
         </div>
+
+        {/* Ticket Display Dialog */}
+        <Dialog open={ticketDialogOpen} onOpenChange={setTicketDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Event Tickets</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              {tickets.map((ticket, index) => (
+                <TicketDisplay
+                  key={ticket.id || index}
+                  ticket={ticket}
+                  showPrintStyles={false}
+                />
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
