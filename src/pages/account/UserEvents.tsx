@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -76,13 +75,13 @@ const UserEvents = () => {
   const handleViewTickets = async (booking: EventBooking) => {
     setSelectedBooking(booking);
     
-    // Fetch tickets for this booking
+    // Fetch tickets for this booking using the correct table name
     try {
       const { data: ticketsData, error } = await supabase
-        .from('tickets')
+        .from('generated_tickets')
         .select(`
           *,
-          booking:event_bookings!tickets_booking_id_fkey (
+          booking:event_bookings!generated_tickets_booking_id_fkey (
             booking_code,
             event:events (
               title,
@@ -91,10 +90,6 @@ const UserEvents = () => {
               location,
               image_url,
               description
-            ),
-            event_ticket:event_tickets (
-              name,
-              ticket_type
             )
           )
         `)
@@ -124,7 +119,19 @@ const UserEvents = () => {
         };
         setTickets([mockTicket]);
       } else {
-        setTickets(ticketsData || []);
+        // Transform the data to match the expected format
+        const transformedTickets = ticketsData?.map(ticket => ({
+          ...ticket,
+          booking: {
+            booking_code: ticket.booking?.booking_code || booking.booking_code,
+            event: ticket.booking?.event || booking.event,
+            event_ticket: {
+              name: 'General Admission',
+              ticket_type: 'standard'
+            }
+          }
+        })) || [];
+        setTickets(transformedTickets);
       }
     } catch (error) {
       console.error('Error fetching tickets:', error);
