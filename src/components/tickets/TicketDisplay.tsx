@@ -62,16 +62,11 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         </div>
 
         <div className="p-8">
-          {/* Event Title */}
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">{event.title}</h2>
-            {event.description && (
-              <p className="text-gray-600 text-lg leading-relaxed max-w-2xl mx-auto">
-                {event.description}
-              </p>
-            )}
-          </div>
-
+  {/* Event Title */}
+  <div className="text-center mb-8">
+    <h2 className="text-4xl font-bold text-gray-900 mb-3">{event.title}</h2>
+  </div>
+</div>
           {/* Event Image */}
           {event.image_url && (
             <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
