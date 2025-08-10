@@ -119,7 +119,7 @@ const AdminNewsletters = () => {
   const loadContent = async () => {
     setLoading(true);
     try {
-      // Load latest courses with proper join
+      // Load latest courses
       const { data: coursesData } = await supabase
         .from('courses')
         .select(`
@@ -128,16 +128,13 @@ const AdminNewsletters = () => {
           description,
           thumbnail_url,
           price,
-          creator_id,
-          profiles!courses_creator_id_fkey (
-            full_name
-          )
+          creator_id
         `)
         .eq('is_published', true)
         .order('created_at', { ascending: false })
         .limit(6);
 
-      // Load upcoming events with proper join
+      // Load upcoming events
       const { data: eventsData } = await supabase
         .from('events')
         .select(`
@@ -149,10 +146,7 @@ const AdminNewsletters = () => {
           start_time,
           end_time,
           price,
-          creator_id,
-          profiles!events_creator_id_fkey (
-            full_name
-          )
+          creator_id
         `)
         .eq('is_published', true)
         .gte('start_time', new Date().toISOString())
@@ -170,14 +164,23 @@ const AdminNewsletters = () => {
         `)
         .limit(8);
 
-      // Process courses with stats
-      const processedCourses = await Promise.all(
+      // Process courses with stats and creator info
+      const processedCourses: Course[] = await Promise.all(
         (coursesData || []).map(async (course) => {
+          // Get creator profile
+          const { data: creatorProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', course.creator_id)
+            .single();
+
+          // Get enrollment count
           const { count: enrollmentCount } = await supabase
             .from('course_enrollments')
             .select('*', { count: 'exact' })
             .eq('course_id', course.id);
 
+          // Get reviews
           const { data: reviews } = await supabase
             .from('course_reviews')
             .select('rating')
@@ -189,7 +192,9 @@ const AdminNewsletters = () => {
 
           return {
             ...course,
-            creator: course.profiles || { full_name: 'Unknown Creator' },
+            creator: {
+              full_name: creatorProfile?.full_name || 'Unknown Creator'
+            },
             enrollment_count: enrollmentCount || 0,
             average_rating: averageRating,
             total_reviews: reviews?.length || 0
@@ -197,9 +202,17 @@ const AdminNewsletters = () => {
         })
       );
 
-      // Process events with stats
-      const processedEvents = await Promise.all(
+      // Process events with stats and creator info
+      const processedEvents: Event[] = await Promise.all(
         (eventsData || []).map(async (event) => {
+          // Get creator profile
+          const { data: creatorProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', event.creator_id)
+            .single();
+
+          // Get registration count
           const { count: registrationCount } = await supabase
             .from('event_bookings')
             .select('*', { count: 'exact' })
@@ -207,7 +220,9 @@ const AdminNewsletters = () => {
 
           return {
             ...event,
-            creator: event.profiles || { full_name: 'Unknown Creator' },
+            creator: {
+              full_name: creatorProfile?.full_name || 'Unknown Creator'
+            },
             registration_count: registrationCount || 0,
             average_rating: 4.5,
             total_reviews: 12
@@ -216,7 +231,7 @@ const AdminNewsletters = () => {
       );
 
       // Process creators with stats
-      const processedCreators = await Promise.all(
+      const processedCreators: Creator[] = await Promise.all(
         (creatorsData || []).map(async (creator) => {
           const { count: courseCount } = await supabase
             .from('courses')
@@ -315,7 +330,7 @@ const AdminNewsletters = () => {
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex items-center gap-2 mb-3">
-          {course.average_rating > 0 && (
+          {course.average_rating && course.average_rating > 0 && (
             <div className="flex items-center gap-1">
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
               <span className="text-sm font-medium">{course.average_rating.toFixed(1)}</span>
