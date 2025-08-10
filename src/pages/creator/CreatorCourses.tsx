@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import PaginationControls from '@/components/creator/PaginationControls';
 import CoursePreviewDialog from '@/components/creator/CoursePreviewDialog';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 const COURSES_PER_PAGE = 6; // 2 rows × 3 cards per row
 
@@ -233,10 +234,13 @@ const CreatorCourses = () => {
                       <Clock className="h-4 w-4" />
                       <span>{Math.ceil((course.duration_minutes || 0) / 60)}h</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" />
-                      <span>{course.is_free ? "Free" : `$${course.price}`}</span>
-                    </div>
+                   <div className="flex items-center gap-1">
+  {course.is_free ? (
+    <span>Free</span>
+  ) : (
+    <PriceDisplay amount={course.price} originalCurrency="USD" />
+  )}
+</div>
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-current text-yellow-400" />
                       <span>4.8</span>
