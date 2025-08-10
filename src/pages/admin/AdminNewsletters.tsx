@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail } from 'lucide-react';
+import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/layout/AdminLayout';
@@ -79,6 +79,7 @@ const AdminNewsletters = () => {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [selectedContent, setSelectedContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -89,27 +90,38 @@ const AdminNewsletters = () => {
 
   const loadUsers = async () => {
     try {
-      const { data: authUsers, error } = await supabase.auth.admin.listUsers();
-      if (error) throw error;
+      // Use the get_user_emails function to fetch user emails
+      const { data, error } = await supabase.rpc('get_user_emails', {
+        user_ids: []
+      });
 
-      const usersWithProfiles = await Promise.all(
-        (authUsers?.users || []).map(async (user) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', user.id)
-            .single();
+      if (error) {
+        // Fallback: try to get users from profiles table
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name');
 
-          return {
-            id: user.id,
-            email: user.email,
-            full_name: profile?.full_name || user.user_metadata?.full_name,
-            created_at: user.created_at
-          };
-        })
-      );
+        if (profilesData) {
+          const usersWithEmails = profilesData.map(profile => ({
+            id: profile.id,
+            email: `user-${profile.id.slice(0, 8)}@email.com`, // Placeholder email
+            full_name: profile.full_name,
+            created_at: new Date().toISOString()
+          }));
+          setUsers(usersWithEmails);
+        }
+        return;
+      }
 
-      setUsers(usersWithProfiles);
+      if (data) {
+        const formattedUsers = data.map((user: any) => ({
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name || `User ${user.email}`,
+          created_at: user.created_at
+        }));
+        setUsers(formattedUsers);
+      }
     } catch (error) {
       console.error('Error loading users:', error);
       toast.error('Failed to load users');
@@ -304,26 +316,42 @@ const AdminNewsletters = () => {
     setSelectedUsers([]);
   };
 
+  const addToNewsletter = (item: Course | Event | Creator, type: 'course' | 'event' | 'creator') => {
+    const newItem = { ...item, type };
+    setSelectedContent(prev => {
+      if (prev.find(content => content.id === item.id && content.type === type)) {
+        toast.info('Item already added to newsletter');
+        return prev;
+      }
+      toast.success('Item added to newsletter');
+      return [...prev, newItem];
+    });
+  };
+
+  const removeFromNewsletter = (itemId: string, type: string) => {
+    setSelectedContent(prev => prev.filter(item => !(item.id === itemId && item.type === type)));
+  };
+
   const CourseCard = ({ course }: { course: Course }) => (
-    <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/30 overflow-hidden">
+    <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-orange-50/30 to-purple-50/30 overflow-hidden transform hover:-translate-y-2">
       <div className="relative overflow-hidden">
         {course.thumbnail_url ? (
           <img
             src={course.thumbnail_url}
             alt={course.title}
-            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center">
+          <div className="w-full h-48 bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
             <span className="text-purple-600 font-semibold">No Image</span>
           </div>
         )}
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-semibold text-purple-600">
+        <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-bold text-purple-600 shadow-lg">
           ${course.price}
         </div>
       </div>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg line-clamp-2 text-gray-800">
+        <CardTitle className="text-lg line-clamp-2 text-gray-800 group-hover:text-purple-700 transition-colors">
           {course.title}
         </CardTitle>
         <p className="text-sm text-gray-600 line-clamp-2">{course.description}</p>
@@ -338,14 +366,19 @@ const AdminNewsletters = () => {
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-sm mb-4">
           <div className="flex items-center gap-1 text-gray-600">
             <Users className="h-4 w-4" />
             <span>{course.enrollment_count} students</span>
           </div>
           <span className="text-gray-700 font-medium">by {course.creator?.full_name}</span>
         </div>
-        <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-700" size="sm">
+        <Button 
+          className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 shadow-lg" 
+          size="sm"
+          onClick={() => addToNewsletter(course, 'course')}
+        >
+          <Plus className="h-4 w-4 mr-2" />
           Add to Newsletter
         </Button>
       </CardContent>
@@ -353,25 +386,25 @@ const AdminNewsletters = () => {
   );
 
   const EventCard = ({ event }: { event: Event }) => (
-    <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/30 overflow-hidden">
+    <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-purple-50/30 to-orange-50/30 overflow-hidden transform hover:-translate-y-2">
       <div className="relative overflow-hidden">
         {event.image_url ? (
           <img
             src={event.image_url}
             alt={event.title}
-            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-blue-100 to-green-100 flex items-center justify-center">
-            <span className="text-blue-600 font-semibold">No Image</span>
+          <div className="w-full h-48 bg-gradient-to-br from-purple-100 via-orange-100 to-pink-100 flex items-center justify-center">
+            <span className="text-orange-600 font-semibold">No Image</span>
           </div>
         )}
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-semibold text-blue-600">
+        <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-bold text-orange-600 shadow-lg">
           ${event.price}
         </div>
       </div>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg line-clamp-2 text-gray-800">
+        <CardTitle className="text-lg line-clamp-2 text-gray-800 group-hover:text-orange-700 transition-colors">
           {event.title}
         </CardTitle>
         <p className="text-sm text-gray-600 line-clamp-2">{event.description}</p>
@@ -396,7 +429,12 @@ const AdminNewsletters = () => {
         <div className="text-sm text-gray-700 font-medium mb-3">
           by {event.creator?.full_name}
         </div>
-        <Button className="w-full bg-purple-600 hover:bg-purple-700" size="sm">
+        <Button 
+          className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 shadow-lg" 
+          size="sm"
+          onClick={() => addToNewsletter(event, 'event')}
+        >
+          <Plus className="h-4 w-4 mr-2" />
           Add to Newsletter
         </Button>
       </CardContent>
@@ -404,22 +442,22 @@ const AdminNewsletters = () => {
   );
 
   const CreatorCard = ({ creator }: { creator: Creator }) => (
-    <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/30 overflow-hidden">
+    <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-orange-50/20 to-purple-50/20 overflow-hidden transform hover:-translate-y-2">
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
           {creator.avatar_url ? (
             <img
               src={creator.avatar_url}
               alt={creator.full_name}
-              className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-md"
+              className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-300"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 via-orange-400 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
               {creator.full_name?.charAt(0) || 'U'}
             </div>
           )}
           <div className="flex-1">
-            <CardTitle className="text-lg text-gray-800">
+            <CardTitle className="text-lg text-gray-800 group-hover:text-purple-700 transition-colors">
               {creator.full_name}
             </CardTitle>
             {creator.average_rating && (
@@ -436,22 +474,27 @@ const AdminNewsletters = () => {
           <p className="text-sm text-gray-600 line-clamp-3 mb-4">{creator.bio}</p>
         )}
         <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-          <div className="text-center p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
-            <div className="font-semibold text-purple-600">{creator.total_courses}</div>
+          <div className="text-center p-3 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg">
+            <div className="font-bold text-purple-600">{creator.total_courses}</div>
             <div className="text-xs text-gray-600">Courses</div>
           </div>
-          <div className="text-center p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg">
-            <div className="font-semibold text-blue-600">{creator.total_events}</div>
+          <div className="text-center p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg">
+            <div className="font-bold text-orange-600">{creator.total_events}</div>
             <div className="text-xs text-gray-600">Events</div>
           </div>
         </div>
-        <div className="flex items-center justify-center py-3 border-t border-gray-100">
+        <div className="flex items-center justify-center py-3 border-t border-gray-100 mb-3">
           <div className="flex items-center gap-1 text-gray-700">
             <User className="h-4 w-4" />
             <span className="font-medium">{creator.total_students} students</span>
           </div>
         </div>
-        <Button className="w-full bg-purple-600 hover:bg-purple-700" size="sm">
+        <Button 
+          className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 shadow-lg" 
+          size="sm"
+          onClick={() => addToNewsletter(creator, 'creator')}
+        >
+          <Plus className="h-4 w-4 mr-2" />
           Feature Creator
         </Button>
       </CardContent>
@@ -497,7 +540,7 @@ const AdminNewsletters = () => {
             View
           </Button>
           {newsletter.status === 'draft' && (
-            <Button size="sm" className="flex-1 bg-purple-600 hover:bg-purple-700">
+            <Button size="sm" className="flex-1 bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600">
               Edit
             </Button>
           )}
@@ -508,182 +551,226 @@ const AdminNewsletters = () => {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-            Newsletter Management
-          </h1>
-          <p className="text-gray-600">
-            Create engaging newsletters with dynamic content and send to selected users
-          </p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-purple-600 to-orange-600 bg-clip-text text-transparent">
+              Newsletter Management
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Create engaging newsletters with dynamic content and send to selected users
+            </p>
+          </div>
 
-        {/* Tabs */}
-        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-          <Button
-            variant={activeTab === 'create' ? 'default' : 'ghost'}
-            onClick={() => setActiveTab('create')}
-            className={activeTab === 'create' ? 'bg-purple-600 text-white hover:bg-purple-700' : ''}
-          >
-            Create Newsletter
-          </Button>
-          <Button
-            variant={activeTab === 'drafts' ? 'default' : 'ghost'}
-            onClick={() => setActiveTab('drafts')}
-            className={activeTab === 'drafts' ? 'bg-purple-600 text-white hover:bg-purple-700' : ''}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            Drafts ({newsletters.filter(n => n.status === 'draft').length})
-          </Button>
-          <Button
-            variant={activeTab === 'sent' ? 'default' : 'ghost'}
-            onClick={() => setActiveTab('sent')}
-            className={activeTab === 'sent' ? 'bg-purple-600 text-white hover:bg-purple-700' : ''}
-          >
-            <Send className="h-4 w-4 mr-2" />
-            Sent ({newsletters.filter(n => n.status === 'sent').length})
-          </Button>
-        </div>
+          {/* Tabs */}
+          <div className="flex space-x-1 bg-gradient-to-r from-orange-100 to-purple-100 rounded-lg p-1 shadow-md">
+            <Button
+              variant={activeTab === 'create' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('create')}
+              className={activeTab === 'create' ? 'bg-gradient-to-r from-purple-600 to-orange-500 text-white hover:from-purple-700 hover:to-orange-600' : ''}
+            >
+              Create Newsletter
+            </Button>
+            <Button
+              variant={activeTab === 'drafts' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('drafts')}
+              className={activeTab === 'drafts' ? 'bg-gradient-to-r from-purple-600 to-orange-500 text-white hover:from-purple-700 hover:to-orange-600' : ''}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Drafts ({newsletters.filter(n => n.status === 'draft').length})
+            </Button>
+            <Button
+              variant={activeTab === 'sent' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('sent')}
+              className={activeTab === 'sent' ? 'bg-gradient-to-r from-purple-600 to-orange-500 text-white hover:from-purple-700 hover:to-orange-600' : ''}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Sent ({newsletters.filter(n => n.status === 'sent').length})
+            </Button>
+          </div>
 
-        {activeTab === 'create' && (
-          <div className="space-y-8">
-            {/* User Selection */}
-            <Card className="shadow-lg border-0">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-purple-600" />
-                  Select Recipients
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2 mb-4">
-                  <Button onClick={selectAllUsers} variant="outline" size="sm">
-                    Select All ({users.length})
-                  </Button>
-                  <Button onClick={clearSelection} variant="outline" size="sm">
-                    Clear Selection
-                  </Button>
-                  <Badge variant="secondary" className="ml-auto">
-                    {selectedUsers.length} selected
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                  {users.map((user) => (
-                    <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                      <Checkbox
-                        checked={selectedUsers.includes(user.id)}
-                        onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{user.full_name || user.email}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <EnhancedNewsletterForm />
-            
-            {/* Dynamic Content Section */}
+          {activeTab === 'create' && (
             <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-gray-800">
-                Dynamic Content Selection
-              </h2>
+              {/* User Selection */}
+              <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-orange-50/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-700">
+                    <Mail className="h-5 w-5" />
+                    Select Recipients ({users.length} users available)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 mb-4">
+                    <Button onClick={selectAllUsers} variant="outline" size="sm" className="border-purple-200 hover:bg-purple-50">
+                      Select All ({users.length})
+                    </Button>
+                    <Button onClick={clearSelection} variant="outline" size="sm" className="border-orange-200 hover:bg-orange-50">
+                      Clear Selection
+                    </Button>
+                    <Badge variant="secondary" className="ml-auto bg-gradient-to-r from-purple-100 to-orange-100 text-purple-700">
+                      {selectedUsers.length} selected
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                    {users.map((user) => (
+                      <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-orange-50 transition-colors shadow-sm">
+                        <Checkbox
+                          checked={selectedUsers.includes(user.id)}
+                          onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{user.full_name || user.email}</p>
+                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {users.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <Mail className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                      <p>No users found. Users will appear here once they register.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <EnhancedNewsletterForm />
               
-              {/* Latest Courses */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 text-purple-600">Latest Courses</h3>
-                {loading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[...Array(6)].map((_, i) => (
-                      <div key={i} className="animate-pulse bg-gray-200 h-80 rounded-lg"></div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {courses.map((course) => (
-                      <CourseCard key={course.id} course={course} />
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Dynamic Content Section */}
+              <div className="space-y-8">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                  Dynamic Content Selection
+                </h2>
+                
+                {/* Latest Courses */}
+                <div>
+                  <h3 className="text-2xl font-semibold mb-6 text-purple-600">Latest Courses</h3>
+                  {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[...Array(6)].map((_, i) => (
+                        <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-80 rounded-lg shadow-lg"></div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {courses.map((course) => (
+                        <CourseCard key={course.id} course={course} />
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              {/* Upcoming Events */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 text-blue-600">Upcoming Events</h3>
-                {loading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[...Array(6)].map((_, i) => (
-                      <div key={i} className="animate-pulse bg-gray-200 h-80 rounded-lg"></div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {events.map((event) => (
-                      <EventCard key={event.id} event={event} />
-                    ))}
-                  </div>
-                )}
-              </div>
+                {/* Upcoming Events */}
+                <div>
+                  <h3 className="text-2xl font-semibold mb-6 text-orange-600">Upcoming Events</h3>
+                  {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[...Array(6)].map((_, i) => (
+                        <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-80 rounded-lg shadow-lg"></div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {events.map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              {/* High Performing Creators */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 text-green-600">High Performing Creators</h3>
-                {loading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {[...Array(8)].map((_, i) => (
-                      <div key={i} className="animate-pulse bg-gray-200 h-80 rounded-lg"></div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {creators.map((creator) => (
-                      <CreatorCard key={creator.id} creator={creator} />
-                    ))}
-                  </div>
+                {/* High Performing Creators */}
+                <div>
+                  <h3 className="text-2xl font-semibold mb-6 text-purple-600">High Performing Creators</h3>
+                  {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {[...Array(8)].map((_, i) => (
+                        <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-80 rounded-lg shadow-lg"></div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {creators.map((creator) => (
+                        <CreatorCard key={creator.id} creator={creator} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Content for Newsletter */}
+                {selectedContent.length > 0 && (
+                  <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-purple-50/30">
+                    <CardHeader>
+                      <CardTitle className="text-purple-700">Selected Content for Newsletter ({selectedContent.length} items)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-4">
+                        {selectedContent.map((item) => (
+                          <div key={`${item.id}-${item.type}`} className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg border">
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className="bg-white">
+                                {item.type}
+                              </Badge>
+                              <div>
+                                <p className="font-medium">{item.title || item.full_name}</p>
+                                <p className="text-sm text-gray-600 line-clamp-1">
+                                  {item.description || item.bio || 'No description'}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFromNewsletter(item.id, item.type)}
+                              className="hover:bg-red-100 hover:text-red-600"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'drafts' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Draft Newsletters</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {newsletters
-                .filter(n => n.status === 'draft')
-                .map((newsletter) => (
-                  <NewsletterCard key={newsletter.id} newsletter={newsletter} />
-                ))}
-            </div>
-            {newsletters.filter(n => n.status === 'draft').length === 0 && (
-              <div className="text-center py-12 text-gray-500">
-                No draft newsletters found
+          {activeTab === 'drafts' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Draft Newsletters</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {newsletters
+                  .filter(n => n.status === 'draft')
+                  .map((newsletter) => (
+                    <NewsletterCard key={newsletter.id} newsletter={newsletter} />
+                  ))}
               </div>
-            )}
-          </div>
-        )}
+              {newsletters.filter(n => n.status === 'draft').length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  No draft newsletters found
+                </div>
+              )}
+            </div>
+          )}
 
-        {activeTab === 'sent' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Sent Newsletters</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {newsletters
-                .filter(n => n.status === 'sent')
-                .map((newsletter) => (
-                  <NewsletterCard key={newsletter.id} newsletter={newsletter} />
-                ))}
-            </div>
-            {newsletters.filter(n => n.status === 'sent').length === 0 && (
-              <div className="text-center py-12 text-gray-500">
-                No sent newsletters found
+          {activeTab === 'sent' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Sent Newsletters</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {newsletters
+                  .filter(n => n.status === 'sent')
+                  .map((newsletter) => (
+                    <NewsletterCard key={newsletter.id} newsletter={newsletter} />
+                  ))}
               </div>
-            )}
-          </div>
-        )}
+              {newsletters.filter(n => n.status === 'sent').length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  No sent newsletters found
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </AdminLayout>
   );
