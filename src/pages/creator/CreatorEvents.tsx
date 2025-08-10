@@ -162,13 +162,10 @@ const CreatorEvents = () => {
               {searchTerm ? 'No events match your search criteria.' : 'Create your first event to get started'}
             </p>
             {!searchTerm && (
-            <Button 
-  onClick={() => navigate('/creator/events/create')}
-  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl"
->
-  <Plus className="h-4 w-4 mr-2" />
-  Create First Event
-</Button>
+              <Button onClick={() => navigate('/creator/events/create')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Event
+              </Button>
             )}
           </CardContent>
         </Card>
