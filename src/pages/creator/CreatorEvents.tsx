@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { Event } from '@/services/eventService';
 import PaginationControls from '@/components/creator/PaginationControls';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 const EVENTS_PER_PAGE = 6;
 
@@ -208,12 +209,14 @@ const CreatorEvents = () => {
                     {event.description}
                   </p>
 
-                  <div className="flex items-center gap-2 mb-4">
-                    <Badge variant={event.is_free ? 'secondary' : 'default'}>
-                      {event.is_free ? 'Free' : `$${event.price}`}
-                    </Badge>
-                    <Badge variant="outline">{event.event_type}</Badge>
-                  </div>
+                 <div className="flex items-center gap-2 mb-4">
+                <Badge variant={event.is_free ? 'secondary' : 'default'}>
+                 {event.is_free ? 'Free' : (
+                <PriceDisplay amount={event.price} originalCurrency="USD" />
+                    )}
+             </Badge>
+               <Badge variant="outline">{event.event_type}</Badge>
+                </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <Button 
