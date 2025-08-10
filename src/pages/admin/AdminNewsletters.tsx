@@ -119,7 +119,7 @@ const AdminNewsletters = () => {
   const loadContent = async () => {
     setLoading(true);
     try {
-      // Load latest courses
+      // Load latest courses with proper join
       const { data: coursesData } = await supabase
         .from('courses')
         .select(`
@@ -128,7 +128,8 @@ const AdminNewsletters = () => {
           description,
           thumbnail_url,
           price,
-          profiles:creator_id (
+          creator_id,
+          profiles!courses_creator_id_fkey (
             full_name
           )
         `)
@@ -136,7 +137,7 @@ const AdminNewsletters = () => {
         .order('created_at', { ascending: false })
         .limit(6);
 
-      // Load upcoming events
+      // Load upcoming events with proper join
       const { data: eventsData } = await supabase
         .from('events')
         .select(`
@@ -148,7 +149,8 @@ const AdminNewsletters = () => {
           start_time,
           end_time,
           price,
-          profiles:creator_id (
+          creator_id,
+          profiles!events_creator_id_fkey (
             full_name
           )
         `)
@@ -187,7 +189,7 @@ const AdminNewsletters = () => {
 
           return {
             ...course,
-            creator: course.profiles,
+            creator: course.profiles || { full_name: 'Unknown Creator' },
             enrollment_count: enrollmentCount || 0,
             average_rating: averageRating,
             total_reviews: reviews?.length || 0
@@ -205,7 +207,7 @@ const AdminNewsletters = () => {
 
           return {
             ...event,
-            creator: event.profiles,
+            creator: event.profiles || { full_name: 'Unknown Creator' },
             registration_count: registrationCount || 0,
             average_rating: 4.5,
             total_reviews: 12

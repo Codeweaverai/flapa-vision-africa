@@ -18,6 +18,7 @@ export interface Event {
   created_at: string;
   updated_at: string;
   online_meeting_link?: string;
+  is_published?: boolean;
 }
 
 export interface Registration {
