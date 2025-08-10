@@ -11,6 +11,7 @@ import { ArrowLeft, Plus, Edit, Trash2, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface EventTicket {
   id: string;
@@ -97,7 +98,6 @@ const CreatorEventTickets = () => {
     setDialogOpen(true);
   };
 
-  // Helper function to format date for datetime-local input
   const formatDateForInput = (dateString: string) => {
     const date = new Date(dateString);
     const isoString = date.toISOString();
@@ -109,16 +109,12 @@ const CreatorEventTickets = () => {
     if (!eventId) return;
 
     try {
-      // Prepare the data for Supabase
       const ticketData = {
         ...formData,
-        // Convert empty string to null for dates
         early_bird_end_date: formData.early_bird_end_date 
           ? new Date(formData.early_bird_end_date).toISOString() 
           : null,
-        // Ensure price is a number
         price: Number(formData.price),
-        // Ensure quantity is a number
         quantity_available: Number(formData.quantity_available)
       };
 
@@ -191,7 +187,11 @@ const CreatorEventTickets = () => {
   return (
     <CreatorLayout title="Event Tickets">
       <div className="mb-6">
-        <Button variant="outline" onClick={() => navigate('/creator/events')}>
+        <Button 
+          variant="outline" 
+          className="hover:bg-gradient-to-r hover:from-orange-500/10 hover:to-purple-600/10"
+          onClick={() => navigate('/creator/events')}
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Events
         </Button>
@@ -199,7 +199,10 @@ const CreatorEventTickets = () => {
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Event Tickets</h2>
-        <Button onClick={handleAddTicket}>
+        <Button 
+          className="bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg hover:from-orange-600 hover:to-purple-700"
+          onClick={handleAddTicket}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add Ticket
         </Button>
@@ -215,7 +218,10 @@ const CreatorEventTickets = () => {
             <p className="text-muted-foreground mb-6">
               Create ticket types for your event
             </p>
-            <Button onClick={handleAddTicket}>
+            <Button 
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg hover:from-orange-600 hover:to-purple-700"
+              onClick={handleAddTicket}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add First Ticket
             </Button>
@@ -230,16 +236,23 @@ const CreatorEventTickets = () => {
                   <div className="flex-1">
                     <CardTitle className="text-lg">{ticket.name}</CardTitle>
                     <p className="text-sm text-muted-foreground">{ticket.ticket_type}</p>
-                    <p className="text-lg font-bold text-primary">${ticket.price}</p>
+                    <p className="text-lg font-bold text-primary">
+                      <PriceDisplay amount={ticket.price} originalCurrency="USD" />
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditTicket(ticket)}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="hover:bg-gradient-to-r hover:from-orange-500/10 hover:to-purple-600/10"
+                      onClick={() => handleEditTicket(ticket)}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:bg-destructive/10"
                       onClick={() => handleDeleteTicket(ticket.id)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -251,13 +264,23 @@ const CreatorEventTickets = () => {
                 {ticket.description && (
                   <p className="text-sm text-muted-foreground mb-2">{ticket.description}</p>
                 )}
-                <p className="text-sm">Available: {ticket.quantity_available - ticket.quantity_sold}</p>
-                <p className="text-sm">Sold: {ticket.quantity_sold}</p>
-                {ticket.early_bird_end_date && (
-                  <p className="text-sm text-orange-600">
-                    Early bird until: {new Date(ticket.early_bird_end_date).toLocaleDateString()}
-                  </p>
-                )}
+                <div className="space-y-1">
+                  <p className="text-sm">Available: {ticket.quantity_available - ticket.quantity_sold}</p>
+                  <p className="text-sm">Sold: {ticket.quantity_sold}</p>
+                  {ticket.early_bird_end_date && (
+                    <p className="text-sm text-orange-600">
+                      Early bird until: {new Date(ticket.early_bird_end_date).toLocaleDateString()}
+                    </p>
+                  )}
+                  <div className="pt-2">
+                    <Button 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg hover:from-orange-600 hover:to-purple-700"
+                      size="sm"
+                    >
+                      View Purchases
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -362,10 +385,18 @@ const CreatorEventTickets = () => {
             </div>
 
             <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="hover:bg-gradient-to-r hover:from-orange-500/10 hover:to-purple-600/10"
+                onClick={() => setDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button 
+                type="submit"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg hover:from-orange-600 hover:to-purple-700"
+              >
                 {editingTicket ? 'Update' : 'Create'} Ticket
               </Button>
             </div>
