@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -37,17 +37,6 @@ import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
-
-// Debounce utility function
-function debounce(func: (...args: any[]) => void, delay: number) {
-  let timeoutId: NodeJS.Timeout;
-  return function(...args: any[]) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-      func.apply(this, args);
-    }, delay);
-  };
-}
 
 interface Course {
   id?: string;
@@ -198,7 +187,14 @@ const CourseLearningPage = () => {
   const [hasPassedExam, setHasPassedExam] = useState(false);
   const [canRetakeExam, setCanRetakeExam] = useState(false);
   const [showFinalExamModal, setShowFinalExamModal] = useState(false);
-  const [completedThresholds, setCompletedThresholds] = useState<Record<string, boolean>>({});
+  const [showResumeButton, setShowResumeButton] = useState(false);
+  const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
+  
+  const lessonCompletedRef = useRef<Record<string, boolean>>({});
+  const isEnrolled = enrollment?.payment_status === 'completed';
+  const progressPercentage = progress?.progress_percentage || 0;
+  const isNotComplete = progressPercentage < 100;
+  const hasLessons = modules.some(module => module.lessons.length > 0);
 
   useEffect(() => {
     if (courseId) {
@@ -212,6 +208,54 @@ const CourseLearningPage = () => {
       setLoading(false);
     }
   }, [courseId, user]);
+
+  useEffect(() => {
+    if (isEnrolled && modules.length > 0 && !selectedLesson) {
+      if (progress?.last_accessed_lesson_id) {
+        const lastLesson = modules.flatMap(m => m.lessons)
+          .find(l => l.id === progress.last_accessed_lesson_id);
+        
+        if (lastLesson) {
+          setResumeLesson(lastLesson);
+          setShowResumeButton(true);
+          return;
+        }
+      }
+      
+      const firstLesson = modules[0]?.lessons?.[0];
+      if (firstLesson) {
+        setSelectedLesson(firstLesson);
+        setCurrentLessonId(firstLesson.id);
+      }
+    }
+  }, [isEnrolled, modules, progress, selectedLesson]);
+
+  useEffect(() => {
+    const completedMap = completedLessons.reduce((acc, id) => {
+      acc[id] = true;
+      return acc;
+    }, {} as Record<string, boolean>);
+    lessonCompletedRef.current = completedMap;
+  }, [completedLessons]);
+
+  useEffect(() => {
+    if (isEnrolled && selectedLesson) {
+      supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user?.id,
+          course_id: courseId,
+          last_accessed_module_id: selectedLesson.module_id,
+          last_accessed_lesson_id: selectedLesson.id,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        })
+        .then(({ error }) => {
+          if (error) console.error('Error updating last accessed:', error);
+        });
+    }
+  }, [selectedLesson, isEnrolled]);
 
   const fetchCourseData = async () => {
     if (!courseId) {
@@ -264,15 +308,6 @@ const CourseLearningPage = () => {
       );
       
       setModules(modulesWithLessons);
-
-      // Auto-select first lesson if enrolled and modules exist
-      if (enrollment?.payment_status === 'completed' && modulesWithLessons.length > 0) {
-        const firstLesson = modulesWithLessons[0]?.lessons?.[0];
-        if (firstLesson) {
-          setSelectedLesson(firstLesson);
-          setCurrentLessonId(firstLesson.id);
-        }
-      }
 
       const { count: enrolledCount, error: enrollCountError } = await supabase
         .from('course_enrollments')
@@ -390,13 +425,6 @@ const CourseLearningPage = () => {
       if (error) throw error;
       const completedIds = completedData?.map(item => item.lesson_id) || [];
       setCompletedLessons(completedIds);
-      
-      // Initialize the thresholds for completed lessons
-      const thresholds = completedIds.reduce((acc, id) => {
-        acc[id] = true;
-        return acc;
-      }, {} as Record<string, boolean>);
-      setCompletedThresholds(thresholds);
     } catch (error) {
       console.error('Error fetching completed lessons:', error);
     }
@@ -464,6 +492,14 @@ const CourseLearningPage = () => {
     }
   };
 
+  const handleResumeLearning = () => {
+    if (resumeLesson) {
+      setSelectedLesson(resumeLesson);
+      setCurrentLessonId(resumeLesson.id);
+      setShowResumeButton(false);
+    }
+  };
+
   const handleStartLearning = () => {
     if (modules.length > 0 && modules[0].lessons.length > 0) {
       const firstLesson = modules[0].lessons[0];
@@ -499,43 +535,33 @@ const CourseLearningPage = () => {
     setSelectedLesson(lesson);
   };
 
-  const debouncedProgressUpdate = debounce(async (lessonId: string, enrollmentId: string) => {
-    try {
-      await supabase
-        .from('lesson_progress')
-        .upsert({
-          enrollment_id: enrollmentId,
-          lesson_id: lessonId,
-          is_completed: true,
-          completion_date: new Date().toISOString()
-        }, {
-          onConflict: 'enrollment_id,lesson_id'
-        });
-      
-      fetchCompletedLessons();
-      const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
-      const completedCount = [...new Set([...completedLessons, lessonId])].length;
-      const progressPercentage = Math.round((completedCount / totalLessons) * 100);
-      updateCourseProgress(progressPercentage);
-    } catch (error) {
-      console.error('Error updating lesson progress:', error);
-    }
-  }, 2000); // 2 second debounce
-
-  const handleVideoProgress = (progress: { played: number, playedSeconds: number, loaded: number, loadedSeconds: number }) => {
+  const handleVideoProgress = (progress: { played: number, playedSeconds: number }) => {
     setCurrentVideoTime(progress.playedSeconds);
     
-    if (progress.playedSeconds > 0 && selectedLesson && enrollment) {
+    if (progress.playedSeconds > 0 && (selectedLesson || modules[0]?.lessons[0]) && isEnrolled) {
+      const currentLesson = selectedLesson || modules[0]?.lessons[0];
       const watchPercentage = progress.played * 100;
       
-      // Only proceed if we haven't already marked this lesson complete
-      if (watchPercentage > 80 && !completedThresholds[selectedLesson.id]) {
-        // Update local state immediately
-        setCompletedThresholds(prev => ({ ...prev, [selectedLesson.id]: true }));
-        setCompletedLessons(prev => [...new Set([...prev, selectedLesson.id])]);
+      if (watchPercentage > 80 && currentLesson && !lessonCompletedRef.current[currentLesson.id]) {
+        lessonCompletedRef.current[currentLesson.id] = true;
         
-        // Debounce the backend update
-        debouncedProgressUpdate(selectedLesson.id, enrollment.id);
+        supabase
+          .from('lesson_progress')
+          .upsert({
+            enrollment_id: enrollment?.id,
+            lesson_id: currentLesson.id,
+            is_completed: true,
+            completion_date: new Date().toISOString()
+          }, {
+            onConflict: 'enrollment_id,lesson_id'
+          })
+          .then(() => {
+            fetchCompletedLessons();
+            const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
+            const completedCount = [...new Set([...completedLessons, currentLesson.id])].length;
+            const progressPercentage = Math.round((completedCount / totalLessons) * 100);
+            updateCourseProgress(progressPercentage);
+          });
       }
     }
   };
@@ -567,11 +593,6 @@ const CourseLearningPage = () => {
     
     fetchCourseData();
   };
-
-  const enrolledUser = enrollment && enrollment.payment_status === 'completed';
-  const progressPercentage = progress?.progress_percentage || 0;
-  const isNotComplete = progressPercentage < 100;
-  const hasLessons = modules.some(module => module.lessons.length > 0);
 
   if (loading) {
     return (
@@ -611,6 +632,18 @@ const CourseLearningPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <div className="container mx-auto px-4 py-8">
+        {showResumeButton && resumeLesson && (
+          <div className="mb-4">
+            <Button 
+              onClick={handleResumeLearning}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Resume where you left off: {resumeLesson.title}
+            </Button>
+          </div>
+        )}
+
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Badge variant="secondary">{course.category}</Badge>
@@ -641,14 +674,14 @@ const CourseLearningPage = () => {
           </div>
         </div>
 
-        {enrollment && enrollment.payment_status === 'completed' && (
+        {isEnrolled && (
           <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Your Progress</h3>
-                <span className="text-2xl font-bold text-orange-600">{progress?.progress_percentage || 0}%</span>
+                <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
               </div>
-              <Progress value={progress?.progress_percentage || 0} className="h-3" />
+              <Progress value={progressPercentage} className="h-3" />
               <div className="flex items-center justify-between mt-4">
                 <p className="text-sm text-gray-600">
                   Keep going! You're doing great.
@@ -722,40 +755,6 @@ const CourseLearningPage = () => {
           </div>
 
           <div className="lg:col-span-7">
-            {enrollment && enrollment.payment_status === 'completed' && selectedLesson && selectedLesson.video_url && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Play className="h-5 w-5" />
-                    {selectedLesson.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="aspect-video rounded-lg overflow-hidden bg-black">
-                    <ReactPlayer
-                      url={selectedLesson.video_url}
-                      width="100%"
-                      height="100%"
-                      controls={true}
-                      config={{
-                        file: {
-                          attributes: {
-                            controlsList: 'nodownload'
-                          }
-                        }
-                      }}
-                      onProgress={handleVideoProgress}
-                      progressInterval={1000}
-                      light={course.thumbnail_url}
-                    />
-                  </div>
-                  {selectedLesson.description && (
-                    <p className="mt-4 text-gray-600">{selectedLesson.description}</p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
             <Tabs defaultValue="content" className="w-full">
               <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="content" className="flex items-center gap-2">
@@ -772,26 +771,50 @@ const CourseLearningPage = () => {
               </TabsList>
               
               <TabsContent value="content" className="space-y-6">
-                {enrollment && enrollment.payment_status === 'completed' ? (
+                {isEnrolled ? (
                   <Card>
                     <CardContent className="p-6">
-                      {selectedLesson ? (
+                      {selectedLesson || modules[0]?.lessons[0] ? (
                         <div>
-                          <h3 className="text-lg font-semibold mb-4">{selectedLesson.title}</h3>
-                          {selectedLesson.description && (
-                            <p className="text-gray-600 mb-4">{selectedLesson.description}</p>
+                          <h3 className="text-lg font-semibold mb-4">
+                            {selectedLesson?.title || modules[0]?.lessons[0]?.title}
+                          </h3>
+                          {(selectedLesson?.description || modules[0]?.lessons[0]?.description) && (
+                            <p className="text-gray-600 mb-4">
+                              {selectedLesson?.description || modules[0]?.lessons[0]?.description}
+                            </p>
                           )}
-                          {selectedLesson.content && (
+                          {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
+                            <div className="aspect-video rounded-lg overflow-hidden bg-black mb-4">
+                              <ReactPlayer
+                                url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url}
+                                width="100%"
+                                height="100%"
+                                controls={true}
+                                config={{
+                                  file: {
+                                    attributes: {
+                                      controlsList: 'nodownload'
+                                    }
+                                  }
+                                }}
+                                onProgress={handleVideoProgress}
+                                progressInterval={1000}
+                                light={course.thumbnail_url}
+                              />
+                            </div>
+                          )}
+                          {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
                             <div className="prose max-w-none">
-                              {typeof selectedLesson.content === 'string' 
-                                ? selectedLesson.content 
-                                : JSON.stringify(selectedLesson.content)
+                              {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
+                                ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
+                                : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
                               }
                             </div>
                           )}
                         </div>
                       ) : (
-                        <p className="text-gray-500">Select a lesson to view its content</p>
+                        <p className="text-gray-500">This course doesn't have any lessons yet</p>
                       )}
                     </CardContent>
                   </Card>
@@ -812,7 +835,7 @@ const CourseLearningPage = () => {
               </TabsContent>
 
               <TabsContent value="lesson-notes" className="space-y-6">
-                {enrollment && enrollment.payment_status === 'completed' ? (
+                {isEnrolled ? (
                   <LessonNotesTab 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
                   />
@@ -833,7 +856,7 @@ const CourseLearningPage = () => {
               </TabsContent>
               
               <TabsContent value="transcripts">
-                {enrollment && enrollment.payment_status === 'completed' ? (
+                {isEnrolled ? (
                   <VideoTranscripts 
                     lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
                     currentTime={currentVideoTime}
@@ -868,12 +891,14 @@ const CourseLearningPage = () => {
 
         <FloatingAILearningAssistant 
           courseId={courseId!}
-          lessonId={selectedLesson?.id}
-          lessonTitle={selectedLesson?.title}
-          lessonContent={typeof selectedLesson?.content === 'string' ? selectedLesson.content : JSON.stringify(selectedLesson?.content)}
+          lessonId={selectedLesson?.id || modules[0]?.lessons[0]?.id || ''}
+          lessonTitle={selectedLesson?.title || modules[0]?.lessons[0]?.title || ''}
+          lessonContent={typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
+            ? (selectedLesson?.content || modules[0]?.lessons[0]?.content || '')
+            : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content || {})}
         />
 
-        {(!enrollment || enrollment.payment_status !== 'completed') && (
+        {!isEnrolled && (
           <Card className="mt-8 sticky bottom-4">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
