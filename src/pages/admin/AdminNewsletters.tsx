@@ -1,14 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus } from 'lucide-react';
+import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/layout/AdminLayout';
 import EnhancedNewsletterForm from '@/components/admin/EnhancedNewsletterForm';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Course {
   id: string;
@@ -81,6 +81,8 @@ const AdminNewsletters = () => {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedContent, setSelectedContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   useEffect(() => {
     loadContent();
@@ -90,37 +92,49 @@ const AdminNewsletters = () => {
 
   const loadUsers = async () => {
     try {
-      // Use the get_user_emails function to fetch user emails
-      const { data, error } = await supabase.rpc('get_user_emails', {
+      console.log('Loading users...');
+      
+      // First try to get users through RPC function
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_emails', {
         user_ids: []
       });
 
-      if (error) {
-        // Fallback: try to get users from profiles table
-        const { data: profilesData } = await supabase
+      if (rpcError) {
+        console.error('RPC error:', rpcError);
+        
+        // Fallback: get all profiles and construct user objects
+        const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, full_name');
+          .select('id, full_name, email, created_at');
+
+        if (profilesError) {
+          console.error('Profiles error:', profilesError);
+          toast.error('Failed to load users: ' + profilesError.message);
+          return;
+        }
 
         if (profilesData) {
-          const usersWithEmails = profilesData.map(profile => ({
+          const formattedUsers = profilesData.map((profile: any) => ({
             id: profile.id,
-            email: `user-${profile.id.slice(0, 8)}@email.com`, // Placeholder email
-            full_name: profile.full_name,
-            created_at: new Date().toISOString()
+            email: profile.email || `user-${profile.id.slice(0, 8)}@email.com`,
+            full_name: profile.full_name || `User ${profile.id.slice(0, 8)}`,
+            created_at: profile.created_at || new Date().toISOString()
           }));
-          setUsers(usersWithEmails);
+          setUsers(formattedUsers);
+          console.log('Loaded users from profiles:', formattedUsers.length);
         }
         return;
       }
 
-      if (data) {
-        const formattedUsers = data.map((user: any) => ({
+      if (rpcData) {
+        const formattedUsers = rpcData.map((user: any) => ({
           id: user.id,
           email: user.email,
           full_name: user.full_name || `User ${user.email}`,
           created_at: user.created_at
         }));
         setUsers(formattedUsers);
+        console.log('Loaded users from RPC:', formattedUsers.length);
       }
     } catch (error) {
       console.error('Error loading users:', error);
@@ -332,40 +346,60 @@ const AdminNewsletters = () => {
     setSelectedContent(prev => prev.filter(item => !(item.id === itemId && item.type === type)));
   };
 
+  const handleEditNewsletter = (newsletter: Newsletter) => {
+    setEditingNewsletter(newsletter);
+    setShowEditDialog(true);
+  };
+
+  const handleDeleteNewsletter = async (newsletterId: string) => {
+    if (!confirm('Are you sure you want to delete this newsletter?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('newsletters')
+        .delete()
+        .eq('id', newsletterId);
+
+      if (error) throw error;
+      
+      toast.success('Newsletter deleted successfully');
+      loadNewsletters();
+    } catch (error) {
+      console.error('Error deleting newsletter:', error);
+      toast.error('Failed to delete newsletter');
+    }
+  };
+
   const CourseCard = ({ course }: { course: Course }) => (
     <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-orange-50/30 to-purple-50/30 overflow-hidden transform hover:-translate-y-2">
-      <div className="relative overflow-hidden">
+      <div className="relative overflow-hidden h-48">
         {course.thumbnail_url ? (
           <img
             src={course.thumbnail_url}
             alt={course.title}
-            className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
+          <div className="w-full h-full bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
             <span className="text-purple-600 font-semibold">No Image</span>
           </div>
         )}
-        <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-bold text-purple-600 shadow-lg">
-          ${course.price}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute bottom-4 left-4 right-4">
+          <h3 className="text-white font-bold text-lg mb-2 line-clamp-2">{course.title}</h3>
+          <div className="flex items-center justify-between">
+            <span className="text-white/90 font-medium">${course.price}</span>
+            {course.average_rating && course.average_rating > 0 && (
+              <div className="flex items-center gap-1 text-white/90">
+                <Star className="h-4 w-4 fill-current" />
+                <span className="text-sm">{course.average_rating.toFixed(1)}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg line-clamp-2 text-gray-800 group-hover:text-purple-700 transition-colors">
-          {course.title}
-        </CardTitle>
-        <p className="text-sm text-gray-600 line-clamp-2">{course.description}</p>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center gap-2 mb-3">
-          {course.average_rating && course.average_rating > 0 && (
-            <div className="flex items-center gap-1">
-              <Star className="h-4 w-4 text-yellow-500 fill-current" />
-              <span className="text-sm font-medium">{course.average_rating.toFixed(1)}</span>
-              <span className="text-xs text-gray-500">({course.total_reviews})</span>
-            </div>
-          )}
-        </div>
+      <CardContent className="p-4">
+        <p className="text-sm text-gray-600 line-clamp-2 mb-3">{course.description}</p>
         <div className="flex items-center justify-between text-sm mb-4">
           <div className="flex items-center gap-1 text-gray-600">
             <Users className="h-4 w-4" />
@@ -387,34 +421,33 @@ const AdminNewsletters = () => {
 
   const EventCard = ({ event }: { event: Event }) => (
     <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-purple-50/30 to-orange-50/30 overflow-hidden transform hover:-translate-y-2">
-      <div className="relative overflow-hidden">
+      <div className="relative overflow-hidden h-48">
         {event.image_url ? (
           <img
             src={event.image_url}
             alt={event.title}
-            className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-purple-100 via-orange-100 to-pink-100 flex items-center justify-center">
+          <div className="w-full h-full bg-gradient-to-br from-purple-100 via-orange-100 to-pink-100 flex items-center justify-center">
             <span className="text-orange-600 font-semibold">No Image</span>
           </div>
         )}
-        <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-bold text-orange-600 shadow-lg">
-          ${event.price}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute bottom-4 left-4 right-4">
+          <h3 className="text-white font-bold text-lg mb-2 line-clamp-2">{event.title}</h3>
+          <div className="flex items-center justify-between">
+            <span className="text-white/90 font-medium">${event.price}</span>
+            <div className="flex items-center gap-1 text-white/90">
+              <Calendar className="h-4 w-4" />
+              <span className="text-sm">{new Date(event.start_time).toLocaleDateString()}</span>
+            </div>
+          </div>
         </div>
       </div>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg line-clamp-2 text-gray-800 group-hover:text-orange-700 transition-colors">
-          {event.title}
-        </CardTitle>
-        <p className="text-sm text-gray-600 line-clamp-2">{event.description}</p>
-      </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="p-4">
+        <p className="text-sm text-gray-600 line-clamp-2 mb-3">{event.description}</p>
         <div className="space-y-2 text-sm mb-3">
-          <div className="flex items-center gap-1 text-gray-600">
-            <Calendar className="h-4 w-4" />
-            <span>{new Date(event.start_time).toLocaleDateString()}</span>
-          </div>
           {event.location && (
             <div className="flex items-center gap-1 text-gray-600">
               <MapPin className="h-4 w-4" />
@@ -443,8 +476,8 @@ const AdminNewsletters = () => {
 
   const CreatorCard = ({ creator }: { creator: Creator }) => (
     <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-orange-50/20 to-purple-50/20 overflow-hidden transform hover:-translate-y-2">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-3">
+      <CardContent className="p-6">
+        <div className="flex items-center gap-4 mb-4">
           {creator.avatar_url ? (
             <img
               src={creator.avatar_url}
@@ -457,9 +490,9 @@ const AdminNewsletters = () => {
             </div>
           )}
           <div className="flex-1">
-            <CardTitle className="text-lg text-gray-800 group-hover:text-purple-700 transition-colors">
+            <h3 className="text-lg font-bold text-gray-800 group-hover:text-purple-700 transition-colors">
               {creator.full_name}
-            </CardTitle>
+            </h3>
             {creator.average_rating && (
               <div className="flex items-center gap-1 mt-1">
                 <Star className="h-4 w-4 text-yellow-500 fill-current" />
@@ -468,12 +501,12 @@ const AdminNewsletters = () => {
             )}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
+        
         {creator.bio && (
           <p className="text-sm text-gray-600 line-clamp-3 mb-4">{creator.bio}</p>
         )}
-        <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+        
+        <div className="grid grid-cols-3 gap-3 text-sm mb-4">
           <div className="text-center p-3 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg">
             <div className="font-bold text-purple-600">{creator.total_courses}</div>
             <div className="text-xs text-gray-600">Courses</div>
@@ -482,13 +515,12 @@ const AdminNewsletters = () => {
             <div className="font-bold text-orange-600">{creator.total_events}</div>
             <div className="text-xs text-gray-600">Events</div>
           </div>
-        </div>
-        <div className="flex items-center justify-center py-3 border-t border-gray-100 mb-3">
-          <div className="flex items-center gap-1 text-gray-700">
-            <User className="h-4 w-4" />
-            <span className="font-medium">{creator.total_students} students</span>
+          <div className="text-center p-3 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg">
+            <div className="font-bold text-green-600">{creator.total_students}</div>
+            <div className="text-xs text-gray-600">Students</div>
           </div>
         </div>
+        
         <Button 
           className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 shadow-lg" 
           size="sm"
@@ -540,9 +572,25 @@ const AdminNewsletters = () => {
             View
           </Button>
           {newsletter.status === 'draft' && (
-            <Button size="sm" className="flex-1 bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600">
-              Edit
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleEditNewsletter(newsletter)}
+                className="flex-1"
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleDeleteNewsletter(newsletter.id)}
+                className="text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
           )}
         </div>
       </CardContent>
@@ -772,6 +820,18 @@ const AdminNewsletters = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Newsletter Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Newsletter</DialogTitle>
+          </DialogHeader>
+          {editingNewsletter && (
+            <EnhancedNewsletterForm />
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };

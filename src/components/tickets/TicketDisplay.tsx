@@ -1,7 +1,11 @@
+
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
-import { Calendar, MapPin, Clock, User, Ticket, Hash } from 'lucide-react';
+import { Calendar, MapPin, Clock, User, Ticket, Hash, Printer, Download } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface TicketProps {
   ticket: {
@@ -32,10 +36,85 @@ interface TicketProps {
 const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false }) => {
   const event = ticket.booking.event;
   const eventTicket = ticket.booking.event_ticket;
+  const ticketRef = React.useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    content: () => ticketRef.current,
+    pageStyle: `
+      @page {
+        size: auto;
+        margin: 0mm;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+    `,
+  });
+
+  const downloadPdfTicket = () => {
+    if (!ticketRef.current) return;
+
+    const input = ticketRef.current;
+    const scale = 2; // Increase scale for better quality
+
+    html2canvas(input, {
+      scale,
+      useCORS: true,
+      logging: false,
+      allowTaint: true,
+    }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 295; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`${event.title}_${ticket.ticket_code}.pdf`);
+    });
+  };
 
   return (
     <div className={`ticket-container ${showPrintStyles ? 'print-ticket' : ''}`}>
-      <div className="relative overflow-hidden bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-4xl mx-auto">
+      {/* Action buttons */}
+      {!showPrintStyles && (
+        <div className="flex justify-center gap-4 mb-6">
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+          >
+            <Printer className="h-5 w-5" />
+            Print Ticket
+          </button>
+          <button
+            onClick={downloadPdfTicket}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+          >
+            <Download className="h-5 w-5" />
+            Download PDF
+          </button>
+        </div>
+      )}
+
+      {/* Ticket content */}
+      <div 
+        ref={ticketRef}
+        className="relative overflow-hidden bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-4xl mx-auto"
+      >
         {/* Header with gradient */}
         <div className="relative bg-gradient-to-r from-orange-500 via-red-500 to-purple-600 text-white p-8">
           <div className="absolute inset-0 bg-black bg-opacity-10"></div>
@@ -186,6 +265,10 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
               }
               .print-ticket:last-child {
                 page-break-after: avoid;
+              }
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
               }
             }
           `}
