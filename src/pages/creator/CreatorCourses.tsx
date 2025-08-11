@@ -308,9 +308,8 @@ const CreatorCourses = () => {
                   </Button>
 
                   <Button
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
                     size="sm"
-                    className="w-full"
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 transition-all"
                     onClick={() => handleTogglePublish(course.id, course.is_published)}
                   >
                     <Play className="h-4 w-4 mr-1" />
