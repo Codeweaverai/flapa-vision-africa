@@ -1,208 +1,99 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import Stripe from "https://esm.sh/stripe@14.21.0";
+
+const supabaseClient = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  { auth: { persistSession: false } }
+);
+
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+  apiVersion: "2023-10-16",
+});
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
-}
-
-interface Database {
-  // Add your database types here
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get the Stripe webhook secret from Supabase secrets
-    const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
-    if (!webhookSecret) {
-      console.error('Missing STRIPE_WEBHOOK_SECRET')
-      return new Response('Webhook secret not configured', { status: 500 })
+    const signature = req.headers.get("stripe-signature");
+    const body = await req.text();
+    const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+
+    if (!signature || !webhookSecret) {
+      throw new Error("Missing Stripe signature or webhook secret");
     }
 
-    // Get the signature from the headers
-    const signature = req.headers.get('stripe-signature')
-    if (!signature) {
-      console.error('Missing stripe-signature header')
-      return new Response('Missing signature', { status: 400 })
-    }
+    // Verify webhook signature
+    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    
+    console.log("Received Stripe webhook:", event.type);
 
-    // Get the raw body
-    const body = await req.text()
-    
-    // Verify the webhook signature
-    const encoder = new TextEncoder()
-    const data = encoder.encode(body)
-    
-    // Extract timestamp and signature from header
-    const elements = signature.split(',')
-    let timestamp = ''
-    let v1Signature = ''
-    
-    for (const element of elements) {
-      const [key, value] = element.split('=')
-      if (key === 't') {
-        timestamp = value
-      } else if (key === 'v1') {
-        v1Signature = value
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      
+      console.log("Processing checkout session:", session.id);
+      
+      // Extract order ID from metadata
+      const orderId = session.metadata?.orderId;
+      
+      if (!orderId) {
+        console.error("No orderId found in session metadata");
+        return new Response("No orderId in metadata", { status: 400 });
       }
-    }
 
-    if (!timestamp || !v1Signature) {
-      console.error('Invalid signature format')
-      return new Response('Invalid signature format', { status: 400 })
-    }
+      // Update order status to completed
+      const { error: orderError } = await supabaseClient
+        .from('orders')
+        .update({
+          payment_status: 'completed',
+          stripe_session_id: session.id,
+          stripe_payment_intent_id: session.payment_intent,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
 
-    // Check if timestamp is recent (within 5 minutes)
-    const timestampSeconds = parseInt(timestamp)
-    const currentTime = Math.floor(Date.now() / 1000)
-    const tolerance = 300 // 5 minutes
-    
-    if (Math.abs(currentTime - timestampSeconds) > tolerance) {
-      console.error('Timestamp outside tolerance')
-      return new Response('Timestamp outside tolerance', { status: 400 })
-    }
+      if (orderError) {
+        console.error("Error updating order:", orderError);
+        throw orderError;
+      }
 
-    // Create the expected signature
-    const payload = `${timestamp}.${body}`
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(webhookSecret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    )
-    
-    const signatureBytes = await crypto.subtle.sign('HMAC', key, encoder.encode(payload))
-    const expectedSignature = Array.from(new Uint8Array(signatureBytes))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
+      console.log("Order updated successfully:", orderId);
 
-    // Compare signatures
-    if (expectedSignature !== v1Signature) {
-      console.error('Signature verification failed')
-      return new Response('Invalid signature', { status: 400 })
-    }
+      // Call verify-payment function for fulfillment
+      console.log("Calling verify-payment function for order:", orderId);
+      const { data: verifyData, error: verifyError } = await supabaseClient.functions.invoke('verify-payment', {
+        body: { orderId }
+      });
 
-    // Parse the event
-    const event = JSON.parse(body)
-    console.log('Verified webhook event:', event.type)
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient<Database>(supabaseUrl, supabaseKey)
-
-    // Handle different event types
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutCompleted(supabase, event.data.object)
-        break
-      case 'payment_intent.succeeded':
-        await handlePaymentSucceeded(supabase, event.data.object)
-        break
-      case 'payment_intent.payment_failed':
-        await handlePaymentFailed(supabase, event.data.object)
-        break
-      default:
-        console.log(`Unhandled event type: ${event.type}`)
+      if (verifyError) {
+        console.error("Error calling verify-payment:", verifyError);
+        // Don't throw here - payment is already processed, but log the issue
+        console.error("Verify-payment failed for order:", orderId, "Error:", verifyError);
+      } else {
+        console.log("Verify-payment completed successfully for order:", orderId);
+        console.log("Verify-payment response:", verifyData);
+      }
     }
 
     return new Response(JSON.stringify({ received: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    })
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
 
   } catch (error) {
-    console.error('Webhook error:', error)
-    return new Response(
-      JSON.stringify({ error: 'Webhook processing failed' }), 
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
-    )
+    console.error("Stripe webhook error:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
-})
-
-async function handleCheckoutCompleted(supabase: any, session: any) {
-  console.log('Processing checkout completion for session:', session.id)
-  
-  try {
-    // Update order status
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        payment_status: 'completed',
-        stripe_session_id: session.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_session_id', session.id)
-
-    if (error) {
-      console.error('Error updating order:', error)
-      throw error
-    }
-
-    console.log('Successfully updated order for session:', session.id)
-  } catch (error) {
-    console.error('Error in handleCheckoutCompleted:', error)
-    throw error
-  }
-}
-
-async function handlePaymentSucceeded(supabase: any, paymentIntent: any) {
-  console.log('Processing payment success for:', paymentIntent.id)
-  
-  try {
-    // Update payment status
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        payment_status: 'completed',
-        stripe_payment_intent_id: paymentIntent.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_payment_intent_id', paymentIntent.id)
-
-    if (error) {
-      console.error('Error updating payment:', error)
-      throw error
-    }
-
-    console.log('Successfully updated payment for:', paymentIntent.id)
-  } catch (error) {
-    console.error('Error in handlePaymentSucceeded:', error)
-    throw error
-  }
-}
-
-async function handlePaymentFailed(supabase: any, paymentIntent: any) {
-  console.log('Processing payment failure for:', paymentIntent.id)
-  
-  try {
-    // Update payment status
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        payment_status: 'failed',
-        stripe_payment_intent_id: paymentIntent.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_payment_intent_id', paymentIntent.id)
-
-    if (error) {
-      console.error('Error updating failed payment:', error)
-      throw error
-    }
-
-    console.log('Successfully updated failed payment for:', paymentIntent.id)
-  } catch (error) {
-    console.error('Error in handlePaymentFailed:', error)
-    throw error
-  }
-}
+});

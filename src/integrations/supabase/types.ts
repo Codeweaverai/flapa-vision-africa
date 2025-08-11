@@ -3585,16 +3585,6 @@ export type Database = {
         Args: { ticket_id: string }
         Returns: number
       }
-      get_creator_basic_info: {
-        Args: { creator_user_id: string }
-        Returns: {
-          id: string
-          username: string
-          full_name: string
-          avatar_url: string
-          bio: string
-        }[]
-      }
       get_current_user_email: {
         Args: Record<PropertyKey, never>
         Returns: string
