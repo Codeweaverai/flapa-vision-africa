@@ -1,11 +1,11 @@
 
 import React, { forwardRef, useState } from 'react';
-import { Input, InputProps } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface SecureInputProps extends Omit<InputProps, 'type'> {
+interface SecureInputProps extends Omit<React.ComponentProps<"input">, 'type'> {
   type: 'email' | 'password' | 'text' | 'tel' | 'url';
   error?: string;
   showPasswordToggle?: boolean;
