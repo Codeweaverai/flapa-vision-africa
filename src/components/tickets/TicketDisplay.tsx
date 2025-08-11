@@ -39,7 +39,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
   const ticketRef = React.useRef<HTMLDivElement>(null);
 
   const handlePrint = useReactToPrint({
-    content: () => ticketRef.current,
+    contentRef: ticketRef,
     pageStyle: `
       @page {
         size: auto;
