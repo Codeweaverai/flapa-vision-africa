@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -73,24 +74,6 @@ const CreatorAnalytics: React.FC = () => {
       loadAnalyticsData();
     }
   }, [user]);
-
-  const fetchUserProfiles = async (userIds: string[]) => {
-    if (userIds.length === 0) return [];
-    
-    const uniqueIds = [...new Set(userIds)]; // Remove duplicates
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, username, full_name, avatar_url')
-      .in('id', uniqueIds);
-
-    if (error) {
-      console.error('Error fetching user profiles:', error);
-      return [];
-    }
-    
-    return data || [];
-  };
 
   const loadAnalyticsData = async () => {
     if (!user) return;
@@ -283,42 +266,21 @@ const CreatorAnalytics: React.FC = () => {
       .sort((a, b) => b.bookings - a.bookings)
       .slice(0, 5) || [];
 
-      // Get user IDs for recent enrollments and bookings
-      const recentEnrollmentUserIds = allEnrollments
-        .slice(0, 10)
-        .map(e => e.user_id);
-        
-      const recentBookingUserIds = allBookings
-        .slice(0, 10)
-        .map(b => b.user_id);
-
-      // Fetch profiles in parallel
-      const [enrollmentProfiles, bookingProfiles] = await Promise.all([
-        fetchUserProfiles(recentEnrollmentUserIds),
-        fetchUserProfiles(recentBookingUserIds)
-      ]);
-
-      // Create a map for quick lookup
-      const profileMap = new Map(
-        [...enrollmentProfiles, ...bookingProfiles].map(p => [p.id, p])
-      );
-
-      // Process recent enrollments with actual profiles
+      // Recent activity - get user details for recent enrollments and bookings
       const recentEnrollments = allEnrollments
         .sort((a, b) => new Date(b.enrollment_date).getTime() - new Date(a.enrollment_date).getTime())
         .slice(0, 10)
         .map(enrollment => ({
           ...enrollment,
-          profiles: profileMap.get(enrollment.user_id) || { username: 'Student', full_name: 'Unknown Student' }
+          profiles: { username: 'Student', full_name: 'Student' } // Placeholder since we can't access profiles.email
         }));
 
-      // Process recent bookings with actual profiles  
       const recentBookings = allBookings
         .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
         .slice(0, 10)
         .map(booking => ({
           ...booking,
-          profiles: profileMap.get(booking.user_id) || { username: 'Attendee', full_name: 'Unknown Attendee' }
+          profiles: { username: 'Attendee', full_name: 'Attendee' } // Placeholder since we can't access profiles.email
         }));
 
       const processedData = {
