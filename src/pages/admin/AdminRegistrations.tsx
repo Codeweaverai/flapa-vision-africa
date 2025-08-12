@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, Users, CreditCard, TrendingUp, Download, FileText } from 'lucide-react';
+import { CalendarDays, Users, CreditCard, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import RegistrationsTable, { type RegistrationItem } from '@/components/admin/RegistrationsTable';
@@ -60,63 +59,56 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
       
-      // Load course enrollments with corrected join
+      // Load course enrollments with proper join
       const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select(`
           *,
           courses(title),
-          profiles:user_id(full_name, email)
+          profiles!inner(full_name, email)
         `)
         .order('enrollment_date', { ascending: false });
 
       if (enrollmentError) {
-        console.error('Enrollment error details:', {
-          message: enrollmentError.message,
-          details: enrollmentError.details,
-          hint: enrollmentError.hint
-        });
+        console.error('Enrollment error:', enrollmentError);
         toast.error('Failed to load course enrollments');
-      } else {
-        setCourseEnrollments(enrollmentsData || []);
+        return;
       }
 
-      // Load event bookings with corrected join
+      // Load event bookings with proper join
       const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
         .select(`
           *,
           events(title),
-          profiles:user_id(full_name, email)
+          profiles!inner(full_name, email)
         `)
         .order('booking_date', { ascending: false });
 
       if (bookingError) {
-        console.error('Booking error details:', {
-          message: bookingError.message,
-          details: bookingError.details,
-          hint: bookingError.hint
-        });
+        console.error('Booking error:', bookingError);
         toast.error('Failed to load event bookings');
-      } else {
-        setEventBookings(bookingsData || []);
+        return;
       }
+
+      setCourseEnrollments(enrollmentsData || []);
+      setEventBookings(bookingsData || []);
 
     } catch (error) {
       console.error('Error loading registrations:', error);
-      toast.error('An unexpected error occurred while loading registrations');
+      toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
-  // Transform course enrollments to common format
+  // Transform data to common format
   const transformedEnrollments: RegistrationItem[] = courseEnrollments.map((enrollment) => ({
     id: enrollment.id,
     user_id: enrollment.user_id,
     entity_id: enrollment.course_id,
     entity_title: enrollment.courses?.title || 'Unknown Course',
-    entity_type: 'course' as const,
+    entity_type: 'course',
     user_name: enrollment.profiles?.full_name || 'Unknown User',
     user_email: enrollment.profiles?.email || 'No email',
     created_at: enrollment.enrollment_date,
@@ -124,17 +116,15 @@ const AdminRegistrations = () => {
     payment_status: enrollment.payment_status,
     payment_amount: null,
     payment_currency: null,
-    payment_method: null,
     type: 'course'
   }));
 
-  // Transform event bookings to common format
   const transformedBookings: RegistrationItem[] = eventBookings.map((booking) => ({
     id: booking.id,
     user_id: booking.user_id,
     entity_id: booking.event_id,
     entity_title: booking.events?.title || 'Unknown Event',
-    entity_type: 'event' as const,
+    entity_type: 'event',
     user_name: booking.profiles?.full_name || 'Unknown User',
     user_email: booking.profiles?.email || 'No email',
     created_at: booking.booking_date,
@@ -142,48 +132,35 @@ const AdminRegistrations = () => {
     payment_status: booking.payment_status,
     payment_amount: booking.payment_amount,
     payment_currency: booking.payment_currency,
-    payment_method: null,
     type: 'event'
   }));
 
   const allRegistrations = [...transformedEnrollments, ...transformedBookings];
-
   const totalRegistrations = allRegistrations.length;
   const enrollmentCount = transformedEnrollments.length;
   const bookingCount = transformedBookings.length;
-  const totalRevenue = allRegistrations.reduce((sum, reg) => 
-    sum + (reg.payment_amount || 0), 0
-  );
+  const totalRevenue = allRegistrations.reduce((sum, reg) => sum + (reg.payment_amount || 0), 0);
 
-  const generateReport = async () => {
-    try {
-      const reportData = {
-        generated_at: new Date().toISOString(),
-        total_registrations: totalRegistrations,
-        course_enrollments: enrollmentCount,
-        event_bookings: bookingCount,
-        total_revenue: totalRevenue,
-        registrations: allRegistrations
-      };
+  const generateReport = () => {
+    const reportData = {
+      generated_at: new Date().toISOString(),
+      total_registrations: totalRegistrations,
+      course_enrollments: enrollmentCount,
+      event_bookings: bookingCount,
+      total_revenue: totalRevenue,
+      registrations: allRegistrations
+    };
 
-      const blob = new Blob([JSON.stringify(reportData, null, 2)], {
-        type: 'application/json'
-      });
-      
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `registrations-report-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success('Report generated successfully');
-    } catch (error) {
-      console.error('Error generating report:', error);
-      toast.error('Failed to generate report');
-    }
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `registrations-report-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Report downloaded');
   };
 
   if (loading) {
@@ -202,6 +179,7 @@ const AdminRegistrations = () => {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <AdminLayout title="Registrations">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Stats Cards */}
           <Card className="bg-gradient-to-br from-orange-500 to-purple-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
@@ -209,9 +187,7 @@ const AdminRegistrations = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalRegistrations}</div>
-              <p className="text-xs opacity-80">
-                All time registrations
-              </p>
+              <p className="text-xs opacity-80">All time registrations</p>
             </CardContent>
           </Card>
 
@@ -222,9 +198,7 @@ const AdminRegistrations = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{enrollmentCount}</div>
-              <p className="text-xs opacity-80">
-                Course sign-ups
-              </p>
+              <p className="text-xs opacity-80">Course sign-ups</p>
             </CardContent>
           </Card>
 
@@ -235,9 +209,7 @@ const AdminRegistrations = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{bookingCount}</div>
-              <p className="text-xs opacity-80">
-                Event bookings
-              </p>
+              <p className="text-xs opacity-80">Event bookings</p>
             </CardContent>
           </Card>
 
@@ -248,9 +220,7 @@ const AdminRegistrations = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-              <p className="text-xs opacity-80">
-                From paid registrations
-              </p>
+              <p className="text-xs opacity-80">From paid registrations</p>
             </CardContent>
           </Card>
         </div>
