@@ -59,7 +59,7 @@ const AdminRegistrations = () => {
   const loadRegistrations = async () => {
     try {
       // Load course enrollments with admin access
-      const { data: enrollments, error: enrollmentError } = await supabase
+      const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select(`
           *,
@@ -68,10 +68,22 @@ const AdminRegistrations = () => {
         `)
         .order('enrollment_date', { ascending: false });
 
-      if (enrollmentError) throw enrollmentError;
+      if (enrollmentError) {
+        console.error('Enrollment error:', enrollmentError);
+        toast.error('Failed to load course enrollments');
+      } else {
+        // Filter out any records with invalid profiles data
+        const validEnrollments = (enrollmentsData || []).filter(enrollment => 
+          enrollment.profiles && 
+          typeof enrollment.profiles === 'object' && 
+          'full_name' in enrollment.profiles &&
+          'email' in enrollment.profiles
+        ) as CourseEnrollment[];
+        setCourseEnrollments(validEnrollments);
+      }
 
       // Load event bookings with admin access
-      const { data: bookings, error: bookingError } = await supabase
+      const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
         .select(`
           *,
@@ -80,10 +92,20 @@ const AdminRegistrations = () => {
         `)
         .order('booking_date', { ascending: false });
 
-      if (bookingError) throw bookingError;
+      if (bookingError) {
+        console.error('Booking error:', bookingError);
+        toast.error('Failed to load event bookings');
+      } else {
+        // Filter out any records with invalid profiles data
+        const validBookings = (bookingsData || []).filter(booking => 
+          booking.profiles && 
+          typeof booking.profiles === 'object' && 
+          'full_name' in booking.profiles &&
+          'email' in booking.profiles
+        ) as EventBooking[];
+        setEventBookings(validBookings);
+      }
 
-      setCourseEnrollments(enrollments || []);
-      setEventBookings(bookings || []);
     } catch (error) {
       console.error('Error loading registrations:', error);
       toast.error('Failed to load registrations');

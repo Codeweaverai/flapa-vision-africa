@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Send, Eye, Save, Users, Calendar, BookOpen, Mail } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import NewsletterRecipients from './NewsletterRecipients';
 
 interface Recipient {
@@ -22,6 +23,7 @@ interface Recipient {
 }
 
 const EnhancedNewsletterForm = () => {
+  const { user } = useAuth();
   const [newsletter, setNewsletter] = useState({
     subject: '',
     body_html: '',
@@ -41,6 +43,11 @@ const EnhancedNewsletterForm = () => {
   ];
 
   const handleSaveDraft = async () => {
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -49,7 +56,8 @@ const EnhancedNewsletterForm = () => {
         .insert({
           subject: newsletter.subject,
           body_html: newsletter.body_html,
-          status: 'draft'
+          status: 'draft',
+          created_by: user.id
         })
         .select()
         .single();
@@ -67,6 +75,11 @@ const EnhancedNewsletterForm = () => {
   };
 
   const handleSendNewsletter = async () => {
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+
     try {
       if (!newsletter.subject.trim()) {
         toast.error('Please enter a subject');
@@ -91,7 +104,8 @@ const EnhancedNewsletterForm = () => {
         .insert({
           subject: newsletter.subject,
           body_html: newsletter.body_html,
-          status: 'sending'
+          status: 'sending',
+          created_by: user.id
         })
         .select()
         .single();

@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, Clock, User, Ticket, QrCode } from 'lucide-react';
-import QRCodeReact from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
 
 interface TicketDisplayProps {
@@ -28,9 +28,10 @@ interface TicketDisplayProps {
       payment_currency?: string;
     };
   };
+  showPrintStyles?: boolean;
 }
 
-const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
+const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket, showPrintStyles = false }) => {
   const event = ticket.event;
   const booking = ticket.booking;
 
@@ -56,33 +57,33 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 bg-white">
+    <div className={`max-w-2xl mx-auto p-3 bg-white ${showPrintStyles ? 'print:p-0 print:max-w-full' : ''}`}>
       {/* Ticket Header */}
-      <Card className="mb-4 bg-gradient-to-r from-orange-500 to-purple-600 text-white overflow-hidden">
-        <CardContent className="p-4">
+      <Card className="mb-3 bg-gradient-to-r from-orange-500 to-purple-600 text-white overflow-hidden">
+        <CardContent className="p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Ticket className="h-5 w-5" />
-              <span className="font-bold text-lg">TICKET</span>
+              <Ticket className="h-4 w-4" />
+              <span className="font-bold text-sm">TICKET</span>
             </div>
             <Badge className={`${getStatusColor(ticket.ticket_status)} text-xs`}>
               {ticket.ticket_status.toUpperCase()}
             </Badge>
           </div>
-          <div className="text-sm opacity-90">
+          <div className="text-xs opacity-90">
             Ticket ID: {ticket.ticket_code}
           </div>
         </CardContent>
       </Card>
 
       {/* Event Information */}
-      <Card className="mb-4">
-        <CardContent className="p-4">
-          <h2 className="text-xl font-bold mb-3 text-gray-800">{event.title}</h2>
+      <Card className="mb-3">
+        <CardContent className="p-3">
+          <h2 className="text-lg font-bold mb-2 text-gray-800">{event.title}</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-orange-500" />
+              <Calendar className="h-3 w-3 text-orange-500" />
               <div>
                 <div className="font-medium">Date</div>
                 <div className="text-gray-600">
@@ -92,7 +93,7 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
             </div>
 
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-purple-500" />
+              <Clock className="h-3 w-3 text-purple-500" />
               <div>
                 <div className="font-medium">Time</div>
                 <div className="text-gray-600">
@@ -103,7 +104,7 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
 
             {event.location && (
               <div className="flex items-center gap-2 md:col-span-2">
-                <MapPin className="h-4 w-4 text-green-500" />
+                <MapPin className="h-3 w-3 text-green-500" />
                 <div>
                   <div className="font-medium">Location</div>
                   <div className="text-gray-600">{event.location}</div>
@@ -112,7 +113,7 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
             )}
 
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-blue-500" />
+              <User className="h-3 w-3 text-blue-500" />
               <div>
                 <div className="font-medium">Ticket Holder</div>
                 <div className="text-gray-600">{ticket.ticket_holder_name}</div>
@@ -120,7 +121,7 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
             </div>
 
             <div className="flex items-center gap-2">
-              <Ticket className="h-4 w-4 text-orange-500" />
+              <Ticket className="h-3 w-3 text-orange-500" />
               <div>
                 <div className="font-medium">Event Type</div>
                 <div className="text-gray-600 capitalize">{event.event_type}</div>
@@ -131,18 +132,18 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
       </Card>
 
       {/* QR Code and Booking Info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
         {/* QR Code */}
         <Card>
-          <CardContent className="p-4 text-center">
+          <CardContent className="p-3 text-center">
             <div className="flex items-center justify-center mb-2">
-              <QrCode className="h-4 w-4 text-gray-600 mr-2" />
-              <span className="font-medium text-sm">Scan to Verify</span>
+              <QrCode className="h-3 w-3 text-gray-600 mr-1" />
+              <span className="font-medium text-xs">Scan to Verify</span>
             </div>
             <div className="flex justify-center">
-              <QRCodeReact
+              <QRCodeSVG
                 value={ticket.qr_code_data}
-                size={120}
+                size={80}
                 level="M"
                 includeMargin={true}
               />
@@ -152,13 +153,13 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
 
         {/* Booking Details */}
         <Card>
-          <CardContent className="p-4">
-            <h3 className="font-medium mb-3 text-center">Booking Details</h3>
-            <div className="space-y-2 text-sm">
+          <CardContent className="p-3">
+            <h3 className="font-medium mb-2 text-center text-sm">Booking Details</h3>
+            <div className="space-y-1 text-xs">
               {booking?.booking_code && (
                 <div>
                   <span className="font-medium">Booking Code:</span>
-                  <div className="text-gray-600 font-mono">{booking.booking_code}</div>
+                  <div className="text-gray-600 font-mono text-xs">{booking.booking_code}</div>
                 </div>
               )}
               
@@ -183,9 +184,9 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
       </div>
 
       {/* Important Notes */}
-      <Card className="bg-gray-50">
-        <CardContent className="p-4">
-          <h3 className="font-medium mb-2 text-sm">Important Notes:</h3>
+      <Card className="bg-gray-50 mb-3">
+        <CardContent className="p-3">
+          <h3 className="font-medium mb-2 text-xs">Important Notes:</h3>
           <ul className="text-xs text-gray-600 space-y-1">
             <li>• Please arrive 15 minutes before the event start time</li>
             <li>• This ticket is non-transferable and non-refundable</li>
@@ -196,7 +197,7 @@ const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket }) => {
       </Card>
 
       {/* Footer */}
-      <div className="text-center mt-4 text-xs text-gray-500">
+      <div className="text-center mt-3 text-xs text-gray-500">
         Powered by SkillPulse • For support, contact support@skillpulse.com
       </div>
     </div>
