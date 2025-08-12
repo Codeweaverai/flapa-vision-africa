@@ -34,6 +34,138 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
     { name: '{{display_name}}', description: 'Recipient\'s display name' }
   ];
 
+  const generateCourseHTML = (course: any) => {
+    const siteUrl = window.location.origin;
+    return `
+      <div style="max-width: 400px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">
+        ${course.thumbnail_url ? `
+          <div style="height: 200px; background: linear-gradient(135deg, #f97316, #a855f7); position: relative; overflow: hidden;">
+            <img src="${course.thumbnail_url}" alt="${course.title}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.9;" />
+            <div style="position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; color: #f97316;">
+              $${course.price || '0'}
+            </div>
+          </div>
+        ` : `
+          <div style="height: 200px; background: linear-gradient(135deg, #f97316, #a855f7); display: flex; align-items: center; justify-content: center;">
+            <div style="color: white; font-size: 48px;">📚</div>
+          </div>
+        `}
+        <div style="padding: 24px;">
+          <div style="margin-bottom: 16px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #1f2937; line-height: 1.3;">${course.title}</h3>
+            <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${(course.description || '').substring(0, 120)}${course.description && course.description.length > 120 ? '...' : ''}</p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+              <span style="background: #fef7ed; color: #ea580c; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${course.category || 'Course'}</span>
+              <span style="background: #f0f9ff; color: #0284c7; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${course.difficulty_level || 'Beginner'}</span>
+            </div>
+          </div>
+          <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #f3f4f6;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #6b7280;">
+              <span>⏱️ ${course.duration_minutes ? `${Math.floor(course.duration_minutes / 60)}h ${course.duration_minutes % 60}m` : 'Self-paced'}</span>
+              <span>👤 by ${course.creator?.full_name || 'Instructor'}</span>
+            </div>
+          </div>
+          <div style="text-align: center;">
+            <a href="${siteUrl}/courses/${course.id}" style="display: inline-block; background: linear-gradient(135deg, #f97316, #a855f7); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; transition: all 0.3s ease;">
+              View Course Details →
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const generateEventHTML = (event: any) => {
+    const siteUrl = window.location.origin;
+    const eventDate = event.start_time ? new Date(event.start_time) : null;
+    return `
+      <div style="max-width: 400px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">
+        ${event.image_url ? `
+          <div style="height: 200px; background: linear-gradient(135deg, #f97316, #a855f7); position: relative; overflow: hidden;">
+            <img src="${event.image_url}" alt="${event.title}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.9;" />
+            <div style="position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; color: #f97316;">
+              $${event.price || '0'}
+            </div>
+          </div>
+        ` : `
+          <div style="height: 200px; background: linear-gradient(135deg, #f97316, #a855f7); display: flex; align-items: center; justify-content: center;">
+            <div style="color: white; font-size: 48px;">🎉</div>
+          </div>
+        `}
+        <div style="padding: 24px;">
+          <div style="margin-bottom: 16px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #1f2937; line-height: 1.3;">${event.title}</h3>
+            <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${(event.description || '').substring(0, 120)}${event.description && event.description.length > 120 ? '...' : ''}</p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+              <span style="background: #fef7ed; color: #ea580c; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${event.event_type || 'Event'}</span>
+              ${eventDate ? `<span style="background: #f0fdf4; color: #16a34a; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">📅 ${eventDate.toLocaleDateString()}</span>` : ''}
+            </div>
+          </div>
+          <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #f3f4f6;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #6b7280;">
+              <span>📍 ${event.location || 'TBD'}</span>
+              <span>👤 by ${event.creator?.full_name || 'Organizer'}</span>
+            </div>
+            ${eventDate ? `
+              <div style="margin-top: 8px; font-size: 14px; color: #6b7280;">
+                🕒 ${eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              </div>
+            ` : ''}
+          </div>
+          <div style="text-align: center;">
+            <a href="${siteUrl}/events/${event.id}" style="display: inline-block; background: linear-gradient(135deg, #f97316, #a855f7); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; transition: all 0.3s ease;">
+              View Event Details →
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const generateCreatorHTML = (creator: any) => {
+    const siteUrl = window.location.origin;
+    return `
+      <div style="max-width: 400px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">
+        <div style="height: 120px; background: linear-gradient(135deg, #f97316, #a855f7); position: relative; display: flex; align-items: center; justify-content: center;">
+          ${creator.avatar_url ? `
+            <img src="${creator.avatar_url}" alt="${creator.full_name}" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
+          ` : `
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+              👤
+            </div>
+          `}
+        </div>
+        <div style="padding: 24px; text-align: center;">
+          <div style="margin-bottom: 16px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #1f2937;">${creator.full_name || creator.username || 'Creator'}</h3>
+            <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${(creator.bio || 'Talented creator on our platform').substring(0, 120)}${creator.bio && creator.bio.length > 120 ? '...' : ''}</p>
+          </div>
+          <div style="margin-bottom: 16px; padding: 16px; background: #f8fafc; border-radius: 12px;">
+            <div style="display: flex; justify-content: space-around; text-align: center;">
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: #f97316;">${creator.total_courses || 0}</div>
+                <div style="font-size: 12px; color: #6b7280;">Courses</div>
+              </div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: #a855f7;">${creator.total_events || 0}</div>
+                <div style="font-size: 12px; color: #6b7280;">Events</div>
+              </div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: #16a34a;">${creator.total_students || 0}</div>
+                <div style="font-size: 12px; color: #6b7280;">Students</div>
+              </div>
+            </div>
+          </div>
+          <div style="text-align: center;">
+            <a href="${siteUrl}/creators/${creator.id}" style="display: inline-block; background: linear-gradient(135deg, #f97316, #a855f7); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; transition: all 0.3s ease;">
+              View Profile →
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
   const handleSaveDraft = async () => {
     if (!user) {
       toast.error('User not authenticated');
@@ -94,39 +226,18 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
       // Generate content with selected dynamic content
       let enhancedContent = newsletter.body_html;
 
-      // Add selected content to the newsletter
+      // Add selected content to the newsletter with enhanced designs
       if (selectedContent.length > 0) {
-        enhancedContent += '\n\n<div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px;">';
-        enhancedContent += '<h2 style="color: #333; margin-bottom: 20px;">Featured Content</h2>';
+        enhancedContent += '\n\n<div style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #fef7ed, #faf5ff); border-radius: 16px;">';
+        enhancedContent += '<h2 style="color: #1f2937; margin-bottom: 30px; text-align: center; font-size: 28px; font-weight: bold;">✨ Featured Content Just For You</h2>';
 
         selectedContent.forEach((item) => {
           if (item.type === 'course') {
-            enhancedContent += `
-              <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #9333ea;">
-                <h3 style="color: #9333ea; margin: 0 0 8px 0;">${item.title}</h3>
-                <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
-                <p style="color: #f97316; font-weight: bold; margin: 0;">Price: $${item.price}</p>
-                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
-              </div>
-            `;
+            enhancedContent += generateCourseHTML(item);
           } else if (item.type === 'event') {
-            enhancedContent += `
-              <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #f97316;">
-                <h3 style="color: #f97316; margin: 0 0 8px 0;">${item.title}</h3>
-                <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
-                <p style="color: #9333ea; font-weight: bold; margin: 0;">Price: $${item.price}</p>
-                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📅 ${new Date(item.start_time).toLocaleDateString()}</p>
-                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
-              </div>
-            `;
+            enhancedContent += generateEventHTML(item);
           } else if (item.type === 'creator') {
-            enhancedContent += `
-              <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #059669;">
-                <h3 style="color: #059669; margin: 0 0 8px 0;">Featured Creator: ${item.full_name}</h3>
-                <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.bio || 'Talented creator on our platform'}</p>
-                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📚 ${item.total_courses} Courses | 🎉 ${item.total_events} Events | 👥 ${item.total_students} Students</p>
-              </div>
-            `;
+            enhancedContent += generateCreatorHTML(item);
           }
         });
 
@@ -202,39 +313,18 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
     preview = preview.replace(/\{\{course_names\}\}/g, 'React Development, Python Basics, Digital Marketing');
     preview = preview.replace(/\{\{event_titles\}\}/g, 'Tech Conference 2024, Web Dev Workshop, AI Summit');
     
-    // Add selected content to preview
+    // Add selected content to preview with enhanced designs
     if (selectedContent.length > 0) {
-      preview += '\n\n<div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px;">';
-      preview += '<h2 style="color: #333; margin-bottom: 20px;">Featured Content</h2>';
+      preview += '\n\n<div style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #fef7ed, #faf5ff); border-radius: 16px;">';
+      preview += '<h2 style="color: #1f2937; margin-bottom: 30px; text-align: center; font-size: 28px; font-weight: bold;">✨ Featured Content Just For You</h2>';
 
       selectedContent.forEach((item) => {
         if (item.type === 'course') {
-          preview += `
-            <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #9333ea;">
-              <h3 style="color: #9333ea; margin: 0 0 8px 0;">${item.title}</h3>
-              <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
-              <p style="color: #f97316; font-weight: bold; margin: 0;">Price: $${item.price}</p>
-              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
-            </div>
-          `;
+          preview += generateCourseHTML(item);
         } else if (item.type === 'event') {
-          preview += `
-            <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #f97316;">
-              <h3 style="color: #f97316; margin: 0 0 8px 0;">${item.title}</h3>
-              <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
-              <p style="color: #9333ea; font-weight: bold; margin: 0;">Price: $${item.price}</p>
-              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📅 ${new Date(item.start_time).toLocaleDateString()}</p>
-              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
-            </div>
-          `;
+          preview += generateEventHTML(item);
         } else if (item.type === 'creator') {
-          preview += `
-            <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #059669;">
-              <h3 style="color: #059669; margin: 0 0 8px 0;">Featured Creator: ${item.full_name}</h3>
-              <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.bio || 'Talented creator on our platform'}</p>
-              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📚 ${item.total_courses} Courses | 🎉 ${item.total_events} Events | 👥 ${item.total_students} Students</p>
-            </div>
-          `;
+          preview += generateCreatorHTML(item);
         }
       });
 
