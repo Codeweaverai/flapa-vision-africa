@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,7 +36,7 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
   const generateCourseHTML = (course: any) => {
     const siteUrl = window.location.origin;
     return `
-      <div style="max-width: 400px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">
+      <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb; height: 100%;">
         ${course.thumbnail_url ? `
           <div style="height: 200px; background: linear-gradient(135deg, #f97316, #a855f7); position: relative; overflow: hidden;">
             <img src="${course.thumbnail_url}" alt="${course.title}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.9;" />
@@ -50,8 +49,8 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
             <div style="color: white; font-size: 48px;">📚</div>
           </div>
         `}
-        <div style="padding: 24px;">
-          <div style="margin-bottom: 16px;">
+        <div style="padding: 24px; height: calc(100% - 200px); display: flex; flex-direction: column;">
+          <div style="margin-bottom: 16px; flex-grow: 1;">
             <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #1f2937; line-height: 1.3;">${course.title}</h3>
             <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${(course.description || '').substring(0, 120)}${course.description && course.description.length > 120 ? '...' : ''}</p>
             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
@@ -79,7 +78,7 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
     const siteUrl = window.location.origin;
     const eventDate = event.start_time ? new Date(event.start_time) : null;
     return `
-      <div style="max-width: 400px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">
+      <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb; height: 100%;">
         ${event.image_url ? `
           <div style="height: 200px; background: linear-gradient(135deg, #f97316, #a855f7); position: relative; overflow: hidden;">
             <img src="${event.image_url}" alt="${event.title}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.9;" />
@@ -92,8 +91,8 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
             <div style="color: white; font-size: 48px;">🎉</div>
           </div>
         `}
-        <div style="padding: 24px;">
-          <div style="margin-bottom: 16px;">
+        <div style="padding: 24px; height: calc(100% - 200px); display: flex; flex-direction: column;">
+          <div style="margin-bottom: 16px; flex-grow: 1;">
             <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #1f2937; line-height: 1.3;">${event.title}</h3>
             <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${(event.description || '').substring(0, 120)}${event.description && event.description.length > 120 ? '...' : ''}</p>
             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
@@ -125,7 +124,7 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
   const generateCreatorHTML = (creator: any) => {
     const siteUrl = window.location.origin;
     return `
-      <div style="max-width: 400px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">
+      <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-family: Arial, sans-serif; border: 1px solid #e5e7eb; height: 100%;">
         <div style="height: 120px; background: linear-gradient(135deg, #f97316, #a855f7); position: relative; display: flex; align-items: center; justify-content: center;">
           ${creator.avatar_url ? `
             <img src="${creator.avatar_url}" alt="${creator.full_name}" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
@@ -135,10 +134,10 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
             </div>
           `}
         </div>
-        <div style="padding: 24px; text-align: center;">
-          <div style="margin-bottom: 16px;">
-            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #1f2937;">${creator.full_name || creator.username || 'Creator'}</h3>
-            <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${(creator.bio || 'Talented creator on our platform').substring(0, 120)}${creator.bio && creator.bio.length > 120 ? '...' : ''}</p>
+        <div style="padding: 24px; height: calc(100% - 120px); display: flex; flex-direction: column;">
+          <div style="margin-bottom: 16px; flex-grow: 1;">
+            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #1f2937; text-align: center;">${creator.full_name || creator.username || 'Creator'}</h3>
+            <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; line-height: 1.5; text-align: center;">${(creator.bio || 'Talented creator on our platform').substring(0, 120)}${creator.bio && creator.bio.length > 120 ? '...' : ''}</p>
           </div>
           <div style="margin-bottom: 16px; padding: 16px; background: #f8fafc; border-radius: 12px;">
             <div style="display: flex; justify-content: space-around; text-align: center;">
@@ -230,7 +229,10 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
       if (selectedContent.length > 0) {
         enhancedContent += '\n\n<div style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #fef7ed, #faf5ff); border-radius: 16px;">';
         enhancedContent += '<h2 style="color: #1f2937; margin-bottom: 30px; text-align: center; font-size: 28px; font-weight: bold;">✨ Featured Content Just For You</h2>';
-
+        
+        // Grid container for content items
+        enhancedContent += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 24px; margin: 0 auto; max-width: 1200px;">';
+        
         selectedContent.forEach((item) => {
           if (item.type === 'course') {
             enhancedContent += generateCourseHTML(item);
@@ -240,8 +242,8 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
             enhancedContent += generateCreatorHTML(item);
           }
         });
-
-        enhancedContent += '</div>';
+        
+        enhancedContent += '</div></div>'; // Close grid container and parent div
       }
 
       // Create newsletter record
@@ -317,7 +319,10 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
     if (selectedContent.length > 0) {
       preview += '\n\n<div style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #fef7ed, #faf5ff); border-radius: 16px;">';
       preview += '<h2 style="color: #1f2937; margin-bottom: 30px; text-align: center; font-size: 28px; font-weight: bold;">✨ Featured Content Just For You</h2>';
-
+      
+      // Grid container for content items
+      preview += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 24px; margin: 0 auto; max-width: 1200px;">';
+      
       selectedContent.forEach((item) => {
         if (item.type === 'course') {
           preview += generateCourseHTML(item);
@@ -327,8 +332,8 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
           preview += generateCreatorHTML(item);
         }
       });
-
-      preview += '</div>';
+      
+      preview += '</div></div>'; // Close grid container and parent div
     }
     
     return preview;
