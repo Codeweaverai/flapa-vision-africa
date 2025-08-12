@@ -1,276 +1,328 @@
+
 import { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CombinedRegistration, EventWithRegistrations } from '@/types/eventTypes';
 import EventRegistrationsTable from '@/components/event/EventRegistrationsTable';
-import CourseEnrollmentsTable from '@/components/course/CourseEnrollmentsTable';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  full_name: string;
-}
-
-interface Course {
-  id: string;
-  title: string;
-}
-
-interface Event {
-  id: string;
-  title: string;
-  start_time: string;
-  capacity?: number;
-}
-
-interface EventBooking {
-  id: string;
-  event_id: string;
-  user_id: string;
-  status: string;
-  payment_status: string;
-  booking_date: string;
-  user?: UserProfile;
-}
-
-interface CourseEnrollment {
-  id: string;
-  course_id: string;
-  user_id: string;
-  enrollment_date: string;
-  payment_status: string;
-  is_completed: boolean;
-  user?: UserProfile;
-  course?: Course;
-}
-
-interface EventWithRegistrations extends Event {
-  registrations: (EventBooking & { user: UserProfile })[];
-}
-
-interface CourseEnrollmentWithUser extends CourseEnrollment {
-  user: UserProfile;
-  course: Course;
-}
-
-const AdminRegistrationsPage = () => {
-  const [loading, setLoading] = useState({
-    events: true,
-    courses: true
-  });
-  const [events, setEvents] = useState<EventWithRegistrations[]>([]);
-  const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollmentWithUser[]>([]);
-  const [activeTab, setActiveTab] = useState('events');
+const AdminEventRegistrations = () => {
+  const { eventId } = useParams<{ eventId: string }>();
+  const [loading, setLoading] = useState(true);
+  const [event, setEvent] = useState<EventWithRegistrations | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedRegistration, setSelectedRegistration] = useState<CombinedRegistration | null>(null);
 
   useEffect(() => {
-    fetchEventRegistrations();
-    fetchCourseEnrollments();
-  }, []);
+    if (eventId) {
+      fetchEventWithRegistrations();
+    }
+  }, [eventId]);
 
-  const fetchEventRegistrations = async () => {
-    setLoading(prev => ({ ...prev, events: true }));
+  const fetchEventWithRegistrations = async () => {
+    if (!eventId) return;
+    
+    setLoading(true);
     try {
-      const { data: eventsData, error: eventsError } = await supabase
+      // First, fetch the event details
+      const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select('*');
-      
-      if (eventsError) throw eventsError;
+        .select('*')
+        .eq('id', eventId)
+        .single();
+        
+      if (eventError) {
+        throw new Error("Event not found");
+      }
 
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('event_bookings')
+      // Fetch registrations for this event
+      const { data: registrationsData, error: registrationsError } = await supabase
+        .from('registrations')
         .select(`
           *,
-          user:user_id (id),
-          profile:profiles!user_id (id, email, full_name)
-        `);
-      
-      if (bookingsError) throw bookingsError;
+          profiles:user_id(id, email, full_name)
+        `)
+        .eq('event_id', eventId);
+        
+      if (registrationsError) throw registrationsError;
 
-      const eventsWithRegistrations = eventsData.map(event => ({
-        ...event,
-        date: event.start_time,
-        registrations: bookingsData
-          .filter(booking => booking.event_id === event.id)
-          .map(booking => ({
-            ...booking,
-            user: {
-              id: booking.user?.id || '',
-              email: booking.profile?.email || '',
-              full_name: booking.profile?.full_name || ''
-            }
-          }))
+      // Format the registrations data
+      const formattedRegistrations: CombinedRegistration[] = registrationsData.map((reg: any) => ({
+        ...reg,
+        user: {
+          id: reg.profiles?.id,
+          email: reg.profiles?.email,
+          full_name: reg.profiles?.full_name
+        }
       }));
 
-      setEvents(eventsWithRegistrations);
+      // Create the EventWithRegistrations object
+      const eventWithRegistrations: EventWithRegistrations = {
+        ...eventData,
+        date: eventData.start_time,
+        registrations: formattedRegistrations
+      };
+
+      setEvent(eventWithRegistrations);
     } catch (error: any) {
       console.error('Error fetching event registrations:', error);
       toast.error(error.message || 'Failed to load event registrations');
     } finally {
-      setLoading(prev => ({ ...prev, events: false }));
+      setLoading(false);
     }
   };
 
-  const fetchCourseEnrollments = async () => {
-    setLoading(prev => ({ ...prev, courses: true }));
-    try {
-      const { data, error } = await supabase
-        .from('course_enrollments')
-        .select(`
-          *,
-          user:user_id (id),
-          profile:profiles!user_id (id, email, full_name),
-          course:course_id (id, title)
-        `);
-      
-      if (error) throw error;
-
-      const formattedEnrollments: CourseEnrollmentWithUser[] = data.map(enrollment => ({
-        ...enrollment,
-        user: {
-          id: enrollment.user?.id || '',
-          email: enrollment.profile?.email || '',
-          full_name: enrollment.profile?.full_name || ''
-        },
-        course: {
-          id: enrollment.course?.id || '',
-          title: enrollment.course?.title || ''
-        }
-      }));
-
-      setCourseEnrollments(formattedEnrollments);
-    } catch (error: any) {
-      console.error('Error fetching course enrollments:', error);
-      toast.error(error.message || 'Failed to load course enrollments');
-    } finally {
-      setLoading(prev => ({ ...prev, courses: false }));
-    }
+  const handleEditRegistration = (registration: CombinedRegistration) => {
+    setSelectedRegistration(registration);
+    setIsEditDialogOpen(true);
   };
 
-  const handleDeleteEventRegistration = async (registrationId: string) => {
+  const handleDeleteRegistration = async (registration: CombinedRegistration) => {
+    if (!window.confirm('Are you sure you want to delete this registration?')) {
+      return;
+    }
+
     try {
       const { error } = await supabase
-        .from('event_bookings')
+        .from('registrations')
         .delete()
-        .eq('id', registrationId);
+        .eq('id', registration.id);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      setEvents(prev => prev.map(event => ({
-        ...event,
-        registrations: event.registrations.filter(reg => reg.id !== registrationId)
-      })));
+      // Update state by removing the deleted registration
+      if (event) {
+        setEvent({
+          ...event,
+          registrations: event.registrations.filter(reg => reg.id !== registration.id)
+        });
+      }
 
-      toast.success('Event registration deleted successfully');
+      toast.success('Registration deleted successfully');
     } catch (error) {
-      console.error('Error deleting event registration:', error);
-      toast.error('Failed to delete event registration');
+      console.error('Error deleting registration:', error);
+      toast.error('Failed to delete registration');
     }
   };
 
-  const handleDeleteCourseEnrollment = async (enrollmentId: string) => {
+  // Form schema for editing registration
+  const formSchema = z.object({
+    status: z.string(),
+    payment_status: z.string(),
+    phone_number: z.string().optional(),
+    mobile_operator: z.string().optional()
+  });
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      status: selectedRegistration?.status || 'confirmed',
+      payment_status: selectedRegistration?.payment_status || 'pending',
+      phone_number: selectedRegistration?.phone_number || '',
+      mobile_operator: selectedRegistration?.mobile_operator || '',
+    },
+  });
+
+  useEffect(() => {
+    // Update form values when selected registration changes
+    if (selectedRegistration) {
+      form.reset({
+        status: selectedRegistration.status,
+        payment_status: selectedRegistration.payment_status,
+        phone_number: selectedRegistration.phone_number || '',
+        mobile_operator: selectedRegistration.mobile_operator || '',
+      });
+    }
+  }, [selectedRegistration, form]);
+
+  const handleSaveRegistration = async (values: z.infer<typeof formSchema>) => {
+    if (!selectedRegistration) return;
+
     try {
       const { error } = await supabase
-        .from('course_enrollments')
-        .delete()
-        .eq('id', enrollmentId);
+        .from('registrations')
+        .update({
+          status: values.status,
+          payment_status: values.payment_status,
+          phone_number: values.phone_number,
+          mobile_operator: values.mobile_operator
+        })
+        .eq('id', selectedRegistration.id);
 
       if (error) throw error;
 
-      setCourseEnrollments(prev => prev.filter(enrollment => enrollment.id !== enrollmentId));
+      // Update state
+      if (event) {
+        setEvent({
+          ...event,
+          registrations: event.registrations.map(reg => 
+            reg.id === selectedRegistration.id ? 
+            { ...reg, ...values } : reg
+          )
+        });
+      }
 
-      toast.success('Course enrollment deleted successfully');
+      toast.success('Registration updated successfully');
+      setIsEditDialogOpen(false);
     } catch (error) {
-      console.error('Error deleting course enrollment:', error);
-      toast.error('Failed to delete course enrollment');
+      console.error('Error updating registration:', error);
+      toast.error('Failed to update registration');
     }
   };
 
   return (
     <AdminLayout>
       <div className="container py-6">
-        <h1 className="text-3xl font-bold mb-6">Registrations Management</h1>
+        <h1 className="text-3xl font-bold mb-6">Event Registrations</h1>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList>
-            <TabsTrigger value="events">Event Registrations</TabsTrigger>
-            <TabsTrigger value="courses">Course Enrollments</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="events">
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : event ? (
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Event Registrations</CardTitle>
+                <CardTitle>{event.title}</CardTitle>
                 <CardDescription>
-                  Manage all event registrations
+                  {event.registrations.length} {event.registrations.length === 1 ? 'registration' : 'registrations'} 
+                  {event.capacity ? ` (${event.registrations.length}/${event.capacity} spots filled)` : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loading.events ? (
-                  <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                  </div>
-                ) : events.length > 0 ? (
-                  <div className="space-y-8">
-                    {events.map(event => (
-                      <div key={event.id} className="border rounded-lg p-4">
-                        <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {event.registrations.length} registrations
-                          {event.capacity && ` (${event.registrations.length}/${event.capacity} spots)`}
-                        </p>
-                        <EventRegistrationsTable 
-                          registrations={event.registrations}
-                          onDelete={handleDeleteEventRegistration}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Alert>
-                    <AlertDescription>
-                      No event registrations found.
-                    </AlertDescription>
-                  </Alert>
-                )}
+                <EventRegistrationsTable 
+                  registrations={event.registrations}
+                  loading={loading}
+                  onEdit={handleEditRegistration}
+                  onDelete={handleDeleteRegistration}
+                />
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="courses">
-            <Card>
-              <CardHeader>
-                <CardTitle>Course Enrollments</CardTitle>
-                <CardDescription>
-                  Manage all course enrollments
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading.courses ? (
-                  <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                  </div>
-                ) : courseEnrollments.length > 0 ? (
-                  <CourseEnrollmentsTable 
-                    enrollments={courseEnrollments}
-                    onDelete={handleDeleteCourseEnrollment}
-                  />
-                ) : (
-                  <Alert>
-                    <AlertDescription>
-                      No course enrollments found.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        ) : (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              Failed to load event registrations. The event may not exist.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Edit Registration Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Registration</DialogTitle>
+              <DialogDescription>
+                Update the registration details for {selectedRegistration?.user?.full_name}
+              </DialogDescription>
+            </DialogHeader>
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSaveRegistration)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registration Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="payment_status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Payment Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a payment status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="free">Free</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phone_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="mobile_operator"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mobile Operator</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Changes</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );
 };
 
-export default AdminRegistrationsPage;
+export default AdminEventRegistrations;
