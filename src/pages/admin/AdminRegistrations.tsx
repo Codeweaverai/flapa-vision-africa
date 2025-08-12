@@ -72,13 +72,20 @@ const AdminRegistrations = () => {
         console.error('Enrollment error:', enrollmentError);
         toast.error('Failed to load course enrollments');
       } else {
-        // Filter out any records with invalid profiles data
-        const validEnrollments = (enrollmentsData || []).filter(enrollment => 
-          enrollment.profiles && 
-          typeof enrollment.profiles === 'object' && 
-          'full_name' in enrollment.profiles &&
-          'email' in enrollment.profiles
-        ) as CourseEnrollment[];
+        // Filter and transform the data with proper type checking
+        const validEnrollments: CourseEnrollment[] = (enrollmentsData || [])
+          .filter((enrollment: any) => 
+            enrollment.profiles && 
+            typeof enrollment.profiles === 'object' && 
+            'full_name' in enrollment.profiles &&
+            'email' in enrollment.profiles &&
+            !('error' in enrollment.profiles)
+          )
+          .map((enrollment: any) => ({
+            ...enrollment,
+            profiles: enrollment.profiles as { full_name: string; email: string; }
+          }));
+        
         setCourseEnrollments(validEnrollments);
       }
 
@@ -96,13 +103,20 @@ const AdminRegistrations = () => {
         console.error('Booking error:', bookingError);
         toast.error('Failed to load event bookings');
       } else {
-        // Filter out any records with invalid profiles data
-        const validBookings = (bookingsData || []).filter(booking => 
-          booking.profiles && 
-          typeof booking.profiles === 'object' && 
-          'full_name' in booking.profiles &&
-          'email' in booking.profiles
-        ) as EventBooking[];
+        // Filter and transform the data with proper type checking
+        const validBookings: EventBooking[] = (bookingsData || [])
+          .filter((booking: any) => 
+            booking.profiles && 
+            typeof booking.profiles === 'object' && 
+            'full_name' in booking.profiles &&
+            'email' in booking.profiles &&
+            !('error' in booking.profiles)
+          )
+          .map((booking: any) => ({
+            ...booking,
+            profiles: booking.profiles as { full_name: string; email: string; }
+          }));
+        
         setEventBookings(validBookings);
       }
 
