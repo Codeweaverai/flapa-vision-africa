@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, Users, CreditCard, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -59,44 +60,72 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
       
-      // Load course enrollments with corrected join syntax
+      // Step 1: Fetch all enrollments and bookings without user data
       const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
-        .select(`
-          *,
-          courses!inner(title),
-          profiles:user_id!inner(full_name, email)
-        `)
+        .select('*, courses!inner(title)')
         .order('enrollment_date', { ascending: false });
 
-      if (enrollmentError) {
-        console.error('Enrollment error:', enrollmentError);
-        toast.error('Failed to load course enrollments');
-        return;
-      }
-
-      // Load event bookings with corrected join syntax
       const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
-        .select(`
-          *,
-          events!inner(title),
-          profiles:user_id!inner(full_name, email)
-        `)
+        .select('*, events!inner(title)')
         .order('booking_date', { ascending: false });
 
-      if (bookingError) {
-        console.error('Booking error:', bookingError);
-        toast.error('Failed to load event bookings');
+      if (enrollmentError || bookingError) {
+        throw enrollmentError || bookingError;
+      }
+
+      // Step 2: Get all unique user IDs
+      const userIds = [
+        ...new Set([
+          ...(enrollmentsData?.map(e => e.user_id) || []),
+          ...(bookingsData?.map(b => b.user_id) || [])
+        ])
+      ];
+
+      if (userIds.length === 0) {
+        setCourseEnrollments([]);
+        setEventBookings([]);
         return;
       }
 
-      setCourseEnrollments(enrollmentsData || []);
-      setEventBookings(bookingsData || []);
+      // Step 3: Fetch user emails using RPC
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_emails', { user_ids: userIds });
+
+      if (emailError) throw emailError;
+
+      // Step 4: Fetch profile data
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Step 5: Combine the data
+      const combinedEnrollments = enrollmentsData?.map(enrollment => ({
+        ...enrollment,
+        profiles: {
+          full_name: profiles?.find(p => p.id === enrollment.user_id)?.full_name || 'Unknown',
+          email: emailData?.find(e => e.id === enrollment.user_id)?.email || 'No email'
+        }
+      })) || [];
+
+      const combinedBookings = bookingsData?.map(booking => ({
+        ...booking,
+        profiles: {
+          full_name: profiles?.find(p => p.id === booking.user_id)?.full_name || 'Unknown',
+          email: emailData?.find(e => e.id === booking.user_id)?.email || 'No email'
+        }
+      })) || [];
+
+      setCourseEnrollments(combinedEnrollments);
+      setEventBookings(combinedBookings);
 
     } catch (error) {
       console.error('Error loading registrations:', error);
-      toast.error('An unexpected error occurred while loading registrations');
+      toast.error('Failed to load registrations');
     } finally {
       setLoading(false);
     }
@@ -179,7 +208,6 @@ const AdminRegistrations = () => {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <AdminLayout title="Registrations">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Stats Cards */}
           <Card className="bg-gradient-to-br from-orange-500 to-purple-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
