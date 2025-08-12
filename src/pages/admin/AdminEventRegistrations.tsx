@@ -4,9 +4,57 @@ import { supabase } from '@/lib/supabaseClient';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { CombinedRegistration, EventWithRegistrations, CourseEnrollmentWithUser } from '@/types/eventTypes';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import EventRegistrationsTable from '@/components/event/EventRegistrationsTable';
 import CourseEnrollmentsTable from '@/components/course/CourseEnrollmentsTable';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+}
+
+interface Course {
+  id: string;
+  title: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  start_time: string;
+  capacity?: number;
+}
+
+interface EventBooking {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: string;
+  payment_status: string;
+  booking_date: string;
+  user?: UserProfile;
+}
+
+interface CourseEnrollment {
+  id: string;
+  course_id: string;
+  user_id: string;
+  enrollment_date: string;
+  payment_status: string;
+  is_completed: boolean;
+  user?: UserProfile;
+  course?: Course;
+}
+
+interface EventWithRegistrations extends Event {
+  registrations: (EventBooking & { user: UserProfile })[];
+}
+
+interface CourseEnrollmentWithUser extends CourseEnrollment {
+  user: UserProfile;
+  course: Course;
+}
 
 const AdminRegistrationsPage = () => {
   const [loading, setLoading] = useState({
@@ -25,14 +73,12 @@ const AdminRegistrationsPage = () => {
   const fetchEventRegistrations = async () => {
     setLoading(prev => ({ ...prev, events: true }));
     try {
-      // Fetch all events with their registrations
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*');
-        
+      
       if (eventsError) throw eventsError;
 
-      // Fetch all event bookings with user profiles
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('event_bookings')
         .select(`
@@ -40,10 +86,9 @@ const AdminRegistrationsPage = () => {
           user:user_id (id),
           profile:profiles!user_id (id, email, full_name)
         `);
-        
+      
       if (bookingsError) throw bookingsError;
 
-      // Combine events with their registrations
       const eventsWithRegistrations = eventsData.map(event => ({
         ...event,
         date: event.start_time,
@@ -52,9 +97,9 @@ const AdminRegistrationsPage = () => {
           .map(booking => ({
             ...booking,
             user: {
-              id: booking.user?.id,
-              email: booking.profile?.email,
-              full_name: booking.profile?.full_name
+              id: booking.user?.id || '',
+              email: booking.profile?.email || '',
+              full_name: booking.profile?.full_name || ''
             }
           }))
       }));
@@ -71,7 +116,6 @@ const AdminRegistrationsPage = () => {
   const fetchCourseEnrollments = async () => {
     setLoading(prev => ({ ...prev, courses: true }));
     try {
-      // Fetch all course enrollments with user and course info
       const { data, error } = await supabase
         .from('course_enrollments')
         .select(`
@@ -80,20 +124,19 @@ const AdminRegistrationsPage = () => {
           profile:profiles!user_id (id, email, full_name),
           course:course_id (id, title)
         `);
-        
+      
       if (error) throw error;
 
-      // Format the enrollments data
       const formattedEnrollments: CourseEnrollmentWithUser[] = data.map(enrollment => ({
         ...enrollment,
         user: {
-          id: enrollment.user?.id,
-          email: enrollment.profile?.email,
-          full_name: enrollment.profile?.full_name
+          id: enrollment.user?.id || '',
+          email: enrollment.profile?.email || '',
+          full_name: enrollment.profile?.full_name || ''
         },
         course: {
-          id: enrollment.course?.id,
-          title: enrollment.course?.title
+          id: enrollment.course?.id || '',
+          title: enrollment.course?.title || ''
         }
       }));
 
@@ -115,11 +158,10 @@ const AdminRegistrationsPage = () => {
 
       if (error) throw error;
 
-      // Update state
       setEvents(prev => prev.map(event => ({
         ...event,
         registrations: event.registrations.filter(reg => reg.id !== registrationId)
-      }));
+      })));
 
       toast.success('Event registration deleted successfully');
     } catch (error) {
@@ -137,7 +179,6 @@ const AdminRegistrationsPage = () => {
 
       if (error) throw error;
 
-      // Update state
       setCourseEnrollments(prev => prev.filter(enrollment => enrollment.id !== enrollmentId));
 
       toast.success('Course enrollment deleted successfully');
@@ -177,8 +218,8 @@ const AdminRegistrationsPage = () => {
                       <div key={event.id} className="border rounded-lg p-4">
                         <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
                         <p className="text-sm text-muted-foreground mb-4">
-                          {event.registrations.length} {event.registrations.length === 1 ? 'registration' : 'registrations'}
-                          {event.capacity ? ` (${event.registrations.length}/${event.capacity} spots filled)` : ''}
+                          {event.registrations.length} registrations
+                          {event.capacity && ` (${event.registrations.length}/${event.capacity} spots)`}
                         </p>
                         <EventRegistrationsTable 
                           registrations={event.registrations}
