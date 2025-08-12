@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2,Search } from 'lucide-react';
+import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2, Search, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/layout/AdminLayout';
@@ -72,6 +72,7 @@ interface User {
   username: string | null;
   created_at: string;
   newsletter_subscribed?: boolean;
+  email_confirmed_at?: string | null;
 }
 
 const AdminNewsletters = () => {
@@ -87,7 +88,8 @@ const AdminNewsletters = () => {
   const [loading, setLoading] = useState({
     users: true,
     content: true,
-    newsletters: true
+    newsletters: true,
+    sending: false
   });
   const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -100,7 +102,6 @@ const AdminNewsletters = () => {
   }, []);
 
   useEffect(() => {
-    // Filter users based on search term
     if (searchTerm.trim() === '') {
       setFilteredUsers(users);
     } else {
@@ -118,40 +119,34 @@ const AdminNewsletters = () => {
     try {
       setLoading(prev => ({ ...prev, users: true }));
       
-      // First get all auth users with emails
-      const { data: authUsers, error: authError } = await supabase
-        .from('auth.users')
-        .select('id, email, created_at')
-        .order('created_at', { ascending: false });
+      // Call the edge function to get all users
+      const response = await fetch('/functions/get-newsletter-recipients', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
 
-      if (authError) throw authError;
-      if (!authUsers || authUsers.length === 0) {
-        setUsers([]);
-        return;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const userIds = authUsers.map(user => user.id);
+      const data = await response.json();
+      const recipients = data.recipients || [];
 
-      // Then get profile data for these users
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, username, newsletter_subscribed')
-        .in('id', userIds);
-
-      if (profilesError) throw profilesError;
-
-      // Combine the data
-      const combinedUsers = authUsers.map(authUser => ({
-        id: authUser.id,
-        email: authUser.email,
-        full_name: profiles?.find(p => p.id === authUser.id)?.full_name || null,
-        username: profiles?.find(p => p.id === authUser.id)?.username || null,
-        created_at: authUser.created_at,
-        newsletter_subscribed: profiles?.find(p => p.id === authUser.id)?.newsletter_subscribed || false
+      // Transform the data to match our User interface
+      const formattedUsers = recipients.map((user: any) => ({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name || null,
+        username: null,
+        created_at: user.created_at,
+        newsletter_subscribed: true,
+        email_confirmed_at: user.email_confirmed_at
       }));
 
-      setUsers(combinedUsers);
-      setFilteredUsers(combinedUsers);
+      setUsers(formattedUsers);
+      setFilteredUsers(formattedUsers);
     } catch (error) {
       console.error('Error loading users:', error);
       toast.error('Failed to load users');
@@ -189,20 +184,17 @@ const AdminNewsletters = () => {
       // Process courses with stats and creator info
       const processedCourses: Course[] = await Promise.all(
         (coursesData || []).map(async (course) => {
-          // Get creator profile
           const { data: creatorProfile } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', course.creator_id)
             .single();
 
-          // Get enrollment count
           const { count: enrollmentCount } = await supabase
             .from('course_enrollments')
             .select('*', { count: 'exact' })
             .eq('course_id', course.id);
 
-          // Get reviews
           const { data: reviews } = await supabase
             .from('course_reviews')
             .select('rating')
@@ -227,14 +219,12 @@ const AdminNewsletters = () => {
       // Process events with stats and creator info
       const processedEvents: Event[] = await Promise.all(
         (eventsData || []).map(async (event) => {
-          // Get creator profile
           const { data: creatorProfile } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', event.creator_id)
             .single();
 
-          // Get registration count
           const { count: registrationCount } = await supabase
             .from('event_bookings')
             .select('*', { count: 'exact' })
@@ -369,31 +359,70 @@ const AdminNewsletters = () => {
     }
   };
 
-  const handleSendNewsletter = async () => {
+  const handleSendNewsletter = async (newsletterData: { subject: string; body_html: string }) => {
     if (selectedUsers.length === 0) {
       toast.warning('Please select at least one recipient');
       return;
     }
 
     try {
-      // Implement your newsletter sending logic here
-      // This would typically call your email service API
+      setLoading(prev => ({ ...prev, sending: true }));
       
+      // First save the newsletter to the database
+      const { data: savedNewsletter, error: saveError } = await supabase
+        .from('newsletters')
+        .insert({
+          subject: newsletterData.subject,
+          body_html: newsletterData.body_html,
+          status: 'draft',
+          total_recipients: selectedUsers.length
+        })
+        .select()
+        .single();
+
+      if (saveError) throw saveError;
+
+      // Then trigger the send-newsletter-now function
+      const response = await fetch('/functions/send-newsletter-now', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newsletterId: savedNewsletter.id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
       toast.success(`Newsletter sent to ${selectedUsers.length} recipients`);
       setSelectedUsers([]);
+      setSelectedContent([]);
+      loadNewsletters();
     } catch (error) {
       console.error('Error sending newsletter:', error);
-      toast.error('Failed to send newsletter');
+      toast.error(error.message || 'Failed to send newsletter');
+    } finally {
+      setLoading(prev => ({ ...prev, sending: false }));
     }
   };
 
   const handleExportRecipients = () => {
     const selectedUserData = users.filter(user => selectedUsers.includes(user.id));
     const csvContent = "data:text/csv;charset=utf-8," +
-      "Email,Full Name,Username,Subscribed\n" +
+      "Email,Full Name,Username,Subscribed,Verified\n" +
       selectedUserData.map(user => 
         `"${user.email}","${user.full_name || ''}","${user.username || ''}",` +
-        `${user.newsletter_subscribed ? 'Yes' : 'No'}`
+        `${user.newsletter_subscribed ? 'Yes' : 'No'},` +
+        `${user.email_confirmed_at ? 'Yes' : 'No'}`
       ).join("\n");
 
     const encodedUri = encodeURI(csvContent);
@@ -426,7 +455,60 @@ const AdminNewsletters = () => {
 
   const NewsletterCard = ({ newsletter }: { newsletter: Newsletter }) => (
     <Card className="hover:shadow-lg transition-shadow duration-200 border-0 shadow-md">
-      {/* ... (same as your original NewsletterCard implementation) ... */}
+      <CardHeader>
+        <CardTitle className="flex justify-between items-start">
+          <span>{newsletter.subject}</span>
+          <Badge variant={newsletter.status === 'sent' ? 'default' : 'secondary'}>
+            {newsletter.status}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            Created: {new Date(newsletter.created_at).toLocaleDateString()}
+          </span>
+          {newsletter.sent_at && (
+            <span className="text-muted-foreground">
+              Sent: {new Date(newsletter.sent_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <div className="flex items-center gap-1">
+            <Users className="h-4 w-4 text-purple-600" />
+            <span>{newsletter.total_recipients || 0} recipients</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Checkbox className="h-4 w-4 text-green-600" checked />
+            <span>{newsletter.successful_sends || 0} success</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <X className="h-4 w-4 text-red-600" />
+            <span>{newsletter.failed_sends || 0} failed</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleEditNewsletter(newsletter)}
+            disabled={newsletter.status === 'sent'}
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDeleteNewsletter(newsletter.id)}
+            className="hover:bg-red-100 hover:text-red-600"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
+        </div>
+      </CardContent>
     </Card>
   );
 
@@ -534,6 +616,9 @@ const AdminNewsletters = () => {
                               {user.newsletter_subscribed && (
                                 <span className="ml-2 text-xs text-green-600">(Subscribed)</span>
                               )}
+                              {user.email_confirmed_at && (
+                                <span className="ml-2 text-xs text-blue-600">(Verified)</span>
+                              )}
                             </p>
                             <p className="text-xs text-gray-500 truncate">{user.email}</p>
                           </div>
@@ -554,6 +639,7 @@ const AdminNewsletters = () => {
                 selectedUsers={selectedUsers}
                 selectedContent={selectedContent}
                 onSend={handleSendNewsletter}
+                loading={loading.sending}
               />
               
               {/* Dynamic Content Section */}
