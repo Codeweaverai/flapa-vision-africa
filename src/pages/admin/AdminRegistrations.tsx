@@ -18,10 +18,11 @@ interface CourseEnrollment {
   payment_status: string;
   payment_id: string | null;
   completion_date: string | null;
+  order_id: string | null;
   courses: {
     title: string;
   } | null;
-  user_profile: {
+  profiles: {
     full_name: string;
     email: string;
   } | null;
@@ -40,7 +41,7 @@ interface EventBooking {
   events: {
     title: string;
   } | null;
-  user_profile: {
+  profiles: {
     full_name: string;
     email: string;
   } | null;
@@ -57,59 +58,53 @@ const AdminRegistrations = () => {
 
   const loadRegistrations = async () => {
     try {
-      // Load course enrollments with proper joins
+      setLoading(true);
+      
+      // Load course enrollments with corrected join
       const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select(`
           *,
           courses(title),
-          profiles!course_enrollments_user_id_fkey(full_name, email)
+          profiles:user_id(full_name, email)
         `)
         .order('enrollment_date', { ascending: false });
 
       if (enrollmentError) {
-        console.error('Enrollment error:', enrollmentError);
+        console.error('Enrollment error details:', {
+          message: enrollmentError.message,
+          details: enrollmentError.details,
+          hint: enrollmentError.hint
+        });
         toast.error('Failed to load course enrollments');
       } else {
-        // Filter out invalid records and ensure proper typing
-        const validEnrollments = (enrollmentsData || [])
-          .filter((enrollment: any) => enrollment.profiles && typeof enrollment.profiles === 'object' && !enrollment.profiles.error)
-          .map((enrollment: any) => ({
-            ...enrollment,
-            user_profile: enrollment.profiles
-          }));
-        
-        setCourseEnrollments(validEnrollments);
+        setCourseEnrollments(enrollmentsData || []);
       }
 
-      // Load event bookings with proper joins
+      // Load event bookings with corrected join
       const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
         .select(`
           *,
           events(title),
-          profiles!event_bookings_user_id_fkey(full_name, email)
+          profiles:user_id(full_name, email)
         `)
         .order('booking_date', { ascending: false });
 
       if (bookingError) {
-        console.error('Booking error:', bookingError);
+        console.error('Booking error details:', {
+          message: bookingError.message,
+          details: bookingError.details,
+          hint: bookingError.hint
+        });
         toast.error('Failed to load event bookings');
       } else {
-        // Filter out invalid records and ensure proper typing
-        const validBookings = (bookingsData || [])
-          .filter((booking: any) => booking.profiles && typeof booking.profiles === 'object' && !booking.profiles.error)
-          .map((booking: any) => ({
-            ...booking,
-            user_profile: booking.profiles
-          }));
-        
-        setEventBookings(validBookings);
+        setEventBookings(bookingsData || []);
       }
 
     } catch (error) {
       console.error('Error loading registrations:', error);
-      toast.error('Failed to load registrations');
+      toast.error('An unexpected error occurred while loading registrations');
     } finally {
       setLoading(false);
     }
@@ -122,8 +117,8 @@ const AdminRegistrations = () => {
     entity_id: enrollment.course_id,
     entity_title: enrollment.courses?.title || 'Unknown Course',
     entity_type: 'course' as const,
-    user_name: enrollment.user_profile?.full_name || 'Unknown User',
-    user_email: enrollment.user_profile?.email || 'No email',
+    user_name: enrollment.profiles?.full_name || 'Unknown User',
+    user_email: enrollment.profiles?.email || 'No email',
     created_at: enrollment.enrollment_date,
     status: enrollment.is_completed ? 'completed' : 'active',
     payment_status: enrollment.payment_status,
@@ -140,8 +135,8 @@ const AdminRegistrations = () => {
     entity_id: booking.event_id,
     entity_title: booking.events?.title || 'Unknown Event',
     entity_type: 'event' as const,
-    user_name: booking.user_profile?.full_name || 'Unknown User',
-    user_email: booking.user_profile?.email || 'No email',
+    user_name: booking.profiles?.full_name || 'Unknown User',
+    user_email: booking.profiles?.email || 'No email',
     created_at: booking.booking_date,
     status: booking.status,
     payment_status: booking.payment_status,
@@ -267,6 +262,13 @@ const AdminRegistrations = () => {
           >
             <Download className="mr-2 h-4 w-4" />
             Generate Report
+          </Button>
+          <Button
+            onClick={loadRegistrations}
+            variant="outline"
+            className="border-orange-500 text-orange-500 hover:bg-orange-50"
+          >
+            Refresh Data
           </Button>
         </div>
 
