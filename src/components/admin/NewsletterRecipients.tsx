@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Users, Search, Mail, CheckCircle, Clock, User, Crown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Users, Search, Mail, CheckCircle, Clock, User, Crown, UserCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
@@ -14,17 +16,23 @@ interface Recipient {
   email_confirmed_at: string | null;
   created_at: string;
   role?: string;
+  selected?: boolean;
 }
 
 interface NewsletterRecipientsProps {
   onRecipientCountChange: (count: number) => void;
+  onSelectedRecipientsChange: (recipients: Recipient[]) => void;
 }
 
-const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ onRecipientCountChange }) => {
+const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ 
+  onRecipientCountChange, 
+  onSelectedRecipientsChange 
+}) => {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [filteredRecipients, setFilteredRecipients] = useState<Recipient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectAll, setSelectAll] = useState(false);
 
   useEffect(() => {
     fetchRecipients();
@@ -42,36 +50,94 @@ const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ onRecipient
     }
   }, [searchTerm, recipients]);
 
+  useEffect(() => {
+    const selectedRecipients = recipients.filter(r => r.selected);
+    onSelectedRecipientsChange(selectedRecipients);
+  }, [recipients, onSelectedRecipientsChange]);
+
   const fetchRecipients = async () => {
     try {
       setLoading(true);
-      console.log('Fetching newsletter recipients...');
+      console.log('Fetching newsletter recipients from auth.users...');
       
-      const { data, error } = await supabase.functions.invoke('get-newsletter-recipients');
+      // Fetch users directly from auth.users table using admin access
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
+        throw authError;
       }
 
-      console.log('Function response:', data);
+      console.log('Auth users fetched:', authUsers?.users?.length || 0);
 
-      if (data && data.recipients) {
-        const { recipients: fetchedRecipients, total_count } = data;
-        setRecipients(fetchedRecipients);
-        setFilteredRecipients(fetchedRecipients);
-        onRecipientCountChange(total_count);
-        toast.success(`Loaded ${total_count} recipients successfully`);
-      } else {
-        console.error('Invalid data structure:', data);
-        toast.error('Invalid response format from server');
+      // Fetch profiles to get additional user info
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, role');
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
       }
+
+      // Create a map of profiles for quick lookup
+      const profilesMap = new Map();
+      if (profiles) {
+        profiles.forEach((profile: any) => {
+          profilesMap.set(profile.id, profile);
+        });
+      }
+
+      // Combine auth users with profile data
+      const recipientsList = authUsers?.users?.map((user: any) => {
+        const profile = profilesMap.get(user.id);
+        
+        // Get the best available name from various sources
+        const fullName = profile?.full_name || 
+                        profile?.username ||
+                        user.user_metadata?.full_name || 
+                        user.user_metadata?.name ||
+                        user.email?.split('@')[0] ||
+                        'User';
+
+        return {
+          id: user.id,
+          email: user.email,
+          full_name: fullName,
+          email_confirmed_at: user.email_confirmed_at,
+          created_at: user.created_at,
+          role: profile?.role || 'user',
+          selected: false
+        };
+      }) || [];
+
+      console.log('Processed recipients:', recipientsList.length);
+
+      setRecipients(recipientsList);
+      setFilteredRecipients(recipientsList);
+      onRecipientCountChange(recipientsList.length);
+      toast.success(`Loaded ${recipientsList.length} recipients successfully`);
     } catch (error) {
       console.error('Error fetching recipients:', error);
       toast.error('Failed to load recipients');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    setRecipients(prev => prev.map(recipient => ({
+      ...recipient,
+      selected: checked
+    })));
+  };
+
+  const handleSelectRecipient = (recipientId: string, checked: boolean) => {
+    setRecipients(prev => prev.map(recipient => 
+      recipient.id === recipientId 
+        ? { ...recipient, selected: checked }
+        : recipient
+    ));
   };
 
   const getRoleIcon = (role?: string) => {
@@ -91,11 +157,13 @@ const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ onRecipient
     return <Badge variant="outline" className="bg-gray-50 text-gray-700 text-xs">User</Badge>;
   };
 
+  const selectedCount = recipients.filter(r => r.selected).length;
+
   if (loading) {
     return (
-      <Card>
+      <Card className="bg-white/80 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
             <Users className="h-5 w-5" />
             Newsletter Recipients
           </CardTitle>
@@ -110,9 +178,9 @@ const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ onRecipient
   }
 
   return (
-    <Card>
+    <Card className="bg-white/80 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
           <Users className="h-5 w-5" />
           Newsletter Recipients ({recipients.length})
         </CardTitle>
@@ -125,6 +193,26 @@ const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ onRecipient
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="select-all"
+                checked={selectAll}
+                onCheckedChange={handleSelectAll}
+              />
+              <label htmlFor="select-all" className="text-sm font-medium">
+                Select All Recipients
+              </label>
+            </div>
+            
+            {selectedCount > 0 && (
+              <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                <UserCheck className="h-3 w-3 mr-1" />
+                {selectedCount} selected
+              </Badge>
+            )}
           </div>
           
           {recipients.length > 0 && (
@@ -155,29 +243,37 @@ const NewsletterRecipients: React.FC<NewsletterRecipientsProps> = ({ onRecipient
             filteredRecipients.map((recipient) => (
               <div 
                 key={recipient.id} 
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50/50 to-purple-50/50 rounded-lg hover:from-orange-100/50 hover:to-purple-100/50 transition-colors"
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    {getRoleIcon(recipient.role)}
-                    <span className="font-medium text-gray-900">
-                      {recipient.full_name}
-                    </span>
-                    {recipient.email_confirmed_at ? (
-                      <div title="Email verified">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      </div>
-                    ) : (
-                      <div title="Email not verified">
-                        <Clock className="h-4 w-4 text-yellow-500" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-gray-600">
-                    <Mail className="h-3 w-3" />
-                    {recipient.email}
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={recipient.selected || false}
+                    onCheckedChange={(checked) => handleSelectRecipient(recipient.id, checked as boolean)}
+                  />
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      {getRoleIcon(recipient.role)}
+                      <span className="font-medium text-gray-900">
+                        {recipient.full_name}
+                      </span>
+                      {recipient.email_confirmed_at ? (
+                        <div title="Email verified">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        </div>
+                      ) : (
+                        <div title="Email not verified">
+                          <Clock className="h-4 w-4 text-yellow-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Mail className="h-3 w-3" />
+                      {recipient.email}
+                    </div>
                   </div>
                 </div>
+                
                 <div className="flex flex-col items-end gap-2">
                   {getRoleBadge(recipient.role)}
                   <Badge 
