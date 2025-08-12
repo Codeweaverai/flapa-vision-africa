@@ -66,7 +66,7 @@ const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewslet
             </div>
           </div>
           <div style="text-align: center;">
-            <a href="${siteUrl}/courses/${course.id}" style="display: inline-block; background: linear-gradient(135deg, #f97316, #a855f7); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; transition: all 0.3s ease;">
+            <a href="${siteUrl}/course-detail/${course.id}" style="display: inline-block; background: linear-gradient(135deg, #f97316, #a855f7); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; transition: all 0.3s ease;">
               View Course Details →
             </a>
           </div>
