@@ -1,29 +1,38 @@
 
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Users, CreditCard, TrendingUp, BookOpen, Calendar, DollarSign, Eye } from 'lucide-react';
+import { CalendarDays, Users, DollarSign, TrendingUp, BookOpen, Calendar, ShoppingCart } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 interface AnalyticsData {
   totalUsers: number;
+  totalOrders: number;
   totalRevenue: number;
-  platformRevenue: number;
-  creatorRevenue: number;
   totalCourses: number;
   totalEvents: number;
-  mostBookedCourses: Array<{ title: string; count: number; revenue: number }>;
-  mostBookedEvents: Array<{ title: string; count: number; revenue: number }>;
-  monthlyRevenue: Array<{ month: string; revenue: number; platformFee: number }>;
-  userGrowth: Array<{ month: string; users: number }>;
-  courseCategories: Array<{ category: string; count: number }>;
+  recentOrders: any[];
+  monthlyRevenue: any[];
+  courseCategories: any[];
+  eventCategories: any[];
 }
 
 const AdminAnalytics = () => {
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData>({
+    totalUsers: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalCourses: 0,
+    totalEvents: 0,
+    recentOrders: [],
+    monthlyRevenue: [],
+    courseCategories: [],
+    eventCategories: []
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,157 +42,90 @@ const AdminAnalytics = () => {
   const loadAnalytics = async () => {
     try {
       console.log('Loading analytics data...');
+      setLoading(true);
 
-      // Get total users count
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, created_at');
+      // Load basic counts
+      const [usersResult, ordersResult, coursesResult, eventsResult] = await Promise.all([
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('orders').select('*').eq('payment_status', 'completed'),
+        supabase.from('courses').select('id, title, category', { count: 'exact' }),
+        supabase.from('events').select('id, title, category', { count: 'exact' })
+      ]);
 
-      if (profilesError) throw profilesError;
+      if (usersResult.error) throw usersResult.error;
+      if (ordersResult.error) throw ordersResult.error;
+      if (coursesResult.error) throw coursesResult.error;
+      if (eventsResult.error) throw eventsResult.error;
 
-      // Get orders data for revenue calculation
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items(
-            *,
-            courses(title, category),
-            event_tickets(
-              *,
-              events(title)
-            )
-          )
-        `)
-        .eq('payment_status', 'completed');
+      const totalUsers = usersResult.count || 0;
+      const orders = ordersResult.data || [];
+      const totalOrders = orders.length;
+      const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+      const courses = coursesResult.data || [];
+      const events = eventsResult.data || [];
 
-      if (ordersError) throw ordersError;
-
-      // Get course enrollments for course analytics
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('course_enrollments')
-        .select(`
-          *,
-          courses(title, category)
-        `)
-        .eq('payment_status', 'completed');
-
-      if (enrollmentsError) throw enrollmentsError;
-
-      // Get event bookings for event analytics
-      const { data: bookings, error: bookingsError } = await supabase
-        .from('event_bookings')
-        .select(`
-          *,
-          events(title)
-        `)
-        .eq('payment_status', 'completed');
-
-      if (bookingsError) throw bookingsError;
-
-      // Get all courses and events
-      const { data: courses, error: coursesError } = await supabase
-        .from('courses')
-        .select('*');
-
-      const { data: events, error: eventsError } = await supabase
-        .from('events')
-        .select('*');
-
-      if (coursesError) throw coursesError;
-      if (eventsError) throw eventsError;
-
-      // Calculate analytics
-      const totalUsers = profiles?.length || 0;
-      
-      // Calculate revenue from orders
-      const totalRevenue = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
-      const platformRevenue = totalRevenue * 0.08; // 8% platform fee
-      const creatorRevenue = totalRevenue - platformRevenue;
-
-      // Course analytics
-      const courseBookingCounts = new Map<string, { count: number; revenue: number; title: string }>();
-      enrollments?.forEach(enrollment => {
-        const courseTitle = enrollment.courses?.title || 'Unknown Course';
-        const current = courseBookingCounts.get(courseTitle) || { count: 0, revenue: 0, title: courseTitle };
-        courseBookingCounts.set(courseTitle, {
-          ...current,
-          count: current.count + 1
-        });
+      // Process monthly revenue
+      const monthlyRevenueMap = new Map();
+      orders.forEach(order => {
+        if (order.created_at) {
+          const month = new Date(order.created_at).toISOString().substring(0, 7);
+          monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + (order.total_amount || 0));
+        }
       });
 
-      // Event analytics
-      const eventBookingCounts = new Map<string, { count: number; revenue: number; title: string }>();
-      bookings?.forEach(booking => {
-        const eventTitle = booking.events?.title || 'Unknown Event';
-        const current = eventBookingCounts.get(eventTitle) || { count: 0, revenue: 0, title: eventTitle };
-        eventBookingCounts.set(eventTitle, {
-          ...current,
-          count: current.count + 1,
-          revenue: current.revenue + (Number(booking.payment_amount) || 0)
-        });
+      const monthlyRevenue = Array.from(monthlyRevenueMap.entries())
+        .map(([month, revenue]) => ({
+          month,
+          revenue: Number(revenue.toFixed(2))
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month))
+        .slice(-6); // Last 6 months
+
+      // Process course categories
+      const courseCategoryMap = new Map();
+      courses.forEach(course => {
+        const category = course.category || 'Uncategorized';
+        courseCategoryMap.set(category, (courseCategoryMap.get(category) || 0) + 1);
       });
 
-      // Monthly revenue from orders
-      const monthlyRevenueMap = new Map<string, { revenue: number; platformFee: number }>();
-      orders?.forEach(order => {
-        const month = new Date(order.created_at).toISOString().slice(0, 7);
-        const revenue = Number(order.total_amount);
-        const platformFee = revenue * 0.08;
-        const current = monthlyRevenueMap.get(month) || { revenue: 0, platformFee: 0 };
-        monthlyRevenueMap.set(month, {
-          revenue: current.revenue + revenue,
-          platformFee: current.platformFee + platformFee
-        });
+      const courseCategories = Array.from(courseCategoryMap.entries()).map(([name, value]) => ({
+        name,
+        value
+      }));
+
+      // Process event categories
+      const eventCategoryMap = new Map();
+      events.forEach(event => {
+        const category = event.category || 'Uncategorized';
+        eventCategoryMap.set(category, (eventCategoryMap.get(category) || 0) + 1);
       });
 
-      // User growth
-      const userGrowthMap = new Map<string, number>();
-      profiles?.forEach(profile => {
-        const month = new Date(profile.created_at).toISOString().slice(0, 7);
-        userGrowthMap.set(month, (userGrowthMap.get(month) || 0) + 1);
-      });
+      const eventCategories = Array.from(eventCategoryMap.entries()).map(([name, value]) => ({
+        name,
+        value
+      }));
 
-      // Course categories
-      const categoryMap = new Map<string, number>();
-      courses?.forEach(course => {
-        const category = course.category || 'Other';
-        categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
-      });
-
-      const analyticsData: AnalyticsData = {
+      setAnalytics({
         totalUsers,
+        totalOrders,
         totalRevenue,
-        platformRevenue,
-        creatorRevenue,
-        totalCourses: courses?.length || 0,
-        totalEvents: events?.length || 0,
-        mostBookedCourses: Array.from(courseBookingCounts.values())
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10),
-        mostBookedEvents: Array.from(eventBookingCounts.values())
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10),
-        monthlyRevenue: Array.from(monthlyRevenueMap.entries())
-          .map(([month, data]) => ({ month, ...data }))
-          .sort((a, b) => a.month.localeCompare(b.month)),
-        userGrowth: Array.from(userGrowthMap.entries())
-          .map(([month, users]) => ({ month, users }))
-          .sort((a, b) => a.month.localeCompare(b.month)),
-        courseCategories: Array.from(categoryMap.entries())
-          .map(([category, count]) => ({ category, count }))
-      };
+        totalCourses: courses.length,
+        totalEvents: events.length,
+        recentOrders: orders.slice(-10).reverse(),
+        monthlyRevenue,
+        courseCategories,
+        eventCategories
+      });
 
-      setAnalytics(analyticsData);
     } catch (error) {
       console.error('Error loading analytics:', error);
-      toast.error('Failed to load analytics');
+      toast.error('Failed to load analytics data');
     } finally {
       setLoading(false);
     }
   };
 
-  const COLORS = ['#f97316', '#a855f7', '#ec4899', '#8b5cf6', '#06b6d4'];
+  const COLORS = ['#f97316', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
   if (loading) {
     return (
@@ -197,24 +139,12 @@ const AdminAnalytics = () => {
     );
   }
 
-  if (!analytics) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <AdminLayout title="Analytics">
-          <div className="text-center py-8">
-            <p className="text-gray-500">No analytics data available</p>
-          </div>
-        </AdminLayout>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-      <AdminLayout title="Platform Analytics">
+      <AdminLayout title="Analytics">
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-orange-500 to-purple-600 text-white">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
               <Users className="h-4 w-4" />
@@ -225,48 +155,60 @@ const AdminAnalytics = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-500 to-orange-600 text-white">
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Platform Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+              <ShoppingCart className="h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analytics.totalOrders.toLocaleString()}</div>
+              <p className="text-xs opacity-80">Completed orders</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <DollarSign className="h-4 w-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${analytics.platformRevenue.toFixed(2)}</div>
-              <p className="text-xs opacity-80">8% commission</p>
+              <div className="text-2xl font-bold">${analytics.totalRevenue.toLocaleString()}</div>
+              <p className="text-xs opacity-80">From all sales</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-orange-400 to-purple-500 text-white">
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <CreditCard className="h-4 w-4" />
+              <CardTitle className="text-sm font-medium">Total Courses</CardTitle>
+              <BookOpen className="h-4 w-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${analytics.totalRevenue.toFixed(2)}</div>
-              <p className="text-xs opacity-80">All transactions</p>
+              <div className="text-2xl font-bold">{analytics.totalCourses.toLocaleString()}</div>
+              <p className="text-xs opacity-80">Available courses</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-400 to-orange-500 text-white">
+          <Card className="bg-gradient-to-br from-pink-500 to-pink-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Creator Revenue</CardTitle>
-              <TrendingUp className="h-4 w-4" />
+              <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+              <Calendar className="h-4 w-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${analytics.creatorRevenue.toFixed(2)}</div>
-              <p className="text-xs opacity-80">After platform fee</p>
+              <div className="text-2xl font-bold">{analytics.totalEvents.toLocaleString()}</div>
+              <p className="text-xs opacity-80">Created events</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Charts Section */}
+        {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Monthly Revenue Chart */}
           <Card className="bg-white/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Monthly Revenue
+                Revenue Trend
               </CardTitle>
+              <CardDescription>Monthly revenue over the last 6 months</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -274,48 +216,26 @@ const AdminAnalytics = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Revenue']} />
-                  <Line type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2} />
-                  <Line type="monotone" dataKey="platformFee" stroke="#a855f7" strokeWidth={2} />
+                  <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#f97316" 
+                    strokeWidth={3}
+                    dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* User Growth Chart */}
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                User Growth
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={analytics.userGrowth}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="users" fill="url(#gradient)" />
-                  <defs>
-                    <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0.8}/>
-                    </linearGradient>
-                  </defs>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Course Categories Pie Chart */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Course Categories */}
           <Card className="bg-white/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 Course Categories
               </CardTitle>
+              <CardDescription>Distribution of courses by category</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -328,7 +248,7 @@ const AdminAnalytics = () => {
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
-                    dataKey="count"
+                    dataKey="value"
                   >
                     {analytics.courseCategories.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -339,87 +259,47 @@ const AdminAnalytics = () => {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-
-          {/* Platform Stats */}
-          <Card className="bg-white/80 backdrop-blur-sm lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Platform Statistics
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-gradient-to-br from-orange-100 to-purple-100 rounded-lg">
-                  <BookOpen className="h-8 w-8 mx-auto mb-2 text-orange-600" />
-                  <div className="text-2xl font-bold text-gray-800">{analytics.totalCourses}</div>
-                  <div className="text-sm text-gray-600">Total Courses</div>
-                </div>
-                <div className="text-center p-4 bg-gradient-to-br from-purple-100 to-orange-100 rounded-lg">
-                  <Calendar className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-                  <div className="text-2xl font-bold text-gray-800">{analytics.totalEvents}</div>
-                  <div className="text-sm text-gray-600">Total Events</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Most Booked Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Most Booked Courses */}
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Most Booked Courses
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analytics.mostBookedCourses.map((course, index) => (
-                  <div key={course.title} className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-                        #{index + 1}
-                      </Badge>
+        {/* Recent Orders */}
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              Recent Orders
+            </CardTitle>
+            <CardDescription>Latest completed orders</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {analytics.recentOrders.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No orders found</p>
+              ) : (
+                analytics.recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg bg-white">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <div>
-                        <div className="font-medium">{course.title}</div>
-                        <div className="text-sm text-gray-600">{course.count} enrollments</div>
+                        <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Most Booked Events */}
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Most Booked Events
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analytics.mostBookedEvents.map((event, index) => (
-                  <div key={event.title} className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="secondary" className="bg-gradient-to-r from-purple-500 to-orange-600 text-white">
-                        #{index + 1}
+                    <div className="text-right">
+                      <p className="font-medium">${order.total_amount?.toFixed(2) || '0.00'}</p>
+                      <Badge 
+                        variant="outline" 
+                        className="bg-green-50 text-green-700 border-green-200"
+                      >
+                        {order.payment_status}
                       </Badge>
-                      <div>
-                        <div className="font-medium">{event.title}</div>
-                        <div className="text-sm text-gray-600">
-                          {event.count} bookings • ${event.revenue.toFixed(2)}
-                        </div>
-                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </AdminLayout>
     </div>
   );

@@ -1,205 +1,140 @@
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Clock, User, Ticket, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { format } from 'date-fns';
 
-interface TicketDisplayProps {
+export interface TicketDisplayProps {
   ticket: {
-    id: string;
+    id?: string;
     ticket_code: string;
-    qr_code_data: string;
     ticket_holder_name: string;
-    ticket_status: string;
     event?: {
-      id: string;
       title: string;
-      description?: string;
-      start_time: string;
-      end_time: string;
+      event_date: string;
       location?: string;
-      event_type: string;
+      venue?: string;
     };
-    booking?: {
-      booking_code: string;
-      payment_amount?: number;
-      payment_currency?: string;
+    events?: {
+      title: string;
+      event_date: string;
+      location?: string;
+      venue?: string;
     };
+    qr_code_data?: string;
   };
   showPrintStyles?: boolean;
 }
 
-const TicketDisplay: React.FC<TicketDisplayProps> = ({ ticket, showPrintStyles = false }) => {
-  const event = ticket.event;
-  const booking = ticket.booking;
-
-  if (!event) {
+const TicketDisplay = ({ ticket, showPrintStyles = false }: TicketDisplayProps) => {
+  // Get event data from either event or events property
+  const eventData = ticket.event || ticket.events;
+  
+  if (!eventData) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">Event information not available</p>
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="text-center text-gray-500">
+          <p>Event information not available</p>
+        </div>
       </div>
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'used':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-blue-100 text-blue-800';
-    }
-  };
+  const qrData = ticket.qr_code_data || JSON.stringify({
+    ticket_code: ticket.ticket_code,
+    ticket_id: ticket.id,
+    holder_name: ticket.ticket_holder_name
+  });
 
   return (
-    <div className={`max-w-2xl mx-auto p-3 bg-white ${showPrintStyles ? 'print:p-0 print:max-w-full' : ''}`}>
-      {/* Ticket Header */}
-      <Card className="mb-3 bg-gradient-to-r from-orange-500 to-purple-600 text-white overflow-hidden">
-        <CardContent className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Ticket className="h-4 w-4" />
-              <span className="font-bold text-sm">TICKET</span>
-            </div>
-            <Badge className={`${getStatusColor(ticket.ticket_status)} text-xs`}>
-              {ticket.ticket_status.toUpperCase()}
-            </Badge>
+    <div className={`bg-gradient-to-r from-orange-100 to-purple-100 border border-orange-200 rounded-lg overflow-hidden ${showPrintStyles ? 'print:shadow-none print:border-2 print:border-black' : 'shadow-lg'}`}>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-orange-500 to-purple-600 text-white p-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-bold mb-1">{eventData.title}</h2>
+            <p className="text-orange-100 text-sm">Event Ticket</p>
           </div>
-          <div className="text-xs opacity-90">
-            Ticket ID: {ticket.ticket_code}
+          <div className="text-right">
+            <p className="text-sm font-medium">Ticket #</p>
+            <p className="text-lg font-bold">{ticket.ticket_code}</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Event Information */}
-      <Card className="mb-3">
-        <CardContent className="p-3">
-          <h2 className="text-lg font-bold mb-2 text-gray-800">{event.title}</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-3 w-3 text-orange-500" />
-              <div>
-                <div className="font-medium">Date</div>
-                <div className="text-gray-600">
-                  {format(new Date(event.start_time), 'EEEE, MMMM dd, yyyy')}
-                </div>
-              </div>
+      {/* Main Content */}
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Ticket Details */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                Ticket Holder
+              </h3>
+              <p className="text-lg font-bold text-gray-900">{ticket.ticket_holder_name}</p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Clock className="h-3 w-3 text-purple-500" />
-              <div>
-                <div className="font-medium">Time</div>
-                <div className="text-gray-600">
-                  {format(new Date(event.start_time), 'h:mm a')} - {format(new Date(event.end_time), 'h:mm a')}
-                </div>
-              </div>
-            </div>
-
-            {event.location && (
-              <div className="flex items-center gap-2 md:col-span-2">
-                <MapPin className="h-3 w-3 text-green-500" />
-                <div>
-                  <div className="font-medium">Location</div>
-                  <div className="text-gray-600">{event.location}</div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <User className="h-3 w-3 text-blue-500" />
-              <div>
-                <div className="font-medium">Ticket Holder</div>
-                <div className="text-gray-600">{ticket.ticket_holder_name}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Ticket className="h-3 w-3 text-orange-500" />
-              <div>
-                <div className="font-medium">Event Type</div>
-                <div className="text-gray-600 capitalize">{event.event_type}</div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                Event Details
+              </h3>
+              <div className="space-y-1">
+                <p className="text-gray-900 font-medium">{eventData.title}</p>
+                <p className="text-gray-600">
+                  {new Date(eventData.event_date).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+                <p className="text-gray-600">
+                  {new Date(eventData.event_date).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+                {(eventData.location || eventData.venue) && (
+                  <p className="text-gray-600">{eventData.location || eventData.venue}</p>
+                )}
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* QR Code and Booking Info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        {/* QR Code */}
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="flex items-center justify-center mb-2">
-              <QrCode className="h-3 w-3 text-gray-600 mr-1" />
-              <span className="font-medium text-xs">Scan to Verify</span>
-            </div>
-            <div className="flex justify-center">
+          {/* QR Code */}
+          <div className="flex flex-col items-center justify-center">
+            <div className="bg-white p-4 rounded-lg border-2 border-gray-200 mb-3">
               <QRCodeSVG
-                value={ticket.qr_code_data}
-                size={80}
+                value={qrData}
+                size={120}
                 level="M"
-                includeMargin={true}
+                includeMargin={false}
               />
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-gray-500 text-center">
+              Scan this QR code at the event entrance
+            </p>
+          </div>
+        </div>
 
-        {/* Booking Details */}
-        <Card>
-          <CardContent className="p-3">
-            <h3 className="font-medium mb-2 text-center text-sm">Booking Details</h3>
-            <div className="space-y-1 text-xs">
-              {booking?.booking_code && (
-                <div>
-                  <span className="font-medium">Booking Code:</span>
-                  <div className="text-gray-600 font-mono text-xs">{booking.booking_code}</div>
-                </div>
-              )}
-              
-              {booking?.payment_amount && (
-                <div>
-                  <span className="font-medium">Amount Paid:</span>
-                  <div className="text-gray-600">
-                    {booking.payment_currency || 'USD'} {booking.payment_amount.toFixed(2)}
-                  </div>
-                </div>
-              )}
-              
-              <div>
-                <span className="font-medium">Issue Date:</span>
-                <div className="text-gray-600">
-                  {format(new Date(), 'MMM dd, yyyy')}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Footer */}
+        <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="flex justify-between items-center text-xs text-gray-500">
+            <p>Please bring this ticket to the event</p>
+            <p>Ticket ID: {ticket.id || 'N/A'}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Important Notes */}
-      <Card className="bg-gray-50 mb-3">
-        <CardContent className="p-3">
-          <h3 className="font-medium mb-2 text-xs">Important Notes:</h3>
-          <ul className="text-xs text-gray-600 space-y-1">
-            <li>• Please arrive 15 minutes before the event start time</li>
-            <li>• This ticket is non-transferable and non-refundable</li>
-            <li>• Present this QR code for entry verification</li>
-            <li>• Keep this ticket until the end of the event</li>
-          </ul>
-        </CardContent>
-      </Card>
-
-      {/* Footer */}
-      <div className="text-center mt-3 text-xs text-gray-500">
-        Powered by SkillPulse • For support, contact support@skillpulse.com
-      </div>
+      {/* Print Styles */}
+      {showPrintStyles && (
+        <style jsx>{`
+          @media print {
+            .ticket-display {
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+          }
+        `}</style>
+      )}
     </div>
   );
 };

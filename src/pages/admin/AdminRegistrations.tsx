@@ -22,7 +22,7 @@ interface CourseEnrollment {
   courses: {
     title: string;
   } | null;
-  profiles: {
+  user_profile: {
     full_name: string;
     email: string;
   } | null;
@@ -41,7 +41,7 @@ interface EventBooking {
   events: {
     title: string;
   } | null;
-  profiles: {
+  user_profile: {
     full_name: string;
     email: string;
   } | null;
@@ -58,13 +58,13 @@ const AdminRegistrations = () => {
 
   const loadRegistrations = async () => {
     try {
-      // Load course enrollments with admin access
+      // Load course enrollments with user profiles joined via user_id
       const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select(`
           *,
           courses(title),
-          profiles(full_name, email)
+          user_profile:profiles!course_enrollments_user_id_fkey(full_name, email)
         `)
         .order('enrollment_date', { ascending: false });
 
@@ -72,30 +72,16 @@ const AdminRegistrations = () => {
         console.error('Enrollment error:', enrollmentError);
         toast.error('Failed to load course enrollments');
       } else {
-        // Filter and transform the data with proper type checking
-        const validEnrollments: CourseEnrollment[] = (enrollmentsData || [])
-          .filter((enrollment: any) => 
-            enrollment.profiles && 
-            typeof enrollment.profiles === 'object' && 
-            'full_name' in enrollment.profiles &&
-            'email' in enrollment.profiles &&
-            !('error' in enrollment.profiles)
-          )
-          .map((enrollment: any) => ({
-            ...enrollment,
-            profiles: enrollment.profiles as { full_name: string; email: string; }
-          }));
-        
-        setCourseEnrollments(validEnrollments);
+        setCourseEnrollments(enrollmentsData || []);
       }
 
-      // Load event bookings with admin access
+      // Load event bookings with user profiles joined via user_id
       const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
         .select(`
           *,
           events(title),
-          profiles(full_name, email)
+          user_profile:profiles!event_bookings_user_id_fkey(full_name, email)
         `)
         .order('booking_date', { ascending: false });
 
@@ -103,21 +89,7 @@ const AdminRegistrations = () => {
         console.error('Booking error:', bookingError);
         toast.error('Failed to load event bookings');
       } else {
-        // Filter and transform the data with proper type checking
-        const validBookings: EventBooking[] = (bookingsData || [])
-          .filter((booking: any) => 
-            booking.profiles && 
-            typeof booking.profiles === 'object' && 
-            'full_name' in booking.profiles &&
-            'email' in booking.profiles &&
-            !('error' in booking.profiles)
-          )
-          .map((booking: any) => ({
-            ...booking,
-            profiles: booking.profiles as { full_name: string; email: string; }
-          }));
-        
-        setEventBookings(validBookings);
+        setEventBookings(bookingsData || []);
       }
 
     } catch (error) {
@@ -135,8 +107,8 @@ const AdminRegistrations = () => {
     entity_id: enrollment.course_id,
     entity_title: enrollment.courses?.title || 'Unknown Course',
     entity_type: 'course' as const,
-    user_name: enrollment.profiles?.full_name || 'Unknown User',
-    user_email: enrollment.profiles?.email || 'No email',
+    user_name: enrollment.user_profile?.full_name || 'Unknown User',
+    user_email: enrollment.user_profile?.email || 'No email',
     created_at: enrollment.enrollment_date,
     status: enrollment.is_completed ? 'completed' : 'active',
     payment_status: enrollment.payment_status,
@@ -153,8 +125,8 @@ const AdminRegistrations = () => {
     entity_id: booking.event_id,
     entity_title: booking.events?.title || 'Unknown Event',
     entity_type: 'event' as const,
-    user_name: booking.profiles?.full_name || 'Unknown User',
-    user_email: booking.profiles?.email || 'No email',
+    user_name: booking.user_profile?.full_name || 'Unknown User',
+    user_email: booking.user_profile?.email || 'No email',
     created_at: booking.booking_date,
     status: booking.status,
     payment_status: booking.payment_status,
