@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { DollarSign, Search, Eye, Calendar, User, CreditCard, Smartphone, TrendingUp } from 'lucide-react';
+import { DollarSign, Search, Eye, Calendar, User, CreditCard, Smartphone, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -48,8 +47,11 @@ interface CreatorBalance {
   };
 }
 
+const PAGE_SIZE = 10;
+
 const AdminPayouts = () => {
   const [payouts, setPayouts] = useState<CreatorPayout[]>([]);
+  const [filteredPayouts, setFilteredPayouts] = useState<CreatorPayout[]>([]);
   const [creatorBalances, setCreatorBalances] = useState<CreatorBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,76 +59,108 @@ const AdminPayouts = () => {
   const [methodFilter, setMethodFilter] = useState('all');
   const [selectedPayout, setSelectedPayout] = useState<CreatorPayout | null>(null);
   const [showBalances, setShowBalances] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPayoutCount, setTotalPayoutCount] = useState(0);
 
   useEffect(() => {
-    loadPayouts();
-    loadCreatorBalances();
+    loadInitialData();
   }, []);
 
-  const loadPayouts = async () => {
+  useEffect(() => {
+    filterPayouts();
+  }, [searchTerm, statusFilter, methodFilter, payouts]);
+
+  const loadInitialData = async () => {
     try {
-      console.log('Loading all creator payouts as admin...');
-      
-      // Get all payouts (admin has access to everything)
-      const { data: payoutsData, error: payoutsError } = await supabase
-        .from('creator_payouts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (payoutsError) throw payoutsError;
-
-      console.log('Payouts loaded:', payoutsData?.length || 0);
-
-      // Get creator profiles and emails for each payout
-      const payoutsWithProfiles = await Promise.all(
-        (payoutsData || []).map(async (payout) => {
-          try {
-            // Get profile data
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('full_name, username')
-              .eq('id', payout.creator_id)
-              .single();
-
-            // Get user email from auth
-            const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
-
-            return {
-              ...payout,
-              creator_profile: {
-                full_name: profileData?.full_name || 'N/A',
-                username: profileData?.username || 'N/A',
-                email: userData.user?.email || 'N/A'
-              }
-            };
-          } catch (error) {
-            console.error('Error fetching creator data for payout:', payout.id, error);
-            return {
-              ...payout,
-              creator_profile: {
-                full_name: 'N/A',
-                username: 'N/A',
-                email: 'N/A'
-              }
-            };
-          }
-        })
-      );
-
-      setPayouts(payoutsWithProfiles);
-    } catch (error) {
-      console.error('Error loading payouts:', error);
-      toast.error('Failed to load payouts');
+      setLoading(true);
+      await Promise.all([loadPayouts(), loadCreatorBalances()]);
     } finally {
       setLoading(false);
     }
   };
 
+  const loadPayouts = async () => {
+    try {
+      // Get total count
+      const { count } = await supabase
+        .from('creator_payouts')
+        .select('*', { count: 'exact', head: true });
+      setTotalPayoutCount(count || 0);
+
+      // Get first page of data
+      const { data, error } = await supabase
+        .from('creator_payouts')
+        .select(`
+          *,
+          creator_profile:profiles(full_name, username)
+        `)
+        .order('created_at', { ascending: false })
+        .range(0, PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      const payoutsWithEmails = await enrichPayoutsWithEmails(data || []);
+      setPayouts(payoutsWithEmails);
+    } catch (error) {
+      console.error('Error loading payouts:', error);
+      toast.error('Failed to load payouts');
+    }
+  };
+
+  const loadMorePayouts = async (page: number) => {
+    try {
+      setLoading(true);
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from('creator_payouts')
+        .select(`
+          *,
+          creator_profile:profiles(full_name, username)
+        `)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const payoutsWithEmails = await enrichPayoutsWithEmails(data || []);
+      setPayouts(prev => {
+        const newPayouts = [...prev];
+        payoutsWithEmails.forEach(newPayout => {
+          if (!newPayouts.some(p => p.id === newPayout.id)) {
+            newPayouts.push(newPayout);
+          }
+        });
+        return newPayouts;
+      });
+
+      setCurrentPage(page);
+    } catch (error) {
+      console.error('Error loading more payouts:', error);
+      toast.error('Failed to load more payouts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const enrichPayoutsWithEmails = async (payoutsData: CreatorPayout[]) => {
+    return Promise.all(
+      payoutsData.map(async (payout) => {
+        const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
+        return {
+          ...payout,
+          creator_profile: {
+            ...payout.creator_profile,
+            email: userData.user?.email || 'N/A'
+          }
+        };
+      })
+    );
+  };
+
   const loadCreatorBalances = async () => {
     try {
-      console.log('Loading creator balances...');
-      
-      // Get all users who have transactions (indicating they are creators)
       const { data: transactions, error: transactionsError } = await supabase
         .from('payment_transactions')
         .select('creator_id')
@@ -135,103 +169,13 @@ const AdminPayouts = () => {
 
       if (transactionsError) throw transactionsError;
 
-      // Get unique creator IDs
-      const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean))];
-      console.log('Found creators with transactions:', creatorIds.length);
+      const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean)];
+      const balances = await Promise.all(creatorIds.map(calculateCreatorBalance));
 
-      // Calculate balances for each creator
-      const balancesWithDetails = await Promise.all(
-        creatorIds.map(async (creatorId) => {
-          try {
-            // Get all completed transactions for this creator
-            const { data: creatorTransactions, error: creatorTransError } = await supabase
-              .from('payment_transactions')
-              .select('*')
-              .eq('creator_id', creatorId)
-              .eq('status', 'completed');
-
-            if (creatorTransError) throw creatorTransError;
-
-            // Get completed payouts for this creator
-            const { data: creatorPayouts, error: payoutsError } = await supabase
-              .from('creator_payouts')
-              .select('amount')
-              .eq('creator_id', creatorId)
-              .eq('status', 'completed');
-
-            if (payoutsError) throw payoutsError;
-
-            // Calculate balances
-            const totalEarnings = creatorTransactions?.reduce((sum, t) => sum + Number(t.creator_earning || 0), 0) || 0;
-            const totalPayouts = creatorPayouts?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
-            
-            // Calculate available and pending based on 7-day hold
-            const now = new Date();
-            let availableBalance = 0;
-            let pendingBalance = 0;
-
-            creatorTransactions?.forEach(transaction => {
-              const earningAmount = Number(transaction.creator_earning || 0);
-              const transactionDate = new Date(transaction.created_at);
-              const eligibleDate = new Date(transactionDate);
-              eligibleDate.setDate(transactionDate.getDate() + 7);
-              eligibleDate.setHours(0, 0, 0, 0);
-
-              if (now >= eligibleDate) {
-                availableBalance += earningAmount;
-              } else {
-                pendingBalance += earningAmount;
-              }
-            });
-
-            // Subtract completed payouts from available balance
-            availableBalance = Math.max(0, availableBalance - totalPayouts);
-
-            // Get creator profile and email
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('full_name, username')
-              .eq('id', creatorId)
-              .single();
-
-            const { data: userData } = await supabase.auth.admin.getUserById(creatorId);
-
-            return {
-              creator_id: creatorId,
-              available_balance: availableBalance,
-              pending_balance: pendingBalance,
-              total_earnings: totalEarnings,
-              total_payouts: totalPayouts,
-              creator_profile: {
-                full_name: profileData?.full_name || 'N/A',
-                username: profileData?.username || 'N/A',
-                email: userData.user?.email || 'N/A'
-              }
-            };
-          } catch (error) {
-            console.error('Error calculating balance for creator:', creatorId, error);
-            return {
-              creator_id: creatorId,
-              available_balance: 0,
-              pending_balance: 0,
-              total_earnings: 0,
-              total_payouts: 0,
-              creator_profile: {
-                full_name: 'N/A',
-                username: 'N/A',
-                email: 'N/A'
-              }
-            };
-          }
-        })
-      );
-
-      // Filter out creators with zero balances and earnings
-      const creatorsWithActivity = balancesWithDetails.filter(
+      const creatorsWithActivity = balances.filter(
         balance => balance.total_earnings > 0 || balance.available_balance > 0 || balance.pending_balance > 0
       );
 
-      console.log('Creators with activity:', creatorsWithActivity.length);
       setCreatorBalances(creatorsWithActivity);
     } catch (error) {
       console.error('Error loading creator balances:', error);
@@ -239,18 +183,86 @@ const AdminPayouts = () => {
     }
   };
 
-  const filteredPayouts = payouts.filter(payout => {
-    const matchesSearch = 
-      payout.creator_profile?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payout.creator_profile?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payout.creator_profile?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payout.id.toLowerCase().includes(searchTerm.toLowerCase());
+  const calculateCreatorBalance = async (creatorId: string) => {
+    try {
+      const [{ data: transactions }, { data: payouts }] = await Promise.all([
+        supabase.from('payment_transactions').select('*').eq('creator_id', creatorId).eq('status', 'completed'),
+        supabase.from('creator_payouts').select('amount').eq('creator_id', creatorId).eq('status', 'completed')
+      ]);
+
+      const totalEarnings = transactions?.reduce((sum, t) => sum + Number(t.creator_earning || 0), 0) || 0;
+      const totalPayouts = payouts?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+
+      const now = new Date();
+      let availableBalance = 0;
+      let pendingBalance = 0;
+
+      transactions?.forEach(transaction => {
+        const earningAmount = Number(transaction.creator_earning || 0);
+        const transactionDate = new Date(transaction.created_at);
+        const eligibleDate = new Date(transactionDate);
+        eligibleDate.setDate(transactionDate.getDate() + 7);
+
+        if (now >= eligibleDate) {
+          availableBalance += earningAmount;
+        } else {
+          pendingBalance += earningAmount;
+        }
+      });
+
+      availableBalance = Math.max(0, availableBalance - totalPayouts);
+
+      const [{ data: profileData }, { data: userData }] = await Promise.all([
+        supabase.from('profiles').select('full_name, username').eq('id', creatorId).single(),
+        supabase.auth.admin.getUserById(creatorId)
+      ]);
+
+      return {
+        creator_id: creatorId,
+        available_balance: availableBalance,
+        pending_balance: pendingBalance,
+        total_earnings: totalEarnings,
+        total_payouts: totalPayouts,
+        creator_profile: {
+          full_name: profileData?.full_name || 'N/A',
+          username: profileData?.username || 'N/A',
+          email: userData.user?.email || 'N/A'
+        }
+      };
+    } catch (error) {
+      console.error('Error calculating balance for creator:', creatorId, error);
+      return {
+        creator_id: creatorId,
+        available_balance: 0,
+        pending_balance: 0,
+        total_earnings: 0,
+        total_payouts: 0,
+        creator_profile: {
+          full_name: 'N/A',
+          username: 'N/A',
+          email: 'N/A'
+        }
+      };
+    }
+  };
+
+  const filterPayouts = () => {
+    const filtered = payouts.filter(payout => {
+      const matchesSearch = 
+        payout.creator_profile?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payout.creator_profile?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payout.creator_profile?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payout.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || payout.status === statusFilter;
+      const matchesMethod = methodFilter === 'all' || payout.payout_method === methodFilter;
+      
+      return matchesSearch && matchesStatus && matchesMethod;
+    });
     
-    const matchesStatus = statusFilter === 'all' || payout.status === statusFilter;
-    const matchesMethod = methodFilter === 'all' || payout.payout_method === methodFilter;
-    
-    return matchesSearch && matchesStatus && matchesMethod;
-  });
+    setFilteredPayouts(filtered);
+    setCurrentPage(1);
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
@@ -274,8 +286,15 @@ const AdminPayouts = () => {
       <Smartphone className="h-4 w-4" />;
   };
 
+  // Calculate paginated data
+  const paginatedPayouts = filteredPayouts.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const totalPages = Math.ceil(filteredPayouts.length / PAGE_SIZE);
+
   // Calculate summary statistics
-  const totalPayouts = payouts.length;
   const completedPayouts = payouts.filter(p => p.status === 'completed').length;
   const pendingPayouts = payouts.filter(p => p.status === 'pending').length;
   const failedPayouts = payouts.filter(p => p.status === 'failed').length;
@@ -306,7 +325,7 @@ const AdminPayouts = () => {
                 <DollarSign className="h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalPayouts}</div>
+                <div className="text-2xl font-bold">{totalPayoutCount}</div>
                 <p className="text-xs opacity-80">${totalPayoutAmount.toFixed(2)} total</p>
               </CardContent>
             </Card>
@@ -486,7 +505,7 @@ const AdminPayouts = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredPayouts.map((payout) => (
+                        {paginatedPayouts.map((payout) => (
                           <TableRow key={payout.id}>
                             <TableCell>
                               <div>
@@ -615,6 +634,34 @@ const AdminPayouts = () => {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * PAGE_SIZE + 1}-
+                      {Math.min(currentPage * PAGE_SIZE, filteredPayouts.length)} of {filteredPayouts.length} payouts
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadMorePayouts(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadMorePayouts(currentPage + 1)}
+                        disabled={currentPage >= totalPages}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
