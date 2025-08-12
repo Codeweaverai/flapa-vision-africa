@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,22 +52,24 @@ const NewsletterRecipients = ({ onRecipientCountChange, onSelectedRecipientsChan
     try {
       setLoading(true);
       
-      // Use the new admin function to get all user emails
-      const { data, error } = await supabase.rpc('get_all_user_emails');
+      // Get all profiles with user information
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role, created_at');
 
-      if (error) {
-        console.error('Error loading recipients:', error);
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError);
         toast.error('Failed to load recipients');
         return;
       }
 
-      const recipientsList: Recipient[] = (data || []).map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name || 'Unknown User',
+      const recipientsList: Recipient[] = (profiles || []).map((profile: any) => ({
+        id: profile.id,
+        email: profile.email || 'No email',
+        full_name: profile.full_name || 'Unknown User',
         email_confirmed_at: null,
-        created_at: user.created_at,
-        role: user.role || 'user',
+        created_at: profile.created_at || new Date().toISOString(),
+        role: profile.role || 'user',
         selected: false
       }));
 

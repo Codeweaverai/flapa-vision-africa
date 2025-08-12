@@ -126,14 +126,16 @@ const TicketDisplay = ({ ticket, showPrintStyles = false }: TicketDisplayProps) 
 
       {/* Print Styles */}
       {showPrintStyles && (
-        <style jsx>{`
-          @media print {
-            .ticket-display {
-              break-inside: avoid;
-              page-break-inside: avoid;
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              .ticket-display {
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
             }
-          }
-        `}</style>
+          `
+        }} />
       )}
     </div>
   );

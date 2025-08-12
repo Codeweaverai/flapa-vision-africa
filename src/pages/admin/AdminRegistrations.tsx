@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,13 +57,13 @@ const AdminRegistrations = () => {
 
   const loadRegistrations = async () => {
     try {
-      // Load course enrollments with user profiles joined via user_id
+      // Load course enrollments with proper joins
       const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select(`
           *,
           courses(title),
-          user_profile:profiles!course_enrollments_user_id_fkey(full_name, email)
+          profiles!course_enrollments_user_id_fkey(full_name, email)
         `)
         .order('enrollment_date', { ascending: false });
 
@@ -72,16 +71,24 @@ const AdminRegistrations = () => {
         console.error('Enrollment error:', enrollmentError);
         toast.error('Failed to load course enrollments');
       } else {
-        setCourseEnrollments(enrollmentsData || []);
+        // Filter out invalid records and ensure proper typing
+        const validEnrollments = (enrollmentsData || [])
+          .filter((enrollment: any) => enrollment.profiles && typeof enrollment.profiles === 'object' && !enrollment.profiles.error)
+          .map((enrollment: any) => ({
+            ...enrollment,
+            user_profile: enrollment.profiles
+          }));
+        
+        setCourseEnrollments(validEnrollments);
       }
 
-      // Load event bookings with user profiles joined via user_id
+      // Load event bookings with proper joins
       const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
         .select(`
           *,
           events(title),
-          user_profile:profiles!event_bookings_user_id_fkey(full_name, email)
+          profiles!event_bookings_user_id_fkey(full_name, email)
         `)
         .order('booking_date', { ascending: false });
 
@@ -89,7 +96,15 @@ const AdminRegistrations = () => {
         console.error('Booking error:', bookingError);
         toast.error('Failed to load event bookings');
       } else {
-        setEventBookings(bookingsData || []);
+        // Filter out invalid records and ensure proper typing
+        const validBookings = (bookingsData || [])
+          .filter((booking: any) => booking.profiles && typeof booking.profiles === 'object' && !booking.profiles.error)
+          .map((booking: any) => ({
+            ...booking,
+            user_profile: booking.profiles
+          }));
+        
+        setEventBookings(validBookings);
       }
 
     } catch (error) {
@@ -138,7 +153,6 @@ const AdminRegistrations = () => {
 
   const allRegistrations = [...transformedEnrollments, ...transformedBookings];
 
-  // Calculate statistics
   const totalRegistrations = allRegistrations.length;
   const enrollmentCount = transformedEnrollments.length;
   const bookingCount = transformedBookings.length;
@@ -192,7 +206,6 @@ const AdminRegistrations = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <AdminLayout title="Registrations">
-        {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-orange-500 to-purple-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -247,7 +260,6 @@ const AdminRegistrations = () => {
           </Card>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-4 mb-6">
           <Button
             onClick={generateReport}
@@ -258,7 +270,6 @@ const AdminRegistrations = () => {
           </Button>
         </div>
 
-        {/* Registrations Table */}
         <Card className="bg-white/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-xl bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">

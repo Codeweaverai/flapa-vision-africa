@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,7 +48,7 @@ const AdminAnalytics = () => {
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('orders').select('*').eq('payment_status', 'completed'),
         supabase.from('courses').select('id, title, category', { count: 'exact' }),
-        supabase.from('events').select('id, title, category', { count: 'exact' })
+        supabase.from('events').select('id, title', { count: 'exact' })
       ]);
 
       if (usersResult.error) throw usersResult.error;
@@ -93,17 +92,10 @@ const AdminAnalytics = () => {
         value
       }));
 
-      // Process event categories
-      const eventCategoryMap = new Map();
-      events.forEach(event => {
-        const category = event.category || 'Uncategorized';
-        eventCategoryMap.set(category, (eventCategoryMap.get(category) || 0) + 1);
-      });
-
-      const eventCategories = Array.from(eventCategoryMap.entries()).map(([name, value]) => ({
-        name,
-        value
-      }));
+      // For events, we'll just create a simple distribution since we don't have category field
+      const eventCategories = [
+        { name: 'All Events', value: events.length }
+      ];
 
       setAnalytics({
         totalUsers,
