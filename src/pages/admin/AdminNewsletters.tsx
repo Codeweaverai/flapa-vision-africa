@@ -3,13 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2,Search } from 'lucide-react';
+import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/layout/AdminLayout';
 import EnhancedNewsletterForm from '@/components/admin/EnhancedNewsletterForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 
 interface Course {
   id: string;
@@ -68,10 +67,8 @@ interface Newsletter {
 interface User {
   id: string;
   email: string;
-  full_name: string | null;
-  username: string | null;
+  full_name?: string;
   created_at: string;
-  newsletter_subscribed?: boolean;
 }
 
 const AdminNewsletters = () => {
@@ -81,17 +78,11 @@ const AdminNewsletters = () => {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedContent, setSelectedContent] = useState<any[]>([]);
-  const [loading, setLoading] = useState({
-    users: true,
-    content: true,
-    newsletters: true
-  });
+  const [loading, setLoading] = useState(false);
   const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     loadContent();
@@ -99,74 +90,72 @@ const AdminNewsletters = () => {
     loadUsers();
   }, []);
 
-  useEffect(() => {
-    // Filter users based on search term
-    if (searchTerm.trim() === '') {
-      setFilteredUsers(users);
-    } else {
-      const term = searchTerm.toLowerCase();
-      const filtered = users.filter(user =>
-        user.email.toLowerCase().includes(term) ||
-        (user.full_name && user.full_name.toLowerCase().includes(term)) ||
-        (user.username && user.username.toLowerCase().includes(term))
-      );
-      setFilteredUsers(filtered);
-    }
-  }, [searchTerm, users]);
-
   const loadUsers = async () => {
     try {
-      setLoading(prev => ({ ...prev, users: true }));
+      console.log('Loading users...');
       
-      // First get all auth users with emails
-      const { data: authUsers, error: authError } = await supabase
-        .from('auth.users')
-        .select('id, email, created_at')
-        .order('created_at', { ascending: false });
+      // First try to get users through RPC function
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_emails', {
+        user_ids: []
+      });
 
-      if (authError) throw authError;
-      if (!authUsers || authUsers.length === 0) {
-        setUsers([]);
+      if (rpcError) {
+        console.error('RPC error:', rpcError);
+        
+        // Fallback: get all profiles and construct user objects
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, created_at');
+
+        if (profilesError) {
+          console.error('Profiles error:', profilesError);
+          toast.error('Failed to load users: ' + profilesError.message);
+          return;
+        }
+
+        if (profilesData) {
+          const formattedUsers = profilesData.map((profile: any) => ({
+            id: profile.id,
+            email: profile.email || `user-${profile.id.slice(0, 8)}@email.com`,
+            full_name: profile.full_name || `User ${profile.id.slice(0, 8)}`,
+            created_at: profile.created_at || new Date().toISOString()
+          }));
+          setUsers(formattedUsers);
+          console.log('Loaded users from profiles:', formattedUsers.length);
+        }
         return;
       }
 
-      const userIds = authUsers.map(user => user.id);
-
-      // Then get profile data for these users
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, username, newsletter_subscribed')
-        .in('id', userIds);
-
-      if (profilesError) throw profilesError;
-
-      // Combine the data
-      const combinedUsers = authUsers.map(authUser => ({
-        id: authUser.id,
-        email: authUser.email,
-        full_name: profiles?.find(p => p.id === authUser.id)?.full_name || null,
-        username: profiles?.find(p => p.id === authUser.id)?.username || null,
-        created_at: authUser.created_at,
-        newsletter_subscribed: profiles?.find(p => p.id === authUser.id)?.newsletter_subscribed || false
-      }));
-
-      setUsers(combinedUsers);
-      setFilteredUsers(combinedUsers);
+      if (rpcData) {
+        const formattedUsers = rpcData.map((user: any) => ({
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name || `User ${user.email}`,
+          created_at: user.created_at
+        }));
+        setUsers(formattedUsers);
+        console.log('Loaded users from RPC:', formattedUsers.length);
+      }
     } catch (error) {
       console.error('Error loading users:', error);
       toast.error('Failed to load users');
-    } finally {
-      setLoading(prev => ({ ...prev, users: false }));
     }
   };
 
   const loadContent = async () => {
-    setLoading(prev => ({ ...prev, content: true }));
+    setLoading(true);
     try {
       // Load latest courses
       const { data: coursesData } = await supabase
         .from('courses')
-        .select('id, title, description, thumbnail_url, price, creator_id')
+        .select(`
+          id,
+          title,
+          description,
+          thumbnail_url,
+          price,
+          creator_id
+        `)
         .eq('is_published', true)
         .order('created_at', { ascending: false })
         .limit(6);
@@ -174,7 +163,17 @@ const AdminNewsletters = () => {
       // Load upcoming events
       const { data: eventsData } = await supabase
         .from('events')
-        .select('id, title, description, image_url, location, start_time, end_time, price, creator_id')
+        .select(`
+          id,
+          title,
+          description,
+          image_url,
+          location,
+          start_time,
+          end_time,
+          price,
+          creator_id
+        `)
         .eq('is_published', true)
         .gte('start_time', new Date().toISOString())
         .order('start_time', { ascending: true })
@@ -183,7 +182,12 @@ const AdminNewsletters = () => {
       // Load top creators
       const { data: creatorsData } = await supabase
         .from('profiles')
-        .select('id, full_name, bio, avatar_url')
+        .select(`
+          id,
+          full_name,
+          bio,
+          avatar_url
+        `)
         .limit(8);
 
       // Process courses with stats and creator info
@@ -293,12 +297,11 @@ const AdminNewsletters = () => {
       console.error('Error loading content:', error);
       toast.error('Failed to load content');
     } finally {
-      setLoading(prev => ({ ...prev, content: false }));
+      setLoading(false);
     }
   };
 
   const loadNewsletters = async () => {
-    setLoading(prev => ({ ...prev, newsletters: true }));
     try {
       const { data, error } = await supabase
         .from('newsletters')
@@ -310,8 +313,6 @@ const AdminNewsletters = () => {
     } catch (error) {
       console.error('Error loading newsletters:', error);
       toast.error('Failed to load newsletters');
-    } finally {
-      setLoading(prev => ({ ...prev, newsletters: false }));
     }
   };
 
@@ -322,7 +323,7 @@ const AdminNewsletters = () => {
   };
 
   const selectAllUsers = () => {
-    setSelectedUsers(filteredUsers.map(user => user.id));
+    setSelectedUsers(users.map(user => user.id));
   };
 
   const clearSelection = () => {
@@ -369,64 +370,230 @@ const AdminNewsletters = () => {
     }
   };
 
-  const handleSendNewsletter = async () => {
-    if (selectedUsers.length === 0) {
-      toast.warning('Please select at least one recipient');
-      return;
-    }
-
-    try {
-      // Implement your newsletter sending logic here
-      // This would typically call your email service API
-      
-      toast.success(`Newsletter sent to ${selectedUsers.length} recipients`);
-      setSelectedUsers([]);
-    } catch (error) {
-      console.error('Error sending newsletter:', error);
-      toast.error('Failed to send newsletter');
-    }
-  };
-
-  const handleExportRecipients = () => {
-    const selectedUserData = users.filter(user => selectedUsers.includes(user.id));
-    const csvContent = "data:text/csv;charset=utf-8," +
-      "Email,Full Name,Username,Subscribed\n" +
-      selectedUserData.map(user => 
-        `"${user.email}","${user.full_name || ''}","${user.username || ''}",` +
-        `${user.newsletter_subscribed ? 'Yes' : 'No'}`
-      ).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `newsletter-recipients-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Card components remain the same as in your original code
   const CourseCard = ({ course }: { course: Course }) => (
     <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-orange-50/30 to-purple-50/30 overflow-hidden transform hover:-translate-y-2">
-      {/* ... (same as your original CourseCard implementation) ... */}
+      <div className="relative overflow-hidden h-48">
+        {course.thumbnail_url ? (
+          <img
+            src={course.thumbnail_url}
+            alt={course.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
+            <span className="text-purple-600 font-semibold">No Image</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute bottom-4 left-4 right-4">
+          <h3 className="text-white font-bold text-lg mb-2 line-clamp-2">{course.title}</h3>
+          <div className="flex items-center justify-between">
+            <span className="text-white/90 font-medium">${course.price}</span>
+            {course.average_rating && course.average_rating > 0 && (
+              <div className="flex items-center gap-1 text-white/90">
+                <Star className="h-4 w-4 fill-current" />
+                <span className="text-sm">{course.average_rating.toFixed(1)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <CardContent className="p-4">
+        <p className="text-sm text-gray-600 line-clamp-2 mb-3">{course.description}</p>
+        <div className="flex items-center justify-between text-sm mb-4">
+          <div className="flex items-center gap-1 text-gray-600">
+            <Users className="h-4 w-4" />
+            <span>{course.enrollment_count} students</span>
+          </div>
+          <span className="text-gray-700 font-medium">by {course.creator?.full_name}</span>
+        </div>
+        <Button 
+          className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 shadow-lg" 
+          size="sm"
+          onClick={() => addToNewsletter(course, 'course')}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add to Newsletter
+        </Button>
+      </CardContent>
     </Card>
   );
 
   const EventCard = ({ event }: { event: Event }) => (
     <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-purple-50/30 to-orange-50/30 overflow-hidden transform hover:-translate-y-2">
-      {/* ... (same as your original EventCard implementation) ... */}
+      <div className="relative overflow-hidden h-48">
+        {event.image_url ? (
+          <img
+            src={event.image_url}
+            alt={event.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-purple-100 via-orange-100 to-pink-100 flex items-center justify-center">
+            <span className="text-orange-600 font-semibold">No Image</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute bottom-4 left-4 right-4">
+          <h3 className="text-white font-bold text-lg mb-2 line-clamp-2">{event.title}</h3>
+          <div className="flex items-center justify-between">
+            <span className="text-white/90 font-medium">${event.price}</span>
+            <div className="flex items-center gap-1 text-white/90">
+              <Calendar className="h-4 w-4" />
+              <span className="text-sm">{new Date(event.start_time).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <CardContent className="p-4">
+        <p className="text-sm text-gray-600 line-clamp-2 mb-3">{event.description}</p>
+        <div className="space-y-2 text-sm mb-3">
+          {event.location && (
+            <div className="flex items-center gap-1 text-gray-600">
+              <MapPin className="h-4 w-4" />
+              <span className="line-clamp-1">{event.location}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1 text-gray-600">
+            <Users className="h-4 w-4" />
+            <span>{event.registration_count} registered</span>
+          </div>
+        </div>
+        <div className="text-sm text-gray-700 font-medium mb-3">
+          by {event.creator?.full_name}
+        </div>
+        <Button 
+          className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 shadow-lg" 
+          size="sm"
+          onClick={() => addToNewsletter(event, 'event')}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add to Newsletter
+        </Button>
+      </CardContent>
     </Card>
   );
 
   const CreatorCard = ({ creator }: { creator: Creator }) => (
     <Card className="group hover:shadow-2xl transition-all duration-500 border-0 shadow-xl bg-gradient-to-br from-white via-orange-50/20 to-purple-50/20 overflow-hidden transform hover:-translate-y-2">
-      {/* ... (same as your original CreatorCard implementation) ... */}
+      <CardContent className="p-6">
+        <div className="flex items-center gap-4 mb-4">
+          {creator.avatar_url ? (
+            <img
+              src={creator.avatar_url}
+              alt={creator.full_name}
+              className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 via-orange-400 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+              {creator.full_name?.charAt(0) || 'U'}
+            </div>
+          )}
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-800 group-hover:text-purple-700 transition-colors">
+              {creator.full_name}
+            </h3>
+            {creator.average_rating && (
+              <div className="flex items-center gap-1 mt-1">
+                <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                <span className="text-sm font-medium">{creator.average_rating.toFixed(1)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {creator.bio && (
+          <p className="text-sm text-gray-600 line-clamp-3 mb-4">{creator.bio}</p>
+        )}
+        
+        <div className="grid grid-cols-3 gap-3 text-sm mb-4">
+          <div className="text-center p-3 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg">
+            <div className="font-bold text-purple-600">{creator.total_courses}</div>
+            <div className="text-xs text-gray-600">Courses</div>
+          </div>
+          <div className="text-center p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg">
+            <div className="font-bold text-orange-600">{creator.total_events}</div>
+            <div className="text-xs text-gray-600">Events</div>
+          </div>
+          <div className="text-center p-3 bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg">
+            <div className="font-bold text-green-600">{creator.total_students}</div>
+            <div className="text-xs text-gray-600">Students</div>
+          </div>
+        </div>
+        
+        <Button 
+          className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 shadow-lg" 
+          size="sm"
+          onClick={() => addToNewsletter(creator, 'creator')}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Feature Creator
+        </Button>
+      </CardContent>
     </Card>
   );
 
   const NewsletterCard = ({ newsletter }: { newsletter: Newsletter }) => (
     <Card className="hover:shadow-lg transition-shadow duration-200 border-0 shadow-md">
-      {/* ... (same as your original NewsletterCard implementation) ... */}
+      <CardHeader className="pb-4">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <CardTitle className="text-lg line-clamp-1">{newsletter.subject}</CardTitle>
+            <div className="text-sm text-gray-600 line-clamp-2 mt-2" 
+                 dangerouslySetInnerHTML={{ __html: newsletter.body_html.substring(0, 100) + '...' }} />
+          </div>
+          <Badge variant={newsletter.status === 'sent' ? 'default' : 'secondary'}>
+            {newsletter.status}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Created:</span>
+            <span>{new Date(newsletter.created_at).toLocaleDateString()}</span>
+          </div>
+          {newsletter.sent_at && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Sent:</span>
+              <span>{new Date(newsletter.sent_at).toLocaleDateString()}</span>
+            </div>
+          )}
+          {newsletter.total_recipients && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Recipients:</span>
+              <span>{newsletter.total_recipients}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" size="sm" className="flex-1">
+            <Eye className="h-4 w-4 mr-1" />
+            View
+          </Button>
+          {newsletter.status === 'draft' && (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleEditNewsletter(newsletter)}
+                className="flex-1"
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleDeleteNewsletter(newsletter.id)}
+                className="text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </CardContent>
     </Card>
   );
 
@@ -483,78 +650,39 @@ const AdminNewsletters = () => {
                 <CardContent>
                   <div className="flex gap-2 mb-4">
                     <Button onClick={selectAllUsers} variant="outline" size="sm" className="border-purple-200 hover:bg-purple-50">
-                      Select All ({filteredUsers.length})
+                      Select All ({users.length})
                     </Button>
                     <Button onClick={clearSelection} variant="outline" size="sm" className="border-orange-200 hover:bg-orange-50">
                       Clear Selection
                     </Button>
-                    {selectedUsers.length > 0 && (
-                      <Button 
-                        onClick={handleExportRecipients} 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-green-200 hover:bg-green-50 ml-auto"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export Selected ({selectedUsers.length})
-                      </Button>
-                    )}
-                    <Badge variant="secondary" className="ml-2 bg-gradient-to-r from-purple-100 to-orange-100 text-purple-700">
+                    <Badge variant="secondary" className="ml-auto bg-gradient-to-r from-purple-100 to-orange-100 text-purple-700">
                       {selectedUsers.length} selected
                     </Badge>
                   </div>
-
-                  <div className="relative mb-4">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search users by email, name, or username..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-
-                  {loading.users ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {[...Array(6)].map((_, i) => (
-                        <div key={i} className="animate-pulse bg-gradient-to-r from-gray-100 to-gray-200 h-16 rounded-lg" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                      {filteredUsers.map((user) => (
-                        <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-orange-50 transition-colors shadow-sm">
-                          <Checkbox
-                            checked={selectedUsers.includes(user.id)}
-                            onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {user.full_name || user.email}
-                              {user.newsletter_subscribed && (
-                                <span className="ml-2 text-xs text-green-600">(Subscribed)</span>
-                              )}
-                            </p>
-                            <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                    {users.map((user) => (
+                      <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-orange-50 transition-colors shadow-sm">
+                        <Checkbox
+                          checked={selectedUsers.includes(user.id)}
+                          onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{user.full_name || user.email}</p>
+                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  {!loading.users && filteredUsers.length === 0 && (
+                      </div>
+                    ))}
+                  </div>
+                  {users.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                       <Mail className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                      <p>No users found matching your search.</p>
+                      <p>No users found. Users will appear here once they register.</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              <EnhancedNewsletterForm 
-                selectedUsers={selectedUsers}
-                selectedContent={selectedContent}
-                onSend={handleSendNewsletter}
-              />
+              <EnhancedNewsletterForm />
               
               {/* Dynamic Content Section */}
               <div className="space-y-8">
@@ -565,7 +693,7 @@ const AdminNewsletters = () => {
                 {/* Latest Courses */}
                 <div>
                   <h3 className="text-2xl font-semibold mb-6 text-purple-600">Latest Courses</h3>
-                  {loading.content ? (
+                  {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {[...Array(6)].map((_, i) => (
                         <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-80 rounded-lg shadow-lg"></div>
@@ -583,7 +711,7 @@ const AdminNewsletters = () => {
                 {/* Upcoming Events */}
                 <div>
                   <h3 className="text-2xl font-semibold mb-6 text-orange-600">Upcoming Events</h3>
-                  {loading.content ? (
+                  {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {[...Array(6)].map((_, i) => (
                         <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-80 rounded-lg shadow-lg"></div>
@@ -601,7 +729,7 @@ const AdminNewsletters = () => {
                 {/* High Performing Creators */}
                 <div>
                   <h3 className="text-2xl font-semibold mb-6 text-purple-600">High Performing Creators</h3>
-                  {loading.content ? (
+                  {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       {[...Array(8)].map((_, i) => (
                         <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-80 rounded-lg shadow-lg"></div>
@@ -658,27 +786,17 @@ const AdminNewsletters = () => {
           {activeTab === 'drafts' && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Draft Newsletters</h2>
-              {loading.newsletters ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-64 rounded-lg shadow-lg"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {newsletters
+                  .filter(n => n.status === 'draft')
+                  .map((newsletter) => (
+                    <NewsletterCard key={newsletter.id} newsletter={newsletter} />
                   ))}
+              </div>
+              {newsletters.filter(n => n.status === 'draft').length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  No draft newsletters found
                 </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {newsletters
-                      .filter(n => n.status === 'draft')
-                      .map((newsletter) => (
-                        <NewsletterCard key={newsletter.id} newsletter={newsletter} />
-                      ))}
-                  </div>
-                  {newsletters.filter(n => n.status === 'draft').length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      No draft newsletters found
-                    </div>
-                  )}
-                </>
               )}
             </div>
           )}
@@ -686,27 +804,17 @@ const AdminNewsletters = () => {
           {activeTab === 'sent' && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Sent Newsletters</h2>
-              {loading.newsletters ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 h-64 rounded-lg shadow-lg"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {newsletters
+                  .filter(n => n.status === 'sent')
+                  .map((newsletter) => (
+                    <NewsletterCard key={newsletter.id} newsletter={newsletter} />
                   ))}
+              </div>
+              {newsletters.filter(n => n.status === 'sent').length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  No sent newsletters found
                 </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {newsletters
-                      .filter(n => n.status === 'sent')
-                      .map((newsletter) => (
-                        <NewsletterCard key={newsletter.id} newsletter={newsletter} />
-                      ))}
-                  </div>
-                  {newsletters.filter(n => n.status === 'sent').length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      No sent newsletters found
-                    </div>
-                  )}
-                </>
               )}
             </div>
           )}
@@ -720,13 +828,7 @@ const AdminNewsletters = () => {
             <DialogTitle>Edit Newsletter</DialogTitle>
           </DialogHeader>
           {editingNewsletter && (
-            <EnhancedNewsletterForm 
-              newsletter={editingNewsletter}
-              onSuccess={() => {
-                setShowEditDialog(false);
-                loadNewsletters();
-              }}
-            />
+            <EnhancedNewsletterForm />
           )}
         </DialogContent>
       </Dialog>
