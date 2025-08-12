@@ -169,7 +169,7 @@ const AdminPayouts = () => {
 
       if (transactionsError) throw transactionsError;
 
-      const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean)];
+      const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean))];
       const balances = await Promise.all(creatorIds.map(calculateCreatorBalance));
 
       const creatorsWithActivity = balances.filter(
