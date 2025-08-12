@@ -30,6 +30,7 @@ interface CreatorPayout {
   creator_profile?: {
     full_name: string;
     username: string;
+    email: string;
   };
 }
 
@@ -42,6 +43,7 @@ interface CreatorBalance {
   creator_profile?: {
     full_name: string;
     username: string;
+    email: string;
   };
 }
 
@@ -94,7 +96,7 @@ const AdminPayouts = () => {
 
       if (payoutsError) throw payoutsError;
 
-      // Get associated profiles (without email)
+      // Get associated profiles
       const creatorIds = payoutsData?.map(p => p.creator_id).filter(Boolean) || [];
       const { data: profilesData } = await supabase
         .from('profiles')
@@ -108,12 +110,27 @@ const AdminPayouts = () => {
           ...payout,
           creator_profile: {
             full_name: profile?.full_name || 'N/A',
-            username: profile?.username || 'N/A'
+            username: profile?.username || 'N/A',
+            email: 'N/A' // Will be updated with email
           }
         };
       }) || [];
 
-      setPayouts(payoutsWithProfiles);
+      // Get emails for each payout
+      const payoutsWithEmails = await Promise.all(
+        payoutsWithProfiles.map(async (payout) => {
+          const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
+          return {
+            ...payout,
+            creator_profile: {
+              ...payout.creator_profile,
+              email: userData.user?.email || 'N/A'
+            }
+          };
+        })
+      );
+
+      setPayouts(payoutsWithEmails);
     } catch (error) {
       console.error('Error loading payouts:', error);
       toast.error('Failed to load payouts');
@@ -134,7 +151,7 @@ const AdminPayouts = () => {
 
       if (error) throw error;
 
-      // Get associated profiles (without email)
+      // Get associated profiles
       const creatorIds = payoutsData?.map(p => p.creator_id).filter(Boolean) || [];
       const { data: profilesData } = await supabase
         .from('profiles')
@@ -148,15 +165,30 @@ const AdminPayouts = () => {
           ...payout,
           creator_profile: {
             full_name: profile?.full_name || 'N/A',
-            username: profile?.username || 'N/A'
+            username: profile?.username || 'N/A',
+            email: 'N/A'
           }
         };
       }) || [];
 
+      // Get emails for each payout
+      const payoutsWithEmails = await Promise.all(
+        payoutsWithProfiles.map(async (payout) => {
+          const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
+          return {
+            ...payout,
+            creator_profile: {
+              ...payout.creator_profile,
+              email: userData.user?.email || 'N/A'
+            }
+          };
+        })
+      );
+
       // Merge with existing payouts
       setPayouts(prev => {
         const newPayouts = [...prev];
-        payoutsWithProfiles.forEach(newPayout => {
+        payoutsWithEmails.forEach(newPayout => {
           if (!newPayouts.some(p => p.id === newPayout.id)) {
             newPayouts.push(newPayout);
           }
@@ -184,7 +216,6 @@ const AdminPayouts = () => {
       if (transactionsError) throw transactionsError;
 
       const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean))];
-      
       const balances = await Promise.all(creatorIds.map(calculateCreatorBalance));
 
       const creatorsWithActivity = balances.filter(
@@ -227,11 +258,10 @@ const AdminPayouts = () => {
 
       availableBalance = Math.max(0, availableBalance - totalPayouts);
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name, username')
-        .eq('id', creatorId)
-        .single();
+      const [{ data: profileData }, { data: userData }] = await Promise.all([
+        supabase.from('profiles').select('full_name, username').eq('id', creatorId).single(),
+        supabase.auth.admin.getUserById(creatorId)
+      ]);
 
       return {
         creator_id: creatorId,
@@ -241,7 +271,8 @@ const AdminPayouts = () => {
         total_payouts: totalPayouts,
         creator_profile: {
           full_name: profileData?.full_name || 'N/A',
-          username: profileData?.username || 'N/A'
+          username: profileData?.username || 'N/A',
+          email: userData.user?.email || 'N/A'
         }
       };
     } catch (error) {
@@ -254,7 +285,8 @@ const AdminPayouts = () => {
         total_payouts: 0,
         creator_profile: {
           full_name: 'N/A',
-          username: 'N/A'
+          username: 'N/A',
+          email: 'N/A'
         }
       };
     }
@@ -265,6 +297,7 @@ const AdminPayouts = () => {
       const matchesSearch = 
         payout.creator_profile?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payout.creator_profile?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payout.creator_profile?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payout.id.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || payout.status === statusFilter;
@@ -405,6 +438,7 @@ const AdminPayouts = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Creator</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Available Balance</TableHead>
                         <TableHead>Pending Balance</TableHead>
                         <TableHead>Total Earnings</TableHead>
@@ -424,6 +458,7 @@ const AdminPayouts = () => {
                               </div>
                             </div>
                           </TableCell>
+                          <TableCell>{balance.creator_profile?.email}</TableCell>
                           <TableCell>
                             <div className="font-medium text-green-600">
                               <PriceDisplay amount={balance.available_balance} originalCurrency="USD" />
@@ -445,7 +480,7 @@ const AdminPayouts = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      )}
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -461,7 +496,7 @@ const AdminPayouts = () => {
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Search by creator name, username, or payout ID..."
+                          placeholder="Search by creator name, email, or payout ID..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-8"
@@ -524,7 +559,7 @@ const AdminPayouts = () => {
                                   {payout.creator_profile?.full_name || 'N/A'}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  @{payout.creator_profile?.username || 'N/A'}
+                                  {payout.creator_profile?.email}
                                 </div>
                               </div>
                             </TableCell>
@@ -586,9 +621,9 @@ const AdminPayouts = () => {
                                           </p>
                                         </div>
                                         <div>
-                                          <label className="text-sm font-medium">Username</label>
+                                          <label className="text-sm font-medium">Email</label>
                                           <p className="text-sm text-muted-foreground">
-                                            @{selectedPayout.creator_profile?.username}
+                                            {selectedPayout.creator_profile?.email}
                                           </p>
                                         </div>
                                         <div>
