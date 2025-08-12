@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2 } from 'lucide-react';
+import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2,Search } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/layout/AdminLayout';
