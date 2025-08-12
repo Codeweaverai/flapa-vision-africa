@@ -1,106 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AdminLayout from '@/components/layout/AdminLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, Mail, BookOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CalendarDays, Users, CreditCard, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import AdminLayout from '@/components/layout/AdminLayout';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import RegistrationsTable, { type RegistrationItem } from '@/components/admin/RegistrationsTable';
 
-interface Course {
+interface CourseEnrollment {
   id: string;
-  title: string;
-  description: string;
-  thumbnail_url?: string;
-  price: number;
-  average_rating?: number;
-  total_reviews?: number;
-  enrollment_count?: number;
-  creator: {
-    full_name: string;
-  };
-}
-
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  image_url?: string;
-  location?: string;
-  start_time: string;
-  end_time: string;
-  price: number;
-  average_rating?: number;
-  total_reviews?: number;
-  registration_count?: number;
-  creator: {
-    full_name: string;
-  };
-}
-
-interface Creator {
-  id: string;
-  full_name: string;
-  bio?: string;
-  avatar_url?: string;
-  total_courses?: number;
-  total_events?: number;
-  average_rating?: number;
-  total_students?: number;
-}
-
-interface Newsletter {
-  id: string;
-  subject: string;
-  body_html: string;
-  status: string;
-  created_at: string;
-  sent_at?: string;
-  total_recipients?: number;
-  successful_sends?: number;
-  failed_sends?: number;
-}
-
-interface User {
-  id: string;
-  email: string;
-  full_name?: string;
-  created_at: string;
-}
-
-interface RegistrationItem {
-  id: string;
+  course_id: string;
   user_id: string;
-  entity_id: string;
-  entity_title: string;
-  entity_type: 'course' | 'event';
-  user_name: string;
-  user_email: string;
-  created_at: string;
+  enrollment_date: string;
+  is_completed: boolean;
+  payment_status: string;
+  payment_id: string | null;
+  completion_date: string | null;
+  order_id: string | null;
+  courses: {
+    title: string;
+  } | null;
+  profiles: {
+    full_name: string;
+    email: string;
+  } | null;
+}
+
+interface EventBooking {
+  id: string;
+  event_id: string;
+  user_id: string;
   status: string;
   payment_status: string;
   payment_amount: number | null;
   payment_currency: string | null;
-  payment_method: string | null;
-  type: string;
+  phone_number: string | null;
+  booking_date: string;
+  events: {
+    title: string;
+  } | null;
+  profiles: {
+    full_name: string;
+    email: string;
+  } | null;
 }
 
 const AdminRegistrations = () => {
-  const [courseEnrollments, setCourseEnrollments] = useState<RegistrationItem[]>([]);
-  const [eventBookings, setEventBookings] = useState<RegistrationItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollment[]>([]);
+  const [eventBookings, setEventBookings] = useState<EventBooking[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadRegistrations();
@@ -110,69 +60,68 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
       
-      // Load course enrollments with profiles
-      const { data: enrollments, error: enrollmentError } = await supabase
+      // Step 1: Fetch all enrollments and bookings without user data
+      const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
-        .select(`
-          *,
-          courses!inner(title),
-          user_profile:profiles!course_enrollments_user_id_fkey(full_name, email)
-        `)
+        .select('*, courses!inner(title)')
         .order('enrollment_date', { ascending: false });
 
-      if (enrollmentError) {
-        console.error('Enrollment error:', enrollmentError);
-      } else if (enrollments) {
-        const formattedEnrollments: RegistrationItem[] = enrollments.map((enrollment: any) => ({
-          id: enrollment.id,
-          user_id: enrollment.user_id,
-          entity_id: enrollment.course_id,
-          entity_title: enrollment.courses?.title || 'Unknown Course',
-          entity_type: 'course' as const,
-          user_name: enrollment.user_profile?.full_name || 'Unknown User',
-          user_email: enrollment.user_profile?.email || 'No email',
-          created_at: enrollment.enrollment_date,
-          status: enrollment.is_completed ? 'completed' : 'active',
-          payment_status: enrollment.payment_status || 'pending',
-          payment_amount: null,
-          payment_currency: null,
-          payment_method: null,
-          type: 'Course'
-        }));
-        setCourseEnrollments(formattedEnrollments);
-      }
-
-      // Load event bookings with profiles  
-      const { data: bookings, error: bookingError } = await supabase
+      const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
-        .select(`
-          *,
-          events!inner(title),
-          user_profile:profiles!event_bookings_user_id_fkey(full_name, email)
-        `)
+        .select('*, events!inner(title)')
         .order('booking_date', { ascending: false });
 
-      if (bookingError) {
-        console.error('Booking error:', bookingError);
-      } else if (bookings) {
-        const formattedBookings: RegistrationItem[] = bookings.map((booking: any) => ({
-          id: booking.id,
-          user_id: booking.user_id,
-          entity_id: booking.event_id,
-          entity_title: booking.events?.title || 'Unknown Event',
-          entity_type: 'event' as const,
-          user_name: booking.user_profile?.full_name || 'Unknown User',
-          user_email: booking.user_profile?.email || 'No email',
-          created_at: booking.booking_date,
-          status: booking.status || 'pending',
-          payment_status: booking.payment_status || 'pending',
-          payment_amount: booking.payment_amount || 0,
-          payment_currency: booking.payment_currency || 'USD',
-          payment_method: booking.mobile_operator || null,
-          type: 'Event'
-        }));
-        setEventBookings(formattedBookings);
+      if (enrollmentError || bookingError) {
+        throw enrollmentError || bookingError;
       }
+
+      // Step 2: Get all unique user IDs
+      const userIds = [
+        ...new Set([
+          ...(enrollmentsData?.map(e => e.user_id) || []),
+          ...(bookingsData?.map(b => b.user_id) || [])
+        ])
+      ];
+
+      if (userIds.length === 0) {
+        setCourseEnrollments([]);
+        setEventBookings([]);
+        return;
+      }
+
+      // Step 3: Fetch user emails using RPC
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_emails', { user_ids: userIds });
+
+      if (emailError) throw emailError;
+
+      // Step 4: Fetch profile data
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Step 5: Combine the data
+      const combinedEnrollments = enrollmentsData?.map(enrollment => ({
+        ...enrollment,
+        profiles: {
+          full_name: profiles?.find(p => p.id === enrollment.user_id)?.full_name || 'Unknown',
+          email: emailData?.find(e => e.id === enrollment.user_id)?.email || 'No email'
+        }
+      })) || [];
+
+      const combinedBookings = bookingsData?.map(booking => ({
+        ...booking,
+        profiles: {
+          full_name: profiles?.find(p => p.id === booking.user_id)?.full_name || 'Unknown',
+          email: emailData?.find(e => e.id === booking.user_id)?.email || 'No email'
+        }
+      })) || [];
+
+      setCourseEnrollments(combinedEnrollments);
+      setEventBookings(combinedBookings);
 
     } catch (error) {
       console.error('Error loading registrations:', error);
@@ -182,69 +131,193 @@ const AdminRegistrations = () => {
     }
   };
 
-  const allRegistrations = [...courseEnrollments, ...eventBookings].sort((a, b) => (new Date(b.created_at)).getTime() - (new Date(a.created_at)).getTime());
+  // Transform data to common format
+  const transformedEnrollments: RegistrationItem[] = courseEnrollments.map((enrollment) => ({
+    id: enrollment.id,
+    user_id: enrollment.user_id,
+    entity_id: enrollment.course_id,
+    entity_title: enrollment.courses?.title || 'Unknown Course',
+    entity_type: 'course',
+    user_name: enrollment.profiles?.full_name || 'Unknown User',
+    user_email: enrollment.profiles?.email || 'No email',
+    created_at: enrollment.enrollment_date,
+    status: enrollment.is_completed ? 'completed' : 'active',
+    payment_status: enrollment.payment_status,
+    payment_amount: null,
+    payment_currency: null,
+    type: 'course'
+  }));
+
+  const transformedBookings: RegistrationItem[] = eventBookings.map((booking) => ({
+    id: booking.id,
+    user_id: booking.user_id,
+    entity_id: booking.event_id,
+    entity_title: booking.events?.title || 'Unknown Event',
+    entity_type: 'event',
+    user_name: booking.profiles?.full_name || 'Unknown User',
+    user_email: booking.profiles?.email || 'No email',
+    created_at: booking.booking_date,
+    status: booking.status,
+    payment_status: booking.payment_status,
+    payment_amount: booking.payment_amount,
+    payment_currency: booking.payment_currency,
+    type: 'event'
+  }));
+
+  const allRegistrations = [...transformedEnrollments, ...transformedBookings];
+  const totalRegistrations = allRegistrations.length;
+  const enrollmentCount = transformedEnrollments.length;
+  const bookingCount = transformedBookings.length;
+  const totalRevenue = allRegistrations.reduce((sum, reg) => sum + (reg.payment_amount || 0), 0);
+
+  const generateReport = () => {
+    const reportData = {
+      generated_at: new Date().toISOString(),
+      total_registrations: totalRegistrations,
+      course_enrollments: enrollmentCount,
+      event_bookings: bookingCount,
+      total_revenue: totalRevenue,
+      registrations: allRegistrations
+    };
+
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `registrations-report-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Report downloaded successfully');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <AdminLayout title="Registrations">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          </div>
+        </AdminLayout>
+      </div>
+    );
+  }
 
   return (
-    <AdminLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-purple-600 to-orange-600 bg-clip-text text-transparent">
-              Registrations Management
-            </h1>
-            <p className="text-gray-600 mt-2">
-              View and manage all course enrollments and event bookings
-            </p>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>All Registrations</CardTitle>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      <AdminLayout title="Registrations">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-orange-500 to-purple-600 text-white">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
+              <Users className="h-4 w-4" />
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[100px]">Type</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Method</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {allRegistrations.map((registration) => (
-                        <TableRow key={registration.id}>
-                          <TableCell className="font-medium">{registration.type}</TableCell>
-                          <TableCell>{registration.entity_title}</TableCell>
-                          <TableCell>{registration.user_name}</TableCell>
-                          <TableCell>{registration.user_email}</TableCell>
-                          <TableCell>{new Date(registration.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>{registration.status}</TableCell>
-                          <TableCell>{registration.payment_status}</TableCell>
-                          <TableCell>{registration.payment_amount}</TableCell>
-                          <TableCell>{registration.payment_method}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              <div className="text-2xl font-bold">{totalRegistrations}</div>
+              <p className="text-xs opacity-80">All time registrations</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-orange-600 text-white">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Course Enrollments</CardTitle>
+              <CalendarDays className="h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{enrollmentCount}</div>
+              <p className="text-xs opacity-80">Course sign-ups</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-400 to-purple-500 text-white">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Event Bookings</CardTitle>
+              <Users className="h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{bookingCount}</div>
+              <p className="text-xs opacity-80">Event bookings</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-400 to-orange-500 text-white">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CreditCard className="h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+              <p className="text-xs opacity-80">From paid registrations</p>
             </CardContent>
           </Card>
         </div>
-      </div>
-    </AdminLayout>
+
+        <div className="flex gap-4 mb-6">
+          <Button
+            onClick={generateReport}
+            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Generate Report
+          </Button>
+          <Button
+            onClick={loadRegistrations}
+            variant="outline"
+            className="border-orange-500 text-orange-500 hover:bg-orange-50"
+          >
+            Refresh Data
+          </Button>
+        </div>
+
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-xl bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              All Registrations
+            </CardTitle>
+            <CardDescription>
+              Manage course enrollments and event bookings
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-orange-100 to-purple-100">
+                <TabsTrigger value="all">All ({totalRegistrations})</TabsTrigger>
+                <TabsTrigger value="courses">Courses ({enrollmentCount})</TabsTrigger>
+                <TabsTrigger value="events">Events ({bookingCount})</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="all" className="mt-6">
+                <RegistrationsTable 
+                  registrations={allRegistrations}
+                  onEdit={(registration) => console.log('Edit:', registration)}
+                  onDelete={(id) => console.log('Delete:', id)}
+                  onView={(registration) => console.log('View:', registration)}
+                />
+              </TabsContent>
+              
+              <TabsContent value="courses" className="mt-6">
+                <RegistrationsTable 
+                  registrations={transformedEnrollments}
+                  onEdit={(registration) => console.log('Edit:', registration)}
+                  onDelete={(id) => console.log('Delete:', id)}
+                  onView={(registration) => console.log('View:', registration)}
+                />
+              </TabsContent>
+              
+              <TabsContent value="events" className="mt-6">
+                <RegistrationsTable 
+                  registrations={transformedBookings}
+                  onEdit={(registration) => console.log('Edit:', registration)}
+                  onDelete={(id) => console.log('Delete:', id)}
+                  onView={(registration) => console.log('View:', registration)}
+                />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </AdminLayout>
+    </div>
   );
 };
 
