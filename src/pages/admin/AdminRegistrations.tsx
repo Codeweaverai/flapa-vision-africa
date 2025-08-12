@@ -59,13 +59,13 @@ const AdminRegistrations = () => {
     try {
       setLoading(true);
       
-      // Load course enrollments with proper join
+      // Load course enrollments with corrected join syntax
       const { data: enrollmentsData, error: enrollmentError } = await supabase
         .from('course_enrollments')
         .select(`
           *,
-          courses(title),
-          profiles!inner(full_name, email)
+          courses!inner(title),
+          profiles:user_id!inner(full_name, email)
         `)
         .order('enrollment_date', { ascending: false });
 
@@ -75,13 +75,13 @@ const AdminRegistrations = () => {
         return;
       }
 
-      // Load event bookings with proper join
+      // Load event bookings with corrected join syntax
       const { data: bookingsData, error: bookingError } = await supabase
         .from('event_bookings')
         .select(`
           *,
-          events(title),
-          profiles!inner(full_name, email)
+          events!inner(title),
+          profiles:user_id!inner(full_name, email)
         `)
         .order('booking_date', { ascending: false });
 
@@ -96,7 +96,7 @@ const AdminRegistrations = () => {
 
     } catch (error) {
       console.error('Error loading registrations:', error);
-      toast.error('An unexpected error occurred');
+      toast.error('An unexpected error occurred while loading registrations');
     } finally {
       setLoading(false);
     }
@@ -160,7 +160,7 @@ const AdminRegistrations = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('Report downloaded');
+    toast.success('Report downloaded successfully');
   };
 
   if (loading) {
