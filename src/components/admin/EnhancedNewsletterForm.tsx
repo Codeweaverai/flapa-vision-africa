@@ -10,29 +10,21 @@ import { Send, Eye, Save, Users, Calendar, BookOpen, Mail } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import NewsletterRecipients from './NewsletterRecipients';
 
-interface Recipient {
-  id: string;
-  email: string;
-  full_name: string;
-  email_confirmed_at: string | null;
-  created_at: string;
-  role?: string;
-  selected?: boolean;
+interface EnhancedNewsletterFormProps {
+  selectedRecipients: string[];
+  selectedContent: any[];
+  onNewsletterSent: () => void;
 }
 
-const EnhancedNewsletterForm = () => {
+const EnhancedNewsletterForm = ({ selectedRecipients, selectedContent, onNewsletterSent }: EnhancedNewsletterFormProps) => {
   const { user } = useAuth();
   const [newsletter, setNewsletter] = useState({
     subject: '',
     body_html: '',
     status: 'draft'
   });
-  const [recipientCount, setRecipientCount] = useState(0);
-  const [selectedRecipients, setSelectedRecipients] = useState<Recipient[]>([]);
   const [loading, setLoading] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
 
   // Dynamic content variables
   const dynamicVariables = [
@@ -66,6 +58,7 @@ const EnhancedNewsletterForm = () => {
 
       toast.success('Newsletter saved as draft');
       console.log('Newsletter saved:', data);
+      onNewsletterSent();
     } catch (error) {
       console.error('Error saving newsletter:', error);
       toast.error('Failed to save newsletter');
@@ -98,12 +91,54 @@ const EnhancedNewsletterForm = () => {
 
       setLoading(true);
 
+      // Generate content with selected dynamic content
+      let enhancedContent = newsletter.body_html;
+
+      // Add selected content to the newsletter
+      if (selectedContent.length > 0) {
+        enhancedContent += '\n\n<div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px;">';
+        enhancedContent += '<h2 style="color: #333; margin-bottom: 20px;">Featured Content</h2>';
+
+        selectedContent.forEach((item) => {
+          if (item.type === 'course') {
+            enhancedContent += `
+              <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #9333ea;">
+                <h3 style="color: #9333ea; margin: 0 0 8px 0;">${item.title}</h3>
+                <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
+                <p style="color: #f97316; font-weight: bold; margin: 0;">Price: $${item.price}</p>
+                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
+              </div>
+            `;
+          } else if (item.type === 'event') {
+            enhancedContent += `
+              <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #f97316;">
+                <h3 style="color: #f97316; margin: 0 0 8px 0;">${item.title}</h3>
+                <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
+                <p style="color: #9333ea; font-weight: bold; margin: 0;">Price: $${item.price}</p>
+                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📅 ${new Date(item.start_time).toLocaleDateString()}</p>
+                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
+              </div>
+            `;
+          } else if (item.type === 'creator') {
+            enhancedContent += `
+              <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #059669;">
+                <h3 style="color: #059669; margin: 0 0 8px 0;">Featured Creator: ${item.full_name}</h3>
+                <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.bio || 'Talented creator on our platform'}</p>
+                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📚 ${item.total_courses} Courses | 🎉 ${item.total_events} Events | 👥 ${item.total_students} Students</p>
+              </div>
+            `;
+          }
+        });
+
+        enhancedContent += '</div>';
+      }
+
       // Create newsletter record
       const { data: newsletterData, error: newsletterError } = await supabase
         .from('newsletters')
         .insert({
           subject: newsletter.subject,
-          body_html: newsletter.body_html,
+          body_html: enhancedContent,
           status: 'sending',
           created_by: user.id
         })
@@ -114,15 +149,10 @@ const EnhancedNewsletterForm = () => {
 
       console.log('Newsletter created:', newsletterData);
 
-      // Send via edge function with selected recipients
+      // Send via edge function
       const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-newsletter-now', {
         body: {
-          newsletterId: newsletterData.id,
-          selectedRecipients: selectedRecipients.map(r => ({
-            id: r.id,
-            email: r.email,
-            full_name: r.full_name
-          }))
+          newsletterId: newsletterData.id
         }
       });
 
@@ -130,7 +160,7 @@ const EnhancedNewsletterForm = () => {
 
       console.log('Newsletter send result:', sendResult);
 
-      toast.success(`Newsletter sent to ${selectedRecipients.length} recipients`);
+      toast.success(`Newsletter sent to ${sendResult.total_recipients} recipients`);
       
       // Reset form
       setNewsletter({
@@ -138,6 +168,8 @@ const EnhancedNewsletterForm = () => {
         body_html: '',
         status: 'draft'
       });
+
+      onNewsletterSent();
       
     } catch (error) {
       console.error('Error sending newsletter:', error);
@@ -170,153 +202,180 @@ const EnhancedNewsletterForm = () => {
     preview = preview.replace(/\{\{course_names\}\}/g, 'React Development, Python Basics, Digital Marketing');
     preview = preview.replace(/\{\{event_titles\}\}/g, 'Tech Conference 2024, Web Dev Workshop, AI Summit');
     
+    // Add selected content to preview
+    if (selectedContent.length > 0) {
+      preview += '\n\n<div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px;">';
+      preview += '<h2 style="color: #333; margin-bottom: 20px;">Featured Content</h2>';
+
+      selectedContent.forEach((item) => {
+        if (item.type === 'course') {
+          preview += `
+            <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #9333ea;">
+              <h3 style="color: #9333ea; margin: 0 0 8px 0;">${item.title}</h3>
+              <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
+              <p style="color: #f97316; font-weight: bold; margin: 0;">Price: $${item.price}</p>
+              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
+            </div>
+          `;
+        } else if (item.type === 'event') {
+          preview += `
+            <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #f97316;">
+              <h3 style="color: #f97316; margin: 0 0 8px 0;">${item.title}</h3>
+              <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.description}</p>
+              <p style="color: #9333ea; font-weight: bold; margin: 0;">Price: $${item.price}</p>
+              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📅 ${new Date(item.start_time).toLocaleDateString()}</p>
+              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">by ${item.creator?.full_name}</p>
+            </div>
+          `;
+        } else if (item.type === 'creator') {
+          preview += `
+            <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #059669;">
+              <h3 style="color: #059669; margin: 0 0 8px 0;">Featured Creator: ${item.full_name}</h3>
+              <p style="color: #666; margin: 0 0 8px 0; font-size: 14px;">${item.bio || 'Talented creator on our platform'}</p>
+              <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">📚 ${item.total_courses} Courses | 🎉 ${item.total_events} Events | 👥 ${item.total_students} Students</p>
+            </div>
+          `;
+        }
+      });
+
+      preview += '</div>';
+    }
+    
     return preview;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <Card className="bg-white/80 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-              <Mail className="h-6 w-6" />
-              Create Newsletter
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="compose" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-orange-100 to-purple-100">
-                <TabsTrigger value="compose">Compose</TabsTrigger>
-                <TabsTrigger value="recipients">Recipients ({selectedRecipients.length})</TabsTrigger>
-                <TabsTrigger value="preview">Preview</TabsTrigger>
-              </TabsList>
+    <Card className="bg-white/80 backdrop-blur-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+          <Mail className="h-6 w-6" />
+          Create Newsletter
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="compose" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-orange-100 to-purple-100">
+            <TabsTrigger value="compose">Compose</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
+          </TabsList>
 
-              <TabsContent value="compose" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Newsletter Form */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Subject</label>
-                      <Input
-                        value={newsletter.subject}
-                        onChange={(e) => setNewsletter(prev => ({ ...prev, subject: e.target.value }))}
-                        placeholder="Enter newsletter subject..."
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Content</label>
-                      <Textarea
-                        name="body_html"
-                        value={newsletter.body_html}
-                        onChange={(e) => setNewsletter(prev => ({ ...prev, body_html: e.target.value }))}
-                        placeholder="Write your newsletter content here..."
-                        className="min-h-[400px] w-full"
-                      />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={handleSaveDraft}
-                        variant="outline"
-                        disabled={loading}
-                        className="border-orange-500 text-orange-600 hover:bg-orange-50"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Draft
-                      </Button>
-                      
-                      <Button
-                        onClick={handleSendNewsletter}
-                        disabled={loading || selectedRecipients.length === 0}
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Newsletter
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Dynamic Variables Panel */}
-                  <div className="space-y-4">
-                    <Card className="bg-gradient-to-br from-orange-50 to-purple-50">
-                      <CardHeader>
-                        <CardTitle className="text-sm">Dynamic Variables</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {dynamicVariables.map((variable) => (
-                          <div key={variable.name} className="space-y-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => insertDynamicVariable(variable.name)}
-                              className="w-full justify-start text-xs hover:bg-white"
-                            >
-                              {variable.name}
-                            </Button>
-                            <p className="text-xs text-gray-500">{variable.description}</p>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-gradient-to-br from-purple-50 to-orange-50">
-                      <CardHeader>
-                        <CardTitle className="text-sm">Newsletter Stats</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Total Recipients:</span>
-                          <Badge variant="outline">{recipientCount}</Badge>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Selected:</span>
-                          <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-                            {selectedRecipients.length}
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+          <TabsContent value="compose" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Newsletter Form */}
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Subject</label>
+                  <Input
+                    value={newsletter.subject}
+                    onChange={(e) => setNewsletter(prev => ({ ...prev, subject: e.target.value }))}
+                    placeholder="Enter newsletter subject..."
+                    className="w-full"
+                  />
                 </div>
-              </TabsContent>
 
-              <TabsContent value="recipients">
-                <NewsletterRecipients 
-                  onRecipientCountChange={setRecipientCount}
-                  onSelectedRecipientsChange={setSelectedRecipients}
-                />
-              </TabsContent>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Content</label>
+                  <Textarea
+                    name="body_html"
+                    value={newsletter.body_html}
+                    onChange={(e) => setNewsletter(prev => ({ ...prev, body_html: e.target.value }))}
+                    placeholder="Write your newsletter content here..."
+                    className="min-h-[400px] w-full"
+                  />
+                </div>
 
-              <TabsContent value="preview">
-                <Card className="bg-white/80 backdrop-blur-sm">
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSaveDraft}
+                    variant="outline"
+                    disabled={loading}
+                    className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Draft
+                  </Button>
+                  
+                  <Button
+                    onClick={handleSendNewsletter}
+                    disabled={loading || selectedRecipients.length === 0}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Newsletter
+                  </Button>
+                </div>
+              </div>
+
+              {/* Dynamic Variables Panel */}
+              <div className="space-y-4">
+                <Card className="bg-gradient-to-br from-orange-50 to-purple-50">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Eye className="h-5 w-5" />
-                      Newsletter Preview
-                    </CardTitle>
+                    <CardTitle className="text-sm">Dynamic Variables</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="border rounded-lg p-6 bg-white">
-                      <div className="mb-4 pb-4 border-b">
-                        <h2 className="text-xl font-bold">{newsletter.subject || 'Newsletter Subject'}</h2>
+                  <CardContent className="space-y-2">
+                    {dynamicVariables.map((variable) => (
+                      <div key={variable.name} className="space-y-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertDynamicVariable(variable.name)}
+                          className="w-full justify-start text-xs hover:bg-white"
+                        >
+                          {variable.name}
+                        </Button>
+                        <p className="text-xs text-gray-500">{variable.description}</p>
                       </div>
-                      <div 
-                        className="prose max-w-none"
-                        dangerouslySetInnerHTML={{ 
-                          __html: generatePreview() || '<p>Newsletter content will appear here...</p>' 
-                        }}
-                      />
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-purple-50 to-orange-50">
+                  <CardHeader>
+                    <CardTitle className="text-sm">Newsletter Stats</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Selected Recipients:</span>
+                      <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                        {selectedRecipients.length}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Selected Content:</span>
+                      <Badge variant="outline">{selectedContent.length}</Badge>
                     </div>
                   </CardContent>
                 </Card>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="preview">
+            <Card className="bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="h-5 w-5" />
+                  Newsletter Preview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg p-6 bg-white">
+                  <div className="mb-4 pb-4 border-b">
+                    <h2 className="text-xl font-bold">{newsletter.subject || 'Newsletter Subject'}</h2>
+                  </div>
+                  <div 
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ 
+                      __html: generatePreview() || '<p>Newsletter content will appear here...</p>' 
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 };
 

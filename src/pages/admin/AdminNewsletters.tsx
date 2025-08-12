@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,11 +65,13 @@ interface Newsletter {
   failed_sends?: number;
 }
 
-interface User {
+interface Recipient {
   id: string;
   email: string;
-  full_name?: string;
+  full_name: string;
+  email_confirmed_at: string | null;
   created_at: string;
+  role?: string;
 }
 
 const AdminNewsletters = () => {
@@ -77,8 +80,8 @@ const AdminNewsletters = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [selectedContent, setSelectedContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
@@ -87,58 +90,31 @@ const AdminNewsletters = () => {
   useEffect(() => {
     loadContent();
     loadNewsletters();
-    loadUsers();
+    loadRecipients();
   }, []);
 
-  const loadUsers = async () => {
+  const loadRecipients = async () => {
     try {
-      console.log('Loading users...');
+      console.log('Loading recipients using edge function...');
       
-      // First try to get users through RPC function
-      const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_emails', {
-        user_ids: []
-      });
+      const { data, error } = await supabase.functions.invoke('get-newsletter-recipients');
 
-      if (rpcError) {
-        console.error('RPC error:', rpcError);
-        
-        // Fallback: get all profiles and construct user objects
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, email, created_at');
-
-        if (profilesError) {
-          console.error('Profiles error:', profilesError);
-          toast.error('Failed to load users: ' + profilesError.message);
-          return;
-        }
-
-        if (profilesData) {
-          const formattedUsers = profilesData.map((profile: any) => ({
-            id: profile.id,
-            email: profile.email || `user-${profile.id.slice(0, 8)}@email.com`,
-            full_name: profile.full_name || `User ${profile.id.slice(0, 8)}`,
-            created_at: profile.created_at || new Date().toISOString()
-          }));
-          setUsers(formattedUsers);
-          console.log('Loaded users from profiles:', formattedUsers.length);
-        }
+      if (error) {
+        console.error('Error loading recipients:', error);
+        toast.error('Failed to load recipients: ' + error.message);
         return;
       }
 
-      if (rpcData) {
-        const formattedUsers = rpcData.map((user: any) => ({
-          id: user.id,
-          email: user.email,
-          full_name: user.full_name || `User ${user.email}`,
-          created_at: user.created_at
-        }));
-        setUsers(formattedUsers);
-        console.log('Loaded users from RPC:', formattedUsers.length);
+      if (data && data.recipients) {
+        console.log(`Loaded ${data.recipients.length} recipients from edge function`);
+        setRecipients(data.recipients);
+      } else {
+        console.log('No recipients data received');
+        setRecipients([]);
       }
     } catch (error) {
-      console.error('Error loading users:', error);
-      toast.error('Failed to load users');
+      console.error('Error in loadRecipients:', error);
+      toast.error('Failed to load recipients');
     }
   };
 
@@ -316,18 +292,18 @@ const AdminNewsletters = () => {
     }
   };
 
-  const handleUserSelection = (userId: string, checked: boolean) => {
-    setSelectedUsers(prev => 
-      checked ? [...prev, userId] : prev.filter(id => id !== userId)
+  const handleRecipientSelection = (recipientId: string, checked: boolean) => {
+    setSelectedRecipients(prev => 
+      checked ? [...prev, recipientId] : prev.filter(id => id !== recipientId)
     );
   };
 
-  const selectAllUsers = () => {
-    setSelectedUsers(users.map(user => user.id));
+  const selectAllRecipients = () => {
+    setSelectedRecipients(recipients.map(recipient => recipient.id));
   };
 
   const clearSelection = () => {
-    setSelectedUsers([]);
+    setSelectedRecipients([]);
   };
 
   const addToNewsletter = (item: Course | Event | Creator, type: 'course' | 'event' | 'creator') => {
@@ -639,50 +615,54 @@ const AdminNewsletters = () => {
 
           {activeTab === 'create' && (
             <div className="space-y-8">
-              {/* User Selection */}
+              {/* Recipient Selection */}
               <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-orange-50/30">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-purple-700">
                     <Mail className="h-5 w-5" />
-                    Select Recipients ({users.length} users available)
+                    Select Recipients ({recipients.length} users available)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex gap-2 mb-4">
-                    <Button onClick={selectAllUsers} variant="outline" size="sm" className="border-purple-200 hover:bg-purple-50">
-                      Select All ({users.length})
+                    <Button onClick={selectAllRecipients} variant="outline" size="sm" className="border-purple-200 hover:bg-purple-50">
+                      Select All ({recipients.length})
                     </Button>
                     <Button onClick={clearSelection} variant="outline" size="sm" className="border-orange-200 hover:bg-orange-50">
                       Clear Selection
                     </Button>
                     <Badge variant="secondary" className="ml-auto bg-gradient-to-r from-purple-100 to-orange-100 text-purple-700">
-                      {selectedUsers.length} selected
+                      {selectedRecipients.length} selected
                     </Badge>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                    {users.map((user) => (
-                      <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-orange-50 transition-colors shadow-sm">
+                    {recipients.map((recipient) => (
+                      <div key={recipient.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-orange-50 transition-colors shadow-sm">
                         <Checkbox
-                          checked={selectedUsers.includes(user.id)}
-                          onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
+                          checked={selectedRecipients.includes(recipient.id)}
+                          onCheckedChange={(checked) => handleRecipientSelection(recipient.id, checked as boolean)}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{user.full_name || user.email}</p>
-                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                          <p className="text-sm font-medium truncate">{recipient.full_name || recipient.email}</p>
+                          <p className="text-xs text-gray-500 truncate">{recipient.email}</p>
                         </div>
                       </div>
                     ))}
                   </div>
-                  {users.length === 0 && (
+                  {recipients.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                       <Mail className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                      <p>No users found. Users will appear here once they register.</p>
+                      <p>No recipients found. Users will appear here once they register.</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              <EnhancedNewsletterForm />
+              <EnhancedNewsletterForm 
+                selectedRecipients={selectedRecipients}
+                selectedContent={selectedContent}
+                onNewsletterSent={loadNewsletters}
+              />
               
               {/* Dynamic Content Section */}
               <div className="space-y-8">
@@ -828,7 +808,11 @@ const AdminNewsletters = () => {
             <DialogTitle>Edit Newsletter</DialogTitle>
           </DialogHeader>
           {editingNewsletter && (
-            <EnhancedNewsletterForm />
+            <EnhancedNewsletterForm 
+              selectedRecipients={selectedRecipients}
+              selectedContent={selectedContent}
+              onNewsletterSent={loadNewsletters}
+            />
           )}
         </DialogContent>
       </Dialog>
