@@ -1,278 +1,212 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
-import { Calendar, MapPin, Clock, User, Ticket, Hash, Printer, Download } from 'lucide-react';
-import { useReactToPrint } from 'react-to-print';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
-interface TicketProps {
+export interface TicketDisplayProps {
   ticket: {
-    id: string;
+    id?: string;
     ticket_code: string;
     ticket_holder_name: string;
-    qr_code_data: string;
-    ticket_status: string;
-    booking: {
-      booking_code: string;
-      event: {
-        title: string;
-        start_time: string;
-        end_time: string;
-        location: string;
-        image_url?: string;
-        description?: string;
-      };
-      event_ticket: {
-        name: string;
-        ticket_type: string;
-      };
+    ticket_holder_email?: string;
+    user_name?: string;
+    booking_code?: string;
+    status?: string;
+    event?: {
+      title: string;
+      start_time: string;
+      end_time?: string;
+      location?: string;
+      venue?: string;
+      image_url?: string;
     };
+    events?: {
+      title: string;
+      start_time: string;
+      end_time?: string;
+      location?: string;
+      venue?: string;
+      image_url?: string;
+    };
+    event_ticket?: {
+      name: string;
+      ticket_type: string;
+    };
+    qr_code_data?: string;
   };
   showPrintStyles?: boolean;
+  index?: number;
 }
 
-const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false }) => {
-  const event = ticket.booking.event;
-  const eventTicket = ticket.booking.event_ticket;
-  const ticketRef = React.useRef<HTMLDivElement>(null);
-
-  const handlePrint = useReactToPrint({
-    contentRef: ticketRef,
-    pageStyle: `
-      @page {
-        size: auto;
-        margin: 0mm;
-      }
-      @media print {
-        body {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-      }
-    `,
-  });
-
-  const downloadPdfTicket = () => {
-    if (!ticketRef.current) return;
-
-    const input = ticketRef.current;
-    const scale = 2; // Increase scale for better quality
-
-    html2canvas(input, {
-      scale,
-      useCORS: true,
-      logging: false,
-      allowTaint: true,
-    }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 295; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(`${event.title}_${ticket.ticket_code}.pdf`);
+const TicketDisplay = ({ ticket, showPrintStyles = false, index = 0 }: TicketDisplayProps) => {
+  // Get event data from either event or events property
+  const eventData = ticket.event || ticket.events;
+  
+  useEffect(() => {
+    // Generate QR code after component mounts
+    const qrData = ticket.qr_code_data || JSON.stringify({
+      ticket_code: ticket.ticket_code || ticket.booking_code,
+      ticket_id: ticket.id,
+      holder_name: ticket.ticket_holder_name || ticket.user_name,
+      event_title: eventData?.title
     });
-  };
 
-  return (
-    <div className={`ticket-container ${showPrintStyles ? 'print-ticket' : ''}`}>
-      {/* Action buttons */}
-      {!showPrintStyles && (
-        <div className="flex justify-center gap-4 mb-6">
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-          >
-            <Printer className="h-5 w-5" />
-            Print Ticket
-          </button>
-          <button
-            onClick={downloadPdfTicket}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-          >
-            <Download className="h-5 w-5" />
-            Download PDF
-          </button>
+    const qrContainer = document.getElementById(`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`);
+    if (qrContainer) {
+      qrContainer.innerHTML = '';
+      
+      // Create QR code element
+      const qrElement = document.createElement('div');
+      qrElement.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;';
+      
+      // We'll create a simple QR representation since we can't use React components in innerHTML
+      qrElement.innerHTML = `
+        <svg width="120" height="120" style="border: 2px solid #e5e7eb; border-radius: 8px; background: white;">
+          <rect width="120" height="120" fill="white"/>
+          <text x="60" y="50" text-anchor="middle" font-size="10" fill="#6b7280">QR Code</text>
+          <text x="60" y="65" text-anchor="middle" font-size="8" fill="#6b7280">${(ticket.ticket_code || ticket.booking_code || '').substring(0, 12)}</text>
+          <text x="60" y="80" text-anchor="middle" font-size="6" fill="#9ca3af">Scan at entrance</text>
+        </svg>
+      `;
+      
+      qrContainer.appendChild(qrElement);
+    }
+  }, [ticket, index]);
+
+  if (!eventData) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="text-center text-gray-500">
+          <p>Event information not available</p>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Ticket content */}
-      <div 
-        ref={ticketRef}
-        className="relative overflow-hidden bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-4xl mx-auto"
-      >
-        {/* Header with gradient */}
-        <div className="relative bg-gradient-to-r from-orange-500 via-red-500 to-purple-600 text-white p-8">
-          <div className="absolute inset-0 bg-black bg-opacity-10"></div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">SkillPulse Event Ticket</h1>
-                <p className="text-orange-100 text-lg">Your gateway to amazing experiences</p>
+  // Enhanced ticket design HTML
+  const ticketHTML = `
+    <div style="max-width: 800px; margin: 0 auto 30px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); font-family: Arial, sans-serif;">
+      <!-- Header with gradient -->
+      <div style="background: linear-gradient(135deg, #f97316 0%, #a855f7 100%); padding: 30px; text-align: center; color: white;">
+        <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold;">🎫 EVENT TICKET</h1>
+        <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block;">
+          <span style="font-size: 14px; font-weight: 500;">#${ticket.ticket_code || ticket.booking_code}</span>
+        </div>
+      </div>
+
+      <div style="padding: 40px;">
+        <!-- Event Image and Title -->
+        <div style="display: flex; gap: 20px; margin-bottom: 30px; align-items: center;">
+          ${eventData.image_url ? `
+            <div style="width: 120px; height: 120px; border-radius: 15px; overflow: hidden; flex-shrink: 0; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+              <img src="${eventData.image_url}" alt="${eventData.title || 'Event'}" style="width: 100%; height: 100%; object-fit: cover;" />
+            </div>
+          ` : ''}
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #1f2937; font-weight: bold;">${eventData.title || 'Event Title'}</h2>
+            <div style="background: linear-gradient(135deg, #fef7ed, #faf5ff); padding: 12px 16px; border-radius: 10px; border-left: 4px solid #f97316;">
+              <div style="font-weight: 600; color: #ea580c; margin-bottom: 5px;">${ticket.event_ticket?.name || 'Standard Ticket'}</div>
+              <div style="font-size: 14px; color: #7c2d12;">${ticket.event_ticket?.ticket_type || 'Regular'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Event Details Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+          <div>
+            <div style="margin-bottom: 20px;">
+              <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                📅 Date & Time
               </div>
-              <div className="text-right">
-                <div className="bg-white bg-opacity-20 rounded-lg p-3 backdrop-blur-sm">
-                  <Ticket className="h-8 w-8 mb-2 mx-auto" />
-                  <p className="text-sm font-medium">E-TICKET</p>
+              <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                ${eventData.start_time ? format(new Date(eventData.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br>
+                ${eventData.start_time ? format(new Date(eventData.start_time), 'h:mm a') : ''} ${eventData.end_time ? '- ' + format(new Date(eventData.end_time), 'h:mm a') : ''}
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                📍 Location
+              </div>
+              <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                ${eventData.location || eventData.venue || 'TBD'}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="margin-bottom: 20px;">
+              <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                👤 Ticket Holder
+              </div>
+              <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                ${ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
+                ${ticket.ticket_holder_email ? `<br><span style="font-size: 14px;">${ticket.ticket_holder_email}</span>` : ''}
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                ✅ Status
+              </div>
+              <div>
+                <span style="background: #dcfce7; color: #166534; padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">
+                  ${(ticket.status || 'confirmed').toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- QR Code Section -->
+        <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 15px; margin-bottom: 20px;">
+          <div style="margin-bottom: 15px;">
+            <div style="width: 150px; height: 150px; margin: 0 auto; padding: 15px; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+              <div id="qr-code-${ticket.ticket_code || ticket.booking_code}-${index}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">
+                  Loading QR...
                 </div>
               </div>
             </div>
           </div>
-          
-          {/* Decorative pattern */}
-          <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 opacity-20">
-            <div className="w-full h-full bg-white rounded-full transform rotate-45"></div>
+          <div style="font-size: 14px; color: #6b7280; margin-bottom: 10px;">Scan this code at the event entrance</div>
+          <div style="font-family: monospace; font-size: 16px; font-weight: bold; color: #f97316; letter-spacing: 1px;">
+            ${ticket.ticket_code || ticket.booking_code}
           </div>
         </div>
 
-        <div className="p-8">
-          {/* Event Title */}
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">{event.title}</h2>
+        <!-- Footer -->
+        <div style="text-align: center; padding: 20px; border-top: 2px dashed #e5e7eb; color: #6b7280; font-size: 14px; line-height: 1.6;">
+          <div style="margin-bottom: 10px;">
+            <strong style="color: #374151;">Important:</strong> Please bring this ticket (digital or printed) to the event.
+          </div>
+          <div>
+            For questions, contact us at support@skillpulse.com
           </div>
         </div>
-
-        {/* Event Image */}
-        {event.image_url && (
-          <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
-            <img 
-              src={event.image_url} 
-              alt={event.title}
-              className="w-full h-64 object-cover"
-            />
-          </div>
-        )}
-
-        {/* Event Details Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          <div className="space-y-6">
-            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg">
-              <Calendar className="h-6 w-6 text-orange-600 mt-1 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-gray-900">Date & Time</p>
-                <p className="text-gray-700 text-lg">
-                  {format(new Date(event.start_time), 'EEEE, MMMM do, yyyy')}
-                </p>
-                <p className="text-gray-600">
-                  {format(new Date(event.start_time), 'h:mm a')} - {format(new Date(event.end_time), 'h:mm a')}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-              <MapPin className="h-6 w-6 text-purple-600 mt-1 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-gray-900">Venue</p>
-                <p className="text-gray-700 text-lg">{event.location}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-6">
-            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
-              <User className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-gray-900">Ticket Holder</p>
-                <p className="text-gray-700 text-lg">{ticket.ticket_holder_name}</p>
-                <p className="text-sm text-gray-500">Ticket Type: {eventTicket.name}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
-              <Hash className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-gray-900">Ticket Details</p>
-                <p className="text-gray-700 font-mono text-lg">{ticket.ticket_code}</p>
-                <p className="text-sm text-gray-500">Booking: {ticket.booking.booking_code}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* QR Code Section */}
-        <div className="text-center mb-8">
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-8 inline-block">
-            <p className="font-semibold text-gray-900 mb-4 text-lg">Scan QR Code for Entry</p>
-            <div className="bg-white p-6 rounded-xl shadow-lg inline-block">
-              <QRCodeSVG 
-                value={ticket.qr_code_data}
-                size={200}
-                level="M"
-                includeMargin={true}
-                fgColor="#1f2937"
-              />
-            </div>
-            <p className="text-gray-600 mt-4 text-sm max-w-md mx-auto">
-              Present this QR code at the event entrance. Save this ticket to your device for offline access.
-            </p>
-          </div>
-        </div>
-
-        {/* Important Information */}
-        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-6">
-          <h3 className="font-bold text-yellow-800 mb-4 text-lg flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Important Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-yellow-700">
-            <ul className="space-y-2">
-              <li>• Please arrive 30 minutes before the event starts</li>
-              <li>• Keep this ticket safe - lost tickets cannot be replaced</li>
-              <li>• Valid photo ID may be required for entry</li>
-            </ul>
-            <ul className="space-y-2">
-              <li>• This ticket is non-transferable and non-refundable</li>
-              <li>• Event organizers reserve the right to refuse entry</li>
-              <li>• For support, contact: support@skillpulse.com</li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center mt-8 pt-6 border-t border-gray-200">
-          <p className="text-gray-500 text-sm">
-            Generated by SkillPulse Event Management • Ticket ID: {ticket.id.slice(0, 8)}
-          </p>
-        </div>
-
-        {/* Decorative elements */}
-        <div className="absolute top-1/2 left-0 w-6 h-6 bg-gray-100 rounded-full transform -translate-x-3 -translate-y-3"></div>
-        <div className="absolute top-1/2 right-0 w-6 h-6 bg-gray-100 rounded-full transform translate-x-3 -translate-y-3"></div>
       </div>
+    </div>
+  `;
 
+  return (
+    <div className={`${showPrintStyles ? 'print:shadow-none print:border-2 print:border-black' : ''}`}>
+      <div dangerouslySetInnerHTML={{ __html: ticketHTML }} />
+      
+      {/* Print Styles */}
       {showPrintStyles && (
-        <style>
-          {`
+        <style dangerouslySetInnerHTML={{
+          __html: `
             @media print {
-              .print-ticket {
-                page-break-after: always;
-                margin: 0;
-                box-shadow: none;
+              .ticket-display {
+                break-inside: avoid;
+                page-break-inside: avoid;
               }
-              .print-ticket:last-child {
-                page-break-after: avoid;
-              }
-              body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+              @page {
+                margin: 0.5in;
               }
             }
-          `}
-        </style>
+          `
+        }} />
       )}
     </div>
   );
