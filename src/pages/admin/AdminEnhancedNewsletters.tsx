@@ -1,9 +1,18 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import EnhancedNewsletterForm from '@/components/admin/EnhancedNewsletterForm';
 
 const AdminEnhancedNewsletters = () => {
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [selectedContent, setSelectedContent] = useState<any[]>([]);
+
+  const handleNewsletterSent = () => {
+    // Reset selections after newsletter is sent
+    setSelectedRecipients([]);
+    setSelectedContent([]);
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -13,7 +22,11 @@ const AdminEnhancedNewsletters = () => {
             Create engaging newsletters using beautiful templates and dynamic content
           </p>
         </div>
-        <EnhancedNewsletterForm />
+        <EnhancedNewsletterForm 
+          selectedRecipients={selectedRecipients}
+          selectedContent={selectedContent}
+          onNewsletterSent={handleNewsletterSent}
+        />
       </div>
     </AdminLayout>
   );
