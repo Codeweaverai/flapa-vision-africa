@@ -30,7 +30,6 @@ interface CreatorPayout {
   creator_profile?: {
     full_name: string;
     username: string;
-    email: string;
   };
 }
 
@@ -43,7 +42,6 @@ interface CreatorBalance {
   creator_profile?: {
     full_name: string;
     username: string;
-    email: string;
   };
 }
 
@@ -81,56 +79,38 @@ const AdminPayouts = () => {
 
   const loadPayouts = async () => {
     try {
-      // Get total count first
+      // Get total count
       const { count } = await supabase
         .from('creator_payouts')
         .select('*', { count: 'exact', head: true });
       setTotalPayoutCount(count || 0);
 
-      // Get paginated payouts data
-      const { data: payoutsData, error: payoutsError } = await supabase
+      // Get paginated data
+      const { data: payoutsData, error } = await supabase
         .from('creator_payouts')
         .select('*')
         .order('created_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
 
-      if (payoutsError) throw payoutsError;
+      if (error) throw error;
 
-      // Get associated profiles
+      // Get profiles in bulk
       const creatorIds = payoutsData?.map(p => p.creator_id).filter(Boolean) || [];
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, full_name, username')
         .in('id', creatorIds);
 
-      // Combine payouts with profile data
-      const payoutsWithProfiles = payoutsData?.map(payout => {
-        const profile = profilesData?.find(p => p.id === payout.creator_id);
-        return {
-          ...payout,
-          creator_profile: {
-            full_name: profile?.full_name || 'N/A',
-            username: profile?.username || 'N/A',
-            email: 'N/A' // Will be updated with email
-          }
-        };
-      }) || [];
+      // Combine data
+      const enrichedPayouts = payoutsData?.map(payout => ({
+        ...payout,
+        creator_profile: profilesData?.find(p => p.id === payout.creator_id) || {
+          full_name: 'N/A',
+          username: 'N/A'
+        }
+      })) || [];
 
-      // Get emails for each payout
-      const payoutsWithEmails = await Promise.all(
-        payoutsWithProfiles.map(async (payout) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
-          return {
-            ...payout,
-            creator_profile: {
-              ...payout.creator_profile,
-              email: userData.user?.email || 'N/A'
-            }
-          };
-        })
-      );
-
-      setPayouts(payoutsWithEmails);
+      setPayouts(enrichedPayouts);
     } catch (error) {
       console.error('Error loading payouts:', error);
       toast.error('Failed to load payouts');
@@ -151,46 +131,15 @@ const AdminPayouts = () => {
 
       if (error) throw error;
 
-      // Get associated profiles
-      const creatorIds = payoutsData?.map(p => p.creator_id).filter(Boolean) || [];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, username')
-        .in('id', creatorIds);
-
-      // Combine payouts with profile data
-      const payoutsWithProfiles = payoutsData?.map(payout => {
-        const profile = profilesData?.find(p => p.id === payout.creator_id);
-        return {
-          ...payout,
-          creator_profile: {
-            full_name: profile?.full_name || 'N/A',
-            username: profile?.username || 'N/A',
-            email: 'N/A'
-          }
-        };
-      }) || [];
-
-      // Get emails for each payout
-      const payoutsWithEmails = await Promise.all(
-        payoutsWithProfiles.map(async (payout) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
-          return {
-            ...payout,
-            creator_profile: {
-              ...payout.creator_profile,
-              email: userData.user?.email || 'N/A'
-            }
-          };
-        })
-      );
-
-      // Merge with existing payouts
+      // Merge new payouts
       setPayouts(prev => {
         const newPayouts = [...prev];
-        payoutsWithEmails.forEach(newPayout => {
+        payoutsData?.forEach(newPayout => {
           if (!newPayouts.some(p => p.id === newPayout.id)) {
-            newPayouts.push(newPayout);
+            newPayouts.push({
+              ...newPayout,
+              creator_profile: { full_name: 'N/A', username: 'N/A' }
+            });
           }
         });
         return newPayouts;
@@ -207,22 +156,26 @@ const AdminPayouts = () => {
 
   const loadCreatorBalances = async () => {
     try {
-      const { data: transactions, error: transactionsError } = await supabase
+      const { data: transactions, error } = await supabase
         .from('payment_transactions')
         .select('creator_id')
         .not('creator_id', 'is', null)
         .eq('status', 'completed');
 
-      if (transactionsError) throw transactionsError;
+      if (error) throw error;
 
+      // Fixed syntax for creatorIds
       const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean))];
+      
       const balances = await Promise.all(creatorIds.map(calculateCreatorBalance));
 
-      const creatorsWithActivity = balances.filter(
-        balance => balance.total_earnings > 0 || balance.available_balance > 0 || balance.pending_balance > 0
+      setCreatorBalances(
+        balances.filter(b => 
+          b.total_earnings > 0 || 
+          b.available_balance > 0 || 
+          b.pending_balance > 0
+        )
       );
-
-      setCreatorBalances(creatorsWithActivity);
     } catch (error) {
       console.error('Error loading creator balances:', error);
       toast.error('Failed to load creator balances');
@@ -232,36 +185,42 @@ const AdminPayouts = () => {
   const calculateCreatorBalance = async (creatorId: string) => {
     try {
       const [{ data: transactions }, { data: payouts }] = await Promise.all([
-        supabase.from('payment_transactions').select('*').eq('creator_id', creatorId).eq('status', 'completed'),
-        supabase.from('creator_payouts').select('amount').eq('creator_id', creatorId).eq('status', 'completed')
+        supabase.from('payment_transactions')
+          .select('*')
+          .eq('creator_id', creatorId)
+          .eq('status', 'completed'),
+        supabase.from('creator_payouts')
+          .select('amount')
+          .eq('creator_id', creatorId)
+          .eq('status', 'completed')
       ]);
 
-      const totalEarnings = transactions?.reduce((sum, t) => sum + Number(t.creator_earning || 0), 0) || 0;
-      const totalPayouts = payouts?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+      const totalEarnings = transactions?.reduce((sum, t) => sum + (t.creator_earning || 0), 0) || 0;
+      const totalPayouts = payouts?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
       const now = new Date();
       let availableBalance = 0;
       let pendingBalance = 0;
 
-      transactions?.forEach(transaction => {
-        const earningAmount = Number(transaction.creator_earning || 0);
-        const transactionDate = new Date(transaction.created_at);
-        const eligibleDate = new Date(transactionDate);
-        eligibleDate.setDate(transactionDate.getDate() + 7);
-
+      transactions?.forEach(t => {
+        const date = new Date(t.created_at);
+        const eligibleDate = new Date(date);
+        eligibleDate.setDate(date.getDate() + 7);
+        
         if (now >= eligibleDate) {
-          availableBalance += earningAmount;
+          availableBalance += t.creator_earning || 0;
         } else {
-          pendingBalance += earningAmount;
+          pendingBalance += t.creator_earning || 0;
         }
       });
 
       availableBalance = Math.max(0, availableBalance - totalPayouts);
 
-      const [{ data: profileData }, { data: userData }] = await Promise.all([
-        supabase.from('profiles').select('full_name, username').eq('id', creatorId).single(),
-        supabase.auth.admin.getUserById(creatorId)
-      ]);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, username')
+        .eq('id', creatorId)
+        .single();
 
       return {
         creator_id: creatorId,
@@ -269,14 +228,13 @@ const AdminPayouts = () => {
         pending_balance: pendingBalance,
         total_earnings: totalEarnings,
         total_payouts: totalPayouts,
-        creator_profile: {
-          full_name: profileData?.full_name || 'N/A',
-          username: profileData?.username || 'N/A',
-          email: userData.user?.email || 'N/A'
+        creator_profile: profile || {
+          full_name: 'N/A',
+          username: 'N/A'
         }
       };
     } catch (error) {
-      console.error('Error calculating balance for creator:', creatorId, error);
+      console.error(`Error calculating balance for creator ${creatorId}:`, error);
       return {
         creator_id: creatorId,
         available_balance: 0,
@@ -285,8 +243,7 @@ const AdminPayouts = () => {
         total_payouts: 0,
         creator_profile: {
           full_name: 'N/A',
-          username: 'N/A',
-          email: 'N/A'
+          username: 'N/A'
         }
       };
     }
@@ -297,7 +254,6 @@ const AdminPayouts = () => {
       const matchesSearch = 
         payout.creator_profile?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payout.creator_profile?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payout.creator_profile?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payout.id.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || payout.status === statusFilter;
@@ -311,7 +267,7 @@ const AdminPayouts = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
+    const variants = {
       pending: 'bg-yellow-100 text-yellow-800',
       processing: 'bg-blue-100 text-blue-800',
       completed: 'bg-green-100 text-green-800',
@@ -320,7 +276,7 @@ const AdminPayouts = () => {
     };
     
     return (
-      <Badge className={variants[status] || variants.pending}>
+      <Badge className={variants[status as keyof typeof variants] || variants.pending}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
@@ -332,19 +288,15 @@ const AdminPayouts = () => {
       <Smartphone className="h-4 w-4" />;
   };
 
-  // Calculate paginated data
+  // Calculate displayed data
   const paginatedPayouts = filteredPayouts.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
-
   const totalPages = Math.ceil(filteredPayouts.length / PAGE_SIZE);
-
-  // Calculate summary statistics
   const completedPayouts = payouts.filter(p => p.status === 'completed').length;
   const pendingPayouts = payouts.filter(p => p.status === 'pending').length;
-  const failedPayouts = payouts.filter(p => p.status === 'failed').length;
-  const totalPayoutAmount = payouts.reduce((sum, p) => sum + Number(p.amount), 0);
+  const totalPayoutAmount = payouts.reduce((sum, p) => sum + (p.amount || 0), 0);
   const totalAvailableBalance = creatorBalances.reduce((sum, b) => sum + b.available_balance, 0);
 
   if (loading) {
@@ -438,7 +390,6 @@ const AdminPayouts = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Creator</TableHead>
-                        <TableHead>Email</TableHead>
                         <TableHead>Available Balance</TableHead>
                         <TableHead>Pending Balance</TableHead>
                         <TableHead>Total Earnings</TableHead>
@@ -458,7 +409,6 @@ const AdminPayouts = () => {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>{balance.creator_profile?.email}</TableCell>
                           <TableCell>
                             <div className="font-medium text-green-600">
                               <PriceDisplay amount={balance.available_balance} originalCurrency="USD" />
@@ -480,7 +430,7 @@ const AdminPayouts = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -496,7 +446,7 @@ const AdminPayouts = () => {
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Search by creator name, email, or payout ID..."
+                          placeholder="Search by creator name, username, or payout ID..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-8"
@@ -559,7 +509,7 @@ const AdminPayouts = () => {
                                   {payout.creator_profile?.full_name || 'N/A'}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  {payout.creator_profile?.email}
+                                  @{payout.creator_profile?.username || 'N/A'}
                                 </div>
                               </div>
                             </TableCell>
@@ -621,9 +571,9 @@ const AdminPayouts = () => {
                                           </p>
                                         </div>
                                         <div>
-                                          <label className="text-sm font-medium">Email</label>
+                                          <label className="text-sm font-medium">Username</label>
                                           <p className="text-sm text-muted-foreground">
-                                            {selectedPayout.creator_profile?.email}
+                                            @{selectedPayout.creator_profile?.username}
                                           </p>
                                         </div>
                                         <div>
