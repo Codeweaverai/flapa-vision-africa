@@ -952,13 +952,7 @@ const CourseLearningPage = () => {
           hasNextContent={true}
         />
       )}
-       {/* Recommended Courses Section */}
-      <div className="mt-8">
-        <RecommendedCourses 
-          currentCourseId={course.id} 
-          category={course.category} 
-        />
-      </div>
+       
     </Layout>
   );
 };
