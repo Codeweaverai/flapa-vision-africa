@@ -37,12 +37,10 @@ import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
-import PriceDisplay from '@/components/currency/PriceDisplay';
-import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
 
 interface Course {
-  id?: string;
+  id: string;
   title: string;
   description: string;
   summary: string;
@@ -99,43 +97,7 @@ interface ProgressData {
   user_id: string;
   course_id: string;
   progress_percentage: number;
-  last_accessed_module_id?: string;
   last_accessed_lesson_id?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Review {
-  id: string;
-  course_id: string;
-  user_id: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-  updated_at: string;
-  profiles?: {
-    id: string;
-    username?: string;
-    full_name?: string;
-    avatar_url?: string;
-  };
-}
-
-interface LearningOutcome {
-  id: string;
-  course_id: string;
-  outcome: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface FinalExam {
-  id: string;
-  course_id: string;
-  title: string;
-  description: string;
-  passing_score: number;
-  time_limit_minutes: number;
   created_at: string;
   updated_at: string;
 }
@@ -148,13 +110,15 @@ interface Profile {
   bio?: string;
 }
 
-interface ExamResult {
+interface FinalExam {
   id: string;
-  passed: boolean;
-  score: number;
-  final_grade: number;
-  quiz_scores: number[];
-  attempt_number: number;
+  course_id: string;
+  title: string;
+  description: string;
+  passing_score: number;
+  time_limit_minutes: number;
+  created_at: string;
+  updated_at: string;
 }
 
 const CourseLearningPage = () => {
@@ -171,7 +135,6 @@ const CourseLearningPage = () => {
   const [enrollmentCount, setEnrollmentCount] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
-  const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
   const [instructor, setInstructor] = useState<Profile | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
@@ -186,32 +149,24 @@ const CourseLearningPage = () => {
   const [quizPassed, setQuizPassed] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
-  const [examResult, setExamResult] = useState<ExamResult | null>(null);
-  const [hasPassedExam, setHasPassedExam] = useState(false);
-  const [canRetakeExam, setCanRetakeExam] = useState(false);
-  const [showFinalExamModal, setShowFinalExamModal] = useState(false);
   const [showResumeButton, setShowResumeButton] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
   
-  const lessonCompletedRef = useRef<Record<string, boolean>>({});
   const isEnrolled = enrollment?.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
   const isNotComplete = progressPercentage < 100;
   const hasLessons = modules.some(module => module.lessons.length > 0);
   const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
 
-  // Calculate course progress based on completed lessons
   const calculateCourseProgress = (completed: string[], total: number): number => {
     if (total === 0) return 0;
     return Math.round((completed.length / total) * 100);
   };
 
-  // Sync course progress with the database
   const syncCourseProgress = async () => {
     if (!user || !courseId || !enrollment) return;
 
     try {
-      // Get completed lessons
       const { data: completedData, error: completedError } = await supabase
         .from('lesson_progress')
         .select('lesson_id')
@@ -223,7 +178,6 @@ const CourseLearningPage = () => {
       const completedLessonIds = completedData?.map(item => item.lesson_id) || [];
       const progressPercentage = calculateCourseProgress(completedLessonIds, totalLessons);
 
-      // Update both state and database
       setCompletedLessons(completedLessonIds);
       
       const { error: progressError } = await supabase
@@ -239,7 +193,6 @@ const CourseLearningPage = () => {
 
       if (progressError) throw progressError;
 
-      // Refresh progress state
       const { data: progressData } = await supabase
         .from('course_progress')
         .select('*')
@@ -248,7 +201,6 @@ const CourseLearningPage = () => {
         .single();
 
       setProgress(progressData);
-      
     } catch (error) {
       console.error('Error syncing course progress:', error);
     }
@@ -264,7 +216,6 @@ const CourseLearningPage = () => {
       setLoading(true);
       
       try {
-        // Load course and modules first
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select('*')
@@ -278,7 +229,7 @@ const CourseLearningPage = () => {
           return;
         }
 
-        setCourse(courseData as Course);
+        setCourse(courseData);
 
         const { data: modulesData, error: modulesError } = await supabase
           .from('course_modules')
@@ -303,11 +254,9 @@ const CourseLearningPage = () => {
         
         setModules(modulesWithLessons);
 
-        // Load other data in parallel
         const [
           enrolledCount,
           ratingData,
-          outcomesData,
           examData,
           instructorData
         ] = await Promise.all([
@@ -318,10 +267,6 @@ const CourseLearningPage = () => {
           supabase
             .from('course_reviews')
             .select('rating')
-            .eq('course_id', courseId),
-          supabase
-            .from('course_learning_outcomes')
-            .select('*')
             .eq('course_id', courseId),
           supabase
             .from('final_exams')
@@ -344,11 +289,9 @@ const CourseLearningPage = () => {
         const avgRating = ratings.length > 0 ? totalRating / ratings.length : 0;
         setAverageRating(avgRating);
         setReviewCount(ratings.length);
-        setLearningOutcomes(outcomesData.data as LearningOutcome[]);
-        if (examData.data) setFinalExam(examData.data as FinalExam);
-        if (instructorData.data) setInstructor(instructorData.data as Profile);
+        if (examData.data) setFinalExam(examData.data);
+        if (instructorData.data) setInstructor(instructorData.data);
 
-        // Load user-specific data if logged in
         if (user?.id) {
           const [enrollmentData, progressData] = await Promise.all([
             supabase
@@ -389,21 +332,12 @@ const CourseLearningPage = () => {
   }, [courseId, user]);
 
   useEffect(() => {
-    const completedMap = completedLessons.reduce((acc, id) => {
-      acc[id] = true;
-      return acc;
-    }, {} as Record<string, boolean>);
-    lessonCompletedRef.current = completedMap;
-  }, [completedLessons]);
-
-  useEffect(() => {
     if (isEnrolled && selectedLesson) {
       supabase
         .from('course_progress')
         .upsert({
           user_id: user?.id,
           course_id: courseId,
-          last_accessed_module_id: selectedLesson.module_id,
           last_accessed_lesson_id: selectedLesson.id,
           updated_at: new Date().toISOString()
         }, {
@@ -418,7 +352,6 @@ const CourseLearningPage = () => {
   useEffect(() => {
     if (isEnrolled && modules.length > 0 && !selectedLesson) {
       const determineInitialLesson = () => {
-        // 1. Check if there's a last accessed lesson in progress
         if (progress?.last_accessed_lesson_id) {
           const lastLesson = modules.flatMap(m => m.lessons)
             .find(l => l.id === progress.last_accessed_lesson_id);
@@ -429,12 +362,10 @@ const CourseLearningPage = () => {
           }
         }
 
-        // 2. Find first incomplete lesson
         const firstIncomplete = modules.flatMap(m => m.lessons)
           .find(l => !completedLessons.includes(l.id));
         if (firstIncomplete) return firstIncomplete;
 
-        // 3. Default to first lesson
         return modules[0]?.lessons?.[0];
       };
 
@@ -453,7 +384,6 @@ const CourseLearningPage = () => {
 
     const watchPercentage = progress.played * 100;
     
-    // Only mark complete if watched enough and not already complete
     if (watchPercentage > 80 && !completedLessons.includes(selectedLesson.id)) {
       try {
         const { error } = await supabase
@@ -469,10 +399,7 @@ const CourseLearningPage = () => {
           });
 
         if (error) throw error;
-
-        // Sync the updated progress
         await syncCourseProgress();
-        
       } catch (error) {
         console.error('Error updating lesson progress:', error);
       }
@@ -491,7 +418,6 @@ const CourseLearningPage = () => {
         module.lessons.map(lesson => lesson.id)
       );
 
-      // Batch update all lessons as complete
       const { error } = await supabase
         .from('lesson_progress')
         .upsert(
@@ -506,11 +432,8 @@ const CourseLearningPage = () => {
         );
 
       if (error) throw error;
-
-      // Sync the updated progress
       await syncCourseProgress();
       toast.success('All lessons marked as complete!');
-      
     } catch (error) {
       console.error('Error marking lessons complete:', error);
       toast.error('Failed to mark lessons complete');
@@ -524,13 +447,6 @@ const CourseLearningPage = () => {
       setSelectedLesson(resumeLesson);
       setCurrentLessonId(resumeLesson.id);
       setShowResumeButton(false);
-    }
-  };
-
-  const handleStartLearning = () => {
-    if (modules.length > 0 && modules[0].lessons.length > 0) {
-      const firstLesson = modules[0].lessons[0];
-      setSelectedLesson(firstLesson);
     }
   };
 
@@ -572,49 +488,34 @@ const CourseLearningPage = () => {
 
   const handleExamComplete = (result: any) => {
     setShowExamModal(false);
+    fetchCourseData();
+  };
+
+  const fetchCourseData = async () => {
+    if (!courseId) return;
     
-    const examResult: ExamResult = {
-      id: result.id || '',
-      passed: result.passed,
-      score: result.score,
-      final_grade: result.final_grade,
-      quiz_scores: Array.isArray(result.quiz_scores) ? result.quiz_scores : [],
-      attempt_number: result.attempt_number
-    };
+    const { data: courseData } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', courseId)
+      .single();
     
-    setExamResult(examResult);
-    setHasPassedExam(result.passed);
-    setCanRetakeExam(!result.passed);
-    setShowFinalExamModal(true);
-    
-    // Refresh course data to reflect exam completion
-    const loadData = async () => {
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('id', courseId)
-        .single();
-      setCourse(courseData as Course);
-    };
-    loadData();
+    if (courseData) setCourse(courseData);
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <Layout />
+      <Layout>
         <main className="flex-grow flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
         </main>
-        <Layout />
-      </div>
+      </Layout>
     );
   }
 
   if (!courseId) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <Layout />
+      <Layout>
         <main className="flex-grow flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid course URL</h1>
@@ -624,15 +525,13 @@ const CourseLearningPage = () => {
             </Link>
           </div>
         </main>
-        <Layout />
-      </div>
+      </Layout>
     );
   }
 
   if (!course) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <Layout />
+      <Layout>
         <main className="flex-grow flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
@@ -641,14 +540,12 @@ const CourseLearningPage = () => {
             </Link>
           </div>
         </main>
-        <Layout />
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
+    <Layout>
       <main className="flex-grow bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-8">
           {showResumeButton && resumeLesson && (
@@ -761,7 +658,7 @@ const CourseLearningPage = () => {
                 <CardContent>
                   <EnhancedCourseModuleList 
                     modules={modules}
-                    courseId={courseId!}
+                    courseId={courseId}
                     creatorId={course.creator_id}
                     onLessonSelect={handleLessonSelect}
                     currentLessonId={currentLessonId}
@@ -898,7 +795,7 @@ const CourseLearningPage = () => {
                 </TabsContent>
                 
                 <TabsContent value="reviews">
-                  <CourseReviewsTab courseId={courseId!} />
+                  <CourseReviewsTab courseId={courseId} />
                 </TabsContent>
                 
                 <TabsContent value="discussion">
@@ -907,15 +804,6 @@ const CourseLearningPage = () => {
               </Tabs>
             </div>
           </div>
-
-          <FloatingAILearningAssistant 
-            courseId={courseId!}
-            lessonId={selectedLesson?.id || modules[0]?.lessons[0]?.id || ''}
-            lessonTitle={selectedLesson?.title || modules[0]?.lessons[0]?.title || ''}
-            lessonContent={typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
-              ? (selectedLesson?.content || modules[0]?.lessons[0]?.content || '')
-              : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content || {})}
-          />
 
           {!isEnrolled && (
             <Card className="mt-8 sticky bottom-4">
@@ -934,7 +822,7 @@ const CourseLearningPage = () => {
                       {!course.is_free && (
                         <AddToCartButton
                           itemType="course"
-                          itemId={courseId!}
+                          itemId={courseId}
                           itemName={course.title}
                           price={course.price || 0}
                         />
@@ -1002,45 +890,48 @@ const CourseLearningPage = () => {
             </Card>
           )}
 
-          {finalExam && (
-            <FinalExamModal
-              isOpen={showExamModal}
-              onClose={() => setShowExamModal(false)}
-              exam={finalExam}
-              enrollmentId={enrollment?.id || ''}
-              onComplete={handleExamComplete}
-            />
-          )}
-
-          <QuizModal
-            isOpen={showQuizModal}
-            onClose={() => setShowQuizModal(false)}
-            quizId={currentQuizId}
-            lessonId={currentLessonId}
-            onComplete={handleQuizComplete}
+          <FloatingAILearningAssistant 
+            courseId={courseId}
+            lessonId={selectedLesson?.id || modules[0]?.lessons[0]?.id || ''}
+            lessonTitle={selectedLesson?.title || modules[0]?.lessons[0]?.title || ''}
+            lessonContent={typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
+              ? (selectedLesson?.content || modules[0]?.lessons[0]?.content || '')
+              : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content || {})}
           />
-
-          {currentQuiz && (
-            <QuizResultsModal
-              isOpen={showQuizResultsModal}
-              onClose={() => setShowQuizResultsModal(false)}
-              quiz={currentQuiz}
-              score={quizScore}
-              passed={quizPassed}
-              onRetake={handleRetakeQuiz}
-              onProceed={() => setShowQuizResultsModal(false)}
-              hasNextContent={true}
-            />
-          )}
         </div>
-        {/* Recommended Courses Section */}
-        <RecommendedCourses 
-          currentCourseId={course.id} 
-          category={course.category} 
-        />
       </main>
-      <Layout />
-    </div>
+
+      {finalExam && (
+        <FinalExamModal
+          isOpen={showExamModal}
+          onClose={() => setShowExamModal(false)}
+          exam={finalExam}
+          enrollmentId={enrollment?.id || ''}
+          onComplete={handleExamComplete}
+        />
+      )}
+
+      <QuizModal
+        isOpen={showQuizModal}
+        onClose={() => setShowQuizModal(false)}
+        quizId={currentQuizId}
+        lessonId={currentLessonId}
+        onComplete={handleQuizComplete}
+      />
+
+      {currentQuiz && (
+        <QuizResultsModal
+          isOpen={showQuizResultsModal}
+          onClose={() => setShowQuizResultsModal(false)}
+          quiz={currentQuiz}
+          score={quizScore}
+          passed={quizPassed}
+          onRetake={handleRetakeQuiz}
+          onProceed={() => setShowQuizResultsModal(false)}
+          hasNextContent={true}
+        />
+      )}
+    </Layout>
   );
 };
 
