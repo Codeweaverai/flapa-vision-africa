@@ -81,55 +81,25 @@ const AdminPayouts = () => {
 
   const loadPayouts = async () => {
     try {
-      // Get total count first
+      // Get total count
       const { count } = await supabase
         .from('creator_payouts')
         .select('*', { count: 'exact', head: true });
       setTotalPayoutCount(count || 0);
 
-      // Get paginated payouts data
-      const { data: payoutsData, error: payoutsError } = await supabase
+      // Get first page of data
+      const { data, error } = await supabase
         .from('creator_payouts')
-        .select('*')
+        .select(`
+          *,
+          creator_profile:profiles(full_name, username)
+        `)
         .order('created_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
 
-      if (payoutsError) throw payoutsError;
+      if (error) throw error;
 
-      // Get associated profiles
-      const creatorIds = payoutsData?.map(p => p.creator_id).filter(Boolean) || [];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, username')
-        .in('id', creatorIds);
-
-      // Combine payouts with profile data
-      const payoutsWithProfiles = payoutsData?.map(payout => {
-        const profile = profilesData?.find(p => p.id === payout.creator_id);
-        return {
-          ...payout,
-          creator_profile: {
-            full_name: profile?.full_name || 'N/A',
-            username: profile?.username || 'N/A',
-            email: 'N/A' // Will be updated with email
-          }
-        };
-      }) || [];
-
-      // Get emails for each payout
-      const payoutsWithEmails = await Promise.all(
-        payoutsWithProfiles.map(async (payout) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
-          return {
-            ...payout,
-            creator_profile: {
-              ...payout.creator_profile,
-              email: userData.user?.email || 'N/A'
-            }
-          };
-        })
-      );
-
+      const payoutsWithEmails = await enrichPayoutsWithEmails(data || []);
       setPayouts(payoutsWithEmails);
     } catch (error) {
       console.error('Error loading payouts:', error);
@@ -143,49 +113,18 @@ const AdminPayouts = () => {
       const from = (page - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      const { data: payoutsData, error } = await supabase
+      const { data, error } = await supabase
         .from('creator_payouts')
-        .select('*')
+        .select(`
+          *,
+          creator_profile:profiles(full_name, username)
+        `)
         .order('created_at', { ascending: false })
         .range(from, to);
 
       if (error) throw error;
 
-      // Get associated profiles
-      const creatorIds = payoutsData?.map(p => p.creator_id).filter(Boolean) || [];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, username')
-        .in('id', creatorIds);
-
-      // Combine payouts with profile data
-      const payoutsWithProfiles = payoutsData?.map(payout => {
-        const profile = profilesData?.find(p => p.id === payout.creator_id);
-        return {
-          ...payout,
-          creator_profile: {
-            full_name: profile?.full_name || 'N/A',
-            username: profile?.username || 'N/A',
-            email: 'N/A'
-          }
-        };
-      }) || [];
-
-      // Get emails for each payout
-      const payoutsWithEmails = await Promise.all(
-        payoutsWithProfiles.map(async (payout) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
-          return {
-            ...payout,
-            creator_profile: {
-              ...payout.creator_profile,
-              email: userData.user?.email || 'N/A'
-            }
-          };
-        })
-      );
-
-      // Merge with existing payouts
+      const payoutsWithEmails = await enrichPayoutsWithEmails(data || []);
       setPayouts(prev => {
         const newPayouts = [...prev];
         payoutsWithEmails.forEach(newPayout => {
@@ -205,6 +144,21 @@ const AdminPayouts = () => {
     }
   };
 
+  const enrichPayoutsWithEmails = async (payoutsData: CreatorPayout[]) => {
+    return Promise.all(
+      payoutsData.map(async (payout) => {
+        const { data: userData } = await supabase.auth.admin.getUserById(payout.creator_id);
+        return {
+          ...payout,
+          creator_profile: {
+            ...payout.creator_profile,
+            email: userData.user?.email || 'N/A'
+          }
+        };
+      })
+    );
+  };
+
   const loadCreatorBalances = async () => {
     try {
       const { data: transactions, error: transactionsError } = await supabase
@@ -215,7 +169,7 @@ const AdminPayouts = () => {
 
       if (transactionsError) throw transactionsError;
 
-      const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean)];
+      const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean))];
       const balances = await Promise.all(creatorIds.map(calculateCreatorBalance));
 
       const creatorsWithActivity = balances.filter(
