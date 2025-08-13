@@ -141,6 +141,7 @@ const CourseLearningPage = () => {
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [showResumeButton, setShowResumeButton] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
+  const [showTranscript, setShowTranscript] = useState(true);
   
   const isEnrolled = enrollment?.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
@@ -534,7 +535,7 @@ const CourseLearningPage = () => {
     );
   }
 
-  return (
+ return (
     <Layout>
       <main className="flex-grow bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-6 sm:py-8">
@@ -596,7 +597,9 @@ const CourseLearningPage = () => {
                 <Progress value={progressPercentage} className="h-2 sm:h-3" />
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-3 sm:mt-4 gap-2">
                   <p className="text-xs sm:text-sm text-gray-600">
-                    Keep going! You're doing great.
+                    {progressPercentage < 50 ? 'Keep going! You\'re doing great.' : 
+                     progressPercentage < 80 ? 'You\'re making excellent progress!' :
+                     'Almost there! Finish strong!'}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {isNotComplete && hasLessons && (
@@ -616,16 +619,14 @@ const CourseLearningPage = () => {
                     )}
                     
                     {(!hasLessons || progressPercentage === 100) && finalExam && (
-                    
-                       <Button
-                 onClick={handleTakeExam}
-                    size="sm" // Changed from 'xs' to 'sm' for better visibility
-                 className="bg-orange-600 hover:bg-orange-700 text-white text-sm py-1 px-3" // Added padding and increased text size
-                >
-                <GraduationCap className="h-4 w-4 mr-2" /> {/* Increased icon size */}
-                 Final Exam
-                  </Button>
-              
+                      <Button
+                        onClick={handleTakeExam}
+                        size="sm"
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-sm py-1 px-3"
+                      >
+                        <GraduationCap className="h-4 w-4 mr-2" />
+                        Final Exam
+                      </Button>
                     )}
 
                     {progressPercentage === 100 && (
@@ -635,7 +636,7 @@ const CourseLearningPage = () => {
                         className="bg-purple-600 hover:bg-purple-700 text-white text-sm py-1 px-3"
                       >
                         <Eye className="h-4 w-4 mr-2" />
-                        View Course Results
+                        View Results
                       </Button>
                     )}
                   </div>
@@ -665,7 +666,6 @@ const CourseLearningPage = () => {
                     completedLessons={completedLessons}
                     onQuizStart={handleQuizStart}
                     onFinalExamStart={() => setShowExamModal(true)}
-                    mobileView={window.innerWidth < 768}
                   />
                 </CardContent>
               </Card>
@@ -683,9 +683,18 @@ const CourseLearningPage = () => {
                     <StickyNote className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Notes
                   </TabsTrigger>
-                  <TabsTrigger value="transcripts" className="text-xs sm:text-sm">Transcript</TabsTrigger>
-                  <TabsTrigger value="reviews" className="text-xs sm:text-sm">Reviews</TabsTrigger>
-                  <TabsTrigger value="discussion" className="text-xs sm:text-sm">Discuss</TabsTrigger>
+                  <TabsTrigger value="transcripts" className="text-xs sm:text-sm p-1 sm:p-2">
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Transcript
+                  </TabsTrigger>
+                  <TabsTrigger value="reviews" className="text-xs sm:text-sm p-1 sm:p-2">
+                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Reviews
+                  </TabsTrigger>
+                  <TabsTrigger value="discussion" className="text-xs sm:text-sm p-1 sm:p-2">
+                    <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Discuss
+                  </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="content" className="space-y-6">
@@ -694,36 +703,66 @@ const CourseLearningPage = () => {
                       <CardContent className="p-4 sm:p-6">
                         {selectedLesson || modules[0]?.lessons[0] ? (
                           <div>
-                            <h3 className="text-lg font-semibold mb-4">
+                            <h3 className="text-lg sm:text-xl font-semibold mb-4">
                               {selectedLesson?.title || modules[0]?.lessons[0]?.title}
                             </h3>
                             {(selectedLesson?.description || modules[0]?.lessons[0]?.description) && (
-                              <p className="text-gray-600 mb-4">
+                              <p className="text-gray-600 mb-4 text-sm sm:text-base">
                                 {selectedLesson?.description || modules[0]?.lessons[0]?.description}
                               </p>
                             )}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
-                              <div className="aspect-video rounded-lg overflow-hidden bg-black mb-4">
-                                <ReactPlayer
-                                  url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url}
-                                  width="100%"
-                                  height="100%"
-                                  controls={true}
-                                  config={{
-                                    file: {
-                                      attributes: {
-                                        controlsList: 'nodownload'
+                              <>
+                                <div className="aspect-video rounded-lg overflow-hidden bg-black mb-4">
+                                  <ReactPlayer
+                                    url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url}
+                                    width="100%"
+                                    height="100%"
+                                    controls={true}
+                                    config={{
+                                      file: {
+                                        attributes: {
+                                          controlsList: 'nodownload'
+                                        }
                                       }
-                                    }
-                                  }}
-                                  onProgress={handleVideoProgress}
-                                  progressInterval={1000}
-                                  light={course.thumbnail_url}
-                                />
-                              </div>
+                                    }}
+                                    onProgress={handleVideoProgress}
+                                    progressInterval={1000}
+                                    light={course.thumbnail_url}
+                                  />
+                                </div>
+                                
+                                {/* Video Transcript Section */}
+                                <div className="mt-6">
+                                  <div 
+                                    className="flex items-center justify-between cursor-pointer mb-3"
+                                    onClick={() => setShowTranscript(!showTranscript)}
+                                  >
+                                    <h4 className="text-lg font-semibold flex items-center">
+                                      <FileText className="h-5 w-5 mr-2 text-orange-600" />
+                                      Video Transcript
+                                    </h4>
+                                    {showTranscript ? (
+                                      <ChevronUp className="h-5 w-5 text-gray-500" />
+                                    ) : (
+                                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                                    )}
+                                  </div>
+                                  {showTranscript && (
+                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                      <VideoTranscripts 
+                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                                        currentTime={currentVideoTime}
+                                        onSeekTo={handleSeekTo}
+                                        showHeader={false}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </>
                             )}
                             {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
-                              <div className="prose max-w-none">
+                              <div className="prose max-w-none mt-6 text-sm sm:text-base">
                                 {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
                                   ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
                                   : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
