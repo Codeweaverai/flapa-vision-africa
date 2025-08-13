@@ -859,50 +859,6 @@ const CourseLearningPage = () => {
             </Card>
           )}
 
-          {/* Instructor Card */}
-          {instructor && (
-            <Card className="mt-6 sm:mt-8">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <User className="h-4 w-4 sm:h-5 sm:w-5" />
-                  Instructor
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
-                    <AvatarImage src={instructor.avatar_url || undefined} />
-                    <AvatarFallback>
-                      {instructor.full_name?.charAt(0) || 'I'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h4 className="font-semibold text-sm sm:text-base">{instructor.full_name}</h4>
-                    <p className="text-xs sm:text-sm text-gray-600">Course Creator</p>
-                  </div>
-                </div>
-                
-                {instructor.bio && (
-                  <p className="text-xs sm:text-sm text-gray-700">{instructor.bio}</p>
-                )}
-                
-                <div className="flex gap-2">
-                  <Link to={`/creator/profile/${instructor.id}`}>
-                    <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                      View Profile
-                    </Button>
-                  </Link>
-                  <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
-                    <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                      <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      Message
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Recommended Courses */}
           <div className="mt-6 sm:mt-8">
             <RecommendedCourses 
