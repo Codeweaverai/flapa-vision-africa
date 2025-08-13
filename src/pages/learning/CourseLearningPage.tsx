@@ -648,7 +648,7 @@ const CourseLearningPage = () => {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5">
+            <div className="lg:col-span-4">
               <Card className="sticky top-4">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -671,7 +671,7 @@ const CourseLearningPage = () => {
               </Card>
             </div>
 
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-8">
               <Tabs defaultValue="content" className="w-full">
                 <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="content" className="flex items-center gap-2">
@@ -811,9 +811,16 @@ const CourseLearningPage = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-3xl font-bold text-orange-600 mb-2">
-                      {course.is_free ? 'Free' : `$${course.price}`}
-                    </div>
+                  <div className="text-3xl font-bold text-orange-600 mb-2">
+              {course.is_free ? 'Free' : (
+                <PriceDisplay 
+                  amount={course.price} 
+                  originalCurrency="USD" 
+                  className="text-orange-600"
+                />
+              )}
+            </div>
+   
                     {!course.is_free && (
                       <p className="text-sm text-gray-600">One-time payment</p>
                     )}
