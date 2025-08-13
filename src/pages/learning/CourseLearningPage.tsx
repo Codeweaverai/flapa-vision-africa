@@ -616,14 +616,16 @@ const CourseLearningPage = () => {
                     )}
                     
                     {(!hasLessons || progressPercentage === 100) && finalExam && (
-                      <Button
-                        onClick={handleTakeExam}
-                        size="xs"
-                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs"
-                      >
-                        <GraduationCap className="h-3 w-3 mr-1" />
-                        Final Exam
-                      </Button>
+                    
+                       <Button
+                 onClick={handleTakeExam}
+                    size="sm" // Changed from 'xs' to 'sm' for better visibility
+                 className="bg-orange-600 hover:bg-orange-700 text-white text-sm py-1 px-3" // Added padding and increased text size
+                >
+                <GraduationCap className="h-4 w-4 mr-2" /> {/* Increased icon size */}
+                 Final Exam
+                  </Button>
+              
                     )}
 
                     {progressPercentage === 100 && (
