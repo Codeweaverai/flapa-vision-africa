@@ -284,7 +284,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   return (
     <div className="space-y-4" style={{ width: '450px' }}>
       {/* Course Progress */}
-      <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-4 rounded-lg">
+      <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-3 rounded-lg">
         <div className="flex items-center justify-between mb-2">
           <span className="font-medium text-gray-800">Course Progress</span>
           <span className="text-sm font-bold text-orange-600">{courseProgress}%</span>
