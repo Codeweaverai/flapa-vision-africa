@@ -300,7 +300,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
             size="sm"
             onClick={handlePreviousLesson}
             disabled={!getPreviousLesson() || isNavigating}
-            className="flex-1"
+            className="px-3 w-auto"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Previous
@@ -309,7 +309,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
             size="sm"
             onClick={handleNextLesson}
             disabled={!getNextLesson() || isNavigating}
-            className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+            className="px-3 w-auto bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
           >
             Next
             <ChevronRight className="h-4 w-4 ml-1" />
