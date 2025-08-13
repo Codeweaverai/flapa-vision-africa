@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,7 +46,20 @@ interface CreatorBalance {
   };
 }
 
+interface OrderItem {
+  total_price: number;
+  quantity: number;
+  item_type: string;
+  item_id: string;
+  orders: {
+    created_at: string;
+    payment_status: string;
+    user_id: string;
+  };
+}
+
 const PAGE_SIZE = 10;
+const PLATFORM_FEE_RATE = 0.08;
 
 const AdminPayouts = () => {
   const [payouts, setPayouts] = useState<CreatorPayout[]>([]);
@@ -156,82 +170,151 @@ const AdminPayouts = () => {
 
   const loadCreatorBalances = async () => {
     try {
-      const { data: transactions, error } = await supabase
-        .from('payment_transactions')
-        .select('creator_id')
-        .not('creator_id', 'is', null)
-        .eq('status', 'completed');
+      // Get all creators who have courses or events
+      const { data: creators, error: creatorsError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .not('id', 'is', null);
 
-      if (error) throw error;
+      if (creatorsError) throw creatorsError;
 
-      // Fixed syntax for creatorIds
-      const creatorIds = [...new Set(transactions?.map(t => t.creator_id).filter(Boolean))];
-      
-      const balances = await Promise.all(creatorIds.map(calculateCreatorBalance));
+      const balances: CreatorBalance[] = [];
 
-      setCreatorBalances(
-        balances.filter(b => 
-          b.total_earnings > 0 || 
-          b.available_balance > 0 || 
-          b.pending_balance > 0
-        )
-      );
+      for (const creator of creators || []) {
+        const balance = await calculateCreatorBalance(creator.id);
+        if (balance.total_earnings > 0 || balance.available_balance > 0 || balance.pending_balance > 0) {
+          balances.push({
+            ...balance,
+            creator_profile: {
+              full_name: creator.full_name || 'N/A',
+              username: creator.username || 'N/A'
+            }
+          });
+        }
+      }
+
+      setCreatorBalances(balances);
     } catch (error) {
       console.error('Error loading creator balances:', error);
       toast.error('Failed to load creator balances');
     }
   };
 
-  const calculateCreatorBalance = async (creatorId: string) => {
+  const calculateCreatorBalance = async (creatorId: string): Promise<CreatorBalance> => {
     try {
-      const [{ data: transactions }, { data: payouts }] = await Promise.all([
-        supabase.from('payment_transactions')
-          .select('*')
-          .eq('creator_id', creatorId)
-          .eq('status', 'completed'),
-        supabase.from('creator_payouts')
-          .select('amount')
-          .eq('creator_id', creatorId)
-          .eq('status', 'completed')
-      ]);
+      // Get creator's course IDs
+      const { data: creatorCourses } = await supabase
+        .from('courses')
+        .select('id')
+        .eq('creator_id', creatorId);
 
-      const totalEarnings = transactions?.reduce((sum, t) => sum + (t.creator_earning || 0), 0) || 0;
-      const totalPayouts = payouts?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      const courseIds = creatorCourses?.map(c => c.id) || [];
 
-      const now = new Date();
+      // Get creator's event IDs
+      const { data: creatorEvents } = await supabase
+        .from('events')
+        .select('id')
+        .eq('creator_id', creatorId);
+
+      const eventIds = creatorEvents?.map(e => e.id) || [];
+
+      // Get event ticket IDs for creator's events
+      let eventTicketIds: string[] = [];
+      if (eventIds.length > 0) {
+        const { data: eventTickets } = await supabase
+          .from('event_tickets')
+          .select('id')
+          .in('event_id', eventIds);
+        eventTicketIds = eventTickets?.map(t => t.id) || [];
+      }
+
+      // Fetch course order items
+      let courseOrderItems: OrderItem[] = [];
+      if (courseIds.length > 0) {
+        const { data } = await supabase
+          .from('order_items')
+          .select(`
+            total_price,
+            quantity,
+            item_type,
+            item_id,
+            orders!inner(
+              created_at,
+              payment_status,
+              user_id
+            )
+          `)
+          .eq('item_type', 'course')
+          .eq('orders.payment_status', 'completed')
+          .in('item_id', courseIds);
+        courseOrderItems = data || [];
+      }
+
+      // Fetch event order items
+      let eventOrderItems: OrderItem[] = [];
+      if (eventTicketIds.length > 0) {
+        const { data } = await supabase
+          .from('order_items')
+          .select(`
+            total_price,
+            quantity,
+            item_type,
+            item_id,
+            orders!inner(
+              created_at,
+              payment_status,
+              user_id
+            )
+          `)
+          .eq('item_type', 'event_ticket')
+          .eq('orders.payment_status', 'completed')
+          .in('item_id', eventTicketIds);
+        eventOrderItems = data || [];
+      }
+
+      // Calculate earnings
+      const allOrderItems = [...courseOrderItems, ...eventOrderItems];
+      let totalRevenue = 0;
       let availableBalance = 0;
       let pendingBalance = 0;
 
-      transactions?.forEach(t => {
-        const date = new Date(t.created_at);
-        const eligibleDate = new Date(date);
-        eligibleDate.setDate(date.getDate() + 7);
+      const now = new Date();
+
+      allOrderItems.forEach(item => {
+        const itemTotal = Number(item.total_price);
+        const platformFee = itemTotal * PLATFORM_FEE_RATE;
+        const creatorEarning = itemTotal - platformFee;
         
+        totalRevenue += creatorEarning;
+
+        // Calculate 7-day hold period
+        const orderDate = new Date(item.orders.created_at);
+        const eligibleDate = new Date(orderDate);
+        eligibleDate.setDate(orderDate.getDate() + 7);
+
         if (now >= eligibleDate) {
-          availableBalance += t.creator_earning || 0;
+          availableBalance += creatorEarning;
         } else {
-          pendingBalance += t.creator_earning || 0;
+          pendingBalance += creatorEarning;
         }
       });
 
-      availableBalance = Math.max(0, availableBalance - totalPayouts);
+      // Get completed payouts
+      const { data: completedPayouts } = await supabase
+        .from('creator_payouts')
+        .select('amount')
+        .eq('creator_id', creatorId)
+        .eq('status', 'completed');
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, username')
-        .eq('id', creatorId)
-        .single();
+      const totalPayouts = completedPayouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      availableBalance = Math.max(0, availableBalance - totalPayouts);
 
       return {
         creator_id: creatorId,
         available_balance: availableBalance,
         pending_balance: pendingBalance,
-        total_earnings: totalEarnings,
-        total_payouts: totalPayouts,
-        creator_profile: profile || {
-          full_name: 'N/A',
-          username: 'N/A'
-        }
+        total_earnings: totalRevenue,
+        total_payouts: totalPayouts
       };
     } catch (error) {
       console.error(`Error calculating balance for creator ${creatorId}:`, error);
@@ -240,11 +323,7 @@ const AdminPayouts = () => {
         available_balance: 0,
         pending_balance: 0,
         total_earnings: 0,
-        total_payouts: 0,
-        creator_profile: {
-          full_name: 'N/A',
-          username: 'N/A'
-        }
+        total_payouts: 0
       };
     }
   };
@@ -430,7 +509,7 @@ const AdminPayouts = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      )}
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
