@@ -631,10 +631,10 @@ const CourseLearningPage = () => {
                     {progressPercentage === 100 && (
                       <Button
                         onClick={navigateToCourseResults}
-                        size="xs"
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs"
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-sm py-1 px-3"
                       >
-                        <Eye className="h-3 w-3 mr-1" />
+                        <Eye className="h-4 w-4 mr-2" />
                         Results
                       </Button>
                     )}
