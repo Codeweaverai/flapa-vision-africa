@@ -12,7 +12,7 @@ import ReactPlayer from 'react-player';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
-  CheckCircle2, GraduationCap, Eye, FileText
+  CheckCircle2, GraduationCap, Eye, FileText, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
