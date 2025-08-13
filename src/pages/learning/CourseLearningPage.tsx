@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -10,21 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import ReactPlayer from 'react-player';
 import { 
-  Play, 
-  Clock, 
-  User, 
-  BookOpen, 
-  Award, 
-  Star, 
-  Users,
-  MessageCircle,
-  Target,
-  CheckCircle,
-  StickyNote,
-  CheckCircle2,
-  GraduationCap,
-  Eye,
-  FileText
+  Play, Clock, User, BookOpen, Award, Star, Users,
+  MessageCircle, Target, CheckCircle, StickyNote,
+  CheckCircle2, GraduationCap, Eye, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
@@ -39,6 +27,7 @@ import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
 import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
+import PriceDisplay from '@/components/ui/PriceDisplay';
 
 interface Course {
   id: string;
@@ -548,97 +537,103 @@ const CourseLearningPage = () => {
   return (
     <Layout>
       <main className="flex-grow bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+          {/* Resume Button */}
           {showResumeButton && resumeLesson && (
             <div className="mb-4">
               <Button 
                 onClick={handleResumeLearning}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base"
+                size="sm"
               >
-                <Play className="h-4 w-4 mr-2" />
-                Resume where you left off: {resumeLesson.title}
+                <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Resume: {resumeLesson.title.length > 20 ? 
+                  `${resumeLesson.title.substring(0, 20)}...` : 
+                  resumeLesson.title}
               </Button>
             </div>
           )}
 
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="secondary">{course.category}</Badge>
-              <Badge variant="outline">{course.difficulty_level}</Badge>
-              {course.is_free && <Badge className="bg-green-500">Free</Badge>}
+          {/* Course Header */}
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-wrap items-center gap-2 mb-3 sm:mb-4">
+              <Badge variant="secondary" className="text-xs sm:text-sm">{course.category}</Badge>
+              <Badge variant="outline" className="text-xs sm:text-sm">{course.difficulty_level}</Badge>
+              {course.is_free && <Badge className="bg-green-500 text-xs sm:text-sm">Free</Badge>}
             </div>
             
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">{course.title}</h1>
-            <p className="text-xl text-gray-600 mb-6">{course.summary}</p>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2 sm:mb-4">{course.title}</h1>
+            <p className="text-base sm:text-xl text-gray-600 mb-4 sm:mb-6">{course.summary}</p>
             
-            <div className="flex flex-wrap items-center gap-6 text-gray-600">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                <span>{course.duration_minutes} minutes</span>
+            <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm sm:text-base text-gray-600">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span>{course.duration_minutes} min</span>
               </div>
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                <span>{modules.length} modules</span>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span>{modules.length} mods</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                <span>{enrollmentCount} students</span>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span>{enrollmentCount}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                <span>{averageRating.toFixed(1)} ({reviewCount} reviews)</span>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-yellow-400 text-yellow-400" />
+                <span>{averageRating.toFixed(1)} ({reviewCount})</span>
               </div>
             </div>
           </div>
 
+          {/* Progress Card */}
           {isEnrolled && (
-            <Card className="mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Your Progress</h3>
-                  <span className="text-2xl font-bold text-orange-600">{progressPercentage}%</span>
+            <Card className="mb-6 sm:mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-semibold">Your Progress</h3>
+                  <span className="text-xl sm:text-2xl font-bold text-orange-600">{progressPercentage}%</span>
                 </div>
-                <Progress value={progressPercentage} className="h-3" />
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-gray-600">
+                <Progress value={progressPercentage} className="h-2 sm:h-3" />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-3 sm:mt-4 gap-2">
+                  <p className="text-xs sm:text-sm text-gray-600">
                     Keep going! You're doing great.
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {isNotComplete && hasLessons && (
                       <Button
                         onClick={markAllLessonsComplete}
                         disabled={markingComplete}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        size="xs"
+                        className="bg-green-600 hover:bg-green-700 text-white text-xs"
                       >
                         {markingComplete ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
                         ) : (
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
                         )}
-                        {markingComplete ? 'Marking Complete...' : 'Mark All Lessons Complete'}
+                        {markingComplete ? 'Processing...' : 'Mark Complete'}
                       </Button>
                     )}
                     
                     {(!hasLessons || progressPercentage === 100) && finalExam && (
                       <Button
                         onClick={handleTakeExam}
-                        size="sm"
-                        className="bg-orange-600 hover:bg-orange-700 text-white"
+                        size="xs"
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs"
                       >
-                        <GraduationCap className="h-4 w-4 mr-2" />
-                        Take Final Exam
+                        <GraduationCap className="h-3 w-3 mr-1" />
+                        Final Exam
                       </Button>
                     )}
 
                     {progressPercentage === 100 && (
                       <Button
                         onClick={navigateToCourseResults}
-                        size="sm"
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                        size="xs"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Course Results
+                        <Eye className="h-3 w-3 mr-1" />
+                        Results
                       </Button>
                     )}
                   </div>
@@ -647,16 +642,18 @@ const CourseLearningPage = () => {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5">
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+            {/* Course Curriculum */}
+            <div className="lg:col-span-4">
               <Card className="sticky top-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5" />
-                    Course Curriculum
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Curriculum
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-2 sm:p-4">
                   <EnhancedCourseModuleList 
                     modules={modules}
                     courseId={courseId}
@@ -666,31 +663,33 @@ const CourseLearningPage = () => {
                     completedLessons={completedLessons}
                     onQuizStart={handleQuizStart}
                     onFinalExamStart={() => setShowExamModal(true)}
+                    mobileView={window.innerWidth < 768}
                   />
                 </CardContent>
               </Card>
             </div>
 
-            <div className="lg:col-span-7">
+            {/* Content Tabs */}
+            <div className="lg:col-span-8">
               <Tabs defaultValue="content" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="content" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
+                <TabsList className="grid w-full grid-cols-5 h-10 sm:h-12">
+                  <TabsTrigger value="content" className="text-xs sm:text-sm p-1 sm:p-2">
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Content
                   </TabsTrigger>
-                  <TabsTrigger value="lesson-notes" className="flex items-center gap-2">
-                    <StickyNote className="h-4 w-4" />
+                  <TabsTrigger value="lesson-notes" className="text-xs sm:text-sm p-1 sm:p-2">
+                    <StickyNote className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Notes
                   </TabsTrigger>
-                  <TabsTrigger value="transcripts">Transcripts</TabsTrigger>
-                  <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                  <TabsTrigger value="discussion">Discussion</TabsTrigger>
+                  <TabsTrigger value="transcripts" className="text-xs sm:text-sm">Transcript</TabsTrigger>
+                  <TabsTrigger value="reviews" className="text-xs sm:text-sm">Reviews</TabsTrigger>
+                  <TabsTrigger value="discussion" className="text-xs sm:text-sm">Discuss</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="content" className="space-y-6">
                   {isEnrolled ? (
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="p-4 sm:p-6">
                         {selectedLesson || modules[0]?.lessons[0] ? (
                           <div>
                             <h3 className="text-lg font-semibold mb-4">
@@ -806,23 +805,23 @@ const CourseLearningPage = () => {
             </div>
           </div>
 
+          {/* Enrollment Card */}
           {!isEnrolled && (
-            <Card className="mt-8 sticky bottom-4">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+            <Card className="mt-6 sm:mt-8 sticky bottom-4">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
-                  <div className="text-3xl font-bold text-orange-600 mb-2">
-              {course.is_free ? 'Free' : (
-                <PriceDisplay 
-                  amount={course.price} 
-                  originalCurrency="USD" 
-                  className="text-orange-600"
-                />
-              )}
-            </div>
-   
+                    <div className="text-xl sm:text-3xl font-bold text-orange-600 mb-1 sm:mb-2">
+                      {course.is_free ? 'Free' : (
+                        <PriceDisplay 
+                          amount={course.price} 
+                          originalCurrency="USD" 
+                          className="text-orange-600"
+                        />
+                      )}
+                    </div>
                     {!course.is_free && (
-                      <p className="text-sm text-gray-600">One-time payment</p>
+                      <p className="text-xs sm:text-sm text-gray-600">One-time payment</p>
                     )}
                   </div>
                   {user ? (
@@ -833,18 +832,21 @@ const CourseLearningPage = () => {
                           itemId={courseId}
                           itemName={course.title}
                           price={course.price || 0}
+                          size="sm"
                         />
                       )}
                       <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm"
+                        size="sm"
                         onClick={() => navigate(`/course/${courseId}/enroll`)}
                       >
-                        {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
+                        {course.is_free ? 'Enroll Free' : 'Enroll Now'}
                       </Button>
                     </div>
                   ) : (
                     <Button 
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm"
+                      size="sm"
                       onClick={() => navigate('/auth')}
                     >
                       Sign in to Enroll
@@ -855,48 +857,57 @@ const CourseLearningPage = () => {
             </Card>
           )}
 
+          {/* Instructor Card */}
           {instructor && (
-            <Card className="mt-8">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Your Instructor
+            <Card className="mt-6 sm:mt-8">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Instructor
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
+                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
                     <AvatarImage src={instructor.avatar_url || undefined} />
                     <AvatarFallback>
                       {instructor.full_name?.charAt(0) || 'I'}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h4 className="font-semibold">{instructor.full_name}</h4>
-                    <p className="text-sm text-gray-600">Course Creator</p>
+                    <h4 className="font-semibold text-sm sm:text-base">{instructor.full_name}</h4>
+                    <p className="text-xs sm:text-sm text-gray-600">Course Creator</p>
                   </div>
                 </div>
                 
                 {instructor.bio && (
-                  <p className="text-sm text-gray-700">{instructor.bio}</p>
+                  <p className="text-xs sm:text-sm text-gray-700">{instructor.bio}</p>
                 )}
                 
                 <div className="flex gap-2">
                   <Link to={`/creator/profile/${instructor.id}`}>
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button variant="outline" size="sm" className="text-xs sm:text-sm">
                       View Profile
                     </Button>
                   </Link>
                   <Link to={`/inbox?username=${instructor.username || instructor.full_name}`}>
-                    <Button variant="outline" size="sm" className="flex-1">
-                      <MessageCircle className="h-4 w-4 mr-1" />
-                      Send Message
+                    <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                      <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                      Message
                     </Button>
                   </Link>
                 </div>
               </CardContent>
             </Card>
           )}
+
+          {/* Recommended Courses */}
+          <div className="mt-6 sm:mt-8">
+            <RecommendedCourses 
+              currentCourseId={course.id} 
+              category={course.category} 
+            />
+          </div>
 
           <FloatingAILearningAssistant 
             courseId={courseId}
@@ -939,15 +950,6 @@ const CourseLearningPage = () => {
           hasNextContent={true}
         />
       )}
-       {/* Recommended Courses Section */}
-      <div className="mt-8">
-        <RecommendedCourses 
-          currentCourseId={course.id} 
-          category={course.category} 
-        />
-      </div>
-
-      
     </Layout>
   );
 };
