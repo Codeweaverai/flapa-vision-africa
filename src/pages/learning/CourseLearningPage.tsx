@@ -548,8 +548,8 @@ const CourseLearningPage = () => {
                 size="sm"
               >
                 <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Resume: {resumeLesson.title.length > 20 ? 
-                  `${resumeLesson.title.substring(0, 20)}...` : 
+                Resume: {resumeLesson.title.length > 30 ? 
+                  `${resumeLesson.title.substring(0, 30)}...` : 
                   resumeLesson.title}
               </Button>
             </div>
