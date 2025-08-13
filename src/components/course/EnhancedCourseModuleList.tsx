@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Accordion, 
@@ -281,9 +280,9 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     return completedLessons.includes(lessonId);
   };
 
-   return (
+  return (
     <div className="space-y-4 w-full max-w-md mx-auto px-2 sm:px-0">
-      {/* Course Progress - Mobile Optimized */}
+      {/* Course Progress */}
       <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-3 rounded-lg">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm sm:text-base font-medium text-gray-800">Course Progress</span>
@@ -292,7 +291,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         <Progress value={courseProgress} className="h-1.5 sm:h-2" />
       </div>
 
-      {/* Navigation Controls - Stacked on mobile */}
+      {/* Navigation Controls */}
       {currentLessonId && (
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
@@ -317,7 +316,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         </div>
       )}
 
-      {/* Modules - Mobile Optimized */}
+      {/* Modules */}
       <Accordion 
         type="multiple" 
         value={openModules}
@@ -353,7 +352,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                   {module.lessons.map((lesson, index) => (
                     <div key={lesson.id}>
                       <div 
-                        className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 sm:p-3 border rounded-lg cursor-pointer transition-all ${
+                        className={`flex flex-col items-start justify-between p-3 border rounded-lg cursor-pointer transition-all ${
                           currentLessonId === lesson.id 
                             ? 'bg-gradient-to-r from-orange-100 to-purple-100 border-orange-300 shadow-sm' 
                             : 'hover:bg-gray-50 hover:shadow-sm'
@@ -387,9 +386,10 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                         <Button
                           variant={currentLessonId === lesson.id ? "default" : "outline"}
                           size="sm"
-                          className={`mt-2 sm:mt-0 w-full sm:w-auto ${
-                            currentLessonId === lesson.id ? 
-                              "bg-gradient-to-r from-orange-500 to-purple-600" : ""
+                          className={`w-full mt-2 ${
+                            currentLessonId === lesson.id 
+                              ? "bg-gradient-to-r from-orange-500 to-purple-600" 
+                              : ""
                           }`}
                         >
                           <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -409,7 +409,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         ))}
       </Accordion>
 
-      {/* Final Exam - Mobile Optimized */}
+      {/* Final Exam */}
       {finalExam && courseProgress >= 80 && (
         <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-orange-200 rounded-lg p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -442,7 +442,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         </div>
       )}
 
-      {/* Course Results Button - Mobile Optimized */}
+      {/* Course Results Button */}
       {courseProgress === 100 && (
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-lg p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -464,7 +464,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         </div>
       )}
 
-      {/* Creator Profile - Mobile Optimized */}
+      {/* Creator Profile */}
       {creatorProfile && (
         <div className="bg-gradient-to-r from-orange-50 to-purple-50 border-2 border-orange-200 rounded-lg p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
