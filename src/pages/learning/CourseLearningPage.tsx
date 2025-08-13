@@ -536,7 +536,7 @@ const CourseLearningPage = () => {
 
   return (
     <Layout>
-      <main className="flex-grow bg-gradient-to-br from-orange-500 via-purple-600 to-pink-50">
+      <main className="flex-grow bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-6 sm:py-8">
           {/* Resume Button */}
           {showResumeButton && resumeLesson && (
