@@ -414,7 +414,7 @@ const CourseResultsPage = () => {
             
             <div class="verification">
                 Verification Code: ${certificate.verification_code}<br>
-                This certificate can be verified at skillpulse.com/verify-certificate
+                This certificate can be verified at skillpulse.cloud/verify
             </div>
         </div>
     </body>
