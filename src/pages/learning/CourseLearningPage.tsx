@@ -27,7 +27,7 @@ import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
 import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
-import PriceDisplay from '@/components/ui/PriceDisplay';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Course {
   id: string;
