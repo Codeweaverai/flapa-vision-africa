@@ -10,6 +10,7 @@ import { Star, BookOpen, Users, Award, Clock, Play, MessageCircle, Calendar, Map
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface CreatorProfile {
   id: string;
@@ -405,11 +406,21 @@ const CreatorPublicProfile: React.FC = () => {
                           {course.title}
                         </h3>
                         <Badge 
-                          variant={course.is_free ? "secondary" : "default"}
-                          className="ml-2"
-                        >
-                          {course.is_free ? 'Free' : `$${course.price}`}
-                        </Badge>
+  variant={course.is_free ? "secondary" : "default"}
+  className="ml-2"
+>
+  {course.is_free ? (
+    'Free'
+  ) : (
+    <PriceDisplay 
+      amount={course.price} 
+      originalCurrency="USD"
+      targetCurrency={userCurrency}  // Add this prop if you have user's currency preference
+      showOriginal={false}
+      className="text-inherit"  // Inherits badge text styling
+    />
+  )}
+</Badge>
                       </div>
                       
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
@@ -481,12 +492,22 @@ const CreatorPublicProfile: React.FC = () => {
                         <h3 className="font-semibold text-lg line-clamp-2 flex-1">
                           {event.title}
                         </h3>
-                        <Badge 
-                          variant={event.is_free ? "secondary" : "default"}
-                          className="ml-2"
-                        >
-                          {event.is_free ? 'Free' : `$${event.price}`}
-                        </Badge>
+                        <Badge
+                    variant={event.is_free ? "secondary" : "default"}
+                    className="ml-2"
+                       >
+                     {event.is_free ? (
+                    'Free'
+                     ) : (
+                    <PriceDisplay 
+                     amount={event.price}
+                    originalCurrency="USD"
+                     targetCurrency={userCurrency}  // Pass user's preferred currency
+                     showOriginal={false}
+                      currencyDisplay="symbol"
+                          />
+                             )}
+                       </Badge>
                       </div>
                       
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
