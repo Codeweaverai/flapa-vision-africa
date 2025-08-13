@@ -648,7 +648,7 @@ const CourseLearningPage = () => {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-4">
+            <div className="lg:col-span-5">
               <Card className="sticky top-4">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -671,7 +671,7 @@ const CourseLearningPage = () => {
               </Card>
             </div>
 
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-7">
               <Tabs defaultValue="content" className="w-full">
                 <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="content" className="flex items-center gap-2">
