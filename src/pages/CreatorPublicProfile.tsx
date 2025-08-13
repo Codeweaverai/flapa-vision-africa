@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -48,35 +47,28 @@ interface Event {
 
 const CreatorPublicProfile: React.FC = () => {
   const { creatorId } = useParams<{ creatorId: string }>(); 
-  const { user } = useAuth();
+  const { user, userPreferences } = useAuth();
+  const userCurrency = userPreferences?.currency || 'USD'; // Default to USD if no preference
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  console.log('CreatorPublicProfile - creatorId from useParams:', creatorId);
-  console.log('CreatorPublicProfile - current user:', user?.id);
-
   useEffect(() => {
-    // Only proceed if creatorId is available
     if (!creatorId) {
-      console.log('No creatorId found in URL params');
       setError('Creator ID not found in URL');
       setLoading(false);
       return;
     }
 
-    // Validate creatorId format (should be a UUID)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(creatorId)) {
-      console.log('Invalid creator ID format:', creatorId);
       setError('Invalid creator ID format');
       setLoading(false);
       return;
     }
 
-    console.log('Valid creatorId found, fetching data for:', creatorId);
     fetchCreatorData(creatorId);
   }, [creatorId]);
 
@@ -85,35 +77,22 @@ const CreatorPublicProfile: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      console.log('Fetching creator profile for ID:', id);
-      
-      // Fetch creator profile with explicit error handling
+      // Fetch creator profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, bio, avatar_url, username, is_creator, role')
         .eq('id', id)
         .maybeSingle();
 
-      console.log('Profile query result:', { profile, profileError });
-
-      if (profileError) {
-        console.error('Profile fetch error:', profileError);
-        setError(`Failed to fetch creator profile: ${profileError.message}`);
-        return;
-      }
-
+      if (profileError) throw profileError;
       if (!profile) {
-        console.log('No profile found for ID:', id);
         setError('Creator profile not found');
         return;
       }
 
-      console.log('Profile loaded successfully:', profile);
       setCreator(profile);
 
       // Fetch courses and events in parallel
-      console.log('Fetching courses and events for creator:', id);
-      
       const [coursesResult, eventsResult] = await Promise.all([
         supabase
           .from('courses')
@@ -127,30 +106,12 @@ const CreatorPublicProfile: React.FC = () => {
           .eq('creator_id', id)
       ]);
 
-      console.log('Courses query result:', coursesResult);
-      console.log('Events query result:', eventsResult);
-
-      // Handle courses
-      if (coursesResult.error) {
-        console.error('Courses fetch error:', coursesResult.error);
-        setCourses([]);
-      } else {
-        setCourses(coursesResult.data || []);
-        console.log('Courses loaded:', coursesResult.data?.length || 0);
-      }
-
-      // Handle events
-      if (eventsResult.error) {
-        console.error('Events fetch error:', eventsResult.error);
-        setEvents([]);
-      } else {
-        setEvents(eventsResult.data || []);
-        console.log('Events loaded:', eventsResult.data?.length || 0);
-      }
+      setCourses(coursesResult.data || []);
+      setEvents(eventsResult.data || []);
 
     } catch (error) {
-      console.error('Unexpected error in fetchCreatorData:', error);
-      setError('An unexpected error occurred while loading the creator profile');
+      console.error('Error loading creator data:', error);
+      setError('Failed to load creator profile');
       toast.error('Failed to load creator profile');
     } finally {
       setLoading(false);
@@ -207,7 +168,6 @@ const CreatorPublicProfile: React.FC = () => {
     }
   };
 
-  // Loading state
   if (loading) {
     return (
       <Layout>
@@ -234,27 +194,17 @@ const CreatorPublicProfile: React.FC = () => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100 flex items-center justify-center">
           <Card>
             <CardContent className="p-6 text-center">
-              <h2 className="text-xl font-semibold mb-2">
-                Creator Profile Error
-              </h2>
-              <p className="text-muted-foreground mb-4">
-                {error}
-              </p>
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  Creator ID: {creatorId || 'Not found'}
-                </p>
-                <Button asChild>
-                  <Link to="/courses">Browse Courses</Link>
-                </Button>
-              </div>
+              <h2 className="text-xl font-semibold mb-2">Creator Profile Error</h2>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button asChild>
+                <Link to="/courses">Browse Courses</Link>
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -262,19 +212,13 @@ const CreatorPublicProfile: React.FC = () => {
     );
   }
 
-  // No creator found
   if (!creator) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100 flex items-center justify-center">
           <Card>
             <CardContent className="p-6 text-center">
-              <h2 className="text-xl font-semibold mb-2">
-                Creator Not Found
-              </h2>
-              <p className="text-muted-foreground mb-4">
-                The creator profile you're looking for doesn't exist.
-              </p>
+              <h2 className="text-xl font-semibold mb-2">Creator Not Found</h2>
               <Button asChild>
                 <Link to="/courses">Browse Courses</Link>
               </Button>
@@ -287,41 +231,25 @@ const CreatorPublicProfile: React.FC = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100 relative overflow-hidden">
-        {/* Animated Particles Background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-white/30 rounded-full animate-pulse"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${2 + Math.random() * 2}s`
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="container mx-auto px-4 py-8 relative z-10">
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100">
+        <div className="container mx-auto px-4 py-8">
           {/* Creator Header */}
           <Card className="mb-8 bg-white/80 backdrop-blur-sm shadow-xl border-0">
             <CardContent className="p-8">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                 <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                  <AvatarImage src={creator?.avatar_url} alt={creator?.full_name} />
+                  <AvatarImage src={creator.avatar_url} alt={creator.full_name} />
                   <AvatarFallback className="text-2xl bg-gradient-to-br from-orange-400 to-purple-600 text-white">
-                    {creator?.full_name?.split(' ').map(n => n[0]).join('') || creator?.username?.[0] || 'U'}
+                    {creator.full_name?.split(' ').map(n => n[0]).join('') || creator.username?.[0] || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                      {creator?.full_name || creator?.username}
+                      {creator.full_name || creator.username}
                     </h1>
-                    {creator?.is_creator && (
+                    {creator.is_creator && (
                       <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
                         <Award className="w-3 h-3 mr-1" />
                         Verified Creator
@@ -340,7 +268,7 @@ const CreatorPublicProfile: React.FC = () => {
                     </div>
                   </div>
                   
-                  {creator?.bio && (
+                  {creator.bio && (
                     <p className="text-muted-foreground leading-relaxed max-w-3xl mb-6">
                       {creator.bio}
                     </p>
@@ -378,20 +306,13 @@ const CreatorPublicProfile: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {courses.map((course) => (
-                  <Card 
-                    key={course.id} 
-                    className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0"
-                  >
+                  <Card key={course.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
                     <div className="aspect-video bg-gradient-to-br from-orange-200 to-purple-200 rounded-t-lg overflow-hidden">
                       {course.thumbnail_url ? (
                         <img 
                           src={course.thumbnail_url} 
                           alt={course.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.parentElement!.classList.add('flex', 'items-center', 'justify-center');
-                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -405,22 +326,17 @@ const CreatorPublicProfile: React.FC = () => {
                         <h3 className="font-semibold text-lg line-clamp-2 flex-1">
                           {course.title}
                         </h3>
-                        <Badge 
-  variant={course.is_free ? "secondary" : "default"}
-  className="ml-2"
->
-  {course.is_free ? (
-    'Free'
-  ) : (
-    <PriceDisplay 
-      amount={course.price} 
-      originalCurrency="USD"
-      targetCurrency={userCurrency}  // Add this prop if you have user's currency preference
-      showOriginal={false}
-      className="text-inherit"  // Inherits badge text styling
-    />
-  )}
-</Badge>
+                        <Badge variant={course.is_free ? "secondary" : "default"} className="ml-2">
+                          {course.is_free ? 'Free' : (
+                            <PriceDisplay 
+                              amount={course.price} 
+                              originalCurrency="USD"
+                              targetCurrency={userCurrency}
+                              showOriginal={false}
+                              className="text-inherit"
+                            />
+                          )}
+                        </Badge>
                       </div>
                       
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
@@ -438,7 +354,7 @@ const CreatorPublicProfile: React.FC = () => {
                       </div>
                       
                       <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
-                        <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
+                        <Link to={`/learning/course-detail/${course.id}`}>
                           <Play className="h-4 w-4 mr-2" />
                           View Course
                         </Link>
@@ -465,20 +381,13 @@ const CreatorPublicProfile: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {events.map((event) => (
-                  <Card 
-                    key={event.id} 
-                    className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0"
-                  >
+                  <Card key={event.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
                     <div className="aspect-video bg-gradient-to-br from-orange-200 to-purple-200 rounded-t-lg overflow-hidden">
                       {event.image_url ? (
                         <img 
                           src={event.image_url} 
                           alt={event.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.parentElement!.classList.add('flex', 'items-center', 'justify-center');
-                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -492,22 +401,17 @@ const CreatorPublicProfile: React.FC = () => {
                         <h3 className="font-semibold text-lg line-clamp-2 flex-1">
                           {event.title}
                         </h3>
-                        <Badge
-                    variant={event.is_free ? "secondary" : "default"}
-                    className="ml-2"
-                       >
-                     {event.is_free ? (
-                    'Free'
-                     ) : (
-                    <PriceDisplay 
-                     amount={event.price}
-                    originalCurrency="USD"
-                     targetCurrency={userCurrency}  // Pass user's preferred currency
-                     showOriginal={false}
-                      currencyDisplay="symbol"
-                          />
-                             )}
-                       </Badge>
+                        <Badge variant={event.is_free ? "secondary" : "default"} className="ml-2">
+                          {event.is_free ? 'Free' : (
+                            <PriceDisplay 
+                              amount={event.price}
+                              originalCurrency="USD"
+                              targetCurrency={userCurrency}
+                              showOriginal={false}
+                              className="text-inherit"
+                            />
+                          )}
+                        </Badge>
                       </div>
                       
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
@@ -528,7 +432,7 @@ const CreatorPublicProfile: React.FC = () => {
                       </div>
                       
                       <Button className="w-full bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700" asChild>
-                        <Link to={`/events/${event.id}`} className="flex items-center justify-center">
+                        <Link to={`/events/${event.id}`}>
                           <Calendar className="h-4 w-4 mr-2" />
                           View Event
                         </Link>
