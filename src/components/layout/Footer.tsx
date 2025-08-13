@@ -18,8 +18,8 @@ const Footer = () => {
             </p>
             <div className="mt-6 flex items-center">
               <Mail size={16} className="mr-2 text-indigo-300" />
-              <a href="mailto:contact@skillpulse.com" className="hover:text-indigo-300 transition-colors">
-                help@skillpulse.com
+              <a href="mailto:help@skillpulse.cloud" className="hover:text-indigo-300 transition-colors">
+                help@skillpulse.cloud
               </a>
             </div>
           </div>
