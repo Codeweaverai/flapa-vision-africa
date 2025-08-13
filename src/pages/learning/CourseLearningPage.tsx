@@ -37,6 +37,7 @@ import QuizModal from '@/components/course/QuizModal';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
+import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
 
 interface Course {
@@ -931,6 +932,15 @@ const CourseLearningPage = () => {
           hasNextContent={true}
         />
       )}
+       {/* Recommended Courses Section */}
+      <div className="mt-8">
+        <RecommendedCourses 
+          currentCourseId={course.id} 
+          category={course.category} 
+        />
+      </div>
+
+      
     </Layout>
   );
 };
