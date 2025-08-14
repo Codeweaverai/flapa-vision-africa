@@ -294,6 +294,9 @@ const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate('/my-courses')}>
                     My Learning
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/wishlist')}>
+                    My Wishlist
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/my-events')}>
                     My Events
                   </DropdownMenuItem>
