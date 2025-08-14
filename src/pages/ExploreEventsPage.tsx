@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, DollarSign, Users, Star, Filter, Search, ChevronDown } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, Users, Star, Filter, Search, ChevronDown, Heart } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import { formatDate } from '@/lib/utils';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import Layout from '@/components/layout/Layout';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Event {
   id: string;
@@ -37,6 +37,7 @@ interface Event {
     total_reviews: number;
   };
   status: 'upcoming' | 'ongoing' | 'completed';
+  is_free: boolean;
 }
 
 const EVENTS_PER_PAGE = 8;
@@ -58,11 +59,12 @@ const ExploreEventsPage = () => {
 
   const fetchEvents = async () => {
     try {
-      // Fetch all events (not just upcoming)
+      setLoading(true);
+      
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
-        .eq('is_published', true)  // This filters for published events
+        .eq('is_published', true)
         .order('start_time', { ascending: false });
 
       if (eventsError) throw eventsError;
@@ -73,31 +75,24 @@ const ExploreEventsPage = () => {
         return;
       }
 
-      // Get creator profiles
       const creatorIds = [...new Set(eventsData.map(event => event.creator_id).filter(Boolean))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, username, full_name')
         .in('id', creatorIds);
 
-      // Get event tickets
       const eventIds = eventsData.map(event => event.id);
       const { data: tickets } = await supabase
         .from('event_tickets')
         .select('id, name, price, quantity_available, quantity_sold, event_id')
         .in('event_id', eventIds);
 
-      // Fetch reviews for each event
       const eventsWithData = await Promise.all(
         eventsData.map(async (event) => {
-          const { data: reviews, error: reviewsError } = await supabase
+          const { data: reviews } = await supabase
             .from('event_reviews')
             .select('rating')
             .eq('event_id', event.id);
-
-          if (reviewsError) {
-            console.error('Error fetching reviews:', reviewsError);
-          }
 
           const totalReviews = reviews?.length || 0;
           const avgRating = totalReviews > 0 
@@ -106,8 +101,8 @@ const ExploreEventsPage = () => {
 
           const eventProfile = profiles?.find(p => p.id === event.creator_id);
           const eventTickets = tickets?.filter(t => t.event_id === event.id) || [];
+          const is_free = eventTickets.length === 0 || Math.min(...eventTickets.map(t => t.price)) === 0;
 
-          // Determine event status
           const now = new Date();
           const startTime = new Date(event.start_time);
           const endTime = new Date(event.end_time);
@@ -125,7 +120,8 @@ const ExploreEventsPage = () => {
               avg_rating: avgRating,
               total_reviews: totalReviews
             },
-            status
+            status,
+            is_free
           };
         })
       );
@@ -202,8 +198,10 @@ const ExploreEventsPage = () => {
   if (loading) {
     return (
       <Layout>
-          <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-orange-200 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600"></div>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          </div>
         </div>
       </Layout>
     );
@@ -211,7 +209,7 @@ const ExploreEventsPage = () => {
 
   return (
     <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-16">
           {/* Header */}
           <div className="text-center mb-16">
@@ -221,7 +219,7 @@ const ExploreEventsPage = () => {
               </span>
             </h1>
             <p className="text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-              Discover amazing events and workshops from talented creators around the world. Join live sessions, network with professionals, and expand your horizons.
+              Discover amazing events and workshops from talented creators around the world.
             </p>
           </div>
 
@@ -252,7 +250,6 @@ const ExploreEventsPage = () => {
                       <SelectItem value="workshop">Workshop</SelectItem>
                       <SelectItem value="conference">Conference</SelectItem>
                       <SelectItem value="webinar">Webinar</SelectItem>
-                      <SelectItem value="seminar">Seminar</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -266,7 +263,6 @@ const ExploreEventsPage = () => {
                       <SelectItem value="all">All Events</SelectItem>
                       <SelectItem value="upcoming">Upcoming</SelectItem>
                       <SelectItem value="ongoing">Live Now</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -286,85 +282,20 @@ const ExploreEventsPage = () => {
                 </div>
               </div>
             </div>
-
-            <div className="mt-6 flex flex-wrap gap-4 text-sm text-gray-600">
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-100 border border-blue-200 rounded"></div>
-                Upcoming Events
-              </span>
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-100 border border-green-200 rounded"></div>
-                Live Now
-              </span>
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded"></div>
-                Completed
-              </span>
-            </div>
-          </div>
-
-          {/* Results Summary */}
-          <div className="mb-8">
-            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 border border-white/30">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    {sortedEvents.length} Events Found
-                  </h3>
-                  <p className="text-gray-600 mt-1">
-                    Showing {Math.min(displayCount, sortedEvents.length)} of {sortedEvents.length} results
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="flex gap-6 text-sm">
-                    <div>
-                      <span className="font-semibold text-blue-600">
-                        {sortedEvents.filter(e => e.status === 'upcoming').length}
-                      </span>
-                      <span className="text-gray-500 ml-1">Upcoming</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-green-600">
-                        {sortedEvents.filter(e => e.status === 'ongoing').length}
-                      </span>
-                      <span className="text-gray-500 ml-1">Live</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-gray-600">
-                        {sortedEvents.filter(e => e.status === 'completed').length}
-                      </span>
-                      <span className="text-gray-500 ml-1">Completed</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Events Grid */}
           {sortedEvents.length === 0 ? (
             <div className="text-center py-20 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/30">
-              <div className="mb-6">
-                <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">No Events Found</h3>
-                <p className="text-gray-600 max-w-md mx-auto">
-                  We couldn't find any events matching your criteria. Try adjusting your search or filters.
-                </p>
-              </div>
-              <Button 
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterType('all');
-                  setFilterStatus('all');
-                }}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
-              >
-                Clear Filters
-              </Button>
+              <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">No Events Found</h3>
+              <p className="text-gray-600 max-w-md mx-auto">
+                Try adjusting your search or filters.
+              </p>
             </div>
           ) : (
             <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
                 {displayedEvents.map((event) => (
                   <Card key={event.id} className="group overflow-hidden hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:scale-[1.02]">
                     <div onClick={() => navigate(`/events/${event.id}`)}>
@@ -390,6 +321,17 @@ const ExploreEventsPage = () => {
                           </Badge>
                         </div>
 
+                        {/* Wishlist Button */}
+                        <div className="absolute top-4 right-4 z-10">
+                          <WishlistButton 
+                            itemId={event.id}
+                            itemType="event"
+                            variant="ghost"
+                            size="icon"
+                            className="bg-white/90 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all"
+                          />
+                        </div>
+
                         {/* Event Date Overlay */}
                         <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg">
                           <div className="text-sm font-semibold text-gray-900">
@@ -412,31 +354,6 @@ const ExploreEventsPage = () => {
                           </div>
                           <span>by {event.creator_name}</span>
                         </div>
-
-                        <p className="text-gray-600 line-clamp-2 text-sm leading-relaxed">
-                          {event.description}
-                        </p>
-                        
-                        {/* Reviews */}
-                        {event.reviews && event.reviews.total_reviews > 0 && (
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center">
-                              {[...Array(5)].map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`h-4 w-4 ${
-                                    i < Math.round(event.reviews?.avg_rating || 0)
-                                      ? 'fill-yellow-400 text-yellow-400'
-                                      : 'text-gray-300'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                            <span className="text-sm text-gray-600">
-                              {event.reviews.avg_rating.toFixed(1)} ({event.reviews.total_reviews} review{event.reviews.total_reviews !== 1 ? 's' : ''})
-                            </span>
-                          </div>
-                        )}
                       </CardHeader>
 
                       <CardContent className="space-y-4">
