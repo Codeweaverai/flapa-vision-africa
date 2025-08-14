@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +42,6 @@ const WishlistPage = () => {
         .filter(item => item.item_type === 'event')
         .map(item => item.item_id);
 
-      // Fetch courses
       if (courseIds.length > 0) {
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
@@ -70,7 +68,6 @@ const WishlistPage = () => {
         setCourses(coursesWithEnrollment);
       }
 
-      // Fetch events
       if (eventIds.length > 0) {
         const { data: eventsData, error: eventsError } = await supabase
           .from('events')
@@ -120,7 +117,7 @@ const WishlistPage = () => {
       <Layout>
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
           </div>
         </div>
       </Layout>
@@ -130,20 +127,29 @@ const WishlistPage = () => {
   if (wishlistItems.length === 0) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <Heart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h1 className="text-3xl font-bold mb-2">Your Wishlist is Empty</h1>
-            <p className="text-muted-foreground mb-6">
-              Start adding courses and events to your wishlist to keep track of what interests you
-            </p>
-            <div className="space-x-4">
-              <Button onClick={() => navigate('/community/courses')}>
-                Browse Courses
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/events')}>
-                Browse Events
-              </Button>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+          <div className="container mx-auto px-4 py-8">
+            <div className="text-center py-12">
+              <Heart className="h-16 w-16 text-orange-500 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold mb-2">Your Wishlist is Empty</h1>
+              <p className="text-muted-foreground mb-6">
+                Start adding courses and events to your wishlist to keep track of what interests you
+              </p>
+              <div className="space-x-4">
+                <Button 
+                  onClick={() => navigate('/community/courses')}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                >
+                  Browse Courses
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/events')}
+                  className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                >
+                  Browse Events
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -153,125 +159,136 @@ const WishlistPage = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Heart className="h-8 w-8 text-red-500" />
-              My Wishlist
-            </h1>
-            <p className="text-muted-foreground">
-              {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} in your wishlist
-            </p>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Heart className="h-8 w-8 text-orange-500" />
+                My Wishlist
+              </h1>
+              <p className="text-muted-foreground">
+                {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} in your wishlist
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search your wishlist..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search your wishlist..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
           </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-white">
+              <TabsTrigger 
+                value="all"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+              >
+                All ({courses.length + events.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="courses"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+              >
+                Courses ({courses.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="events"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+              >
+                Events ({events.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all" className="space-y-6">
+              {filteredCourses.length === 0 && filteredEvents.length === 0 ? (
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No items found</h3>
+                  <p className="text-muted-foreground">
+                    {searchTerm 
+                      ? 'No items match your search criteria'
+                      : 'Your wishlist is empty'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {filteredCourses.length > 0 && (
+                    <div>
+                      <h2 className="text-xl font-semibold mb-4">Courses</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredCourses.map((course) => (
+                          <CourseWishlistCard key={course.id} course={course} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredEvents.length > 0 && (
+                    <div>
+                      <h2 className="text-xl font-semibold mb-4">Events</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredEvents.map((event) => (
+                          <EventWishlistCard key={event.id} event={event} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="courses" className="space-y-6">
+              {filteredCourses.length === 0 ? (
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No courses found</h3>
+                  <p className="text-muted-foreground">
+                    {searchTerm 
+                      ? 'No courses match your search criteria'
+                      : 'No courses in your wishlist yet'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredCourses.map((course) => (
+                    <CourseWishlistCard key={course.id} course={course} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="events" className="space-y-6">
+              {filteredEvents.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No events found</h3>
+                  <p className="text-muted-foreground">
+                    {searchTerm 
+                      ? 'No events match your search criteria'
+                      : 'No events in your wishlist yet'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredEvents.map((event) => (
+                    <EventWishlistCard key={event.id} event={event} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all">
-              All ({courses.length + events.length})
-            </TabsTrigger>
-            <TabsTrigger value="courses">
-              Courses ({courses.length})
-            </TabsTrigger>
-            <TabsTrigger value="events">
-              Events ({events.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all" className="space-y-6">
-            {filteredCourses.length === 0 && filteredEvents.length === 0 ? (
-              <div className="text-center py-8">
-                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No items found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm 
-                    ? 'No items match your search criteria'
-                    : 'Your wishlist is empty'
-                  }
-                </p>
-              </div>
-            ) : (
-              <>
-                {filteredCourses.length > 0 && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4">Courses</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredCourses.map((course) => (
-                        <CourseWishlistCard key={course.id} course={course} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {filteredEvents.length > 0 && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4">Events</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredEvents.map((event) => (
-                        <EventWishlistCard key={event.id} event={event} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="courses" className="space-y-6">
-            {filteredCourses.length === 0 ? (
-              <div className="text-center py-8">
-                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No courses found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm 
-                    ? 'No courses match your search criteria'
-                    : 'No courses in your wishlist yet'
-                  }
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredCourses.map((course) => (
-                  <CourseWishlistCard key={course.id} course={course} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="events" className="space-y-6">
-            {filteredEvents.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No events found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm 
-                    ? 'No events match your search criteria'
-                    : 'No events in your wishlist yet'
-                  }
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEvents.map((event) => (
-                  <EventWishlistCard key={event.id} event={event} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
       </div>
     </Layout>
   );
@@ -281,7 +298,7 @@ const CourseWishlistCard: React.FC<{ course: CourseWithEnrollment }> = ({ course
   const navigate = useNavigate();
 
   return (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+    <Card className="hover:shadow-lg transition-shadow cursor-pointer group bg-white">
       <CardHeader className="relative">
         {course.thumbnail_url && (
           <img
@@ -307,7 +324,7 @@ const CourseWishlistCard: React.FC<{ course: CourseWithEnrollment }> = ({ course
             </Badge>
           )}
         </div>
-        <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
+        <CardTitle className="line-clamp-2 group-hover:text-orange-600 transition-colors">
           {course.title}
         </CardTitle>
       </CardHeader>
@@ -327,7 +344,7 @@ const CourseWishlistCard: React.FC<{ course: CourseWithEnrollment }> = ({ course
           )}
         </div>
         <Button 
-          className="w-full" 
+          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
           onClick={() => navigate(`/courses/${course.id}`)}
         >
           <BookOpen className="h-4 w-4 mr-2" />
@@ -342,7 +359,7 @@ const EventWishlistCard: React.FC<{ event: EventWithRegistrations }> = ({ event 
   const navigate = useNavigate();
 
   return (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+    <Card className="hover:shadow-lg transition-shadow cursor-pointer group bg-white">
       <CardHeader className="relative">
         {event.image_url && (
           <img
@@ -366,7 +383,7 @@ const EventWishlistCard: React.FC<{ event: EventWithRegistrations }> = ({ event 
             {event.event_type}
           </Badge>
         </div>
-        <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
+        <CardTitle className="line-clamp-2 group-hover:text-orange-600 transition-colors">
           {event.title}
         </CardTitle>
       </CardHeader>
@@ -391,7 +408,7 @@ const EventWishlistCard: React.FC<{ event: EventWithRegistrations }> = ({ event 
           )}
         </div>
         <Button 
-          className="w-full" 
+          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
           onClick={() => navigate(`/events/${event.id}`)}
         >
           <Calendar className="h-4 w-4 mr-2" />
