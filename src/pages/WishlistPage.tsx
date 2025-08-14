@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Search, BookOpen, Calendar, MapPin, Clock, Users, Star, Trash2 } from 'lucide-react';
+import { Heart, Search, BookOpen, Calendar, MapPin, Clock, Users, Star, Play } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { supabase } from '@/lib/supabaseClient';
 import { CourseWithEnrollment, EventWithRegistrations } from '@/types/eventTypes';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 const WishlistPage = () => {
   const navigate = useNavigate();
@@ -53,6 +54,9 @@ const WishlistPage = () => {
               completion_date,
               is_completed,
               user_id
+            ),
+            course_reviews:course_reviews (
+              rating
             )
           `)
           .in('id', courseIds)
@@ -60,10 +64,25 @@ const WishlistPage = () => {
 
         if (coursesError) throw coursesError;
 
-        const coursesWithEnrollment = coursesData?.map(course => ({
-          ...course,
-          enrollment: course.course_enrollments?.[0] || null
-        })) || [];
+        const coursesWithEnrollment = coursesData?.map(course => {
+          const totalReviews = course.course_reviews?.length || 0;
+          const avgRating = totalReviews > 0 
+            ? course.course_reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+            : 4.5;
+          const positiveReviews = totalReviews > 0 
+            ? course.course_reviews.filter(review => review.rating >= 4).length 
+            : Math.floor(totalReviews * 0.9);
+          
+          return {
+            ...course,
+            enrollment: course.course_enrollments?.[0] || null,
+            reviews: {
+              avg_rating: avgRating,
+              total_reviews: totalReviews,
+              positive_percentage: totalReviews > 0 ? (positiveReviews / totalReviews) * 100 : 95
+            }
+          };
+        }) || [];
 
         setCourses(coursesWithEnrollment);
       }
@@ -102,7 +121,7 @@ const WishlistPage = () => {
 
   const filteredCourses = courses.filter(course =>
     course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     course.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -111,18 +130,6 @@ const WishlistPage = () => {
     event.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     event.location?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  if (wishlistLoading || loading) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   if (wishlistLoading || loading) {
     return (
@@ -308,6 +315,11 @@ const WishlistPage = () => {
 const CourseWishlistCard: React.FC<{ course: CourseWithEnrollment }> = ({ course }) => {
   const navigate = useNavigate();
 
+  // Safely get review data with fallbacks
+  const avgRating = course.reviews?.avg_rating || 4.5;
+  const totalReviews = course.reviews?.total_reviews || 100;
+  const positivePercentage = course.reviews?.positive_percentage || 95;
+
   return (
     <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group hover:scale-[1.02]">
       <div className="relative">
@@ -349,10 +361,10 @@ const CourseWishlistCard: React.FC<{ course: CourseWithEnrollment }> = ({ course
           <div className="flex items-center gap-1 text-sm">
             <Star className="h-4 w-4 text-yellow-500 fill-current" />
             <span className="font-medium">
-              {course.reviews.avg_rating > 0 ? course.reviews.avg_rating.toFixed(1) : '4.8'}
+              {avgRating.toFixed(1)}
             </span>
             <span className="text-gray-500 ml-1">
-              ({course.reviews.total_reviews > 0 ? course.reviews.total_reviews : '100'})
+              ({totalReviews})
             </span>
           </div>
           
