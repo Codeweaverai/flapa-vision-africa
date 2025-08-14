@@ -322,7 +322,7 @@ const ExploreEventsPage = () => {
                         </div>
 
                         {/* Wishlist Button */}
-                        <div className="absolute top-4 right-4 z-10">
+                        <div className="absolute bottom-4 right-4 z-10">
                           <WishlistButton 
                             itemId={event.id}
                             itemType="event"
