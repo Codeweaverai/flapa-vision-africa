@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -11,6 +10,7 @@ import { BookOpen, Clock, Search, Filter, Star, Users, TrendingUp, Play } from '
 import { supabase } from '@/lib/supabaseClient';
 import { VALID_CATEGORIES } from '@/services/courseService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 
 const COURSES_PER_LOAD = 20;
 
@@ -27,7 +27,6 @@ interface Course {
   difficulty_level: string;
   created_at: string;
   creator_id: string;
-  // Populated fields
   reviews: {
     avg_rating: number;
     total_reviews: number;
@@ -59,7 +58,6 @@ const ExploreCoursesPage = () => {
   }, [courses, searchTerm, selectedCategory, selectedDifficulty, priceFilter, sortBy]);
 
   useEffect(() => {
-    // Update URL params when filters change
     const params = new URLSearchParams();
     if (searchTerm) params.set('search', searchTerm);
     if (selectedCategory !== 'all') params.set('category', selectedCategory);
@@ -70,7 +68,6 @@ const ExploreCoursesPage = () => {
     try {
       setLoading(true);
       
-      // Fetch published courses
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select('*')
@@ -85,10 +82,8 @@ const ExploreCoursesPage = () => {
         return;
       }
 
-      // Enhance courses with real data
       const enhancedCourses = await Promise.all(
         coursesData.map(async (course) => {
-          // Get course reviews
           const { data: reviews } = await supabase
             .from('course_reviews')
             .select('rating')
@@ -101,7 +96,6 @@ const ExploreCoursesPage = () => {
           const positiveReviews = reviews?.filter(review => review.rating >= 4).length || 0;
           const positivePercentage = totalReviews > 0 ? (positiveReviews / totalReviews) * 100 : 0;
 
-          // Get lessons count
           const { data: modules } = await supabase
             .from('course_modules')
             .select('id, lessons:lessons(id)')
@@ -111,7 +105,6 @@ const ExploreCoursesPage = () => {
             return total + (module.lessons?.length || 0);
           }, 0) || 0;
 
-          // Get students count
           const { data: enrollments } = await supabase
             .from('course_enrollments')
             .select('id')
@@ -145,7 +138,6 @@ const ExploreCoursesPage = () => {
   const applyFiltersAndSort = () => {
     let filtered = [...courses];
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(course =>
         course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -154,26 +146,22 @@ const ExploreCoursesPage = () => {
       );
     }
 
-    // Category filter
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(course => 
         course.category.toLowerCase() === selectedCategory.toLowerCase()
       );
     }
 
-    // Difficulty filter
     if (selectedDifficulty !== 'all') {
       filtered = filtered.filter(course => course.difficulty_level === selectedDifficulty);
     }
 
-    // Price filter
     if (priceFilter === 'free') {
       filtered = filtered.filter(course => course.is_free);
     } else if (priceFilter === 'paid') {
       filtered = filtered.filter(course => !course.is_free);
     }
 
-    // Sort courses
     switch (sortBy) {
       case 'newest':
         filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -194,7 +182,6 @@ const ExploreCoursesPage = () => {
         break;
     }
 
-    // Reset displayed courses and show first batch
     const firstBatch = filtered.slice(0, COURSES_PER_LOAD);
     setDisplayedCourses(firstBatch);
     setHasMoreCourses(filtered.length > COURSES_PER_LOAD);
@@ -203,7 +190,6 @@ const ExploreCoursesPage = () => {
   const loadMoreCourses = async () => {
     setLoadingMore(true);
     
-    // Get the filtered courses again
     let filtered = [...courses];
     
     if (searchTerm) {
@@ -230,7 +216,6 @@ const ExploreCoursesPage = () => {
       filtered = filtered.filter(course => !course.is_free);
     }
 
-    // Apply sorting
     switch (sortBy) {
       case 'newest':
         filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -263,7 +248,6 @@ const ExploreCoursesPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <Layout>
         <div className="container mx-auto px-4 py-8">
-          {/* Hero Section */}
           <div className="text-center mb-12">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
               <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
@@ -275,7 +259,6 @@ const ExploreCoursesPage = () => {
             </p>
           </div>
 
-          {/* Enhanced Filters */}
           <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl border-0 mb-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               <div className="relative lg:col-span-2">
@@ -340,7 +323,6 @@ const ExploreCoursesPage = () => {
             </div>
           </div>
 
-          {/* Results count and info */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <p className="text-gray-600 font-medium">
@@ -358,7 +340,6 @@ const ExploreCoursesPage = () => {
             </div>
           </div>
 
-          {/* Courses Grid */}
           {loading ? (
             <div className="flex justify-center my-16">
               <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500"></div>
@@ -384,10 +365,19 @@ const ExploreCoursesPage = () => {
                       </div>
                     )}
                     
-                    {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     
-                    {/* Price Badge */}
+                    {/* Added Wishlist Button Here */}
+                    <div className="absolute top-3 left-3 z-10">
+                      <WishlistButton 
+                        itemId={course.id}
+                        itemType="course"
+                        variant="ghost"
+                        size="icon"
+                        className="bg-white/80 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all"
+                      />
+                    </div>
+                    
                     <div className="absolute top-3 right-3">
                       {course.is_free ? (
                         <Badge className="bg-green-500 text-white border-0 shadow-lg">
@@ -400,7 +390,6 @@ const ExploreCoursesPage = () => {
                       )}
                     </div>
                     
-                    {/* Category Badge */}
                     <div className="absolute bottom-3 left-3">
                       <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm border-0">
                         {course.category}
@@ -431,7 +420,6 @@ const ExploreCoursesPage = () => {
                   </CardHeader>
 
                   <CardContent className="space-y-4">
-                    {/* Course Stats */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-orange-500" />
@@ -477,7 +465,6 @@ const ExploreCoursesPage = () => {
             </div>
           )}
 
-          {/* No Results State */}
           {displayedCourses.length === 0 && !loading && (
             <div className="text-center py-16">
               <div className="bg-gradient-to-r from-orange-100 to-purple-100 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
@@ -502,7 +489,6 @@ const ExploreCoursesPage = () => {
             </div>
           )}
 
-          {/* Load More Button */}
           {hasMoreCourses && displayedCourses.length > 0 && (
             <div className="flex justify-center mt-12">
               <Button
