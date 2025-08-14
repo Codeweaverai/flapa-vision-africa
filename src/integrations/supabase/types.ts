@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
+  // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -3458,30 +3458,6 @@ export type Database = {
           },
         ]
       }
-      wishlists: {
-        Row: {
-          added_at: string
-          id: string
-          item_id: string
-          item_type: string
-          user_id: string
-        }
-        Insert: {
-          added_at?: string
-          id?: string
-          item_id: string
-          item_type: string
-          user_id: string
-        }
-        Update: {
-          added_at?: string
-          id?: string
-          item_id?: string
-          item_type?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       workplace_invitations: {
         Row: {
           accepted_at: string | null
@@ -3540,10 +3516,10 @@ export type Database = {
       broadcast_message_to_all_users: {
         Args: {
           p_admin_id: string
+          p_subject: string
           p_content: string
           p_message_type?: string
           p_priority?: string
-          p_subject: string
         }
         Returns: string
       }
@@ -3560,11 +3536,11 @@ export type Database = {
         Args: { creator_user_id: string }
         Returns: {
           available_balance: number
-          course_revenue: number
-          event_revenue: number
           pending_balance: number
           total_earnings: number
           total_platform_fees: number
+          course_revenue: number
+          event_revenue: number
         }[]
       }
       can_edit_workplace_content: {
@@ -3578,15 +3554,15 @@ export type Database = {
       count_bookings_by_event: {
         Args: Record<PropertyKey, never>
         Returns: {
-          count: string
           event_id: string
+          count: string
         }[]
       }
       count_registrations_by_event: {
         Args: Record<PropertyKey, never>
         Returns: {
-          count: string
           event_id: string
+          count: string
         }[]
       }
       generate_booking_code: {
@@ -3616,9 +3592,9 @@ export type Database = {
       get_user_emails: {
         Args: { user_ids: string[] }
         Returns: {
-          created_at: string
-          email: string
           id: string
+          email: string
+          created_at: string
         }[]
       }
       get_user_workplace_ids: {
@@ -3632,8 +3608,8 @@ export type Database = {
       is_creator_content_owner: {
         Args: {
           creator_uuid: string
-          item_id_param: string
           item_type_param: string
+          item_id_param: string
         }
         Returns: boolean
       }
@@ -3662,7 +3638,7 @@ export type Database = {
         Returns: undefined
       }
       update_ticket_inventory: {
-        Args: { p_quantity: number; p_ticket_id: string }
+        Args: { p_ticket_id: string; p_quantity: number }
         Returns: boolean
       }
       user_needs_otp_verification: {

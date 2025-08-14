@@ -30,7 +30,6 @@ import ExploreEventsPage from '@/pages/ExploreEventsPage';
 import LocalContentPage from '@/pages/LocalContentPage';
 import EventDetailPage from '@/pages/EventDetailPage';
 import MyEventsPage from '@/pages/MyEventsPage';
-import WishlistPage from '@/pages/WishlistPage';
 
 // Import account pages
 import AccountPage from '@/pages/AccountPage';
@@ -205,9 +204,6 @@ function App() {
                   <Route path="/event-detail/:id" element={<EventDetailPage />} />
                   <Route path="/events/:id" element={<EventDetailPage />} />
                   <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
-
-                  {/* Wishlist Route */}
-                  <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
 
                   {/* Commerce Routes */}
                   <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
