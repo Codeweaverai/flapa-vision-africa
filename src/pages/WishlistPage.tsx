@@ -394,7 +394,7 @@ const CourseWishlistCard: React.FC<{ course: CourseWithEnrollment }> = ({ course
         
         <Button 
           className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
-          onClick={() => navigate(`/courses/${course.id}`)}
+          onClick={() => navigate(`/course-detail/${course.id}`)}
         >
           <Play className="h-4 w-4 mr-2" />
           View Course
