@@ -158,14 +158,14 @@ const WishlistPage = () => {
               </p>
               <div className="space-x-4">
                 <Button 
-                  onClick={() => navigate('/community/courses')}
+                  onClick={() => navigate('/explore-courses')}
                   className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
                 >
                   Browse Courses
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={() => navigate('/events')}
+                  onClick={() => navigate('/explore-events')}
                   className="border-orange-500 text-orange-600 hover:bg-orange-50"
                 >
                   Browse Events
