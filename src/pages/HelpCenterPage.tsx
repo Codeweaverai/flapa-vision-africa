@@ -161,7 +161,7 @@ const HelpCenterPage = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
+        <div className="min-h-screen bg-gradient-to-br from-orange-100 to-purple-100">
           <div className="section-container">
             <div className="text-center">
               <div className="animate-pulse space-y-6">
@@ -178,7 +178,7 @@ const HelpCenterPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-orange-100 to-purple-100 relative overflow-hidden">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[...Array(15)].map((_, i) => (
@@ -201,7 +201,7 @@ const HelpCenterPage = () => {
             <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
               Help Center
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-700 mb-8 max-w-2xl mx-auto">
               Find answers to common questions, search media posts, and get the support you need
             </p>
             
@@ -225,7 +225,7 @@ const HelpCenterPage = () => {
             {categories.map((category) => {
               const IconComponent = category.icon;
               return (
-                <Card key={category.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-0 overflow-hidden">
+                <Card key={category.id} className="group bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-0 overflow-hidden">
                   <div className={`h-2 bg-gradient-to-r ${category.gradient}`}></div>
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-3 text-lg">
@@ -234,12 +234,12 @@ const HelpCenterPage = () => {
                       </div>
                       {category.title}
                     </CardTitle>
-                    <p className="text-gray-600 text-sm">{category.description}</p>
+                    <p className="text-gray-700 text-sm">{category.description}</p>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       {groupedFaqs[category.title]?.length === 0 ? (
-                        <p className="text-gray-500 text-sm italic">No FAQs available in this category.</p>
+                        <p className="text-gray-600 text-sm italic">No FAQs available in this category.</p>
                       ) : (
                         groupedFaqs[category.title]?.map((faq) => (
                           <div key={faq.id} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
@@ -276,13 +276,13 @@ const HelpCenterPage = () => {
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-2">
                   Media Posts
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-gray-700">
                   Explore our latest tutorials, guides, and educational content
                 </p>
               </div>
 
               {filteredMediaPosts.length === 0 ? (
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                   <CardContent className="p-8 text-center">
                     <Play className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                     <h3 className="text-xl font-semibold mb-2 text-gray-800">
@@ -299,7 +299,7 @@ const HelpCenterPage = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredMediaPosts.map((post) => (
-                    <Card key={post.id} className="group bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 overflow-hidden">
+                    <Card key={post.id} className="group bg-white/95 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 overflow-hidden">
                       <div className="aspect-video bg-gradient-to-br from-orange-200 to-purple-200 overflow-hidden">
                         {post.image_url ? (
                           <img 
@@ -331,7 +331,7 @@ const HelpCenterPage = () => {
                           </Badge>
                         </div>
                         
-                        <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+                        <p className="text-sm text-gray-700 mb-4 line-clamp-3">
                           {post.description}
                         </p>
                         
@@ -358,14 +358,14 @@ const HelpCenterPage = () => {
           )}
 
           {/* Contact Support Section */}
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden mb-8">
+          <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl overflow-hidden mb-8">
             <div className="h-2 bg-gradient-to-r from-orange-400 to-purple-500"></div>
             <CardContent className="text-center py-12">
               <div className="max-w-md mx-auto">
                 <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                   Still need help?
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-700 mb-6">
                   Can't find what you're looking for? Our support team is here to help you succeed.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
