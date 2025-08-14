@@ -30,6 +30,7 @@ import ExploreEventsPage from '@/pages/ExploreEventsPage';
 import LocalContentPage from '@/pages/LocalContentPage';
 import EventDetailPage from '@/pages/EventDetailPage';
 import MyEventsPage from '@/pages/MyEventsPage';
+import WishlistPage from '@/pages/WishlistPage';
 
 // Import account pages
 import AccountPage from '@/pages/AccountPage';
@@ -144,7 +145,6 @@ import VerifyCertificatePage from '@/pages/VerifyCertificatePage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import NotFoundPage from '@/pages/NotFoundPage';
-import WishlistPage from '@/pages/WishlistPage';
 
 // Import components
 import ProtectedRoute from '@/components/ProtectedRoute';

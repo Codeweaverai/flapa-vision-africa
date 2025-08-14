@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useShoppingCart } from '@/contexts/CartContext';
+import { useCart } from '@/contexts/CartContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,7 +32,7 @@ import { useWishlist } from '@/hooks/useWishlist';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
-  const { cart } = useShoppingCart();
+  const { items } = useCart();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -94,9 +95,9 @@ const Navbar = () => {
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                   <ShoppingCart className="h-5 w-5 text-gray-700 hover:text-primary" />
-                  {cart.length > 0 && (
+                  {items.length > 0 && (
                     <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                      {cart.length}
+                      {items.length}
                     </Badge>
                   )}
                 </Button>
@@ -213,9 +214,9 @@ const Navbar = () => {
                 <Button variant="ghost" className="relative w-full justify-start py-2 px-3 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-50 flex items-center" onClick={() => setIsOpen(false)}>
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   Cart
-                  {cart.length > 0 && (
+                  {items.length > 0 && (
                     <Badge variant="destructive" className="ml-auto">
-                      {cart.length}
+                      {items.length}
                     </Badge>
                   )}
                 </Button>

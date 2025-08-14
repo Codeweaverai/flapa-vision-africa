@@ -1,150 +1,118 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import Layout from '@/components/layout/Layout';
+import { useWishlist } from '@/hooks/useWishlist';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import { CourseWithEnrollment } from '@/types/eventTypes';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Search, BookOpen, Calendar, MapPin, Clock, Users, Star, Trash2 } from 'lucide-react';
-import { useWishlist } from '@/hooks/useWishlist';
-import { supabase } from '@/lib/supabaseClient';
-import { CourseWithEnrollment, EventWithRegistrations } from '@/types/eventTypes';
-import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
+import { Heart, Search, BookOpen, Calendar, Clock, MapPin, DollarSign } from 'lucide-react';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+import { Link } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
-const WishlistPage = () => {
-  const navigate = useNavigate();
-  const { wishlistItems, loading: wishlistLoading, removeFromWishlist } = useWishlist();
+interface SimpleEvent {
+  id: string;
+  title: string;
+  description: string;
+  date?: string;
+  start_time?: string;
+  location: string;
+  price?: number;
+  currency?: string;
+  image_url?: string;
+  creator_id?: string;
+}
+
+const WishlistPage: React.FC = () => {
+  const { user } = useAuth();
+  const { wishlistItems, loading } = useWishlist();
   const [courses, setCourses] = useState<CourseWithEnrollment[]>([]);
-  const [events, setEvents] = useState<EventWithRegistrations[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState<SimpleEvent[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [loadingItems, setLoadingItems] = useState(false);
 
   useEffect(() => {
     if (wishlistItems.length > 0) {
-      fetchWishlistData();
-    } else {
-      setLoading(false);
+      fetchWishlistDetails();
     }
   }, [wishlistItems]);
 
-  const fetchWishlistData = async () => {
-    try {
-      setLoading(true);
-      
-      const courseIds = wishlistItems
-        .filter(item => item.item_type === 'course')
-        .map(item => item.item_id);
-      
-      const eventIds = wishlistItems
-        .filter(item => item.item_type === 'event')
-        .map(item => item.item_id);
+  const fetchWishlistDetails = async () => {
+    setLoadingItems(true);
+    
+    const courseIds = wishlistItems
+      .filter(item => item.item_type === 'course')
+      .map(item => item.item_id);
+    
+    const eventIds = wishlistItems
+      .filter(item => item.item_type === 'event')
+      .map(item => item.item_id);
 
+    try {
       // Fetch courses
       if (courseIds.length > 0) {
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
-          .select(`
-            *,
-            course_enrollments!left (
-              id,
-              enrollment_date,
-              completion_date,
-              is_completed,
-              user_id
-            )
-          `)
-          .in('id', courseIds)
-          .eq('is_published', true);
+          .select('*')
+          .in('id', courseIds);
 
         if (coursesError) throw coursesError;
-
-        const coursesWithEnrollment = coursesData?.map(course => ({
-          ...course,
-          enrollment: course.course_enrollments?.[0] || null
-        })) || [];
-
-        setCourses(coursesWithEnrollment);
+        setCourses(coursesData || []);
       }
 
-      // Fetch events
+      // Fetch events with simpler query
       if (eventIds.length > 0) {
         const { data: eventsData, error: eventsError } = await supabase
           .from('events')
           .select(`
-            *,
-            event_bookings!left (
-              id,
-              status,
-              payment_status,
-              user_id
-            )
+            id,
+            title,
+            description,
+            date,
+            start_time,
+            location,
+            price,
+            currency,
+            image_url,
+            creator_id
           `)
-          .in('id', eventIds)
-          .eq('is_published', true);
+          .in('id', eventIds);
 
         if (eventsError) throw eventsError;
-
-        const eventsWithRegistrations = eventsData?.map(event => ({
-          ...event,
-          registrations: event.event_bookings || []
-        })) || [];
-
-        setEvents(eventsWithRegistrations);
+        setEvents((eventsData || []) as SimpleEvent[]);
       }
     } catch (error) {
-      console.error('Error fetching wishlist data:', error);
-      toast.error('Failed to load wishlist items');
+      console.error('Error fetching wishlist details:', error);
     } finally {
-      setLoading(false);
+      setLoadingItems(false);
     }
   };
 
   const filteredCourses = courses.filter(course =>
     course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    course.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredEvents = events.filter(event =>
     event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.location?.toLowerCase().includes(searchTerm.toLowerCase())
+    event.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (wishlistLoading || loading) {
+  if (!user) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (wishlistItems.length === 0) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <Heart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h1 className="text-3xl font-bold mb-2">Your Wishlist is Empty</h1>
-            <p className="text-muted-foreground mb-6">
-              Start adding courses and events to your wishlist to keep track of what interests you
-            </p>
-            <div className="space-x-4">
-              <Button onClick={() => navigate('/community/courses')}>
-                Browse Courses
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/events')}>
-                Browse Events
-              </Button>
-            </div>
+          <div className="text-center">
+            <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold mb-2">Please log in to view your wishlist</h1>
+            <Link to="/login">
+              <Button>Login</Button>
+            </Link>
           </div>
         </div>
       </Layout>
@@ -154,249 +122,201 @@ const WishlistPage = () => {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Heart className="h-8 w-8 text-red-500" />
-              My Wishlist
-            </h1>
-            <p className="text-muted-foreground">
-              {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} in your wishlist
-            </p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Heart className="h-8 w-8 text-red-500" />
+            <h1 className="text-3xl font-bold">My Wishlist</h1>
+            <Badge variant="secondary">{wishlistItems.length} items</Badge>
           </div>
         </div>
 
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search your wishlist..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
+              className="pl-10"
             />
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all">
-              All ({courses.length + events.length})
-            </TabsTrigger>
-            <TabsTrigger value="courses">
-              Courses ({courses.length})
-            </TabsTrigger>
-            <TabsTrigger value="events">
-              Events ({events.length})
-            </TabsTrigger>
-          </TabsList>
+        {loading || loadingItems ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading your wishlist...</p>
+          </div>
+        ) : wishlistItems.length === 0 ? (
+          <div className="text-center py-16">
+            <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Your wishlist is empty</h2>
+            <p className="text-gray-600 mb-6">Start adding courses and events you're interested in!</p>
+            <div className="space-x-4">
+              <Link to="/explore-courses">
+                <Button>Browse Courses</Button>
+              </Link>
+              <Link to="/events">
+                <Button variant="outline">Browse Events</Button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all">All ({wishlistItems.length})</TabsTrigger>
+              <TabsTrigger value="courses">Courses ({courses.length})</TabsTrigger>
+              <TabsTrigger value="events">Events ({events.length})</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="all" className="space-y-6">
-            {filteredCourses.length === 0 && filteredEvents.length === 0 ? (
-              <div className="text-center py-8">
-                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No items found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm 
-                    ? 'No items match your search criteria'
-                    : 'Your wishlist is empty'
-                  }
-                </p>
-              </div>
-            ) : (
-              <>
-                {filteredCourses.length > 0 && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4">Courses</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredCourses.map((course) => (
-                        <CourseWishlistCard key={course.id} course={course} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {filteredEvents.length > 0 && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4">Events</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredEvents.map((event) => (
-                        <EventWishlistCard key={event.id} event={event} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="courses" className="space-y-6">
-            {filteredCourses.length === 0 ? (
-              <div className="text-center py-8">
-                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No courses found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm 
-                    ? 'No courses match your search criteria'
-                    : 'No courses in your wishlist yet'
-                  }
-                </p>
-              </div>
-            ) : (
+            <TabsContent value="all" className="mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredCourses.map((course) => (
-                  <CourseWishlistCard key={course.id} course={course} />
+                  <CourseCard key={course.id} course={course} />
+                ))}
+                {filteredEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
                 ))}
               </div>
-            )}
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="events" className="space-y-6">
-            {filteredEvents.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No events found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm 
-                    ? 'No events match your search criteria'
-                    : 'No events in your wishlist yet'
-                  }
-                </p>
+            <TabsContent value="courses" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredCourses.map((course) => (
+                  <CourseCard key={course.id} course={course} />
+                ))}
               </div>
-            ) : (
+              {filteredCourses.length === 0 && (
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">No courses in your wishlist yet</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="events" className="mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredEvents.map((event) => (
-                  <EventWishlistCard key={event.id} event={event} />
+                  <EventCard key={event.id} event={event} />
                 ))}
               </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              {filteredEvents.length === 0 && (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">No events in your wishlist yet</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </Layout>
   );
 };
 
-const CourseWishlistCard: React.FC<{ course: CourseWithEnrollment }> = ({ course }) => {
-  const navigate = useNavigate();
-
+const CourseCard: React.FC<{ course: CourseWithEnrollment }> = ({ course }) => {
   return (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-      <CardHeader className="relative">
-        {course.thumbnail_url && (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      <div className="aspect-video bg-gray-200 relative">
+        {course.thumbnail_url || course.image_url ? (
           <img
-            src={course.thumbnail_url}
+            src={course.thumbnail_url || course.image_url}
             alt={course.title}
-            className="w-full h-48 object-cover rounded-md mb-4"
+            className="w-full h-full object-cover"
           />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="h-12 w-12 text-gray-400" />
+          </div>
         )}
         <div className="absolute top-2 right-2">
-          <WishlistButton 
-            itemId={course.id} 
-            itemType="course"
-            className="bg-white/80 hover:bg-white"
-          />
+          <WishlistButton itemId={course.id} itemType="course" />
         </div>
-        <div className="flex items-center justify-between">
-          <Badge variant={course.is_free ? 'secondary' : 'default'}>
-            {course.is_free ? 'Free' : `$${course.price}`}
-          </Badge>
-          {course.difficulty_level && (
-            <Badge variant="outline">
-              {course.difficulty_level}
-            </Badge>
-          )}
-        </div>
-        <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
-          {course.title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-          {course.description}
-        </p>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      </div>
+      <CardContent className="p-4">
+        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{course.title}</h3>
+        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{course.description}</p>
+        
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
             <Clock className="h-4 w-4" />
-            <span>{course.duration_minutes} min</span>
+            <span>{course.duration_minutes || 0} min</span>
           </div>
-          {course.enrollment && (
-            <Badge variant="secondary">
-              {course.enrollment.is_completed ? 'Completed' : 'Enrolled'}
-            </Badge>
-          )}
+          <div className="flex items-center gap-1">
+            <DollarSign className="h-4 w-4 text-green-600" />
+            {course.is_free ? (
+              <span className="text-green-600 font-medium">Free</span>
+            ) : (
+              <PriceDisplay 
+                amount={course.price || 0} 
+                className="text-green-600 font-medium"
+              />
+            )}
+          </div>
         </div>
-        <Button 
-          className="w-full" 
-          onClick={() => navigate(`/courses/${course.id}`)}
-        >
-          <BookOpen className="h-4 w-4 mr-2" />
-          View Course
-        </Button>
+
+        <Link to={`/course/${course.id}`}>
+          <Button className="w-full">View Course</Button>
+        </Link>
       </CardContent>
     </Card>
   );
 };
 
-const EventWishlistCard: React.FC<{ event: EventWithRegistrations }> = ({ event }) => {
-  const navigate = useNavigate();
-
+const EventCard: React.FC<{ event: SimpleEvent }> = ({ event }) => {
+  const eventDate = event.date || event.start_time;
+  
   return (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-      <CardHeader className="relative">
-        {event.image_url && (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      <div className="aspect-video bg-gray-200 relative">
+        {event.image_url ? (
           <img
             src={event.image_url}
             alt={event.title}
-            className="w-full h-48 object-cover rounded-md mb-4"
+            className="w-full h-full object-cover"
           />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Calendar className="h-12 w-12 text-gray-400" />
+          </div>
         )}
         <div className="absolute top-2 right-2">
-          <WishlistButton 
-            itemId={event.id} 
-            itemType="event"
-            className="bg-white/80 hover:bg-white"
-          />
+          <WishlistButton itemId={event.id} itemType="event" />
         </div>
-        <div className="flex items-center justify-between">
-          <Badge variant={event.is_free ? 'secondary' : 'default'}>
-            {event.is_free ? 'Free' : `${event.currency} ${event.price}`}
-          </Badge>
-          <Badge variant="outline">
-            {event.event_type}
-          </Badge>
-        </div>
-        <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
-          {event.title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-          {event.description}
-        </p>
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{new Date(event.start_time).toLocaleDateString()}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{new Date(event.start_time).toLocaleTimeString()}</span>
-          </div>
+      </div>
+      <CardContent className="p-4">
+        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{event.title}</h3>
+        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{event.description}</p>
+        
+        <div className="space-y-2 mb-3 text-sm text-gray-500">
+          {eventDate && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>{new Date(eventDate).toLocaleDateString()}</span>
+            </div>
+          )}
           {event.location && (
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
               <span className="line-clamp-1">{event.location}</span>
             </div>
           )}
         </div>
-        <Button 
-          className="w-full" 
-          onClick={() => navigate(`/events/${event.id}`)}
-        >
-          <Calendar className="h-4 w-4 mr-2" />
-          View Event
-        </Button>
+
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1">
+            <DollarSign className="h-4 w-4 text-green-600" />
+            <PriceDisplay 
+              amount={event.price || 0} 
+              originalCurrency={(event.currency as any) || 'USD'}
+              className="text-green-600 font-medium"
+            />
+          </div>
+        </div>
+
+        <Link to={`/events/${event.id}`}>
+          <Button className="w-full">View Event</Button>
+        </Link>
       </CardContent>
     </Card>
   );

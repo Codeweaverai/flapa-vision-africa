@@ -40,7 +40,7 @@ export const useWishlist = () => {
         
       if (error) throw error;
       
-      setWishlistItems(data || []);
+      setWishlistItems((data || []) as WishlistItem[]);
     } catch (err) {
       console.error('Error fetching wishlist items:', err);
       setError(err as Error);
@@ -74,7 +74,7 @@ export const useWishlist = () => {
         throw error;
       }
       
-      setWishlistItems(prev => [data, ...prev]);
+      setWishlistItems(prev => [data as WishlistItem, ...prev]);
       toast.success('Added to wishlist');
       return true;
     } catch (err) {
