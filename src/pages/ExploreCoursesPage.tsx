@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -11,6 +10,7 @@ import { BookOpen, Clock, Search, Filter, Star, Users, TrendingUp, Play } from '
 import { supabase } from '@/lib/supabaseClient';
 import { VALID_CATEGORIES } from '@/services/courseService';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 
 const COURSES_PER_LOAD = 20;
 
@@ -386,6 +386,17 @@ const ExploreCoursesPage = () => {
                     
                     {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    
+                    {/* Wishlist Button */}
+                    <div className="absolute top-3 left-3 z-10">
+                      <WishlistButton 
+                        itemId={course.id}
+                        itemType="course"
+                        variant="ghost"
+                        size="icon"
+                        className="bg-white/90 hover:bg-white shadow-lg"
+                      />
+                    </div>
                     
                     {/* Price Badge */}
                     <div className="absolute top-3 right-3">
