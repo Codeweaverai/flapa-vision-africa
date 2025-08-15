@@ -24,11 +24,11 @@ const HeroSection = () => {
       {/* Content */}
      <div className="relative z-20 container mx-auto px-4 text-center text-white">
   <div className="max-w-4xl mx-auto">
-    <h2 className="text-2xl md:text-3xl font-semibold mb-2 text-gray-100">
-      Learn. Network. Elevate. With
-    </h2>
+    <h1 className="text-2xl md:text-3xl font-semibold mb-2 text-gray-100">
+      Learn. Network. Elevate With!
+    </h1>
     <h1 className="text-5xl md:text-7xl font-bold mb-4 leading-tight">
-      <span className="block bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
+      <span className="inline bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
         SkillPulse
       </span>
     </h1>
