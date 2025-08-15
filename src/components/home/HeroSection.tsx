@@ -22,19 +22,19 @@ const HeroSection = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/80 to-purple-600/80 z-10" />
       
       {/* Content */}
-      <div className="relative z-20 container mx-auto px-4 text-center text-white">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-            Build, Grow, Cocreate With!
-            <span className="block bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
-              SkillPulse 
-            </span>
-          </h1>
-          
-          <p className="text-xl md:text-2xl mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed">
-            "Built for the Skill-Driven Generation"
-          </p>
-          
+     <div className="relative z-20 container mx-auto px-4 text-center text-white">
+  <div className="max-w-4xl mx-auto">
+    <h2 className="text-2xl md:text-3xl font-semibold mb-2 text-gray-100">
+      Learn. Network. Elevate. With
+    </h2>
+    <h1 className="text-5xl md:text-7xl font-bold mb-4 leading-tight">
+      <span className="block bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
+        SkillPulse
+      </span>
+    </h1>
+    <p className="text-lg md:text-xl mb-8 text-gray-200 max-w-3xl mx-auto leading-relaxed">
+      Built for the Skill-Driven Generation
+       </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Link to="/explore-courses">
               <Button size="lg" className="text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200">
