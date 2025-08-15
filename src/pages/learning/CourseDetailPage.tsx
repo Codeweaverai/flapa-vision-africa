@@ -15,9 +15,7 @@ import {
   Play, 
   CheckCircle,
   Award,
-  ShoppingCart,
-  Lock,
-  ChevronRight
+  ShoppingCart
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CourseReviews from '@/components/course/CourseReviews';
@@ -53,6 +51,7 @@ interface Course {
   course_preview?: {
     id: string;
     preview_video_url?: string;
+    preview_video_path?: string;
   };
   course_modules: Array<{
     id: string;
@@ -66,7 +65,6 @@ interface Course {
       order_index: number;
       content_type: string;
       video_url?: string;
-      is_preview: boolean;
     }>;
   }>;
   course_learning_outcomes: Array<{
@@ -86,17 +84,19 @@ interface Course {
   }>;
   course_enrollments: Array<{
     id: string;
+    enrollment_date: string;
   }>;
 }
 
 interface CreatorProfile {
   id: string;
   full_name?: string;
-  avatar_url?: string;
   bio?: string;
-  total_courses: number;
-  total_students: number;
-  average_rating: number;
+  avatar_url?: string;
+  average_rating?: number;
+  total_courses?: number;
+  total_students?: number;
+  total_reviews?: number;
 }
 
 const CourseDetailPage = () => {
@@ -107,96 +107,193 @@ const CourseDetailPage = () => {
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // Check auth state
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-      if (session?.user && course) {
-        checkEnrollmentStatus(session.user.id);
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      } catch (error) {
+        console.error('Error checking user:', error);
       }
-    });
+    };
+    checkUser();
+  }, []);
 
-    return () => subscription.unsubscribe();
-  }, [course]);
-
-  // Fetch course data
   useEffect(() => {
     if (id) {
       fetchCourse();
     }
   }, [id]);
 
-  const checkEnrollmentStatus = async (userId: string) => {
-    if (!course) return;
-    
-    const { data: enrollment } = await supabase
-      .from('course_enrollments')
-      .select('id')
-      .eq('course_id', course.id)
-      .eq('user_id', userId)
-      .single();
-
-    setIsEnrolled(!!enrollment);
-  };
-
   const fetchCourse = async () => {
     try {
       setLoading(true);
+      console.log('Fetching course with ID:', id);
       
-      // Fetch course data
+      // First, get the basic course data
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select(`
-          *,
-          profiles(id, full_name, avatar_url, bio),
-          course_previews(id, preview_video_url),
-          course_modules(
-            id,
-            title,
-            description,
-            order_index,
-            lessons(
-              id,
-              title,
-              description,
-              order_index,
-              content_type,
-              video_url,
-              is_preview
-            )
-          ),
-          course_learning_outcomes(id, outcome, order_index),
-          course_reviews(
-            id,
-            rating,
-            review_text,
-            created_at,
-            profiles(full_name, avatar_url)
-          ),
-          course_enrollments(id)
+          *
         `)
         .eq('id', id)
         .eq('is_published', true)
         .single();
 
-      if (courseError || !courseData) {
+      if (courseError) {
+        console.error('Error fetching course:', courseError);
+        toast.error('Failed to load course');
+        return;
+      }
+
+      if (!courseData) {
+        toast.error('Course not found');
         navigate('/courses');
         return;
       }
 
-      setCourse(courseData);
-      await fetchCreatorProfile(courseData.creator_id);
+      console.log('Course data:', courseData);
+
+      // Get creator profile
+      const { data: creatorData, error: creatorError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, bio')
+        .eq('id', courseData.creator_id)
+        .single();
+
+      if (creatorError) {
+        console.error('Error fetching creator:', creatorError);
+      }
+
+      // Get course preview
+      const { data: previewData, error: previewError } = await supabase
+        .from('course_previews')
+        .select('id, preview_video_url, preview_video_path')
+        .eq('course_id', id)
+        .maybeSingle();
+
+      if (previewError) {
+        console.error('Error fetching course preview:', previewError);
+      }
+
+      // Get course modules with lessons
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('course_modules')
+        .select(`
+          id,
+          title,
+          description,
+          order_index,
+          lessons (
+            id,
+            title,
+            description,
+            order_index,
+            content_type,
+            video_url
+          )
+        `)
+        .eq('course_id', id)
+        .order('order_index', { ascending: true });
+
+      if (modulesError) {
+        console.error('Error fetching modules:', modulesError);
+      }
+
+      // Get learning outcomes
+      const { data: outcomesData, error: outcomesError } = await supabase
+        .from('course_learning_outcomes')
+        .select('id, outcome, order_index')
+        .eq('course_id', id)
+        .order('order_index', { ascending: true });
+
+      if (outcomesError) {
+        console.error('Error fetching outcomes:', outcomesError);
+      }
+
+      // Get course reviews with user profiles
+      const { data: reviewsData, error: reviewsError } = await supabase
+        .from('course_reviews')
+        .select(`
+          id,
+          rating,
+          review_text,
+          created_at,
+          user_id
+        `)
+        .eq('course_id', id)
+        .order('created_at', { ascending: false });
+
+      if (reviewsError) {
+        console.error('Error fetching reviews:', reviewsError);
+      }
+
+      // Get user profiles for reviews
+      let reviewsWithProfiles = [];
+      if (reviewsData && reviewsData.length > 0) {
+        const userIds = reviewsData.map(review => review.user_id);
+        const { data: reviewProfiles, error: reviewProfilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
+
+        if (!reviewProfilesError && reviewProfiles) {
+          reviewsWithProfiles = reviewsData.map(review => ({
+            ...review,
+            profiles: reviewProfiles.find(profile => profile.id === review.user_id) || {
+              full_name: 'Unknown User',
+              avatar_url: null
+            }
+          }));
+        }
+      }
+
+      // Get enrollments
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select('id, enrollment_date')
+        .eq('course_id', id);
+
+      if (enrollmentsError) {
+        console.error('Error fetching enrollments:', enrollmentsError);
+      }
+
+      // Combine all data
+      const completeCourse: Course = {
+        ...courseData,
+        profiles: creatorData || { id: courseData.creator_id, full_name: 'Unknown Creator' },
+        course_preview: previewData || undefined,
+        course_modules: modulesData || [],
+        course_learning_outcomes: outcomesData || [],
+        course_reviews: reviewsWithProfiles || [],
+        course_enrollments: enrollmentsData || []
+      };
+
+      setCourse(completeCourse);
+
+      // Fetch creator profile with stats
+      if (courseData.creator_id) {
+        await fetchCreatorProfile(courseData.creator_id);
+      }
 
       // Check if user is enrolled
-      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await checkEnrollmentStatus(user.id);
+        const { data: enrollment } = await supabase
+          .from('course_enrollments')
+          .select('id')
+          .eq('course_id', id)
+          .eq('user_id', user.id)
+          .eq('payment_status', 'completed')
+          .single();
+
+        setIsEnrolled(!!enrollment);
       }
     } catch (error) {
-      console.error('Error loading course:', error);
-      toast.error('Failed to load course');
+      console.error('Error:', error);
+      toast.error('An error occurred while loading the course');
     } finally {
       setLoading(false);
     }
@@ -204,54 +301,44 @@ const CourseDetailPage = () => {
 
   const fetchCreatorProfile = async (creatorId: string) => {
     try {
-      // Get creator stats
-      const { count: totalCourses } = await supabase
-        .from('courses')
-        .select('*', { count: 'exact' })
-        .eq('creator_id', creatorId)
-        .eq('is_published', true);
-
-      const { count: totalStudents } = await supabase
-        .from('course_enrollments')
-        .select('*', { count: 'exact' })
-        .in('course_id', 
-          await supabase
-            .from('courses')
-            .select('id')
-            .eq('creator_id', creatorId)
-            .then(({ data }) => data?.map(c => c.id) || []
-        );
-
-      const { data: reviews } = await supabase
-        .from('course_reviews')
-        .select('rating')
-        .in('course_id', 
-          await supabase
-            .from('courses')
-            .select('id')
-            .eq('creator_id', creatorId)
-            .then(({ data }) => data?.map(c => c.id) || [])
-        );
-
-      const averageRating = reviews && reviews.length > 0 
-        ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
-        : 0;
-
-      // Get creator profile
+      // Get creator basic info
       const { data: profile } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, bio')
         .eq('id', creatorId)
         .single();
 
+      // Get creator stats
+      const { data: courses } = await supabase
+        .from('courses')
+        .select('id')
+        .eq('creator_id', creatorId)
+        .eq('is_published', true);
+
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('payment_status', 'completed')
+        .in('course_id', courses?.map(c => c.id) || []);
+
+      const { data: reviews } = await supabase
+        .from('course_reviews')
+        .select('rating')
+        .in('course_id', courses?.map(c => c.id) || []);
+
+      const averageRating = reviews && reviews.length > 0
+        ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+        : 0;
+
       setCreatorProfile({
         ...profile,
-        total_courses: totalCourses || 0,
-        total_students: totalStudents || 0,
-        average_rating: parseFloat(averageRating.toFixed(1))
+        total_courses: courses?.length || 0,
+        total_students: enrollments?.length || 0,
+        total_reviews: reviews?.length || 0,
+        average_rating: averageRating
       });
     } catch (error) {
-      console.error('Error fetching creator:', error);
+      console.error('Error fetching creator profile:', error);
     }
   };
 
@@ -261,8 +348,7 @@ const CourseDetailPage = () => {
       return;
     }
 
-    if (!course) return;
-
+    setLoading(true);
     try {
       await addToCart({
         itemType: 'course',
@@ -272,15 +358,18 @@ const CourseDetailPage = () => {
         price: course.price,
         ticketHolderNames: []
       });
-      toast.success('Added to cart');
     } catch (error) {
-      toast.error('Failed to add to cart');
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add course to cart');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEnrollNow = () => {
     if (!user) {
-      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      toast.error('Please sign in to enroll in courses');
+      navigate('/auth');
       return;
     }
 
@@ -296,34 +385,82 @@ const CourseDetailPage = () => {
     if (!course || !user) return;
 
     try {
-      const { data: existingEnrollment } = await supabase
+      setEnrollmentLoading(true);
+      console.log('Starting free enrollment for user:', user.id, 'course:', course.id);
+      
+      // Check for existing enrollment with detailed logging
+      const { data: existingEnrollment, error: checkError } = await supabase
         .from('course_enrollments')
-        .select('id')
+        .select('id, user_id, course_id, payment_status')
         .eq('user_id', user.id)
-        .eq('course_id', course.id)
-        .single();
+        .eq('course_id', course.id);
 
-      if (existingEnrollment) {
+      console.log('Existing enrollment check result:', { existingEnrollment, checkError });
+
+      if (checkError) {
+        console.error('Error checking enrollment:', checkError);
+        toast.error('Failed to check enrollment status');
+        return;
+      }
+
+      // If any enrollment exists, consider user enrolled
+      if (existingEnrollment && existingEnrollment.length > 0) {
+        console.log('User already has enrollment:', existingEnrollment[0]);
         setIsEnrolled(true);
+        toast.success('You are already enrolled in this course!');
         navigate(`/learning/course/${course.id}`);
         return;
       }
 
-      const { error } = await supabase
+      console.log('No existing enrollment found, proceeding with insertion...');
+
+      // Proceed with enrollment
+      const enrollmentData = {
+        user_id: user.id,
+        course_id: course.id,
+        payment_status: 'completed',
+        enrollment_date: new Date().toISOString()
+      };
+
+      console.log('Inserting enrollment with data:', enrollmentData);
+
+      const { data: newEnrollment, error: insertError } = await supabase
         .from('course_enrollments')
-        .insert({
-          user_id: user.id,
-          course_id: course.id,
-          payment_status: 'completed'
+        .insert(enrollmentData)
+        .select();
+
+      console.log('Insert result:', { newEnrollment, insertError });
+
+      if (insertError) {
+        console.error('Enrollment error details:', {
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint
         });
 
-      if (error) throw error;
+        // Handle specific error cases
+        if (insertError.code === '23505') { // Unique constraint violation
+          console.log('Unique constraint violation detected');
+          setIsEnrolled(true);
+          toast.success('You are already enrolled in this course!');
+          navigate(`/learning/course/${course.id}`);
+          return;
+        }
+        
+        toast.error(`Failed to enroll: ${insertError.message}`);
+        return;
+      }
 
+      console.log('Enrollment successful:', newEnrollment);
       setIsEnrolled(true);
-      toast.success('Enrolled successfully!');
+      toast.success('Successfully enrolled in course!');
       navigate(`/learning/course/${course.id}`);
     } catch (error) {
-      toast.error('Failed to enroll');
+      console.error('Unexpected enrollment error:', error);
+      toast.error('An unexpected error occurred during enrollment');
+    } finally {
+      setEnrollmentLoading(false);
     }
   };
 
@@ -331,15 +468,10 @@ const CourseDetailPage = () => {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-6">
-            <div className="h-10 w-3/4 bg-gray-200 rounded"></div>
-            <div className="h-6 w-1/2 bg-gray-200 rounded"></div>
-            <div className="aspect-video bg-gray-200 rounded-lg"></div>
-            <div className="grid grid-cols-2 gap-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-4 bg-gray-200 rounded"></div>
-              ))}
-            </div>
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 w-3/4 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
+            <div className="h-4 w-1/2 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-20"></div>
+            <div className="h-64 w-full rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
           </div>
         </div>
       </Layout>
@@ -350,8 +482,11 @@ const CourseDetailPage = () => {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-8 text-center">
-          <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
-          <Button onClick={() => navigate('/courses')}>Browse Courses</Button>
+          <h1 className="text-2xl font-bold text-gray-900">Course not found</h1>
+          <p className="text-gray-600 mt-2">The course you're looking for doesn't exist or has been removed.</p>
+          <Button onClick={() => navigate('/courses')} className="mt-4">
+            Browse Courses
+          </Button>
         </div>
       </Layout>
     );
@@ -365,177 +500,157 @@ const CourseDetailPage = () => {
 
   return (
     <Layout>
-      <div className="bg-gray-50 min-h-screen">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-100">
         <div className="container mx-auto px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Course Header */}
-              <Card>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{course.category}</Badge>
-                    <Badge>{course.difficulty_level}</Badge>
-                    {course.certificate_enabled && (
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <Award className="w-3 h-3" />
-                        Certificate
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <h1 className="text-3xl font-bold tracking-tight">{course.title}</h1>
-                  <p className="text-gray-600">{course.summary}</p>
-                  
-                  <div className="flex flex-wrap items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span>{averageRating.toFixed(1)}</span>
-                      <span className="text-gray-500">({course.course_reviews.length})</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      <span>{course.course_enrollments.length} students</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>
-                        {Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <BookOpen className="w-4 h-4" />
-                      <span>{totalLessons} lessons</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Preview Video */}
-              {course.course_preview?.preview_video_url && (
-                <Card>
-                  <CardContent className="p-0">
-                    <div className="aspect-video">
-                      <ReactPlayer
-                        url={course.course_preview.preview_video_url}
-                        controls
-                        width="100%"
-                        height="100%"
-                        light={course.thumbnail_url}
-                        config={{
-                          file: {
-                            attributes: {
-                              controlsList: 'nodownload',
-                              disablePictureInPicture: true
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Instructor Card */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Course Header - Removed thumbnail image */}
               <Card>
                 <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Instructor</h3>
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={course.profiles.avatar_url} />
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="secondary">{course.category}</Badge>
+                      <Badge variant="outline">{course.difficulty_level}</Badge>
+                      {course.certificate_enabled && (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          <Award className="w-3 h-3 mr-1" />
+                          Certificate
+                        </Badge>
+                      )}
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{course.title}</h1>
+                    <p className="text-gray-600 mb-4">{course.summary}</p>
+                    
+                    {/* Course Stats */}
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-500" />
+                        <span>{averageRating.toFixed(1)}</span>
+                        <span>({course.course_reviews.length} reviews)</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        <span>{course.course_enrollments.length} students</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        <span>{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <BookOpen className="w-4 h-4" />
+                        <span>{totalLessons} lessons</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Course Preview Video */}
+                  {course.course_preview?.preview_video_url && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
+                      <div className="aspect-video rounded-lg overflow-hidden bg-gradient-to-r from-orange-500 to-purple-600">
+                        <ReactPlayer
+                          url={course.course_preview.preview_video_url}
+                          controls={true}
+                          playing={true}
+                          width="100%"
+                          height="100%"
+                          light={course.thumbnail_url}
+                          config={{
+                            file: {
+                              attributes: {
+                                controlsList: 'nodownload noremoteplayback',
+                                disablePictureInPicture: true,
+                                onContextMenu: (e: React.MouseEvent) => e.preventDefault()
+                              }
+                            }
+                          }}
+                          style={{ borderRadius: '8px' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Instructor */}
+                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                    <Avatar>
+                      <AvatarImage src={course.profiles?.avatar_url} />
                       <AvatarFallback>
-                        {course.profiles.full_name?.charAt(0) || 'I'}
+                        {course.profiles?.full_name?.charAt(0) || 'I'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h4 className="font-medium">{course.profiles.full_name || 'Instructor'}</h4>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {course.profiles.bio || 'Course creator'}
-                      </p>
+                      <p className="text-sm text-gray-600">Instructor</p>
+                      <p className="font-semibold">{course.profiles?.full_name || 'Unknown'}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Tabs */}
-              <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+              {/* Course Tabs */}
+              <Tabs defaultValue="overview" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
                   <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                  <TabsTrigger value="instructor">Instructor</TabsTrigger>
                 </TabsList>
-                
-                <TabsContent value="overview">
+
+                <TabsContent value="overview" className="space-y-6">
                   <Card>
-                    <CardContent className="p-6 space-y-6">
-                      <div>
-                        <h3 className="text-xl font-semibold mb-3">Description</h3>
-                        <div className="prose max-w-none">
-                          <p className="text-gray-700 whitespace-pre-line">{course.description}</p>
-                        </div>
+                    <CardContent className="p-6">
+                      <h3 className="text-xl font-semibold mb-4">About this course</h3>
+                      <div className="prose max-w-none">
+                        <p className="text-gray-700 leading-relaxed">{course.description}</p>
                       </div>
-                      
-                      {course.course_learning_outcomes.length > 0 && (
-                        <div>
-                          <h3 className="text-xl font-semibold mb-3">What You'll Learn</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {course.course_learning_outcomes
-                              .sort((a, b) => a.order_index - b.order_index)
-                              .map((outcome) => (
-                                <div key={outcome.id} className="flex items-start gap-2">
-                                  <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                                  <span className="text-gray-700">{outcome.outcome}</span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
+
+                  {course.course_learning_outcomes.length > 0 && (
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="text-xl font-semibold mb-4">What you'll learn</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {course.course_learning_outcomes
+                            .sort((a, b) => a.order_index - b.order_index)
+                            .map((outcome) => (
+                              <div key={outcome.id} className="flex items-start gap-2">
+                                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                <span className="text-gray-700">{outcome.outcome}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
-                
+
                 <TabsContent value="curriculum">
                   <Card>
                     <CardContent className="p-6">
-                      <h3 className="text-xl font-semibold mb-4">Course Content</h3>
-                      <div className="space-y-6">
+                      <h3 className="text-xl font-semibold mb-4">Course curriculum</h3>
+                      <div className="space-y-4">
                         {course.course_modules
                           .sort((a, b) => a.order_index - b.order_index)
-                          .map((module) => (
-                            <div key={module.id} className="border rounded-lg overflow-hidden">
-                              <div className="bg-gray-50 px-4 py-3">
-                                <h4 className="font-medium">
-                                  Module {module.order_index + 1}: {module.title}
-                                </h4>
-                                {module.description && (
-                                  <p className="text-sm text-gray-600 mt-1">{module.description}</p>
-                                )}
-                              </div>
-                              <div className="divide-y">
+                          .map((module, moduleIndex) => (
+                            <div key={module.id} className="border rounded-lg p-4">
+                              <h4 className="font-semibold text-lg mb-2">
+                                Module {moduleIndex + 1}: {module.title}
+                              </h4>
+                              {module.description && (
+                                <p className="text-gray-600 text-sm mb-3">{module.description}</p>
+                              )}
+                              <div className="space-y-2">
                                 {module.lessons
                                   .sort((a, b) => a.order_index - b.order_index)
-                                  .map((lesson) => (
-                                    <div 
-                                      key={lesson.id} 
-                                      className={`px-4 py-3 flex items-center gap-3 ${lesson.is_preview ? 'bg-blue-50' : ''}`}
-                                    >
-                                      {lesson.is_preview ? (
-                                        <Play className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                      ) : (
-                                        <Lock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                      )}
-                                      <div className="flex-1">
-                                        <p className="font-medium text-sm">
-                                          {module.order_index + 1}.{lesson.order_index + 1} {lesson.title}
-                                        </p>
-                                        {lesson.description && (
-                                          <p className="text-xs text-gray-500 mt-1">{lesson.description}</p>
-                                        )}
-                                      </div>
-                                      {lesson.is_preview ? (
-                                        <Badge variant="outline" className="text-xs">Preview</Badge>
-                                      ) : (
-                                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                                  .map((lesson, lessonIndex) => (
+                                    <div key={lesson.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
+                                      <Play className="w-4 h-4 text-blue-500" />
+                                      <span className="text-sm">
+                                        {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
+                                      </span>
+                                      {lesson.content_type === 'video' && (
+                                        <Badge variant="outline" className="text-xs">Video</Badge>
                                       )}
                                     </div>
                                   ))}
@@ -546,52 +661,76 @@ const CourseDetailPage = () => {
                     </CardContent>
                   </Card>
                 </TabsContent>
-                
+
                 <TabsContent value="reviews">
-                  <CourseReviews 
-                    courseId={course.id} 
-                    reviews={course.course_reviews} 
-                    averageRating={averageRating} 
-                  />
+                  <CourseReviews courseId={course.id} />
+                </TabsContent>
+
+                <TabsContent value="instructor">
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-4 mb-6">
+                        <Avatar className="w-16 h-16">
+                          <AvatarImage src={course.profiles?.avatar_url} />
+                          <AvatarFallback className="text-lg">
+                            {course.profiles?.full_name?.charAt(0) || 'I'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="text-xl font-semibold">{course.profiles?.full_name || 'Unknown'}</h3>
+                          <p className="text-gray-600">Course Instructor</p>
+                        </div>
+                      </div>
+                      <div className="text-gray-700">
+                        <p>{course.profiles?.bio || 'Meet your instructor and learn more about their expertise and teaching style.'}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
               </Tabs>
             </div>
 
-            {/* Sidebar */}
+            {/* Sidebar - Made creator card static instead of sticky */}
             <div className="space-y-6">
-              {/* Enrollment Card */}
-              <Card className="sticky top-6">
-                <CardContent className="p-6 space-y-4">
-                  <div className="text-center">
+              {/* Price and Enrollment Card */}
+              <Card className="lg:sticky lg:top-6">
+                <CardContent className="p-6">
+                  <div className="text-center mb-6">
                     {course.is_free ? (
                       <div className="text-3xl font-bold text-green-600">Free</div>
                     ) : (
-                      <div className="text-3xl font-bold">
-                        <PriceDisplay amount={course.price} />
+                      <div className="text-3xl font-bold text-gray-900">
+                        <PriceDisplay amount={course.price} originalCurrency="USD" />
                       </div>
                     )}
                   </div>
 
                   {isEnrolled ? (
                     <Button 
-                      className="w-full" 
+                      className="w-full mb-4" 
                       onClick={() => navigate(`/learning/course/${course.id}`)}
                     >
                       <BookOpen className="w-4 h-4 mr-2" />
                       Continue Learning
                     </Button>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Button 
                         className="w-full" 
                         onClick={handleEnrollNow}
+                        disabled={enrollmentLoading}
                       >
-                        {course.is_free ? 'Enroll for Free' : 'Enroll Now'}
+                        {enrollmentLoading ? (
+                          'Enrolling...'
+                        ) : course.is_free ? (
+                          'Enroll for Free'
+                        ) : (
+                          'Enroll Now'
+                        )}
                       </Button>
                       {!course.is_free && (
                         <Button 
-                          variant="outline"
-                          className="w-full"
+                          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
                           onClick={handleAddToCart}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
@@ -601,58 +740,52 @@ const CourseDetailPage = () => {
                     </div>
                   )}
 
-                  {!user && (
-                    <p className="text-center text-sm text-gray-500">
-                      <button 
-                        onClick={() => navigate('/auth')}
-                        className="text-blue-600 hover:underline"
-                      >
-                        Sign in
-                      </button> to enroll
-                    </p>
-                  )}
-
-                  <div className="pt-4 space-y-3">
-                    <h4 className="font-medium text-sm">This course includes:</h4>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-500" />
-                        <span>
-                          {Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m on-demand video
-                        </span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-gray-500" />
-                        <span>{totalLessons} lessons</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-gray-500" />
-                        <span>Access on mobile and desktop</span>
-                      </li>
-                      {course.certificate_enabled && (
-                        <li className="flex items-center gap-2">
-                          <Award className="w-4 h-4 text-gray-500" />
-                          <span>Certificate of completion</span>
-                        </li>
-                      )}
-                    </ul>
+                  <div className="text-center text-sm text-gray-600 mt-4">
+                    <p>30-day money-back guarantee</p>
+                    <p>Full lifetime access</p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Creator Profile Card */}
+              {/* Creator Card - Removed sticky positioning */}
               {creatorProfile && (
-                <CreatorCard 
-                  creator={creatorProfile} 
-                  showViewProfileButton={true}
-                />
+                <div className="lg:block">
+                  <CreatorCard creator={creatorProfile} />
+                </div>
               )}
+
+              {/* Course Features */}
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-4">This course includes:</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="w-4 h-4 text-gray-500" />
+                      <span>{Math.floor(course.duration_minutes / 60)} hours on-demand video</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <BookOpen className="w-4 h-4 text-gray-500" />
+                      <span>{totalLessons} lessons</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="w-4 h-4 text-gray-500" />
+                      <span>Access on mobile and desktop</span>
+                    </div>
+                    {course.certificate_enabled && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Award className="w-4 h-4 text-gray-500" />
+                        <span>Certificate of completion</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Tags */}
               {course.tags && course.tags.length > 0 && (
                 <Card>
                   <CardContent className="p-6">
-                    <h3 className="font-medium mb-3">Tags</h3>
+                    <h3 className="font-semibold mb-4">Tags</h3>
                     <div className="flex flex-wrap gap-2">
                       {course.tags.map((tag, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
@@ -665,15 +798,13 @@ const CourseDetailPage = () => {
               )}
             </div>
           </div>
-
-          {/* Recommended Courses */}
-          <div className="mt-16">
-            <RecommendedCourses 
-              currentCourseId={course.id} 
-              category={course.category} 
-            />
-          </div>
         </div>
+
+        {/* Recommended Courses Section */}
+        <RecommendedCourses 
+          currentCourseId={course.id} 
+          category={course.category} 
+        />
       </div>
     </Layout>
   );
