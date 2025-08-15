@@ -378,24 +378,24 @@ const TicketVerificationPage = () => {
               </CardContent>
             </Card>
 
-            {/* Enhanced Verification Results */}
+                      {/* Mobile-Optimized Verification Results */}
             {verificationStatus !== 'idle' && (
-              <Card className={`${getStatusColor()} transition-all duration-300 shadow-2xl border-0`}>
-                <CardContent className="p-8">
-                  <div className="flex items-start gap-6">
-                    <div className="flex-shrink-0">
+              <Card className={`${getStatusColor()} transition-all duration-300 shadow-2xl border-0 mx-0 sm:mx-0`}>
+                <CardContent className="p-4 sm:p-8">
+                  <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                    <div className="flex-shrink-0 mx-auto sm:mx-0">
                       {getStatusIcon()}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 w-full">
                       {verificationStatus === 'error' || verificationStatus === 'unauthorized' ? (
-                        <div>
-                          <h3 className="text-2xl font-bold text-red-800 mb-3">
+                        <div className="text-center sm:text-left">
+                          <h3 className="text-xl sm:text-2xl font-bold text-red-800 mb-2 sm:mb-3">
                             ❌ Verification Failed
                           </h3>
-                          <p className="text-red-700 text-lg">{errorMessage}</p>
+                          <p className="text-red-700 text-base sm:text-lg">{errorMessage}</p>
                           {verificationStatus === 'unauthorized' && (
-                            <div className="mt-4 p-4 bg-red-100 rounded-lg border border-red-200">
-                              <p className="text-red-800 text-sm">
+                            <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-red-100 rounded-lg border border-red-200">
+                              <p className="text-red-800 text-xs sm:text-sm">
                                 <strong>Access Restricted:</strong> As a creator, you can only verify tickets for events that you have created. 
                                 If you believe this is an error, please contact the event organizer.
                               </p>
@@ -403,9 +403,9 @@ const TicketVerificationPage = () => {
                           )}
                         </div>
                       ) : verifiedTicket ? (
-                        <div className="space-y-6">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-2xl font-bold text-gray-900">
+                        <div className="space-y-4 sm:space-y-6">
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
+                            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 text-center sm:text-left">
                               {verificationStatus === 'already_checked_in' ? 
                                 '🔹 Already Checked In' : 
                                 '✅ Valid Ticket'
@@ -414,63 +414,63 @@ const TicketVerificationPage = () => {
                             {verificationStatus === 'success' && (
                               <Button 
                                 onClick={() => setShowCheckinModal(true)}
-                                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                                className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200"
                                 size="lg"
                               >
-                                <CheckCircle className="h-5 w-5 mr-2" />
+                                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                                 Check In
                               </Button>
                             )}
                           </div>
 
-                          {/* Enhanced Attendee Info */}
-                          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg">
-                            <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
-                              <User className="h-5 w-5 text-orange-500" />
+                          {/* Attendee Info - Mobile Responsive */}
+                          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-lg">
+                            <h4 className="font-bold text-base sm:text-lg mb-3 sm:mb-4 flex items-center justify-center sm:justify-start gap-2">
+                              <User className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
                               Attendee Information
                             </h4>
-                            <div className="flex items-center gap-6">
-                              <Avatar className="h-20 w-20 ring-4 ring-orange-200">
+                            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                              <Avatar className="h-16 w-16 sm:h-20 sm:w-20 ring-2 sm:ring-4 ring-orange-200">
                                 <AvatarImage src={verifiedTicket.user.avatar_url} />
-                                <AvatarFallback className="text-xl font-bold bg-gradient-to-br from-orange-500 to-purple-600 text-white">
+                                <AvatarFallback className="text-lg sm:text-xl font-bold bg-gradient-to-br from-orange-500 to-purple-600 text-white">
                                   {verifiedTicket.user.full_name?.charAt(0) || 'U'}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="space-y-1">
-                                <p className="font-bold text-2xl text-gray-900">{verifiedTicket.ticket_holder_name}</p>
-                                <p className="text-lg text-gray-700">{verifiedTicket.user.full_name}</p>
-                                <p className="text-sm text-gray-500">{verifiedTicket.user.email}</p>
+                              <div className="space-y-1 text-center sm:text-left">
+                                <p className="font-bold text-xl sm:text-2xl text-gray-900">{verifiedTicket.ticket_holder_name}</p>
+                                <p className="text-base sm:text-lg text-gray-700">{verifiedTicket.user.full_name}</p>
+                                <p className="text-xs sm:text-sm text-gray-500 break-all">{verifiedTicket.user.email}</p>
                               </div>
                             </div>
                           </div>
 
-                          {/* Enhanced Ticket Details */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg">
-                              <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
-                                <Ticket className="h-5 w-5 text-purple-500" />
+                          {/* Ticket Details - Mobile Grid */}
+                          <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-lg">
+                              <h4 className="font-bold text-base sm:text-lg mb-3 sm:mb-4 flex items-center justify-center sm:justify-start gap-2">
+                                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
                                 Ticket Details
                               </h4>
-                              <div className="space-y-3">
-                                <div>
-                                  <span className="text-sm font-medium text-gray-500">Type:</span>
-                                  <Badge variant="outline" className="ml-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
+                              <div className="space-y-2 sm:space-y-3">
+                                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-2">
+                                  <span className="text-xs sm:text-sm font-medium text-gray-500">Type:</span>
+                                  <Badge variant="outline" className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 text-xs sm:text-sm">
                                     {verifiedTicket.ticket_type.name} - {verifiedTicket.ticket_type.ticket_type}
                                   </Badge>
                                 </div>
-                                <div>
-                                  <span className="text-sm font-medium text-gray-500">Ticket Code:</span>
-                                  <span className="ml-2 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{verifiedTicket.ticket_code}</span>
+                                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-2">
+                                  <span className="text-xs sm:text-sm font-medium text-gray-500">Ticket Code:</span>
+                                  <span className="font-mono text-xs sm:text-sm bg-gray-100 px-2 py-1 rounded">{verifiedTicket.ticket_code}</span>
                                 </div>
-                                <div>
-                                  <span className="text-sm font-medium text-gray-500">Booking Code:</span>
-                                  <span className="ml-2 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{verifiedTicket.booking.booking_code}</span>
+                                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-2">
+                                  <span className="text-xs sm:text-sm font-medium text-gray-500">Booking Code:</span>
+                                  <span className="font-mono text-xs sm:text-sm bg-gray-100 px-2 py-1 rounded">{verifiedTicket.booking.booking_code}</span>
                                 </div>
-                                <div>
-                                  <span className="text-sm font-medium text-gray-500">Status:</span>
+                                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-2">
+                                  <span className="text-xs sm:text-sm font-medium text-gray-500">Status:</span>
                                   <Badge 
                                     variant={verifiedTicket.checked_in ? "default" : "secondary"} 
-                                    className={`ml-2 ${verifiedTicket.checked_in ? 'bg-green-500' : 'bg-gray-500'}`}
+                                    className={`${verifiedTicket.checked_in ? 'bg-green-500' : 'bg-gray-500'} text-xs sm:text-sm`}
                                   >
                                     {verifiedTicket.checked_in ? 'Checked In' : 'Not Checked In'}
                                   </Badge>
@@ -478,20 +478,20 @@ const TicketVerificationPage = () => {
                               </div>
                             </div>
 
-                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg">
-                              <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
-                                <Calendar className="h-5 w-5 text-blue-500" />
+                            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-lg">
+                              <h4 className="font-bold text-base sm:text-lg mb-3 sm:mb-4 flex items-center justify-center sm:justify-start gap-2">
+                                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                                 Event Details
                               </h4>
-                              <div className="space-y-3">
+                              <div className="space-y-2 sm:space-y-3 text-center sm:text-left">
                                 <p className="font-bold text-lg text-gray-900">{verifiedTicket.event.title}</p>
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <Clock className="h-4 w-4" />
-                                  {format(new Date(verifiedTicket.event.start_time), 'PPP p')}
+                                <div className="flex items-center justify-center sm:justify-start gap-2 text-gray-600">
+                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="text-xs sm:text-sm">{format(new Date(verifiedTicket.event.start_time), 'PPP p')}</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <MapPin className="h-4 w-4" />
-                                  {verifiedTicket.event.location}
+                                <div className="flex items-center justify-center sm:justify-start gap-2 text-gray-600">
+                                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="text-xs sm:text-sm">{verifiedTicket.event.location}</span>
                                 </div>
                               </div>
                             </div>
@@ -507,7 +507,7 @@ const TicketVerificationPage = () => {
         </div>
       </div>
 
-      {/* Barcode Scanner Modal */}
+      {/* Barcode Scanner Modal (unchanged) */}
       <Dialog open={showScanner} onOpenChange={setShowScanner}>
         <DialogContent className="sm:max-w-md">
           <BarcodeScanner
@@ -517,7 +517,7 @@ const TicketVerificationPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Enhanced Check-in Confirmation Modal */}
+      {/* Check-in Confirmation Modal (unchanged) */}
       <Dialog open={showCheckinModal} onOpenChange={setShowCheckinModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
