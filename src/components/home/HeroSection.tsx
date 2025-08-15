@@ -33,22 +33,26 @@ const HeroSection = () => {
       </span>
     </h1>
     <p className="text-lg md:text-xl mb-8 text-gray-200 max-w-3xl mx-auto leading-relaxed">
-      Built for the Skill-Driven Generation
+      "Built for the Skill-Driven Generation"
        </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link to="/explore-courses">
-              <Button size="lg" className="text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200">
-                <Play className="mr-2 h-5 w-5" />
-                Start Learning Now
-              </Button>
-            </Link>
-            <Link to="/explore-events">
-               <Button size="lg" className="text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200">
-                Explore Events
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
+  <Link to="/explore-courses">
+    <Button 
+      className="w-64 text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200"
+    >
+      <Play className="mr-2 h-5 w-5" />
+      Start Learning Now
+    </Button>
+  </Link>
+  <Link to="/explore-events">
+    <Button 
+      className="w-64 text-lg px-8 py-6 bg-white text-orange-600 hover:bg-gray-100 transform hover:scale-105 transition-all duration-200"
+    >
+      Explore Events
+      <ArrowRight className="ml-2 h-5 w-5" />
+    </Button>
+  </Link>
+</div>
           
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-2xl mx-auto">
