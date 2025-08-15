@@ -28,7 +28,7 @@ const HeroSection = () => {
       Learn. Network. Elevate With!
     </h1>
     <h1 className="text-5xl md:text-7xl font-bold mb-4 leading-tight">
-      <span className="inline bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+      <span className="inline bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
         SkillPulse
       </span>
     </h1>
