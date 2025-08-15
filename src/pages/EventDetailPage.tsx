@@ -422,7 +422,7 @@ const EventDetailPage = () => {
                   <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-orange-100 to-purple-100">
                     <TabsTrigger value="description">Description</TabsTrigger>
                     <TabsTrigger value="agenda">Agenda</TabsTrigger>
-                    <TabsTrigger value="speakers">Spotlight Voices</TabsTrigger>
+                    <TabsTrigger value="speakers">Spotlight</TabsTrigger>
                     <TabsTrigger value="reviews">Reviews</TabsTrigger>
                   </TabsList>
                   
