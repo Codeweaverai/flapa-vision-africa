@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, BookOpen, ShoppingBag, User } from 'lucide-react';
+import { Home, BookOpen, ShoppingBag, User, Heart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const MobileBottomNav = () => {
@@ -20,6 +20,12 @@ const MobileBottomNav = () => {
       icon: BookOpen,
       path: '/my-courses',
       color: 'text-purple-500'
+    },
+    {
+      id: 'wishlist',
+      icon: Heart,
+      path: '/wishlist',
+      color: 'text-red-500'
     },
     {
       id: 'orders',
@@ -56,7 +62,7 @@ const MobileBottomNav = () => {
                   <button
                     key={item.id}
                     onClick={() => navigate(item.path)}
-                    className={`flex items-center justify-center p-3 rounded-full transition-all duration-300 ${
+                    className={`flex items-center justify-center p-2.5 rounded-full transition-all duration-300 ${
                       active 
                         ? 'bg-white/20 shadow-lg' 
                         : 'hover:bg-white/10'
