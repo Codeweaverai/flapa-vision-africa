@@ -111,18 +111,6 @@ const CourseDetailPage = () => {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-      } catch (error) {
-        console.error('Error checking user:', error);
-      }
-    };
-    checkUser();
-  }, []);
-
-  useEffect(() => {
     if (id) {
       fetchCourse();
     }
