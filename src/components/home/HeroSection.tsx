@@ -25,15 +25,14 @@ const HeroSection = () => {
       <div className="relative z-20 container mx-auto px-4 text-center text-white">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-            Welcome to
+            Build, Grow, Cocreate With!
             <span className="block bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
-              SkillPulse Marketplace
+              SkillPulse 
             </span>
           </h1>
           
           <p className="text-xl md:text-2xl mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed">
-            Join thousands of learners mastering new skills through our expert-led courses, 
-            live events, and vibrant community. Your journey to excellence starts here.
+            "Built for the Skill-Driven Generation"
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
