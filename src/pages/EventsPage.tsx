@@ -240,60 +240,28 @@ const EventsPage = () => {
 
                     return (
                       <Card key={event.id} className="overflow-hidden bg-white/90 backdrop-blur-sm shadow-sm border border-orange-200 hover:shadow-md transition-all duration-300">
-                        <div className="flex flex-col lg:flex-row">
-                          {/* Image Column - Fixed aspect ratio on desktop */}
-                          <div className="lg:w-1/3 xl:w-1/4">
-                            <AspectRatio ratio={4/3}>
+                        {/* Mobile Layout - Stacked */}
+                        <div className="lg:hidden flex flex-col">
+                          {/* Image */}
+                          <div className="w-full">
+                            <AspectRatio ratio={16/9}>
                               {event.image_url ? (
-                                <div className="w-full h-full">
-                                  <img 
-                                    src={event.image_url} 
-                                    alt={event.title}
-                                    className="w-full h-full object-cover" 
-                                    loading="lazy"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-6">
-                                    <div className="text-center text-white">
-                                      <div className="text-3xl font-bold">
-                                        {format(parseISO(event.start_time), 'dd')}
-                                      </div>
-                                      <div className="text-lg font-medium">
-                                        {format(parseISO(event.start_time), 'MMM')}
-                                      </div>
-                                      <div className="mt-2 flex items-center justify-center">
-                                        <Clock className="h-4 w-4 mr-2" />
-                                        <span className="text-xs">
-                                          {format(parseISO(event.start_time), 'p')}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
+                                <img 
+                                  src={event.image_url} 
+                                  alt={event.title}
+                                  className="w-full h-full object-cover" 
+                                  loading="lazy"
+                                />
                               ) : (
                                 <div className="w-full h-full bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
-                                  <div className="text-center p-6">
-                                    <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                                      <div className="text-2xl font-bold text-white">
-                                        {format(parseISO(event.start_time), 'dd')}
-                                      </div>
-                                    </div>
-                                    <div className="text-lg font-medium text-purple-600">
-                                      {format(parseISO(event.start_time), 'MMM')}
-                                    </div>
-                                    <div className="mt-2 flex items-center justify-center">
-                                      <Clock className="h-3 w-3 mr-1 text-muted-foreground" />
-                                      <span className="text-xs text-muted-foreground">
-                                        {format(parseISO(event.start_time), 'p')}
-                                      </span>
-                                    </div>
-                                  </div>
+                                  <CalendarIcon className="h-12 w-12 text-purple-600" />
                                 </div>
                               )}
                             </AspectRatio>
                           </div>
 
-                          {/* Content Column */}
-                          <div className="lg:w-2/3 xl:w-3/4 p-6">
+                          {/* Content */}
+                          <div className="p-6">
                             <div className="flex flex-wrap gap-2 mb-4">
                               <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
                                 {getEventTypeLabel(event.event_type)}
@@ -303,7 +271,7 @@ const EventsPage = () => {
                               )}
                             </div>
                             
-                            <h2 className="text-2xl md:text-3xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                               {event.title}
                             </h2>
                             
@@ -364,7 +332,7 @@ const EventsPage = () => {
                               </p>
                             </div>
                             
-                            {/* Event Tickets Section */}
+                            {/* Event Tickets Section - Mobile */}
                             <div className="mb-6">
                               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                                 <Ticket className="h-5 w-5 text-orange-600" />
@@ -453,6 +421,185 @@ const EventsPage = () => {
                                 </div>
                               )}
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop Layout - Image Left, Content Middle, Tickets Right */}
+                        <div className="hidden lg:flex flex-row">
+                          {/* Image Column - Left */}
+                          <div className="w-1/4">
+                            <AspectRatio ratio={3/4}>
+                              {event.image_url ? (
+                                <img 
+                                  src={event.image_url} 
+                                  alt={event.title}
+                                  className="w-full h-full object-cover" 
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
+                                  <CalendarIcon className="h-12 w-12 text-purple-600" />
+                                </div>
+                              )}
+                            </AspectRatio>
+                          </div>
+
+                          {/* Content Column - Middle */}
+                          <div className="w-2/4 p-6 border-r border-orange-200">
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
+                                {getEventTypeLabel(event.event_type)}
+                              </Badge>
+                              {event.is_free && (
+                                <Badge className="bg-green-100 text-green-800 border-green-200">Free Event</Badge>
+                              )}
+                            </div>
+                            
+                            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                              {event.title}
+                            </h2>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                              <div className="flex items-start space-x-3">
+                                <div className="w-10 h-10 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center">
+                                  <CalendarIcon className="h-5 w-5 text-orange-600" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-gray-800 mb-1">Date & Time</p>
+                                  <p className="text-gray-600">{formatDateTime(event.start_time)}</p>
+                                  {event.end_time && (
+                                    <p className="text-muted-foreground text-sm">
+                                      Until {formatTime(event.end_time)}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-start space-x-3">
+                                {event.event_type === 'webinar' ? (
+                                  <>
+                                    <div className="w-10 h-10 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center">
+                                      <VideoIcon className="h-5 w-5 text-purple-600" />
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-gray-800 mb-1">Location</p>
+                                      <p className="text-gray-600">Online Webinar</p>
+                                      {registered && event.online_meeting_link && (
+                                        <a 
+                                          href={event.online_meeting_link} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="text-orange-600 hover:text-orange-800 hover:underline text-sm font-medium"
+                                        >
+                                          Join Meeting →
+                                        </a>
+                                      )}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-10 h-10 bg-gradient-to-r from-orange-100 to-purple-100 rounded-full flex items-center justify-center">
+                                      <MapPin className="h-5 w-5 text-purple-600" />
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-gray-800 mb-1">Location</p>
+                                      <p className="text-gray-600">{event.location || 'To be announced'}</p>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="mb-6">
+                              <p className="text-gray-600 leading-relaxed">
+                                {event.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Tickets Column - Right */}
+                          <div className="w-1/4 p-6">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                              <Ticket className="h-5 w-5 text-orange-600" />
+                              Event Tickets
+                            </h3>
+                            
+                            {registered ? (
+                              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-3">
+                                    <CheckCircle className="h-5 w-5 text-green-600" />
+                                    <div>
+                                      <p className="font-medium text-green-800">You're registered</p>
+                                    </div>
+                                  </div>
+                                  <Button asChild variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50">
+                                    <Link to="/my-events">
+                                      View My Events
+                                    </Link>
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : availableTickets.length > 0 ? (
+                              <div className="space-y-4">
+                                {availableTickets.map((ticket) => {
+                                  const available = ticket.quantity_available - ticket.quantity_sold;
+                                  const selectedQty = selectedTickets[ticket.id] || 0;
+                                  
+                                  return (
+                                    <div key={ticket.id} className="border rounded-lg p-4 bg-gradient-to-r from-orange-50 to-purple-50">
+                                      <div className="flex flex-col gap-2 mb-3">
+                                        <div className="flex justify-between items-center">
+                                          <h4 className="font-semibold">{ticket.name}</h4>
+                                          <Badge variant="outline">{available} left</Badge>
+                                        </div>
+                                        <p className="text-xl font-bold text-orange-600">
+                                          <PriceDisplay 
+                                            amount={ticket.price} 
+                                            originalCurrency={getCurrencyCode(event.currency)} 
+                                          />
+                                        </p>
+                                      </div>
+                                      
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <div className="flex items-center border rounded bg-white w-full">
+                                          <button
+                                            onClick={() => updateTicketQuantity(ticket.id, selectedQty - 1)}
+                                            className="px-3 py-2 hover:bg-gray-100 rounded-l"
+                                            disabled={selectedQty <= 0}
+                                          >
+                                            <Minus className="h-4 w-4" />
+                                          </button>
+                                          <span className="px-3 py-2 border-x">{selectedQty}</span>
+                                          <button
+                                            onClick={() => updateTicketQuantity(ticket.id, selectedQty + 1)}
+                                            className="px-3 py-2 hover:bg-gray-100 rounded-r"
+                                            disabled={selectedQty >= available}
+                                          >
+                                            <Plus className="h-4 w-4" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <Button
+                                        onClick={() => handleAddToCart(event.id, ticket.id, selectedQty || 1)}
+                                        disabled={selectedQty === 0}
+                                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                                      >
+                                        Add to Cart
+                                      </Button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : event.event_tickets && event.event_tickets.length > 0 ? (
+                              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
+                                <p className="text-orange-800">No tickets available</p>
+                              </div>
+                            ) : (
+                              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
+                                <p className="text-orange-800">Ticket info coming soon</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </Card>
