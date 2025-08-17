@@ -202,22 +202,26 @@ const AuthPage = () => {
       </div>
 
       {/* Right Side - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <Link to="/" className="text-3xl font-bold text-white inline-block mb-4 hover:text-orange-200 transition-colors">
-              SkillPulse Events & Professional Skills Marketplace
-            </Link>
-            <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
-              {isInvitationFlow ? 'Join Workplace' : 'Welcome'}
-            </h1>
-            <p className="text-orange-100">
-              {isInvitationFlow 
-                ? 'Sign in to accept your workplace invitation' 
-                : 'Sign in to your account or create a new one'
-              }
-            </p>
-          </div>
+<div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+  <div className="w-full max-w-md">
+    <div className="mb-8 text-center">
+      <Link to="/" className="inline-block mb-4 hover:opacity-90 transition-opacity">
+        <img 
+          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Screenshot_2025-08-05_155641-removebg-preview.png" 
+          alt="SkillPulse Logo"
+          className="h-16 mx-auto" // Adjust height (h-16) as needed to fit your design
+        />
+      </Link>
+      <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
+        {isInvitationFlow ? 'Join Workplace' : ''}
+      </h1>
+      <p className="text-orange-100">
+        {isInvitationFlow 
+          ? 'Sign in to accept your workplace invitation' 
+          : 'Sign in to your account or create a new one'
+        }
+      </p>
+    </div>
           
           <Card className="backdrop-blur-md bg-white/20 border-0 shadow-2xl rounded-2xl">
             <CardContent className="p-6">
