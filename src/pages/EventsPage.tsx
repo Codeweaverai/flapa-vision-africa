@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Event, Registration, fetchEvents, fetchUserRegistrations } from '@/services/eventService';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { format, parseISO } from 'date-fns';
@@ -27,6 +27,31 @@ interface EventTicket {
   early_bird_end_date: string;
 }
 
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  image_url: string;
+  event_type: string;
+  is_free: boolean;
+  price: number;
+  currency: string;
+  capacity: number;
+  online_meeting_link: string;
+  creator_id: string;
+  event_tickets?: EventTicket[];
+}
+
+interface Registration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: string;
+}
+
 const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -45,11 +70,32 @@ const EventsPage = () => {
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const eventsData = await fetchEvents();
-        setEvents(eventsData);
+        // Fetch events with their tickets
+        const { data: eventsData, error } = await supabase
+          .from('events')
+          .select(`
+            *,
+            event_tickets:event_tickets!event_tickets_event_id_fkey(
+              *,
+              quantity_available,
+              quantity_sold,
+              is_active
+            )
+          `)
+          .order('start_time', { ascending: true });
+
+        if (error) throw error;
+
+        setEvents(eventsData as Event[]);
         
         if (user) {
-          const userRegs = await fetchUserRegistrations(user);
+          // Fetch user registrations
+          const { data: userRegs, error: regError } = await supabase
+            .from('event_bookings')
+            .select('*')
+            .eq('user_id', user.id);
+
+          if (regError) throw regError;
           setRegistrations(userRegs as Registration[]);
         }
       } catch (error) {
@@ -132,15 +178,11 @@ const EventsPage = () => {
     }
   };
   
-  const sortedEvents = [...events].sort((a, b) => {
-    return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-  });
-  
-  const upcomingEvents = sortedEvents.filter(event => 
+  const upcomingEvents = events.filter(event => 
     new Date(event.start_time) > new Date()
   );
   
-  const pastEvents = sortedEvents.filter(event => 
+  const pastEvents = events.filter(event => 
     new Date(event.start_time) <= new Date()
   );
 
@@ -351,9 +393,13 @@ const EventsPage = () => {
                                     );
                                   })}
                                 </div>
+                              ) : event.event_tickets && event.event_tickets.length > 0 ? (
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
+                                  <p className="text-orange-800">No tickets currently available</p>
+                                </div>
                               ) : (
                                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
-                                  <p className="text-orange-800">No tickets currently available for this event</p>
+                                  <p className="text-orange-800">Ticket information coming soon</p>
                                 </div>
                               )}
                             </div>
