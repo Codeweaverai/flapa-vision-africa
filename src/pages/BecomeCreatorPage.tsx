@@ -370,7 +370,7 @@ const BecomeCreatorPage = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button asChild size="lg" variant="secondary" className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-4 rounded-xl text-lg">
-                    <Link to="/auth"> Enable Your Creator Dashboard - It's Free</Link>
+                    <Link to="/auth"> Enable Creator Dashboard </Link>
                   </Button>
                   <Button 
                     variant="outline" 
