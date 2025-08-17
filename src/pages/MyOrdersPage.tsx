@@ -13,8 +13,8 @@ import { Link } from 'react-router-dom';
 import TicketDisplay from '@/components/tickets/TicketDisplay';
 import { QRCodeSVG } from 'qrcode.react';
 import html2pdf from 'html2pdf.js';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
-// Extend the Window interface to include QRCode
 declare global {
   interface Window {
     QRCode?: any;
@@ -110,7 +110,6 @@ const MyOrdersPage = () => {
     }
   }, [user]);
 
-  // Load QRCodeJS library dynamically
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
@@ -205,7 +204,6 @@ const MyOrdersPage = () => {
 
   const fetchDetailedTickets = async (order: Order): Promise<TicketData[]> => {
     try {
-      // Get detailed event bookings with generated tickets
       const { data: detailedBookings, error } = await supabase
         .from('event_bookings')
         .select(`
@@ -240,7 +238,6 @@ const MyOrdersPage = () => {
 
       (detailedBookings || []).forEach(booking => {
         if (booking.generated_tickets && booking.generated_tickets.length > 0) {
-          // If we have generated tickets, show them individually
           booking.generated_tickets.forEach(ticket => {
             ticketsWithUserInfo.push({
               id: ticket.id,
@@ -263,7 +260,6 @@ const MyOrdersPage = () => {
             });
           });
         } else {
-          // Fallback to booking-level tickets
           ticketsWithUserInfo.push({
             id: booking.id,
             booking_code: booking.booking_code,
@@ -298,12 +294,11 @@ const MyOrdersPage = () => {
     setSelectedBookings(tickets);
     setShowTicketModal(true);
     
-    // Generate QR codes after modal opens
     setTimeout(() => {
       tickets.forEach((ticket, index) => {
         const qrContainer = document.getElementById(`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`);
         if (qrContainer && window.QRCode) {
-          qrContainer.innerHTML = ''; // Clear existing content
+          qrContainer.innerHTML = '';
           try {
             new window.QRCode(qrContainer, {
               text: ticket.qr_code_data,
@@ -318,7 +313,6 @@ const MyOrdersPage = () => {
             qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code Error</div>';
           }
         } else if (qrContainer) {
-          // Fallback if QRCode library is not loaded
           qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">Loading QR...</div>';
         }
       });
@@ -815,8 +809,8 @@ const MyOrdersPage = () => {
                 <tr>
                   <td>${item.item_name}</td>
                   <td>${item.quantity}</td>
-                  <td>${item.unit_price.toFixed(2)} ${selectedOrder.currency}</td>
-                  <td>${item.total_price.toFixed(2)} ${selectedOrder.currency}</td>
+                  <td><PriceDisplay amount={${item.unit_price}} originalCurrency="${selectedOrder.currency}" /></td>
+                  <td><PriceDisplay amount={${item.total_price}} originalCurrency="${selectedOrder.currency}" /></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -824,7 +818,7 @@ const MyOrdersPage = () => {
 
           <div class="total-section">
             <div class="total-amount">
-              Total: ${selectedOrder.total_amount.toFixed(2)} ${selectedOrder.currency}
+              Total: <PriceDisplay amount={${selectedOrder.total_amount}} originalCurrency="${selectedOrder.currency}" />
             </div>
           </div>
         </div>
@@ -896,7 +890,7 @@ const MyOrdersPage = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold">
-                            {order.currency} {order.total_amount.toFixed(2)}
+                            <PriceDisplay amount={order.total_amount} originalCurrency={order.currency} />
                           </div>
                           {getStatusBadge(order.payment_status)}
                         </div>
@@ -1194,7 +1188,7 @@ const MyOrdersPage = () => {
                   </div>
                   <div>
                     <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                    <p><strong>Total:</strong> {selectedOrder.currency} {selectedOrder.total_amount.toFixed(2)}</p>
+                    <p><strong>Total:</strong> <PriceDisplay amount={selectedOrder.total_amount} originalCurrency={selectedOrder.currency} /></p>
                   </div>
                 </div>
               </div>
@@ -1208,7 +1202,9 @@ const MyOrdersPage = () => {
                         <p className="font-medium">{item.item_name}</p>
                         <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                       </div>
-                      <p className="font-semibold">{item.total_price.toFixed(2)} {selectedOrder.currency}</p>
+                      <p className="font-semibold">
+                        <PriceDisplay amount={item.total_price} originalCurrency={selectedOrder.currency} />
+                      </p>
                     </div>
                   ))}
                 </div>
