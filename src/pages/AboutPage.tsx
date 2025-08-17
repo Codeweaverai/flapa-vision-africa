@@ -116,7 +116,7 @@ const AboutPage = () => {
                   Built for the Skill-Driven Generation
                 </p>
                 <p className="text-xl md:text-2xl opacity-90 leading-relaxed">
-                  We're on a mission to democratize education and empower creators worldwide. 
+                  "Democratizing skill development and event hosting to empower creators worldwide."
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
