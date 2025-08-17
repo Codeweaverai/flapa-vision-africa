@@ -198,7 +198,7 @@ const HelpCenterPage = () => {
         <div className="section-container relative z-10">
           {/* Header Section */}
           <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
               Help Center
             </h1>
             <p className="text-xl text-gray-700 mb-8 max-w-2xl mx-auto">
