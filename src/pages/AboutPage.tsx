@@ -117,8 +117,6 @@ const AboutPage = () => {
                 </p>
                 <p className="text-xl md:text-2xl opacity-90 leading-relaxed">
                   We're on a mission to democratize education and empower creators worldwide. 
-                  Our platform connects passionate instructors with eager learners, fostering 
-                  a global community of knowledge sharing and growth.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
