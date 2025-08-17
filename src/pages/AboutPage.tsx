@@ -93,7 +93,7 @@ const AboutPage = () => {
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
         {/* Hero Section with Image Background */}
-        <section className="relative h-[70vh] min-h-[500px] w-full overflow-hidden">
+        <section className="relative h-[70vh] min-h-[550px] w-full overflow-hidden">
           <div className="absolute inset-0">
             <img
               src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/female-pupil-reviewing-educational-research-collection-library.jpg"
@@ -307,9 +307,13 @@ const AboutPage = () => {
                   boundaries don't limit educational opportunities, and where every person 
                   has the tools to become both a learner and a teacher.
                 </p>
-                <Button size="lg" variant="secondary" className="text-lg px-8 py-6 hover:bg-white/90">
-                  Join Our Mission
-                </Button>
+              
+                <Button
+              size="lg"
+                className="text-lg px-8 py-6 bg-white text-black hover:bg-white/90"
+               >
+  Join Our Mission
+</Button>
               </CardContent>
             </Card>
           </div>
