@@ -190,31 +190,35 @@ const AboutPage = () => {
         </section>
 
         {/* Values Section */}
-        <section className="py-20 px-4 bg-white/50">
-          <div className="container mx-auto max-w-6xl">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">Our Values</h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                These core values guide everything we do and shape the culture of our platform.
-              </p>
+<section className="py-20 px-4 bg-white/50">
+  <div className="container mx-auto max-w-6xl">
+    <div className="text-center mb-16">
+      <h2 className="text-4xl font-bold mb-4">Our Values</h2>
+      <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        These core values guide everything we do and shape the culture of our platform.
+      </p>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      {values.map((value, index) => (
+        <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100 hover:border-purple-200">
+          <CardHeader>
+            <div className="mb-4 flex justify-center">
+              <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-3 rounded-full">
+                <value.icon className="h-8 w-8 text-white" />
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {values.map((value, index) => (
-                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100 hover:border-purple-200">
-                  <CardHeader>
-                    <div className="mb-4">
-                      <value.icon className="h-12 w-12 mx-auto text-purple-600" />
-                    </div>
-                    <CardTitle className="text-purple-800">{value.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-base">{value.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+              {value.title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="text-base">{value.description}</CardDescription>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  </div>
+   </section>
 
         {/* Meet Our Team Section */}
         <section className="py-20 px-4 bg-white">
@@ -294,30 +298,29 @@ const AboutPage = () => {
           </div>
         </section>
 
-        {/* Vision Section */}
-        <section className="py-20 px-4">
-          <div className="container mx-auto max-w-4xl">
-            <Card className="bg-gradient-to-r from-purple-600 to-orange-500 text-white shadow-xl">
-              <CardContent className="p-12 text-center">
-                <Target className="h-16 w-16 mx-auto mb-6 opacity-90" />
-                <h2 className="text-4xl font-bold mb-6">Our Vision</h2>
-                <p className="text-xl leading-relaxed mb-8 opacity-90">
-                  To create a world where anyone, anywhere, can learn anything they want and 
-                  share their knowledge with others. We envision a future where geographical 
-                  boundaries don't limit educational opportunities, and where every person 
-                  has the tools to become both a learner and a teacher.
-                </p>
-              
-                <Button
-              size="lg"
-                className="text-lg px-8 py-6 bg-white text-black hover:bg-white/90"
-               >
-  Join Our Mission
-</Button>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
+      {/* Vision Section */}
+<section className="py-20 px-4">
+  <div className="container mx-auto max-w-4xl px-0 sm:px-4"> {/* Changed px-4 to px-0 sm:px-4 */}
+    <Card className="bg-gradient-to-r from-purple-600 to-orange-500 text-white shadow-xl mx-0 sm:mx-4"> {/* Added mx-0 sm:mx-4 */}
+      <CardContent className="p-6 md:p-12 text-center"> {/* Changed p-12 to p-6 md:p-12 */}
+        <Target className="h-16 w-16 mx-auto mb-6 opacity-90" />
+        <h2 className="text-3xl md:text-4xl font-bold mb-6">Our Vision</h2> {/* Added responsive text size */}
+        <p className="text-lg md:text-xl leading-relaxed mb-8 opacity-90 px-4 sm:px-0"> {/* Added responsive text size and padding */}
+          To create a world where anyone, anywhere, can learn anything they want and 
+          share their knowledge with others. We envision a future where geographical 
+          boundaries don't limit educational opportunities, and where every person 
+          has the tools to become both a learner and a teacher.
+        </p>
+        <Button
+          size="lg"
+          className="text-lg px-8 py-6 bg-white text-black hover:bg-white/90"
+        >
+          Join Our Mission
+        </Button>
+      </CardContent>
+    </Card>
+  </div>
+</section>
 
         {/* CTA Section */}
         <section className="py-20 px-4 bg-white">
