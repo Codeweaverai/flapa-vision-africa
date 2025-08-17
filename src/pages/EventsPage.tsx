@@ -241,56 +241,58 @@ const EventsPage = () => {
                     return (
                       <Card key={event.id} className="overflow-hidden bg-white/90 backdrop-blur-sm shadow-sm border border-orange-200 hover:shadow-md transition-all duration-300">
                         <div className="flex flex-col lg:flex-row">
-                          {/* Image Column - Reduced width on desktop */}
-                          <div className="lg:w-1/3 xl:w-1/4 relative">
-                            {event.image_url ? (
-                              <div className="w-full h-full">
-                                <img 
-                                  src={event.image_url} 
-                                  alt={event.title}
-                                  className="w-full h-64 lg:h-full object-cover" 
-                                  loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-6">
-                                  <div className="text-center text-white">
-                                    <div className="text-3xl font-bold">
-                                      {format(parseISO(event.start_time), 'dd')}
+                          {/* Image Column - Fixed aspect ratio on desktop */}
+                          <div className="lg:w-1/3 xl:w-1/4">
+                            <AspectRatio ratio={4/3}>
+                              {event.image_url ? (
+                                <div className="w-full h-full">
+                                  <img 
+                                    src={event.image_url} 
+                                    alt={event.title}
+                                    className="w-full h-full object-cover" 
+                                    loading="lazy"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-6">
+                                    <div className="text-center text-white">
+                                      <div className="text-3xl font-bold">
+                                        {format(parseISO(event.start_time), 'dd')}
+                                      </div>
+                                      <div className="text-lg font-medium">
+                                        {format(parseISO(event.start_time), 'MMM')}
+                                      </div>
+                                      <div className="mt-2 flex items-center justify-center">
+                                        <Clock className="h-4 w-4 mr-2" />
+                                        <span className="text-xs">
+                                          {format(parseISO(event.start_time), 'p')}
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div className="text-lg font-medium">
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
+                                  <div className="text-center p-6">
+                                    <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                      <div className="text-2xl font-bold text-white">
+                                        {format(parseISO(event.start_time), 'dd')}
+                                      </div>
+                                    </div>
+                                    <div className="text-lg font-medium text-purple-600">
                                       {format(parseISO(event.start_time), 'MMM')}
                                     </div>
                                     <div className="mt-2 flex items-center justify-center">
-                                      <Clock className="h-4 w-4 mr-2" />
-                                      <span className="text-xs">
+                                      <Clock className="h-3 w-3 mr-1 text-muted-foreground" />
+                                      <span className="text-xs text-muted-foreground">
                                         {format(parseISO(event.start_time), 'p')}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="w-full h-64 lg:h-full bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
-                                <div className="text-center p-6">
-                                  <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <div className="text-2xl font-bold text-white">
-                                      {format(parseISO(event.start_time), 'dd')}
-                                    </div>
-                                  </div>
-                                  <div className="text-lg font-medium text-purple-600">
-                                    {format(parseISO(event.start_time), 'MMM')}
-                                  </div>
-                                  <div className="mt-2 flex items-center justify-center">
-                                    <Clock className="h-3 w-3 mr-1 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">
-                                      {format(parseISO(event.start_time), 'p')}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+                              )}
+                            </AspectRatio>
                           </div>
 
-                          {/* Content Column - Takes remaining space */}
+                          {/* Content Column */}
                           <div className="lg:w-2/3 xl:w-3/4 p-6">
                             <div className="flex flex-wrap gap-2 mb-4">
                               <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
@@ -432,7 +434,7 @@ const EventsPage = () => {
                                           <Button
                                             onClick={() => handleAddToCart(event.id, ticket.id, selectedQty || 1)}
                                             disabled={selectedQty === 0}
-                                            className="w-full sm:w-auto flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                                            className="w-full sm:w-auto px-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                                           >
                                             Add to Cart
                                           </Button>
