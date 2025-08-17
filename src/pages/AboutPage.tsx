@@ -92,37 +92,53 @@ const AboutPage = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
-        {/* Hero Section */}
-        <section className="py-20 px-4">
-          <div className="container mx-auto max-w-4xl text-center">
-            <Badge className="mb-6" variant="outline">
-              Our Story
-            </Badge>
-            <h1 className="text-5xl md:text-6xl font-bold mb-6">
-              About <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">SkillPulse</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed">
-              We're on a mission to democratize education and empower creators worldwide. 
-              Our platform connects passionate instructors with eager learners, fostering 
-              a global community of knowledge sharing and growth.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/auth">
-                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                  Get Started <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-              <Link to="/become-creator">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
-                  Learn More
-                </Button>
-              </Link>
+        {/* Hero Section with Image Background */}
+        <section className="relative h-[70vh] min-h-[500px] w-full overflow-hidden">
+          <div className="absolute inset-0">
+            <img
+              src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/female-pupil-reviewing-educational-research-collection-library.jpg"
+              alt="Students learning together"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-purple-700/80" />
+          </div>
+          
+          <div className="relative z-10 h-full flex items-center">
+            <div className="container mx-auto px-4 text-center text-white">
+              <Badge className="mb-6 bg-white/20 backdrop-blur-sm text-white hover:bg-white/30">
+                Our Story
+              </Badge>
+              <h1 className="text-5xl md:text-6xl font-bold mb-6">
+                About <span className="text-white">SkillPulse</span>
+              </h1>
+              <div className="max-w-4xl mx-auto mb-8">
+                <p className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
+                  Built for the Skill-Driven Generation
+                </p>
+                <p className="text-xl md:text-2xl opacity-90 leading-relaxed">
+                  We're on a mission to democratize education and empower creators worldwide. 
+                  Our platform connects passionate instructors with eager learners, fostering 
+                  a global community of knowledge sharing and growth.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link to="/auth">
+                  <Button size="lg" className="text-lg px-8 py-6 bg-white text-purple-700 hover:bg-white/90">
+                    Get Started <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link to="/become-creator">
+                  <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-white hover:bg-white/10">
+                    Learn More
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </section>
 
         {/* Stats Section */}
-        <section className="py-16 px-4 bg-white/50">
+        <section className="py-16 px-4 bg-white">
           <div className="container mx-auto max-w-6xl">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {stats.map((stat, index) => (
@@ -163,7 +179,7 @@ const AboutPage = () => {
                 <img
                   src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//study-group-african-people.jpg?w=600&h=400&fit=crop"
                   alt="Learning together"
-                  className="rounded-2xl shadow-2xl"
+                  className="rounded-2xl shadow-2xl w-full"
                 />
                 <div className="absolute -bottom-6 -right-6 bg-gradient-to-r from-orange-500 to-purple-600 text-white p-6 rounded-2xl shadow-xl">
                   <Heart className="h-8 w-8 mb-2" />
@@ -186,7 +202,7 @@ const AboutPage = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {values.map((value, index) => (
-                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100">
+                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100 hover:border-purple-200">
                   <CardHeader>
                     <div className="mb-4">
                       <value.icon className="h-12 w-12 mx-auto text-purple-600" />
@@ -203,7 +219,7 @@ const AboutPage = () => {
         </section>
 
         {/* Meet Our Team Section */}
-        <section className="py-20 px-4">
+        <section className="py-20 px-4 bg-white">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16">
               <h2 className="text-4xl font-bold mb-4">Meet Our Team</h2>
@@ -213,26 +229,26 @@ const AboutPage = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {teamMembers.map((member, index) => (
-                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100">
+                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100 hover:border-purple-200">
                   <CardContent className="p-6">
                     <div className="mb-4">
                       <img 
                         src={member.image} 
                         alt={member.name}
-                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-4 border-purple-100"
                       />
                       <h3 className="text-xl font-bold text-purple-800">{member.name}</h3>
                       <p className="text-orange-600 font-medium">{member.role}</p>
                     </div>
                     <p className="text-muted-foreground text-sm mb-4">{member.bio}</p>
                     <div className="flex justify-center gap-3">
-                      <Button variant="outline" size="sm" className="p-2">
+                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-100">
                         <Linkedin className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" className="p-2">
+                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-100">
                         <Twitter className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" className="p-2">
+                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-100">
                         <Mail className="h-4 w-4" />
                       </Button>
                     </div>
@@ -244,7 +260,7 @@ const AboutPage = () => {
         </section>
 
         {/* Video Section */}
-        <section className="py-20 bg-white/50">
+        <section className="py-20 bg-gradient-to-br from-purple-50 to-orange-50">
           <div className="container mx-auto max-w-4xl px-4">
             <div className="text-center mb-12">
               <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
@@ -283,7 +299,7 @@ const AboutPage = () => {
         {/* Vision Section */}
         <section className="py-20 px-4">
           <div className="container mx-auto max-w-4xl">
-            <Card className="bg-gradient-to-r from-purple-600 to-orange-500 text-white">
+            <Card className="bg-gradient-to-r from-purple-600 to-orange-500 text-white shadow-xl">
               <CardContent className="p-12 text-center">
                 <Target className="h-16 w-16 mx-auto mb-6 opacity-90" />
                 <h2 className="text-4xl font-bold mb-6">Our Vision</h2>
@@ -293,7 +309,7 @@ const AboutPage = () => {
                   boundaries don't limit educational opportunities, and where every person 
                   has the tools to become both a learner and a teacher.
                 </p>
-                <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
+                <Button size="lg" variant="secondary" className="text-lg px-8 py-6 hover:bg-white/90">
                   Join Our Mission
                 </Button>
               </CardContent>
@@ -302,7 +318,7 @@ const AboutPage = () => {
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 px-4 bg-white/50">
+        <section className="py-20 px-4 bg-white">
           <div className="container mx-auto max-w-4xl text-center">
             <h2 className="text-4xl font-bold mb-6">Ready to Start Learning?</h2>
             <p className="text-xl text-muted-foreground mb-8">
