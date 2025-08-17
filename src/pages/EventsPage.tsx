@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Event, Registration, fetchEvents, fetchUserRegistrations, cancelRegistration } from '@/services/eventService';
+import { Event, Registration, fetchEvents, fetchUserRegistrations } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { CalendarIcon, Clock, MapPin, VideoIcon, AlertCircle, Ticket, Plus, Minus } from 'lucide-react';
+import { CalendarIcon, Clock, MapPin, VideoIcon, AlertCircle, Ticket, Plus, Minus, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
@@ -37,14 +31,11 @@ const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<{[key: string]: number}>({});
   const { user } = useAuth();
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
-  // Helper function to safely convert currency string to CurrencyCode
   const getCurrencyCode = (currency?: string): CurrencyCode => {
     if (!currency) return 'USD';
     const upperCurrency = currency.toUpperCase() as CurrencyCode;
@@ -57,7 +48,6 @@ const EventsPage = () => {
         const eventsData = await fetchEvents();
         setEvents(eventsData);
         
-        // Fetch user registrations if logged in
         if (user) {
           const userRegs = await fetchUserRegistrations(user);
           setRegistrations(userRegs as Registration[]);
@@ -74,6 +64,12 @@ const EventsPage = () => {
   }, [user]);
 
   const handleAddToCart = (eventId: string, ticketId: string, quantity: number) => {
+    if (!user) {
+      toast.error("Please sign in to purchase tickets");
+      navigate("/auth");
+      return;
+    }
+
     const event = events.find(e => e.id === eventId);
     if (!event) return;
 
@@ -103,33 +99,8 @@ const EventsPage = () => {
     }));
   };
 
-  const handleRegistrationComplete = async () => {
-    setIsDialogOpen(false);
-    
-    // Refresh registrations to show the updated status
-    if (user) {
-      const userRegs = await fetchUserRegistrations(user);
-      setRegistrations(userRegs as Registration[]);
-    }
-  };
-  
-  const handleCancelRegistration = async (registrationId: string) => {
-    if (confirm('Are you sure you want to cancel this registration?')) {
-      const success = await cancelRegistration(registrationId, user);
-      if (success) {
-        // Update the registrations list by filtering out the cancelled one
-        setRegistrations(prev => prev.filter(reg => reg.id !== registrationId));
-      }
-    }
-  };
-  
   const isRegistered = (eventId: string) => {
     return registrations.some(reg => reg.event_id === eventId && reg.status !== 'cancelled');
-  };
-  
-  // Find registration for an event
-  const getRegistration = (eventId: string) => {
-    return registrations.find(reg => reg.event_id === eventId && reg.status !== 'cancelled');
   };
 
   const formatDateTime = (dateTimeStr: string) => {
@@ -183,7 +154,7 @@ const EventsPage = () => {
             </h1>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
               Join our upcoming events, webinars, and workshops to learn about technology, 
-              entrepreneurship, and innovation. Connect with like-minded individuals and expand your knowledge.
+              entrepreneurship, and innovation.
             </p>
           </div>
           
@@ -224,6 +195,8 @@ const EventsPage = () => {
                     const availableTickets = event.event_tickets?.filter(ticket => 
                       ticket.is_active && (ticket.quantity_available - ticket.quantity_sold) > 0
                     ) || [];
+                    
+                    const registered = isRegistered(event.id);
 
                     return (
                       <Card key={event.id} className="overflow-hidden bg-white/90 backdrop-blur-sm shadow-sm border border-orange-200 hover:shadow-md transition-all duration-300">
@@ -267,7 +240,7 @@ const EventsPage = () => {
                                     <div>
                                       <p className="font-semibold text-gray-800 mb-1">Location</p>
                                       <p className="text-gray-600">Online Webinar</p>
-                                      {isRegistered(event.id) && event.online_meeting_link && (
+                                      {registered && event.online_meeting_link && (
                                         <a 
                                           href={event.online_meeting_link} 
                                           target="_blank" 
@@ -299,13 +272,31 @@ const EventsPage = () => {
                               </div>
                             )}
                             
-                            {/* Ticket Selection Section */}
-                            {availableTickets.length > 0 && !isRegistered(event.id) && (
-                              <div className="mb-6">
-                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                  <Ticket className="h-5 w-5 text-orange-600" />
-                                  Available Tickets
-                                </h3>
+                            {/* Event Tickets Section */}
+                            <div className="mb-6">
+                              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <Ticket className="h-5 w-5 text-orange-600" />
+                                Event Tickets
+                              </h3>
+                              
+                              {registered ? (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                      <div>
+                                        <p className="font-medium text-green-800">You're registered for this event</p>
+                                        <p className="text-sm text-green-600">Your ticket details are available in your account</p>
+                                      </div>
+                                    </div>
+                                    <Button asChild variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50">
+                                      <Link to="/my-events">
+                                        View My Events
+                                      </Link>
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : availableTickets.length > 0 ? (
                                 <div className="space-y-4">
                                   {availableTickets.map((ticket) => {
                                     const available = ticket.quantity_available - ticket.quantity_sold;
@@ -360,52 +351,12 @@ const EventsPage = () => {
                                     );
                                   })}
                                 </div>
-                              </div>
-                            )}
-                            
-                            {isRegistered(event.id) ? (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge className="bg-green-100 text-green-800 border-green-200">
-                                  ✓ Registered
-                                </Badge>
-                                {getRegistration(event.id)?.status === 'confirmed' && (
-                                  <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
-                                    Confirmed
-                                  </Badge>
-                                )}
-                                {getRegistration(event.id)?.status === 'pending' && (
-                                  <Badge variant="outline" className="bg-yellow-50 border-yellow-200 text-yellow-700">
-                                    Pending
-                                  </Badge>
-                                )}
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="border-red-200 text-red-600 hover:bg-red-50"
-                                  onClick={() => {
-                                    const reg = getRegistration(event.id);
-                                    if (reg) handleCancelRegistration(reg.id);
-                                  }}
-                                >
-                                  Cancel Registration
-                                </Button>
-                              </div>
-                            ) : availableTickets.length === 0 && (
-                              <Button 
-                                onClick={() => {
-                                  if (!user) {
-                                    toast.error("Please sign in to register for events");
-                                    navigate("/auth");
-                                    return;
-                                  }
-                                  setSelectedEvent(event);
-                                  setIsDialogOpen(true);
-                                }}
-                                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
-                              >
-                                Register Now
-                              </Button>
-                            )}
+                              ) : (
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
+                                  <p className="text-orange-800">No tickets currently available for this event</p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center relative overflow-hidden">
