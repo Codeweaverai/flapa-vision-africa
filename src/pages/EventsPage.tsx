@@ -70,7 +70,6 @@ const EventsPage = () => {
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        // Fetch events with their tickets
         const { data: eventsData, error } = await supabase
           .from('events')
           .select(`
@@ -89,7 +88,6 @@ const EventsPage = () => {
         setEvents(eventsData as Event[]);
         
         if (user) {
-          // Fetch user registrations
           const { data: userRegs, error: regError } = await supabase
             .from('event_bookings')
             .select('*')
@@ -242,8 +240,58 @@ const EventsPage = () => {
 
                     return (
                       <Card key={event.id} className="overflow-hidden bg-white/90 backdrop-blur-sm shadow-sm border border-orange-200 hover:shadow-md transition-all duration-300">
-                        <div className="grid lg:grid-cols-3 gap-0">
-                          <div className="lg:col-span-2 p-6">
+                        <div className="flex flex-col lg:flex-row">
+                          {/* Image Column - Reduced width on desktop */}
+                          <div className="lg:w-1/3 xl:w-1/4 relative">
+                            {event.image_url ? (
+                              <div className="w-full h-full">
+                                <img 
+                                  src={event.image_url} 
+                                  alt={event.title}
+                                  className="w-full h-64 lg:h-full object-cover" 
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-6">
+                                  <div className="text-center text-white">
+                                    <div className="text-3xl font-bold">
+                                      {format(parseISO(event.start_time), 'dd')}
+                                    </div>
+                                    <div className="text-lg font-medium">
+                                      {format(parseISO(event.start_time), 'MMM')}
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-center">
+                                      <Clock className="h-4 w-4 mr-2" />
+                                      <span className="text-xs">
+                                        {format(parseISO(event.start_time), 'p')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-full h-64 lg:h-full bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center">
+                                <div className="text-center p-6">
+                                  <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <div className="text-2xl font-bold text-white">
+                                      {format(parseISO(event.start_time), 'dd')}
+                                    </div>
+                                  </div>
+                                  <div className="text-lg font-medium text-purple-600">
+                                    {format(parseISO(event.start_time), 'MMM')}
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-center">
+                                    <Clock className="h-3 w-3 mr-1 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(parseISO(event.start_time), 'p')}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Content Column - Takes remaining space */}
+                          <div className="lg:w-2/3 xl:w-3/4 p-6">
                             <div className="flex flex-wrap gap-2 mb-4">
                               <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
                                 {getEventTypeLabel(event.event_type)}
@@ -308,11 +356,11 @@ const EventsPage = () => {
                               </div>
                             </div>
                             
-                            {event.description && (
-                              <div className="mb-6">
-                                <p className="text-gray-600 leading-relaxed">{event.description}</p>
-                              </div>
-                            )}
+                            <div className="mb-6">
+                              <p className="text-gray-600 leading-relaxed line-clamp-3">
+                                {event.description}
+                              </p>
+                            </div>
                             
                             {/* Event Tickets Section */}
                             <div className="mb-6">
@@ -346,7 +394,7 @@ const EventsPage = () => {
                                     
                                     return (
                                       <div key={ticket.id} className="border rounded-lg p-4 bg-gradient-to-r from-orange-50 to-purple-50">
-                                        <div className="flex justify-between items-start mb-2">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
                                           <div>
                                             <h4 className="font-semibold">{ticket.name}</h4>
                                             <p className="text-xl font-bold text-orange-600">
@@ -360,11 +408,11 @@ const EventsPage = () => {
                                         </div>
                                         
                                         {ticket.description && (
-                                          <p className="text-sm text-gray-600 mb-3">{ticket.description}</p>
+                                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{ticket.description}</p>
                                         )}
                                         
-                                        <div className="flex items-center gap-2">
-                                          <div className="flex items-center border rounded bg-white">
+                                        <div className="flex flex-col sm:flex-row items-center gap-3">
+                                          <div className="flex items-center border rounded bg-white w-full sm:w-auto">
                                             <button
                                               onClick={() => updateTicketQuantity(ticket.id, selectedQty - 1)}
                                               className="px-3 py-2 hover:bg-gray-100 rounded-l"
@@ -384,7 +432,7 @@ const EventsPage = () => {
                                           <Button
                                             onClick={() => handleAddToCart(event.id, ticket.id, selectedQty || 1)}
                                             disabled={selectedQty === 0}
-                                            className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                                            className="w-full sm:w-auto flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                                           >
                                             Add to Cart
                                           </Button>
@@ -403,52 +451,6 @@ const EventsPage = () => {
                                 </div>
                               )}
                             </div>
-                          </div>
-                          
-                          <div className="bg-gradient-to-br from-orange-100 via-purple-100 to-pink-100 flex items-center justify-center relative overflow-hidden">
-                            {event.image_url ? (
-                              <div className="w-full h-full relative">
-                                <img 
-                                  src={event.image_url} 
-                                  alt={event.title}
-                                  className="w-full h-full object-cover" 
-                                  loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-6">
-                                  <div className="text-center text-white">
-                                    <div className="text-4xl font-bold">
-                                      {format(parseISO(event.start_time), 'dd')}
-                                    </div>
-                                    <div className="text-xl font-medium">
-                                      {format(parseISO(event.start_time), 'MMM')}
-                                    </div>
-                                    <div className="mt-3 flex items-center justify-center">
-                                      <Clock className="h-4 w-4 mr-2" />
-                                      <span className="text-sm">
-                                        {format(parseISO(event.start_time), 'p')}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-center p-8">
-                                <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                                  <div className="text-3xl font-bold text-white">
-                                    {format(parseISO(event.start_time), 'dd')}
-                                  </div>
-                                </div>
-                                <div className="text-xl font-medium text-purple-600">
-                                  {format(parseISO(event.start_time), 'MMM')}
-                                </div>
-                                <div className="mt-4 flex items-center justify-center">
-                                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span className="text-sm text-muted-foreground">
-                                    {format(parseISO(event.start_time), 'p')}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
                       </Card>
@@ -477,10 +479,10 @@ const EventsPage = () => {
                 <div className="grid gap-6">
                   {pastEvents.map(event => (
                     <Card key={event.id} className="bg-white/80 backdrop-blur-sm overflow-hidden border border-orange-200 hover:shadow-md transition-all duration-300">
-                      <div className="lg:grid lg:grid-cols-4 gap-6">
+                      <div className="flex flex-col lg:flex-row">
                         {event.image_url && (
-                          <div className="col-span-1">
-                            <AspectRatio ratio={1}>
+                          <div className="lg:w-1/4">
+                            <AspectRatio ratio={4/3}>
                               <img 
                                 src={event.image_url} 
                                 alt={event.title} 
@@ -490,7 +492,7 @@ const EventsPage = () => {
                             </AspectRatio>
                           </div>
                         )}
-                        <div className={`p-6 ${event.image_url ? 'col-span-3' : 'col-span-4'}`}>
+                        <div className={`p-6 ${event.image_url ? 'lg:w-3/4' : 'w-full'}`}>
                           <div className="flex flex-wrap gap-2 mb-4">
                             <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
                               {getEventTypeLabel(event.event_type)}
@@ -528,9 +530,7 @@ const EventsPage = () => {
                             </div>
                           </div>
                           
-                          {event.description && (
-                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{event.description}</p>
-                          )}
+                          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{event.description}</p>
                           
                           {isRegistered(event.id) && (
                             <Badge className="bg-green-100 text-green-800 border-green-200">
