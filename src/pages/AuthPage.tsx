@@ -209,7 +209,7 @@ const AuthPage = () => {
         <img 
           src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Screenshot_2025-08-05_155641-removebg-preview.png" 
           alt="SkillPulse Logo"
-          className="h-[250px] mx-auto" // Adjust height (h-16) as needed to fit your design
+          className="h-[200px] mx-auto" // Adjust height (h-16) as needed to fit your design
         />
       </Link>
       <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
