@@ -126,7 +126,7 @@ const AboutPage = () => {
                   </Button>
                 </Link>
                 <Link to="/become-creator">
-                  <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-black hover:bg-white/10">
+                  <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-purple-700 hover:bg-white/10">
                     Learn More
                   </Button>
                 </Link>
