@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Users, CheckCircle, Clock, QrCode, Calendar, Mail, MessageSquare } from 'lucide-react';
@@ -223,20 +222,108 @@ const CreatorAttendeeManagement: React.FC = () => {
 
   const selectedEventData = events.find(e => e.id === selectedEvent);
 
+  const renderAttendeeCard = (attendee: AttendeeData) => {
+    return (
+      <Card key={attendee.id} className="mb-4 bg-white/90 backdrop-blur-sm border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={selectedAttendees.includes(attendee.id)}
+                onCheckedChange={(checked) => handleSelectAttendee(attendee.id, !!checked)}
+                className="mt-1"
+              />
+              <div>
+                <CardTitle className="text-lg">
+                  {attendee.ticket_holder_name || attendee.user_profile?.full_name || 'Unknown'}
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  {attendee.booking_code}
+                </CardDescription>
+              </div>
+            </div>
+            <Badge
+              variant={attendee.payment_status === 'completed' ? 'default' : 'secondary'}
+              className={
+                attendee.payment_status === 'completed' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-yellow-100 text-yellow-800'
+              }
+            >
+              {attendee.payment_status === 'completed' ? 'Confirmed' : 'Pending'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">Ticket Code</p>
+              <p className="font-mono text-sm">{attendee.ticket_code}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Check-in Status</p>
+              <div className="flex items-center gap-2">
+                {attendee.checked_in ? (
+                  <Badge className="bg-green-100 text-green-800">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Checked In
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-200">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Pending
+                  </Badge>
+                )}
+                {attendee.check_in_time && (
+                  <span className="text-xs text-gray-500">
+                    {format(new Date(attendee.check_in_time), 'HH:mm')}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end">
+          {!attendee.checked_in ? (
+            <Button
+              size="sm"
+              onClick={() => handleCheckIn(attendee.id, attendee.booking_id)}
+              disabled={checkingIn === attendee.id}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {checkingIn === attendee.id ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Check In
+                </>
+              )}
+            </Button>
+          ) : (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              ✓ Checked In
+            </Badge>
+          )}
+        </CardFooter>
+      </Card>
+    );
+  };
+
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Attendee Management</h1>
-            <p className="text-gray-600">Track and manage your event attendees in real-time</p>
+        <div className="container mx-auto px-4 py-6">
+          <div className="mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Attendee Management</h1>
+            <p className="text-sm sm:text-base text-gray-600">Track and manage your event attendees in real-time</p>
           </div>
 
           {/* Event Selection */}
-          <Card className="mb-6 bg-white/80 backdrop-blur-sm border-orange-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-orange-600" />
+          <Card className="mb-4 bg-white/80 backdrop-blur-sm border-orange-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
                 Select Event
               </CardTitle>
             </CardHeader>
@@ -250,7 +337,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                     <SelectItem key={event.id} value={event.id}>
                       <div className="flex flex-col">
                         <span className="font-medium">{event.title}</span>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-xs sm:text-sm text-gray-500">
                           {format(new Date(event.start_time), 'PPP')} • {event.location}
                         </span>
                       </div>
@@ -264,39 +351,39 @@ const CreatorAttendeeManagement: React.FC = () => {
           {selectedEvent && (
             <>
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-green-600 text-sm font-medium">Checked In</p>
-                        <p className="text-2xl font-bold text-green-700">{checkedInCount}</p>
+                        <p className="text-green-600 text-xs sm:text-sm font-medium">Checked In</p>
+                        <p className="text-xl sm:text-2xl font-bold text-green-700">{checkedInCount}</p>
                       </div>
-                      <CheckCircle className="h-8 w-8 text-green-600" />
+                      <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-orange-600 text-sm font-medium">Pending</p>
-                        <p className="text-2xl font-bold text-orange-700">{pendingCount}</p>
+                        <p className="text-orange-600 text-xs sm:text-sm font-medium">Pending</p>
+                        <p className="text-xl sm:text-2xl font-bold text-orange-700">{pendingCount}</p>
                       </div>
-                      <Clock className="h-8 w-8 text-orange-600" />
+                      <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-purple-600 text-sm font-medium">Total Attendees</p>
-                        <p className="text-2xl font-bold text-purple-700">{attendees.length}</p>
+                        <p className="text-purple-600 text-xs sm:text-sm font-medium">Total Attendees</p>
+                        <p className="text-xl sm:text-2xl font-bold text-purple-700">{attendees.length}</p>
                       </div>
-                      <Users className="h-8 w-8 text-purple-600" />
+                      <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
                     </div>
                   </CardContent>
                 </Card>
@@ -304,176 +391,92 @@ const CreatorAttendeeManagement: React.FC = () => {
 
               {/* Search and Actions */}
               <Card className="mb-6 bg-white/80 backdrop-blur-sm border-orange-200">
-                <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                    <div className="relative flex-1 max-w-md">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                    <div className="relative w-full sm:max-w-md">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
-                        placeholder="Search by name, ticket code, or booking code..."
+                        placeholder="Search attendees..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 w-full"
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full sm:w-auto">
                       {selectedAttendees.length > 0 && (
                         <Button
                           onClick={() => setShowAnnouncementModal(true)}
-                          className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white"
+                          className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white w-full sm:w-auto"
                           size="sm"
                         >
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Send Announcement ({selectedAttendees.length})
+                          <MessageSquare className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="whitespace-nowrap">
+                            Send ({selectedAttendees.length})
+                          </span>
                         </Button>
                       )}
                       <Button
-                   variant="outline"
-             size="sm"
-              onClick={() => window.open('/ticket-verification', '_blank')}
-              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-sm hover:shadow-md"
-                 >
-                <QrCode className="h-4 w-4" />
-                   Scan Tickets
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/ticket-verification', '_blank')}
+                        className="flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-sm hover:shadow-md w-full sm:w-auto"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        <span className="whitespace-nowrap">Scan</span>
                       </Button>
                       <AttendeeExportButton 
                         eventId={selectedEvent} 
                         eventTitle={selectedEventData?.title} 
+                        className="w-full sm:w-auto"
                       />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Attendees Table */}
+              {/* Attendee Cards */}
               <Card className="bg-white/80 backdrop-blur-sm border-orange-200">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-orange-600" />
-                    Attendee List
-                    {selectedEventData && (
-                      <Badge variant="outline" className="ml-2">
-                        {selectedEventData.title}
-                      </Badge>
-                    )}
-                  </CardTitle>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-orange-600" />
+                      <CardTitle className="text-lg sm:text-xl">
+                        Attendee List
+                      </CardTitle>
+                      {selectedEventData && (
+                        <Badge variant="outline" className="ml-2">
+                          {selectedEventData.title}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={selectedAttendees.length === filteredAttendees.length && filteredAttendees.length > 0}
+                        onCheckedChange={handleSelectAll}
+                        id="select-all"
+                      />
+                      <label htmlFor="select-all" className="text-sm text-gray-600">
+                        Select all
+                      </label>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
-                    <div className="flex justify-center items-center h-32">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+                    <div className="flex flex-col gap-4">
+                      {[1, 2, 3].map((i) => (
+                        <Card key={i} className="animate-pulse">
+                          <div className="h-24 bg-gray-100 rounded-md"></div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : filteredAttendees.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      {searchTerm ? 'No attendees found matching your search.' : 'No attendees found for this event.'}
                     </div>
                   ) : (
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12">
-                              <Checkbox
-                                checked={selectedAttendees.length === filteredAttendees.length && filteredAttendees.length > 0}
-                                onCheckedChange={handleSelectAll}
-                              />
-                            </TableHead>
-                            <TableHead>Attendee</TableHead>
-                            <TableHead>Ticket Code</TableHead>
-                            <TableHead>Booking Code</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Check-in Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredAttendees.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                                {searchTerm ? 'No attendees found matching your search.' : 'No attendees found for this event.'}
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredAttendees.map((attendee) => (
-                              <TableRow key={attendee.id}>
-                                <TableCell>
-                                  <Checkbox
-                                    checked={selectedAttendees.includes(attendee.id)}
-                                    onCheckedChange={(checked) => handleSelectAttendee(attendee.id, !!checked)}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">
-                                      {attendee.ticket_holder_name || attendee.user_profile?.full_name || 'Unknown'}
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                                    {attendee.ticket_code}
-                                  </code>
-                                </TableCell>
-                                <TableCell>
-                                  <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                                    {attendee.booking_code}
-                                  </code>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={attendee.payment_status === 'completed' ? 'default' : 'secondary'}
-                                    className={
-                                      attendee.payment_status === 'completed' 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-yellow-100 text-yellow-800'
-                                    }
-                                  >
-                                    {attendee.payment_status === 'completed' ? 'Confirmed' : 'Pending'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    {attendee.checked_in ? (
-                                      <Badge className="bg-green-100 text-green-800">
-                                        <CheckCircle className="h-3 w-3 mr-1" />
-                                        Checked In
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-200">
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        Pending
-                                      </Badge>
-                                    )}
-                                    {attendee.check_in_time && (
-                                      <span className="text-xs text-gray-500">
-                                        {format(new Date(attendee.check_in_time), 'HH:mm')}
-                                      </span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {!attendee.checked_in ? (
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleCheckIn(attendee.id, attendee.booking_id)}
-                                      disabled={checkingIn === attendee.id}
-                                      className="bg-green-600 hover:bg-green-700 text-white"
-                                    >
-                                      {checkingIn === attendee.id ? (
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                      ) : (
-                                        <>
-                                          <CheckCircle className="h-4 w-4 mr-1" />
-                                          Check In
-                                        </>
-                                      )}
-                                    </Button>
-                                  ) : (
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                      ✓ Checked In
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                    <div className="space-y-3">
+                      {filteredAttendees.map(renderAttendeeCard)}
                     </div>
                   )}
                 </CardContent>
