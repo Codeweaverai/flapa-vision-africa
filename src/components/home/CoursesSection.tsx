@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { BookOpen, Clock, Users, Star, Play } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Course {
   id: string;
@@ -149,12 +149,23 @@ const CoursesSection = () => {
                   </div>
                 </Link>
 
+                {/* Wishlist Button */}
+                <div className="absolute top-2 right-2 z-10">
+                  <WishlistButton 
+                    itemId={course.id}
+                    itemType="course"
+                    variant="ghost"
+                    size="icon"
+                    className="bg-white/80 hover:bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-all"
+                  />
+                </div>
+
                 <div className="absolute top-2 left-2">
                   <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
                     {course.category}
                   </Badge>
                 </div>
-                <div className="absolute top-2 right-2">
+                <div className="absolute bottom-2 right-2">
                   {course.is_free ? (
                     <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
                       Free
@@ -191,7 +202,7 @@ const CoursesSection = () => {
                 <div className="flex items-center justify-between mb-3 text-xs">
                   <div className="flex items-center text-gray-600">
                     <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
-                    <span>{course.average_rating || 0}</span>
+                    <span>{course.average_rating?.toFixed(1) || 0}</span>
                     <span className="ml-1">({course.total_reviews || 0})</span>
                   </div>
                   <div className="flex items-center text-gray-600">
