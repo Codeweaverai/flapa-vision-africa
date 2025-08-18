@@ -258,36 +258,36 @@ const CreatorDashboard = () => {
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-        <div className="space-y-6 p-6">
+        <div className="space-y-6 p-4 sm:p-6">
           {/* Header */}
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Creator Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back! Here's your performance overview.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">Creator Dashboard</h1>
+              <p className="text-muted-foreground text-sm sm:text-base">Welcome back! Here's your performance overview.</p>
             </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
+            <div className="flex flex-col w-full sm:w-auto sm:flex-row gap-2 sm:items-center sm:justify-end">
               <Button
                 onClick={() => window.location.href = '/creator/attendees'}
                 variant="outline"
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 w-full sm:w-auto"
               >
                 <Users className="h-4 w-4 mr-2" />
-                Manage Attendees
+                <span className="whitespace-nowrap">Manage Attendees</span>
               </Button>
               <Button
                 onClick={() => setIsWithdrawDialogOpen(true)}
                 disabled={!earnings?.available_balance || earnings.available_balance < 5}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 w-full sm:w-auto"
               >
                 <DollarSign className="h-4 w-4 mr-2" />
-                Withdraw Funds
+                <span className="whitespace-nowrap">Withdraw Funds</span>
               </Button>
             </div>
           </div>
 
           {/* Enhanced Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -302,7 +302,7 @@ const CreatorDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -317,7 +317,7 @@ const CreatorDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Students</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
@@ -330,7 +330,7 @@ const CreatorDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Overall Rating</CardTitle>
                 <Star className="h-4 w-4 text-muted-foreground" />
@@ -345,8 +345,8 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Content Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Courses</CardTitle>
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
@@ -359,7 +359,7 @@ const CreatorDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Events</CardTitle>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -372,7 +372,7 @@ const CreatorDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Course Revenue</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -387,7 +387,7 @@ const CreatorDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="min-h-[120px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -404,32 +404,34 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Revenue Overview */}
             <Card>
               <CardHeader>
                 <CardTitle>Revenue Overview</CardTitle>
                 <CardDescription>Monthly earnings from completed payments</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={monthlyRevenueData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Earnings']}
-                      labelFormatter={(label) => `Month: ${label}`}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#8b5cf6" 
-                      strokeWidth={2}
-                      dot={{ fill: '#8b5cf6' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              <CardContent className="px-0 sm:px-6">
+                <div className="h-[250px] sm:h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthlyRevenueData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Earnings']}
+                        labelFormatter={(label) => `Month: ${label}`}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#8b5cf6" 
+                        strokeWidth={2}
+                        dot={{ fill: '#8b5cf6' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
 
@@ -439,24 +441,26 @@ const CreatorDashboard = () => {
                 <CardTitle>Revenue by Source</CardTitle>
                 <CardDescription>Course vs Event earnings</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={revenueBySource.filter(item => item.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      dataKey="value"
-                    >
-                      {revenueBySource.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: any) => `$${Number(value).toFixed(2)}`} />
-                  </PieChart>
-                </ResponsiveContainer>
+              <CardContent className="px-0 sm:px-6">
+                <div className="h-[250px] sm:h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={revenueBySource.filter(item => item.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        dataKey="value"
+                      >
+                        {revenueBySource.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => `$${Number(value).toFixed(2)}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
                 <div className="flex justify-center gap-4 mt-4">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
@@ -478,7 +482,7 @@ const CreatorDashboard = () => {
               <CardDescription>Detailed breakdown of your earnings</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">Total Earnings</div>
                   <div className="text-lg font-semibold">
