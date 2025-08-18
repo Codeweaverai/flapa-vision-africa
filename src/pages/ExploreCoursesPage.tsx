@@ -384,70 +384,88 @@ const ExploreCoursesPage = () => {
                           Free
                         </Badge>
                       ) : (
-                        <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 shadow-lg">
-                          <PriceDisplay amount={course.price} originalCurrency="USD" />
-                        </Badge>
+                        course.price > 0 && (
+                          <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 shadow-lg">
+                            <PriceDisplay amount={course.price} originalCurrency="USD" />
+                          </Badge>
+                        )
                       )}
                     </div>
                     
-                    <div className="absolute bottom-3 left-3">
-                      <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm border-0">
-                        {course.category}
-                      </Badge>
-                    </div>
+                    {course.category && (
+                      <div className="absolute bottom-3 left-3">
+                        <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm border-0">
+                          {course.category}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
 
                   <CardHeader className="pb-4">
                     <div className="flex justify-between items-start mb-2">
-                      <Badge variant="outline" className="border-purple-300 text-purple-600">
-                        {course.difficulty_level}
-                      </Badge>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="font-medium">
-                          {course.reviews.avg_rating > 0 ? course.reviews.avg_rating.toFixed(1) : '4.8'}
-                        </span>
-                      </div>
+                      {course.difficulty_level && (
+                        <Badge variant="outline" className="border-purple-300 text-purple-600">
+                          {course.difficulty_level}
+                        </Badge>
+                      )}
+                      {course.reviews?.avg_rating > 0 && (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                          <span className="font-medium">
+                            {course.reviews.avg_rating.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     <CardTitle className="line-clamp-2 text-lg group-hover:text-orange-600 transition-colors duration-300">
                       {course.title}
                     </CardTitle>
                     
-                    <p className="text-sm text-gray-600 line-clamp-3">
-                      {course.summary}
-                    </p>
+                    {course.summary && (
+                      <p className="text-sm text-gray-600 line-clamp-3">
+                        {course.summary}
+                      </p>
+                    )}
                   </CardHeader>
 
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-orange-500" />
-                        <span className="text-gray-600">
-                          {Math.ceil((course.duration_minutes || 0) / 60)}h
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-purple-500" />
-                        <span className="text-gray-600">
-                          {course.students_count > 0 ? `${course.students_count}` : '1.2k'} students
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-green-500" />
-                        <span className="text-gray-600">
-                          {course.reviews.positive_percentage > 0 
-                            ? `${Math.round(course.reviews.positive_percentage)}%` 
-                            : '95%'
-                          } positive
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-blue-500" />
-                        <span className="text-gray-600">
-                          {course.lessons_count > 0 ? course.lessons_count : '12'} lessons
-                        </span>
-                      </div>
+                      {course.duration_minutes > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-orange-500" />
+                          <span className="text-gray-600">
+                            {Math.ceil(course.duration_minutes / 60)}h
+                          </span>
+                        </div>
+                      )}
+                      
+                      {course.students_count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-purple-500" />
+                          <span className="text-gray-600">
+                            {course.students_count} students
+                          </span>
+                        </div>
+                      )}
+                      
+                      {course.reviews?.positive_percentage > 0 && (
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-green-500" />
+                          <span className="text-gray-600">
+                            {Math.round(course.reviews.positive_percentage)}% positive
+                          </span>
+                        </div>
+                      )}
+                      
+                      {course.lessons_count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-blue-500" />
+                          <span className="text-gray-600">
+                            {course.lessons_count} lessons
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <Button 
