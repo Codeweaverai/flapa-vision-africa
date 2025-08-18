@@ -95,7 +95,6 @@ const CreatorAttendeeManagement: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch generated tickets with booking and check-in data
       const { data: ticketsData, error: ticketsError } = await supabase
         .from('generated_tickets')
         .select(`
@@ -114,7 +113,6 @@ const CreatorAttendeeManagement: React.FC = () => {
 
       if (ticketsError) throw ticketsError;
 
-      // Get user profiles separately (without email field)
       const userIds = ticketsData?.map(ticket => ticket.user_id).filter(Boolean) || [];
       
       let profilesData: any[] = [];
@@ -128,7 +126,6 @@ const CreatorAttendeeManagement: React.FC = () => {
         profilesData = profiles || [];
       }
 
-      // Combine data
       const attendeesData: AttendeeData[] = ticketsData?.map(ticket => ({
         id: ticket.id,
         ticket_code: ticket.ticket_code,
@@ -177,7 +174,6 @@ const CreatorAttendeeManagement: React.FC = () => {
         description: "Attendee checked in successfully",
       });
 
-      // Refresh attendees
       fetchEventAttendees();
     } catch (error) {
       console.error('Error checking in attendee:', error);
@@ -223,32 +219,35 @@ const CreatorAttendeeManagement: React.FC = () => {
   const selectedEventData = events.find(e => e.id === selectedEvent);
 
   const renderAttendeeCard = (attendee: AttendeeData) => {
+    const gradientClass = attendee.checked_in 
+      ? 'bg-gradient-to-br from-green-500 to-teal-600' 
+      : 'bg-gradient-to-br from-orange-500 to-purple-600';
+    
     return (
-      <Card key={attendee.id} className="mb-4 bg-white/90 backdrop-blur-sm border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+      <Card 
+        key={attendee.id} 
+        className={`mb-4 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-2 border-white/30`}
+      >
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3">
               <Checkbox
                 checked={selectedAttendees.includes(attendee.id)}
                 onCheckedChange={(checked) => handleSelectAttendee(attendee.id, !!checked)}
-                className="mt-1"
+                className="mt-1 bg-white/20 border-white/50 text-white"
               />
               <div>
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg text-white">
                   {attendee.ticket_holder_name || attendee.user_profile?.full_name || 'Unknown'}
                 </CardTitle>
-                <CardDescription className="text-sm">
+                <CardDescription className="text-white/80">
                   {attendee.booking_code}
                 </CardDescription>
               </div>
             </div>
             <Badge
-              variant={attendee.payment_status === 'completed' ? 'default' : 'secondary'}
-              className={
-                attendee.payment_status === 'completed' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-yellow-100 text-yellow-800'
-              }
+              variant="outline"
+              className={`bg-white/20 text-white border-white/50 ${attendee.payment_status === 'completed' ? 'bg-green-500/20' : 'bg-yellow-500/20'}`}
             >
               {attendee.payment_status === 'completed' ? 'Confirmed' : 'Pending'}
             </Badge>
@@ -257,25 +256,25 @@ const CreatorAttendeeManagement: React.FC = () => {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-gray-500">Ticket Code</p>
-              <p className="font-mono text-sm">{attendee.ticket_code}</p>
+              <p className="text-sm text-white/80">Ticket Code</p>
+              <p className="font-mono text-sm text-white">{attendee.ticket_code}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Check-in Status</p>
+              <p className="text-sm text-white/80">Check-in Status</p>
               <div className="flex items-center gap-2">
                 {attendee.checked_in ? (
-                  <Badge className="bg-green-100 text-green-800">
+                  <Badge className="bg-white/20 text-white border-white/50">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Checked In
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-200">
+                  <Badge variant="outline" className="bg-white/20 text-white border-white/50">
                     <Clock className="h-3 w-3 mr-1" />
                     Pending
                   </Badge>
                 )}
                 {attendee.check_in_time && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-white/80">
                     {format(new Date(attendee.check_in_time), 'HH:mm')}
                   </span>
                 )}
@@ -289,10 +288,10 @@ const CreatorAttendeeManagement: React.FC = () => {
               size="sm"
               onClick={() => handleCheckIn(attendee.id, attendee.booking_id)}
               disabled={checkingIn === attendee.id}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-white text-orange-600 hover:bg-white/90 shadow-md"
             >
               {checkingIn === attendee.id ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-1" />
@@ -301,7 +300,7 @@ const CreatorAttendeeManagement: React.FC = () => {
               )}
             </Button>
           ) : (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Badge variant="outline" className="bg-white/20 text-white border-white/50">
               ✓ Checked In
             </Badge>
           )}
@@ -320,7 +319,7 @@ const CreatorAttendeeManagement: React.FC = () => {
           </div>
 
           {/* Event Selection */}
-          <Card className="mb-4 bg-white/80 backdrop-blur-sm border-orange-200">
+          <Card className="mb-4 bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
@@ -352,7 +351,7 @@ const CreatorAttendeeManagement: React.FC = () => {
             <>
               {/* Stats Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-sm">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -364,7 +363,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 shadow-sm">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -376,7 +375,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-sm">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -390,7 +389,7 @@ const CreatorAttendeeManagement: React.FC = () => {
               </div>
 
               {/* Search and Actions */}
-              <Card className="mb-6 bg-white/80 backdrop-blur-sm border-orange-200">
+              <Card className="mb-6 bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
                     <div className="relative w-full sm:max-w-md">
@@ -435,7 +434,7 @@ const CreatorAttendeeManagement: React.FC = () => {
               </Card>
 
               {/* Attendee Cards */}
-              <Card className="bg-white/80 backdrop-blur-sm border-orange-200">
+              <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -465,9 +464,10 @@ const CreatorAttendeeManagement: React.FC = () => {
                   {loading ? (
                     <div className="flex flex-col gap-4">
                       {[1, 2, 3].map((i) => (
-                        <Card key={i} className="animate-pulse">
-                          <div className="h-24 bg-gray-100 rounded-md"></div>
-                        </Card>
+                        <div 
+                          key={i} 
+                          className="h-24 bg-gradient-to-br from-orange-100 to-purple-100 rounded-lg border-2 border-white/30 animate-pulse"
+                        ></div>
                       ))}
                     </div>
                   ) : filteredAttendees.length === 0 ? (
