@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +7,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import Layout from '@/components/layout/Layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import WishlistButton from '@/components/wishlist/WishlistButton';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface TrendingItem {
   id: string;
@@ -271,7 +272,20 @@ const TrendingPage = () => {
                     </Badge>
                   </div>
                   
-                  <div className="absolute top-3 right-3">
+                  {/* Wishlist Button for courses */}
+                  {item.type === 'course' && (
+                    <div className="absolute top-3 right-3 z-10">
+                      <WishlistButton 
+                        itemId={item.id}
+                        itemType="course"
+                        variant="ghost"
+                        size="icon"
+                        className="bg-white/80 hover:bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-all"
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="absolute bottom-3 right-3">
                     <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
                       <TrendingUp className="h-3 w-3 mr-1" />
                       #{index + 1}
@@ -303,7 +317,7 @@ const TrendingPage = () => {
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center text-sm text-gray-600">
                           <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
-                          <span>{item.average_rating || 0}</span>
+                          <span>{item.average_rating?.toFixed(1) || 0}</span>
                           <span className="ml-1">({item.total_reviews || 0})</span>
                         </div>
                         <div className="flex items-center text-sm text-gray-600">
