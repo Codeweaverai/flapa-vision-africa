@@ -1,10 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -267,33 +265,35 @@ const CreatorPayments: React.FC = () => {
     if (totalPages <= 1) return null;
 
     return (
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center space-x-6 lg:space-x-8">
-          <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">
-              Page {currentPage} of {totalPages}
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
+      <Pagination className="mt-4">
+        <PaginationContent>
+          <PaginationItem>
             <Button
               variant="outline"
-              className="h-8 w-8 p-0"
+              size="sm"
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage <= 1}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
+          </PaginationItem>
+          <PaginationItem>
+            <div className="text-sm px-4">
+              Page {currentPage} of {totalPages}
+            </div>
+          </PaginationItem>
+          <PaginationItem>
             <Button
               variant="outline"
-              className="h-8 w-8 p-0"
+              size="sm"
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
-        </div>
-      </div>
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     );
   };
 
@@ -361,27 +361,126 @@ const CreatorPayments: React.FC = () => {
     return null;
   };
 
+  const renderTransactionCard = (transaction: any) => (
+    <Card key={transaction.id} className="mb-4">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">{transaction.item_name}</CardTitle>
+            <CardDescription className="text-sm">
+              {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
+            </CardDescription>
+          </div>
+          <Badge variant="outline">
+            {getPaymentTypeLabel(transaction.item_type)}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-sm text-muted-foreground">Customer</p>
+            <p>{transaction.customer_name || 'Unknown'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Order ID</p>
+            <p className="font-mono text-sm">{transaction.order_id?.substring(0, 8) || 'N/A'}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-sm text-muted-foreground">Amount</p>
+            <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Your Earning</p>
+            <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" className="text-green-600 font-medium" />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-sm text-muted-foreground">Platform Fee</p>
+            <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" className="text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Status</p>
+            {getStatusBadge(transaction.payment_status)}
+          </div>
+        </div>
+        
+        <div>
+          <p className="text-sm text-muted-foreground">Payout Date</p>
+          <p>
+            {transaction.payout_eligible_date ? 
+              format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
+              'N/A'
+            }
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderPayoutCard = (payout: any) => (
+    <Card key={payout.id} className="mb-4">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">
+              {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
+            </CardTitle>
+            <CardDescription className="text-sm">
+              {format(new Date(payout.created_at), 'MMM dd, yyyy')}
+            </CardDescription>
+          </div>
+          {getStatusBadge(payout.status)}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-sm text-muted-foreground">Method</p>
+            <Badge variant="outline">
+              {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
+            </Badge>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Currency</p>
+            <p>{payout.currency?.toUpperCase() || 'USD'}</p>
+          </div>
+        </div>
+        
+        <div>
+          <p className="text-sm text-muted-foreground">Destination</p>
+          <p>{payout.destination}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-        <div className="space-y-6 p-6">
-          <div className="flex justify-between items-center">
+        <div className="space-y-6 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 className="text-2xl font-bold">Payments & Payouts</h1>
             <Button
-             variant="outline"
+              variant="outline"
               onClick={() => setIsSetupDialogOpen(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-md hover:shadow-lg"
-             >
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-md hover:shadow-lg w-full sm:w-auto"
+            >
               <Settings className="h-4 w-4" />
-               Payout Settings
-               </Button>
+              Payout Settings
+            </Button>
           </div>
 
           {/* Payout Method Status */}
           {renderPayoutMethodInfo()}
           
           {/* Enhanced Balance Cards with Currency Conversion */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
@@ -497,7 +596,7 @@ const CreatorPayments: React.FC = () => {
           
           {/* Payments & Payouts Tabs */}
           <Tabs defaultValue="transactions" className="w-full">
-            <TabsList>
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="transactions">Customer Transactions</TabsTrigger>
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
             </TabsList>
@@ -512,80 +611,18 @@ const CreatorPayments: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   {loadingTransactions ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-32 w-full rounded-lg" />
                       ))}
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      No payment transactions found
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Order ID</TableHead>
-                              <TableHead>Customer</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Amount</TableHead>
-                              <TableHead>Your Earning</TableHead>
-                              <TableHead>Platform Fee</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Payout Date</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {transactions.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
-                                  No payment transactions found
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              transactions.map((transaction) => (
-                                <TableRow key={transaction.id}>
-                                  <TableCell>
-                                    {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="font-mono text-sm">{transaction.order_id?.substring(0, 8) || 'N/A'}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>{transaction.customer_name || 'Unknown'}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="font-medium">{transaction.item_name}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">
-                                      {getPaymentTypeLabel(transaction.item_type)}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
-                                  </TableCell>
-                                  <TableCell className="font-medium text-green-600">
-                                    <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" />
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground">
-                                    <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" />
-                                  </TableCell>
-                                  <TableCell>
-                                    {getStatusBadge(transaction.payment_status)}
-                                  </TableCell>
-                                  <TableCell>
-                                    {transaction.payout_eligible_date ? 
-                                      format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
-                                      'N/A'
-                                    }
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      {transactions.map(renderTransactionCard)}
                       {renderPagination(transactionsPage, transactionsTotal, setTransactionsPage)}
                     </div>
                   )}
@@ -603,59 +640,18 @@ const CreatorPayments: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   {loadingPayouts ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-32 w-full rounded-lg" />
                       ))}
+                    </div>
+                  ) : payouts.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      No payout requests found
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Amount</TableHead>
-                              <TableHead>Currency</TableHead>
-                              <TableHead>Method</TableHead>
-                              <TableHead>Destination</TableHead>
-                              <TableHead>Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {payouts.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                                  No payout requests found
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              payouts.map((payout) => (
-                                <TableRow key={payout.id}>
-                                  <TableCell>
-                                    {format(new Date(payout.created_at), 'MMM dd, yyyy')}
-                                  </TableCell>
-                                  <TableCell className="font-medium">
-                                    {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
-                                  </TableCell>
-                                  <TableCell>
-                                    {payout.currency?.toUpperCase() || 'USD'}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">
-                                      {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>{payout.destination}</TableCell>
-                                  <TableCell>
-                                    {getStatusBadge(payout.status)}
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      {payouts.map(renderPayoutCard)}
                       {renderPagination(payoutsPage, payoutsTotal, setPayoutsPage)}
                     </div>
                   )}
