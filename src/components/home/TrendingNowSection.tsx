@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { TrendingUp, Clock, Users, Star, Play, BookOpen, Calendar, MapPin } from
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Course {
   id: string;
@@ -130,6 +130,13 @@ const TrendingNowSection = () => {
     });
   };
 
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (loading) {
     return (
       <section className="py-16 bg-gradient-to-br from-orange-50 to-purple-50">
@@ -219,7 +226,20 @@ const TrendingNowSection = () => {
                   </Badge>
                 </div>
                 
-                <div className="absolute top-2 right-2">
+                {/* Wishlist Button for courses */}
+                {item.type === 'course' && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <WishlistButton 
+                      itemId={item.id}
+                      itemType="course"
+                      variant="ghost"
+                      size="icon"
+                      className="bg-white/80 hover:bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-all"
+                    />
+                  </div>
+                )}
+                
+                <div className="absolute bottom-2 right-2">
                   <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-xs">
                     <TrendingUp className="h-3 w-3 mr-1" />
                     #{index + 1}
@@ -251,7 +271,7 @@ const TrendingNowSection = () => {
                     <div className="flex items-center justify-between mb-3 text-xs">
                       <div className="flex items-center text-gray-600">
                         <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
-                        <span>{item.average_rating || 0}</span>
+                        <span>{item.average_rating?.toFixed(1) || 0}</span>
                         <span className="ml-1">({item.total_reviews || 0})</span>
                       </div>
                       <div className="flex items-center text-gray-600">
@@ -273,9 +293,25 @@ const TrendingNowSection = () => {
                         {formatDate(item.start_time)}
                       </div>
                       <div className="flex items-center text-gray-600">
-                        <Users className="h-3 w-3 mr-1" />
-                        <span>{item.total_attendees || 0}</span>
+                        <Clock className="h-3 w-3 mr-1" />
+                        {formatTime(item.start_time)}
                       </div>
+                    </div>
+                    <div className="flex items-center justify-between mb-3 text-xs">
+                      <div className="flex items-center text-gray-600">
+                        <Users className="h-3 w-3 mr-1" />
+                        <span>{item.total_attendees || 0} attending</span>
+                      </div>
+                      {item.price > 0 && !item.is_free && (
+                        <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                          <PriceDisplay amount={item.price} originalCurrency="USD" />
+                        </Badge>
+                      )}
+                      {item.is_free && (
+                        <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
+                          Free
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 text-xs text-gray-600 mb-3">
                       <MapPin className="h-3 w-3" />
