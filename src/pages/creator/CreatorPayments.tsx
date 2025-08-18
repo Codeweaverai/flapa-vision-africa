@@ -234,15 +234,15 @@ const CreatorPayments: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm">Completed</Badge>;
       case 'pending':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 shadow-sm">Pending</Badge>;
       case 'processing':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Processing</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 shadow-sm">Processing</Badge>;
       case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
+        return <Badge variant="destructive" className="shadow-sm">Failed</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary" className="shadow-sm">{status}</Badge>;
     }
   };
   
@@ -265,7 +265,7 @@ const CreatorPayments: React.FC = () => {
     if (totalPages <= 1) return null;
 
     return (
-      <Pagination className="mt-4">
+      <Pagination className="mt-6">
         <PaginationContent>
           <PaginationItem>
             <Button
@@ -273,12 +273,13 @@ const CreatorPayments: React.FC = () => {
               size="sm"
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage <= 1}
+              className="bg-white/80 hover:bg-white shadow-sm"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </PaginationItem>
           <PaginationItem>
-            <div className="text-sm px-4">
+            <div className="text-sm px-4 text-gray-700">
               Page {currentPage} of {totalPages}
             </div>
           </PaginationItem>
@@ -288,6 +289,7 @@ const CreatorPayments: React.FC = () => {
               size="sm"
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
+              className="bg-white/80 hover:bg-white shadow-sm"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -303,10 +305,10 @@ const CreatorPayments: React.FC = () => {
 
     if (!hasStripeSetup && !hasMobileMoneySetup) {
       return (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>No Payout Method Set Up</AlertTitle>
-          <AlertDescription>
+        <Alert className="bg-gradient-to-r from-orange-100 to-purple-100 border-orange-200 shadow-sm">
+          <AlertCircle className="h-4 w-4 text-orange-600" />
+          <AlertTitle className="text-orange-800">No Payout Method Set Up</AlertTitle>
+          <AlertDescription className="text-orange-700">
             Set up a payout method to withdraw your earnings. Choose between Stripe (for USA) or Mobile Money (for African countries).
           </AlertDescription>
         </Alert>
@@ -316,7 +318,7 @@ const CreatorPayments: React.FC = () => {
     // Show active payout method based on default_payout_method
     if (profileData?.default_payout_method === 'stripe' && hasStripeSetup) {
       return (
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <div className="bg-gradient-to-r from-blue-100 to-blue-50 p-4 rounded-lg border border-blue-200 shadow-sm">
           <div className="flex items-center gap-3">
             <CreditCard className="h-5 w-5 text-blue-600" />
             <div className="flex-1">
@@ -328,7 +330,7 @@ const CreatorPayments: React.FC = () => {
                 </div>
               )}
             </div>
-            <Badge variant="default" className="bg-green-100 text-green-800">
+            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm">
               Active
             </Badge>
           </div>
@@ -338,7 +340,7 @@ const CreatorPayments: React.FC = () => {
 
     if (profileData?.default_payout_method === 'mobile_money' && hasMobileMoneySetup) {
       return (
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+        <div className="bg-gradient-to-r from-green-100 to-green-50 p-4 rounded-lg border border-green-200 shadow-sm">
           <div className="flex items-center gap-3">
             <Smartphone className="h-5 w-5 text-green-600" />
             <div className="flex-1">
@@ -350,7 +352,7 @@ const CreatorPayments: React.FC = () => {
                 Within 24 hours processing
               </div>
             </div>
-            <Badge variant="default" className="bg-green-100 text-green-800">
+            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm">
               Active
             </Badge>
           </div>
@@ -361,111 +363,144 @@ const CreatorPayments: React.FC = () => {
     return null;
   };
 
-  const renderTransactionCard = (transaction: any) => (
-    <Card key={transaction.id} className="mb-4">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">{transaction.item_name}</CardTitle>
-            <CardDescription className="text-sm">
-              {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
-            </CardDescription>
-          </div>
-          <Badge variant="outline">
-            {getPaymentTypeLabel(transaction.item_type)}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
-            <p>{transaction.customer_name || 'Unknown'}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Order ID</p>
-            <p className="font-mono text-sm">{transaction.order_id?.substring(0, 8) || 'N/A'}</p>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="text-sm text-muted-foreground">Amount</p>
-            <PriceDisplay amount={transaction.total_amount} originalCurrency="USD" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Your Earning</p>
-            <PriceDisplay amount={transaction.creator_earning} originalCurrency="USD" className="text-green-600 font-medium" />
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="text-sm text-muted-foreground">Platform Fee</p>
-            <PriceDisplay amount={transaction.platform_fee} originalCurrency="USD" className="text-muted-foreground" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Status</p>
-            {getStatusBadge(transaction.payment_status)}
-          </div>
-        </div>
-        
-        <div>
-          <p className="text-sm text-muted-foreground">Payout Date</p>
-          <p>
-            {transaction.payout_eligible_date ? 
-              format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
-              'N/A'
-            }
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderPayoutCard = (payout: any) => (
-    <Card key={payout.id} className="mb-4">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">
-              {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
-            </CardTitle>
-            <CardDescription className="text-sm">
-              {format(new Date(payout.created_at), 'MMM dd, yyyy')}
-            </CardDescription>
-          </div>
-          {getStatusBadge(payout.status)}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="text-sm text-muted-foreground">Method</p>
-            <Badge variant="outline">
-              {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
+  const renderTransactionCard = (transaction: any) => {
+    // Determine gradient based on item type
+    const gradientClass = transaction.item_type === 'course' 
+      ? 'bg-gradient-to-br from-orange-500 to-purple-600'
+      : 'bg-gradient-to-br from-purple-500 to-orange-600';
+    
+    return (
+      <Card key={transaction.id} className={`mb-4 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0`}>
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-lg">{transaction.item_name}</CardTitle>
+              <CardDescription className="text-white/80">
+                {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
+              </CardDescription>
+            </div>
+            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
+              {getPaymentTypeLabel(transaction.item_type)}
             </Badge>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Currency</p>
-            <p>{payout.currency?.toUpperCase() || 'USD'}</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-sm text-white/80">Customer</p>
+              <p className="font-medium">{transaction.customer_name || 'Unknown'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-white/80">Order ID</p>
+              <p className="font-mono text-sm font-medium">{transaction.order_id?.substring(0, 8) || 'N/A'}</p>
+            </div>
           </div>
-        </div>
-        
-        <div>
-          <p className="text-sm text-muted-foreground">Destination</p>
-          <p>{payout.destination}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-sm text-white/80">Amount</p>
+              <PriceDisplay 
+                amount={transaction.total_amount} 
+                originalCurrency="USD" 
+                className="font-medium text-white"
+              />
+            </div>
+            <div>
+              <p className="text-sm text-white/80">Your Earning</p>
+              <PriceDisplay 
+                amount={transaction.creator_earning} 
+                originalCurrency="USD" 
+                className="font-bold text-white"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-sm text-white/80">Platform Fee</p>
+              <PriceDisplay 
+                amount={transaction.platform_fee} 
+                originalCurrency="USD" 
+                className="text-white/90"
+              />
+            </div>
+            <div>
+              <p className="text-sm text-white/80">Status</p>
+              <div className="mt-1">
+                {getStatusBadge(transaction.payment_status)}
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <p className="text-sm text-white/80">Payout Date</p>
+            <p className="font-medium">
+              {transaction.payout_eligible_date ? 
+                format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
+                'N/A'
+              }
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderPayoutCard = (payout: any) => {
+    const statusColor = payout.status === 'completed' 
+      ? 'bg-gradient-to-br from-green-500 to-teal-600'
+      : payout.status === 'failed'
+      ? 'bg-gradient-to-br from-red-500 to-rose-600'
+      : 'bg-gradient-to-br from-amber-500 to-orange-600';
+    
+    return (
+      <Card key={payout.id} className={`mb-4 ${statusColor} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0`}>
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-lg">
+                {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
+              </CardTitle>
+              <CardDescription className="text-white/80">
+                {format(new Date(payout.created_at), 'MMM dd, yyyy')}
+              </CardDescription>
+            </div>
+            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
+              {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-sm text-white/80">Method</p>
+              <Badge variant="outline" className="bg-white/20 text-white border-white/30">
+                {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-sm text-white/80">Currency</p>
+              <p className="font-medium">{payout.currency?.toUpperCase() || 'USD'}</p>
+            </div>
+          </div>
+          
+          <div>
+            <p className="text-sm text-white/80">Destination</p>
+            <p className="font-medium">{payout.destination}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <CreatorLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
         <div className="space-y-6 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 className="text-2xl font-bold">Payments & Payouts</h1>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              Payments & Payouts
+            </h1>
             <Button
               variant="outline"
               onClick={() => setIsSetupDialogOpen(true)}
@@ -477,24 +512,26 @@ const CreatorPayments: React.FC = () => {
           </div>
 
           {/* Payout Method Status */}
-          {renderPayoutMethodInfo()}
+          <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-4 rounded-lg border border-orange-200/50 shadow-sm">
+            {renderPayoutMethodInfo()}
+          </div>
           
           {/* Enhanced Balance Cards with Currency Conversion */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
+            <Card className="bg-gradient-to-br from-orange-100 to-orange-50 shadow-sm hover:shadow-md transition-shadow border-orange-200/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-orange-800">Available Balance</CardTitle>
+                <DollarSign className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
                 {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
+                  <Skeleton className="h-7 w-24 bg-orange-200" />
                 ) : (
-                  <div className="text-base md:text-lg font-semibold">
+                  <div className="text-base md:text-lg font-semibold text-orange-800">
                     <PriceDisplay amount={earnings.available_balance} originalCurrency="USD" />
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-orange-600/80 mt-1">
                   Available for withdrawal (minimum $5.00)
                 </p>
               </CardContent>
@@ -502,65 +539,65 @@ const CreatorPayments: React.FC = () => {
                 <Button 
                   onClick={() => setIsWithdrawDialogOpen(true)}
                   disabled={loadingEarnings || earnings.available_balance < 5 || (!profileData?.stripe_connect_account_id && !profileData?.mobile_money_operator)}
-                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
                   Withdraw Funds
                 </Button>
               </CardFooter>
             </Card>
             
-            <Card>
+            <Card className="bg-gradient-to-br from-purple-100 to-purple-50 shadow-sm hover:shadow-md transition-shadow border-purple-200/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Pending Balance</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-purple-800">Pending Balance</CardTitle>
+                <Calendar className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
                 {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
+                  <Skeleton className="h-7 w-24 bg-purple-200" />
                 ) : (
-                  <div className="text-base md:text-lg font-semibold">
+                  <div className="text-base md:text-lg font-semibold text-purple-800">
                     <PriceDisplay amount={earnings.pending_balance} originalCurrency="USD" />
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-purple-600/80 mt-1">
                   Funds in 7-day hold period
                 </p>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="bg-gradient-to-br from-orange-100 to-purple-100 shadow-sm hover:shadow-md transition-shadow border-orange-200/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-purple-800">Total Earnings</CardTitle>
+                <TrendingUp className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
                 {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
+                  <Skeleton className="h-7 w-24 bg-gradient-to-r from-orange-200 to-purple-200" />
                 ) : (
-                  <div className="text-base md:text-lg font-semibold">
+                  <div className="text-base md:text-lg font-semibold bg-gradient-to-r from-orange-700 to-purple-700 bg-clip-text text-transparent">
                     <PriceDisplay amount={earnings.total_earnings} originalCurrency="USD" />
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-orange-600/80 mt-1">
                   Your share (92% of sales)
                 </p>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="bg-gradient-to-br from-purple-100 to-orange-100 shadow-sm hover:shadow-md transition-shadow border-purple-200/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium">Platform Fees</CardTitle>
-                <Minus className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-purple-800">Platform Fees</CardTitle>
+                <Minus className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
                 {loadingEarnings ? (
-                  <Skeleton className="h-7 w-24" />
+                  <Skeleton className="h-7 w-24 bg-gradient-to-r from-purple-200 to-orange-200" />
                 ) : (
-                  <div className="text-base md:text-lg font-semibold">
+                  <div className="text-base md:text-lg font-semibold bg-gradient-to-r from-purple-700 to-orange-700 bg-clip-text text-transparent">
                     <PriceDisplay amount={earnings.total_platform_fees} originalCurrency="USD" />
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-purple-600/80 mt-1">
                   Platform fee (8% of sales)
                 </p>
               </CardContent>
@@ -569,25 +606,29 @@ const CreatorPayments: React.FC = () => {
 
           {/* Revenue Breakdown */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
+            <Card className="bg-gradient-to-br from-orange-500 to-orange-400 shadow-lg border-0">
               <CardHeader>
-                <CardTitle className="text-lg">Course Revenue</CardTitle>
-                <CardDescription>Earnings from course sales</CardDescription>
+                <CardTitle className="text-white">Course Revenue</CardTitle>
+                <CardDescription className="text-white/80">
+                  Earnings from course sales
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
+                <div className="text-3xl font-bold text-white">
                   <PriceDisplay amount={earnings.course_revenue} originalCurrency="USD" />
                 </div>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="bg-gradient-to-br from-purple-500 to-purple-400 shadow-lg border-0">
               <CardHeader>
-                <CardTitle className="text-lg">Event Revenue</CardTitle>
-                <CardDescription>Earnings from event registrations</CardDescription>
+                <CardTitle className="text-white">Event Revenue</CardTitle>
+                <CardDescription className="text-white/80">
+                  Earnings from event registrations
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
+                <div className="text-3xl font-bold text-white">
                   <PriceDisplay amount={earnings.event_revenue} originalCurrency="USD" />
                 </div>
               </CardContent>
@@ -596,15 +637,27 @@ const CreatorPayments: React.FC = () => {
           
           {/* Payments & Payouts Tabs */}
           <Tabs defaultValue="transactions" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="transactions">Customer Transactions</TabsTrigger>
-              <TabsTrigger value="payouts">Payouts</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-orange-100 to-purple-100 p-1 h-auto rounded-lg border border-orange-200/50">
+              <TabsTrigger 
+                value="transactions" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all"
+              >
+                Customer Transactions
+              </TabsTrigger>
+              <TabsTrigger 
+                value="payouts"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all"
+              >
+                Payouts
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="transactions" className="space-y-4">
-              <Card>
+              <Card className="bg-gradient-to-br from-orange-50 to-purple-50 shadow-sm border-orange-200/50">
                 <CardHeader>
-                  <CardTitle>Customer Payment Transactions</CardTitle>
+                  <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    Customer Payment Transactions
+                  </CardTitle>
                   <CardDescription>
                     View all completed payment transactions from customers for your courses and events
                   </CardDescription>
@@ -613,7 +666,7 @@ const CreatorPayments: React.FC = () => {
                   {loadingTransactions ? (
                     <div className="space-y-4">
                       {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 w-full rounded-lg" />
+                        <Skeleton key={i} className="h-32 w-full rounded-lg bg-gradient-to-r from-orange-100 to-purple-100" />
                       ))}
                     </div>
                   ) : transactions.length === 0 ? (
@@ -631,9 +684,11 @@ const CreatorPayments: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="payouts" className="space-y-4">
-              <Card>
+              <Card className="bg-gradient-to-br from-purple-50 to-orange-50 shadow-sm border-purple-200/50">
                 <CardHeader>
-                  <CardTitle>Payout History</CardTitle>
+                  <CardTitle className="bg-gradient-to-r from-purple-600 to-orange-600 bg-clip-text text-transparent">
+                    Payout History
+                  </CardTitle>
                   <CardDescription>
                     Track your withdrawal requests and their status
                   </CardDescription>
@@ -642,7 +697,7 @@ const CreatorPayments: React.FC = () => {
                   {loadingPayouts ? (
                     <div className="space-y-4">
                       {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 w-full rounded-lg" />
+                        <Skeleton key={i} className="h-32 w-full rounded-lg bg-gradient-to-r from-purple-100 to-orange-100" />
                       ))}
                     </div>
                   ) : payouts.length === 0 ? (
