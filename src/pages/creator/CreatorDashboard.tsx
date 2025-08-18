@@ -34,6 +34,18 @@ interface DashboardStats {
   eventRating: number;
 }
 
+// Card color configurations
+const cardColors = [
+  { bg: 'bg-gradient-to-br from-purple-50 to-purple-100', border: 'border-purple-200' },
+  { bg: 'bg-gradient-to-br from-blue-50 to-blue-100', border: 'border-blue-200' },
+  { bg: 'bg-gradient-to-br from-emerald-50 to-emerald-100', border: 'border-emerald-200' },
+  { bg: 'bg-gradient-to-br from-amber-50 to-amber-100', border: 'border-amber-200' },
+  { bg: 'bg-gradient-to-br from-indigo-50 to-indigo-100', border: 'border-indigo-200' },
+  { bg: 'bg-gradient-to-br from-pink-50 to-pink-100', border: 'border-pink-200' },
+  { bg: 'bg-gradient-to-br from-teal-50 to-teal-100', border: 'border-teal-200' },
+  { bg: 'bg-gradient-to-br from-orange-50 to-orange-100', border: 'border-orange-200' },
+];
+
 const CreatorDashboard = () => {
   const { user } = useAuth();
   const { convertPrice, currentCurrency } = useCurrency();
@@ -258,7 +270,7 @@ const CreatorDashboard = () => {
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-        <div className="space-y-6 p-4 sm:p-6">
+        <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
@@ -286,58 +298,58 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Enhanced Key Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <Card className="min-h-[120px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card className={`min-h-[120px] ${cardColors[0].bg} border ${cardColors[0].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <DollarSign className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">
+                <div className="text-base md:text-lg font-semibold text-purple-800">
                   <PriceDisplay amount={earnings?.total_earnings || 0} originalCurrency="USD" />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-purple-600">
                   Your lifetime earnings (after platform fees)
                 </p>
               </CardContent>
             </Card>
             
-            <Card className="min-h-[120px]">
+            <Card className={`min-h-[120px] ${cardColors[1].bg} border ${cardColors[1].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <TrendingUp className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">
+                <div className="text-base md:text-lg font-semibold text-blue-800">
                   <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-blue-600">
                   Ready for withdrawal
                 </p>
               </CardContent>
             </Card>
             
-            <Card className="min-h-[120px]">
+            <Card className={`min-h-[120px] ${cardColors[2].bg} border ${cardColors[2].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <Users className="h-4 w-4 text-emerald-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">{stats.totalStudents}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-base md:text-lg font-semibold text-emerald-800">{stats.totalStudents}</div>
+                <p className="text-xs text-emerald-600">
                   {stats.totalEnrollments} enrollments, {stats.totalBookings} bookings
                 </p>
               </CardContent>
             </Card>
             
-            <Card className="min-h-[120px]">
+            <Card className={`min-h-[120px] ${cardColors[3].bg} border ${cardColors[3].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Overall Rating</CardTitle>
-                <Star className="h-4 w-4 text-muted-foreground" />
+                <Star className="h-4 w-4 text-amber-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">{stats.averageRating.toFixed(1)}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-base md:text-lg font-semibold text-amber-800">{stats.averageRating.toFixed(1)}</div>
+                <p className="text-xs text-amber-600">
                   From {stats.totalReviews} reviews
                 </p>
               </CardContent>
@@ -345,58 +357,58 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Content Statistics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <Card className="min-h-[120px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card className={`min-h-[120px] ${cardColors[4].bg} border ${cardColors[4].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Courses</CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                <BookOpen className="h-4 w-4 text-indigo-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">{stats.totalCourses}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-base md:text-lg font-semibold text-indigo-800">{stats.totalCourses}</div>
+                <p className="text-xs text-indigo-600">
                   {stats.courseReviews} reviews • {stats.courseRating.toFixed(1)} ⭐
                 </p>
               </CardContent>
             </Card>
             
-            <Card className="min-h-[120px]">
+            <Card className={`min-h-[120px] ${cardColors[5].bg} border ${cardColors[5].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Events</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Calendar className="h-4 w-4 text-pink-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">{stats.totalEvents}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-base md:text-lg font-semibold text-pink-800">{stats.totalEvents}</div>
+                <p className="text-xs text-pink-600">
                   {stats.eventReviews} reviews • {stats.eventRating.toFixed(1)} ⭐
                 </p>
               </CardContent>
             </Card>
             
-            <Card className="min-h-[120px]">
+            <Card className={`min-h-[120px] ${cardColors[6].bg} border ${cardColors[6].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Course Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <DollarSign className="h-4 w-4 text-teal-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">
+                <div className="text-base md:text-lg font-semibold text-teal-800">
                   <PriceDisplay amount={earnings?.course_revenue || 0} originalCurrency="USD" />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-teal-600">
                   From course sales
                 </p>
               </CardContent>
             </Card>
             
-            <Card className="min-h-[120px]">
+            <Card className={`min-h-[120px] ${cardColors[7].bg} border ${cardColors[7].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <DollarSign className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-base md:text-lg font-semibold">
+                <div className="text-base md:text-lg font-semibold text-orange-800">
                   <PriceDisplay amount={earnings?.event_revenue || 0} originalCurrency="USD" />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-orange-600">
                   From event tickets
                 </p>
               </CardContent>
@@ -404,30 +416,45 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
             {/* Revenue Overview */}
-            <Card>
+            <Card className="bg-white/90 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle>Revenue Overview</CardTitle>
                 <CardDescription>Monthly earnings from completed payments</CardDescription>
               </CardHeader>
-              <CardContent className="px-0 sm:px-6">
+              <CardContent className="px-0 sm:px-4">
                 <div className="h-[250px] sm:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={monthlyRevenueData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 12 }}
+                        tickMargin={10}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                        tickMargin={10}
+                        tickFormatter={(value) => `$${value}`}
+                      />
                       <Tooltip 
                         formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Earnings']}
                         labelFormatter={(label) => `Month: ${label}`}
+                        contentStyle={{
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '0.5rem',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        }}
                       />
                       <Line 
                         type="monotone" 
                         dataKey="revenue" 
                         stroke="#8b5cf6" 
                         strokeWidth={2}
-                        dot={{ fill: '#8b5cf6' }}
+                        dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -436,12 +463,12 @@ const CreatorDashboard = () => {
             </Card>
 
             {/* Revenue Breakdown */}
-            <Card>
+            <Card className="bg-white/90 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle>Revenue by Source</CardTitle>
                 <CardDescription>Course vs Event earnings</CardDescription>
               </CardHeader>
-              <CardContent className="px-0 sm:px-6">
+              <CardContent className="px-0 sm:px-4">
                 <div className="h-[250px] sm:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -451,17 +478,28 @@ const CreatorDashboard = () => {
                         cy="50%"
                         innerRadius={60}
                         outerRadius={100}
+                        paddingAngle={2}
                         dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
                       >
                         {revenueBySource.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Cell key={`cell-${index}`} fill={entry.color} stroke="#fff" strokeWidth={1} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: any) => `$${Number(value).toFixed(2)}`} />
+                      <Tooltip 
+                        formatter={(value: any) => `$${Number(value).toFixed(2)}`}
+                        contentStyle={{
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '0.5rem',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex justify-center gap-4 mt-4">
+                <div className="flex justify-center gap-4 mt-2 sm:mt-4">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                     <span className="text-sm">Courses</span>
@@ -476,34 +514,34 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Financial Summary */}
-          <Card>
+          <Card className="bg-white/90 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Financial Summary</CardTitle>
               <CardDescription>Detailed breakdown of your earnings</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">Total Earnings</div>
-                  <div className="text-lg font-semibold">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="space-y-2 p-3 rounded-lg bg-purple-50/50">
+                  <div className="text-sm font-medium text-purple-600">Total Earnings</div>
+                  <div className="text-lg font-semibold text-purple-800">
                     <PriceDisplay amount={earnings?.total_earnings || 0} originalCurrency="USD" />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">Available Balance</div>
-                  <div className="text-base md:text-lg font-semibold text-green-600">
+                <div className="space-y-2 p-3 rounded-lg bg-emerald-50/50">
+                  <div className="text-sm font-medium text-emerald-600">Available Balance</div>
+                  <div className="text-base md:text-lg font-semibold text-emerald-800">
                     <PriceDisplay amount={earnings?.available_balance || 0} originalCurrency="USD" />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">Pending Balance</div>
-                  <div className="text-base md:text-lg font-semibold text-amber-600">
+                <div className="space-y-2 p-3 rounded-lg bg-amber-50/50">
+                  <div className="text-sm font-medium text-amber-600">Pending Balance</div>
+                  <div className="text-base md:text-lg font-semibold text-amber-800">
                     <PriceDisplay amount={earnings?.pending_balance || 0} originalCurrency="USD" />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">Platform Fees</div>
-                  <div className="text-base md:text-lg font-semibold text-red-600">
+                <div className="space-y-2 p-3 rounded-lg bg-rose-50/50">
+                  <div className="text-sm font-medium text-rose-600">Platform Fees</div>
+                  <div className="text-base md:text-lg font-semibold text-rose-800">
                     <PriceDisplay amount={earnings?.total_platform_fees || 0} originalCurrency="USD" />
                   </div>
                 </div>
