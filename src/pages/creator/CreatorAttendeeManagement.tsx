@@ -13,6 +13,13 @@ import { format } from 'date-fns';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import AttendeeExportButton from '@/components/creator/AttendeeExportButton';
 import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination"
 
 interface Event {
   id: string;
@@ -39,6 +46,8 @@ interface AttendeeData {
   payment_status: string;
 }
 
+const ITEMS_PER_PAGE = 5;
+
 const CreatorAttendeeManagement: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -50,6 +59,7 @@ const CreatorAttendeeManagement: React.FC = () => {
   const [checkingIn, setCheckingIn] = useState<string | null>(null);
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (user) {
@@ -60,6 +70,7 @@ const CreatorAttendeeManagement: React.FC = () => {
   useEffect(() => {
     if (selectedEvent) {
       fetchEventAttendees();
+      setCurrentPage(1); // Reset to first page when event changes
     }
   }, [selectedEvent]);
 
@@ -215,6 +226,11 @@ const CreatorAttendeeManagement: React.FC = () => {
 
   const checkedInCount = attendees.filter(a => a.checked_in).length;
   const pendingCount = attendees.length - checkedInCount;
+  const totalPages = Math.ceil(filteredAttendees.length / ITEMS_PER_PAGE);
+  const paginatedAttendees = filteredAttendees.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const selectedEventData = events.find(e => e.id === selectedEvent);
 
@@ -318,22 +334,22 @@ const CreatorAttendeeManagement: React.FC = () => {
             <p className="text-sm sm:text-base text-gray-600">Track and manage your event attendees in real-time</p>
           </div>
 
-          {/* Event Selection */}
-          <Card className="mb-4 bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
+          {/* Event Selection Card with Gradient */}
+          <Card className="mb-4 bg-gradient-to-br from-orange-500 to-purple-600 text-white border-white/30 shadow-lg">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                 Select Event
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose an event to manage" />
+                <SelectTrigger className="w-full bg-white/20 text-white border-white/30 hover:bg-white/30">
+                  <SelectValue placeholder="Choose an event to manage" className="text-white" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white" align="start">
                   {events.map(event => (
-                    <SelectItem key={event.id} value={event.id}>
+                    <SelectItem key={event.id} value={event.id} className="hover:bg-orange-50">
                       <div className="flex flex-col">
                         <span className="font-medium">{event.title}</span>
                         <span className="text-xs sm:text-sm text-gray-500">
@@ -433,7 +449,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Attendee Cards */}
+              {/* Attendee Cards with Pagination */}
               <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
@@ -476,10 +492,37 @@ const CreatorAttendeeManagement: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {filteredAttendees.map(renderAttendeeCard)}
+                      {paginatedAttendees.map(renderAttendeeCard)}
                     </div>
                   )}
                 </CardContent>
+                {filteredAttendees.length > ITEMS_PER_PAGE && (
+                  <CardFooter className="flex justify-center">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="cursor-pointer"
+                          />
+                        </PaginationItem>
+                        <PaginationItem>
+                          <span className="text-sm text-gray-700 px-2">
+                            Page {currentPage} of {totalPages}
+                          </span>
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="cursor-pointer"
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </CardFooter>
+                )}
               </Card>
             </>
           )}
