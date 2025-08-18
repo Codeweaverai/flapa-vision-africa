@@ -33,7 +33,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 5;
 
 const CreatorPayments: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -265,7 +265,7 @@ const CreatorPayments: React.FC = () => {
     if (totalPages <= 1) return null;
 
     return (
-      <Pagination className="mt-6">
+      <Pagination className="mt-4">
         <PaginationContent>
           <PaginationItem>
             <Button
@@ -279,7 +279,7 @@ const CreatorPayments: React.FC = () => {
             </Button>
           </PaginationItem>
           <PaginationItem>
-            <div className="text-sm px-4 text-gray-700">
+            <div className="text-sm px-2 sm:px-4 text-gray-700">
               Page {currentPage} of {totalPages}
             </div>
           </PaginationItem>
@@ -315,11 +315,10 @@ const CreatorPayments: React.FC = () => {
       );
     }
 
-    // Show active payout method based on default_payout_method
     if (profileData?.default_payout_method === 'stripe' && hasStripeSetup) {
       return (
         <div className="bg-gradient-to-r from-blue-100 to-blue-50 p-4 rounded-lg border border-blue-200 shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <CreditCard className="h-5 w-5 text-blue-600" />
             <div className="flex-1">
               <div className="font-medium text-blue-900">Stripe Connect - Connected</div>
@@ -330,7 +329,7 @@ const CreatorPayments: React.FC = () => {
                 </div>
               )}
             </div>
-            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm">
+            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm mt-2 sm:mt-0">
               Active
             </Badge>
           </div>
@@ -341,7 +340,7 @@ const CreatorPayments: React.FC = () => {
     if (profileData?.default_payout_method === 'mobile_money' && hasMobileMoneySetup) {
       return (
         <div className="bg-gradient-to-r from-green-100 to-green-50 p-4 rounded-lg border border-green-200 shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <Smartphone className="h-5 w-5 text-green-600" />
             <div className="flex-1">
               <div className="font-medium text-green-900">Mobile Money - Connected</div>
@@ -352,7 +351,7 @@ const CreatorPayments: React.FC = () => {
                 Within 24 hours processing
               </div>
             </div>
-            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm">
+            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm mt-2 sm:mt-0">
               Active
             </Badge>
           </div>
@@ -364,17 +363,16 @@ const CreatorPayments: React.FC = () => {
   };
 
   const renderTransactionCard = (transaction: any) => {
-    // Determine gradient based on item type
     const gradientClass = transaction.item_type === 'course' 
       ? 'bg-gradient-to-br from-orange-500 to-purple-600'
       : 'bg-gradient-to-br from-purple-500 to-orange-600';
     
     return (
-      <Card key={transaction.id} className={`mb-4 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0`}>
+      <Card key={transaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0`}>
         <CardHeader className="pb-2">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
             <div>
-              <CardTitle className="text-lg">{transaction.item_name}</CardTitle>
+              <CardTitle className="text-lg line-clamp-1">{transaction.item_name}</CardTitle>
               <CardDescription className="text-white/80">
                 {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
               </CardDescription>
@@ -385,18 +383,18 @@ const CreatorPayments: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Customer</p>
-              <p className="font-medium">{transaction.customer_name || 'Unknown'}</p>
+              <p className="font-medium line-clamp-1">{transaction.customer_name || 'Unknown'}</p>
             </div>
             <div>
               <p className="text-sm text-white/80">Order ID</p>
-              <p className="font-mono text-sm font-medium">{transaction.order_id?.substring(0, 8) || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium line-clamp-1">{transaction.order_id?.substring(0, 8) || 'N/A'}</p>
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Amount</p>
               <PriceDisplay 
@@ -415,7 +413,7 @@ const CreatorPayments: React.FC = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Platform Fee</p>
               <PriceDisplay 
@@ -454,9 +452,9 @@ const CreatorPayments: React.FC = () => {
       : 'bg-gradient-to-br from-amber-500 to-orange-600';
     
     return (
-      <Card key={payout.id} className={`mb-4 ${statusColor} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0`}>
+      <Card key={payout.id} className={`mb-3 ${statusColor} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0`}>
         <CardHeader className="pb-2">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
             <div>
               <CardTitle className="text-lg">
                 {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
@@ -471,7 +469,7 @@ const CreatorPayments: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Method</p>
               <Badge variant="outline" className="bg-white/20 text-white border-white/30">
@@ -486,7 +484,7 @@ const CreatorPayments: React.FC = () => {
           
           <div>
             <p className="text-sm text-white/80">Destination</p>
-            <p className="font-medium">{payout.destination}</p>
+            <p className="font-medium line-clamp-1">{payout.destination}</p>
           </div>
         </CardContent>
       </Card>
@@ -496,8 +494,8 @@ const CreatorPayments: React.FC = () => {
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
-        <div className="space-y-6 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="space-y-4 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
               Payments & Payouts
             </h1>
@@ -507,7 +505,7 @@ const CreatorPayments: React.FC = () => {
               className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-md hover:shadow-lg w-full sm:w-auto"
             >
               <Settings className="h-4 w-4" />
-              Payout Settings
+              <span className="whitespace-nowrap">Payout Settings</span>
             </Button>
           </div>
 
@@ -516,8 +514,8 @@ const CreatorPayments: React.FC = () => {
             {renderPayoutMethodInfo()}
           </div>
           
-          {/* Enhanced Balance Cards with Currency Conversion */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Enhanced Balance Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="bg-gradient-to-br from-orange-100 to-orange-50 shadow-sm hover:shadow-md transition-shadow border-orange-200/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-sm font-medium text-orange-800">Available Balance</CardTitle>
@@ -605,16 +603,16 @@ const CreatorPayments: React.FC = () => {
           </div>
 
           {/* Revenue Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Card className="bg-gradient-to-br from-orange-500 to-orange-400 shadow-lg border-0">
               <CardHeader>
-                <CardTitle className="text-white">Course Revenue</CardTitle>
-                <CardDescription className="text-white/80">
+                <CardTitle className="text-white text-lg sm:text-xl">Course Revenue</CardTitle>
+                <CardDescription className="text-white/80 text-sm">
                   Earnings from course sales
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white">
+                <div className="text-2xl sm:text-3xl font-bold text-white">
                   <PriceDisplay amount={earnings.course_revenue} originalCurrency="USD" />
                 </div>
               </CardContent>
@@ -622,13 +620,13 @@ const CreatorPayments: React.FC = () => {
             
             <Card className="bg-gradient-to-br from-purple-500 to-purple-400 shadow-lg border-0">
               <CardHeader>
-                <CardTitle className="text-white">Event Revenue</CardTitle>
-                <CardDescription className="text-white/80">
+                <CardTitle className="text-white text-lg sm:text-xl">Event Revenue</CardTitle>
+                <CardDescription className="text-white/80 text-sm">
                   Earnings from event registrations
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white">
+                <div className="text-2xl sm:text-3xl font-bold text-white">
                   <PriceDisplay amount={earnings.event_revenue} originalCurrency="USD" />
                 </div>
               </CardContent>
@@ -640,41 +638,41 @@ const CreatorPayments: React.FC = () => {
             <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-orange-100 to-purple-100 p-1 h-auto rounded-lg border border-orange-200/50">
               <TabsTrigger 
                 value="transactions" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all text-xs sm:text-sm"
               >
-                Customer Transactions
+                Transactions
               </TabsTrigger>
               <TabsTrigger 
                 value="payouts"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all text-xs sm:text-sm"
               >
                 Payouts
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="transactions" className="space-y-4">
+            <TabsContent value="transactions" className="space-y-3">
               <Card className="bg-gradient-to-br from-orange-50 to-purple-50 shadow-sm border-orange-200/50">
                 <CardHeader>
-                  <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                    Customer Payment Transactions
+                  <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent text-lg sm:text-xl">
+                    Customer Transactions
                   </CardTitle>
-                  <CardDescription>
-                    View all completed payment transactions from customers for your courses and events
+                  <CardDescription className="text-xs sm:text-sm">
+                    View all completed payment transactions
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {loadingTransactions ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 w-full rounded-lg bg-gradient-to-r from-orange-100 to-purple-100" />
+                    <div className="space-y-3">
+                      {Array.from({ length: 2 }).map((_, i) => (
+                        <Skeleton key={i} className="h-28 sm:h-32 w-full rounded-lg bg-gradient-to-r from-orange-100 to-purple-100" />
                       ))}
                     </div>
                   ) : transactions.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground">
+                    <div className="text-center py-6 text-muted-foreground text-sm sm:text-base">
                       No payment transactions found
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {transactions.map(renderTransactionCard)}
                       {renderPagination(transactionsPage, transactionsTotal, setTransactionsPage)}
                     </div>
@@ -683,29 +681,29 @@ const CreatorPayments: React.FC = () => {
               </Card>
             </TabsContent>
             
-            <TabsContent value="payouts" className="space-y-4">
+            <TabsContent value="payouts" className="space-y-3">
               <Card className="bg-gradient-to-br from-purple-50 to-orange-50 shadow-sm border-purple-200/50">
                 <CardHeader>
-                  <CardTitle className="bg-gradient-to-r from-purple-600 to-orange-600 bg-clip-text text-transparent">
+                  <CardTitle className="bg-gradient-to-r from-purple-600 to-orange-600 bg-clip-text text-transparent text-lg sm:text-xl">
                     Payout History
                   </CardTitle>
-                  <CardDescription>
-                    Track your withdrawal requests and their status
+                  <CardDescription className="text-xs sm:text-sm">
+                    Track your withdrawal requests
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {loadingPayouts ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 w-full rounded-lg bg-gradient-to-r from-purple-100 to-orange-100" />
+                    <div className="space-y-3">
+                      {Array.from({ length: 2 }).map((_, i) => (
+                        <Skeleton key={i} className="h-28 sm:h-32 w-full rounded-lg bg-gradient-to-r from-purple-100 to-orange-100" />
                       ))}
                     </div>
                   ) : payouts.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground">
+                    <div className="text-center py-6 text-muted-foreground text-sm sm:text-base">
                       No payout requests found
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {payouts.map(renderPayoutCard)}
                       {renderPagination(payoutsPage, payoutsTotal, setPayoutsPage)}
                     </div>
@@ -716,7 +714,7 @@ const CreatorPayments: React.FC = () => {
           </Tabs>
         </div>
 
-        {/* Enhanced Withdraw Dialog */}
+        {/* Dialogs */}
         <EnhancedWithdrawDialog
           open={isWithdrawDialogOpen}
           onOpenChange={setIsWithdrawDialogOpen}
@@ -728,7 +726,6 @@ const CreatorPayments: React.FC = () => {
           }}
         />
 
-        {/* Payout Method Setup Dialog */}
         <PayoutMethodSetupDialog
           open={isSetupDialogOpen}
           onOpenChange={setIsSetupDialogOpen}
