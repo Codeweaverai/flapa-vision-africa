@@ -318,7 +318,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                 <>
                   <CheckCircle className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Check In</span>
-                  <span className="sm:hidden">Check</span>
+                  <span className="sm:hidden">Check me In</span>
                 </>
               )}
             </Button>
