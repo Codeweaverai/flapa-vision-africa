@@ -70,7 +70,7 @@ const CreatorAttendeeManagement: React.FC = () => {
   useEffect(() => {
     if (selectedEvent) {
       fetchEventAttendees();
-      setCurrentPage(1); // Reset to first page when event changes
+      setCurrentPage(1);
     }
   }, [selectedEvent]);
 
@@ -234,6 +234,10 @@ const CreatorAttendeeManagement: React.FC = () => {
 
   const selectedEventData = events.find(e => e.id === selectedEvent);
 
+  const truncateText = (text: string, maxLength: number) => {
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+  };
+
   const renderAttendeeCard = (attendee: AttendeeData) => {
     const gradientClass = attendee.checked_in 
       ? 'bg-gradient-to-br from-green-500 to-teal-600' 
@@ -252,11 +256,11 @@ const CreatorAttendeeManagement: React.FC = () => {
                 onCheckedChange={(checked) => handleSelectAttendee(attendee.id, !!checked)}
                 className="mt-1 bg-white/20 border-white/50 text-white"
               />
-              <div>
-                <CardTitle className="text-lg text-white">
-                  {attendee.ticket_holder_name || attendee.user_profile?.full_name || 'Unknown'}
+              <div className="min-w-0">
+                <CardTitle className="text-lg text-white truncate">
+                  {truncateText(attendee.ticket_holder_name || attendee.user_profile?.full_name || 'Unknown', window.innerWidth < 640 ? 20 : 50)}
                 </CardTitle>
-                <CardDescription className="text-white/80">
+                <CardDescription className="text-white/80 truncate">
                   {attendee.booking_code}
                 </CardDescription>
               </div>
@@ -273,7 +277,7 @@ const CreatorAttendeeManagement: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-white/80">Ticket Code</p>
-              <p className="font-mono text-sm text-white">{attendee.ticket_code}</p>
+              <p className="font-mono text-sm text-white truncate">{attendee.ticket_code}</p>
             </div>
             <div>
               <p className="text-sm text-white/80">Check-in Status</p>
@@ -281,16 +285,18 @@ const CreatorAttendeeManagement: React.FC = () => {
                 {attendee.checked_in ? (
                   <Badge className="bg-white/20 text-white border-white/50">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Checked In
+                    <span className="hidden sm:inline">Checked In</span>
+                    <span className="sm:hidden">✓</span>
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="bg-white/20 text-white border-white/50">
                     <Clock className="h-3 w-3 mr-1" />
-                    Pending
+                    <span className="hidden sm:inline">Pending</span>
+                    <span className="sm:hidden">⌛</span>
                   </Badge>
                 )}
                 {attendee.check_in_time && (
-                  <span className="text-xs text-white/80">
+                  <span className="text-xs text-white/80 hidden sm:inline">
                     {format(new Date(attendee.check_in_time), 'HH:mm')}
                   </span>
                 )}
@@ -311,13 +317,15 @@ const CreatorAttendeeManagement: React.FC = () => {
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-1" />
-                  Check In
+                  <span className="hidden sm:inline">Check In</span>
+                  <span className="sm:hidden">Check</span>
                 </>
               )}
             </Button>
           ) : (
             <Badge variant="outline" className="bg-white/20 text-white border-white/50">
-              ✓ Checked In
+              <span className="hidden sm:inline">✓ Checked In</span>
+              <span className="sm:hidden">✓ Done</span>
             </Badge>
           )}
         </CardFooter>
@@ -328,13 +336,13 @@ const CreatorAttendeeManagement: React.FC = () => {
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
-        <div className="container mx-auto px-4 py-6">
-          <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Attendee Management</h1>
-            <p className="text-sm sm:text-base text-gray-600">Track and manage your event attendees in real-time</p>
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-1">Attendee Management</h1>
+            <p className="text-xs sm:text-base text-gray-600">Track and manage your event attendees</p>
           </div>
 
-          {/* Event Selection Card with Gradient */}
+          {/* Event Selection Card */}
           <Card className="mb-4 bg-gradient-to-br from-orange-500 to-purple-600 text-white border-white/30 shadow-lg">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
@@ -350,12 +358,9 @@ const CreatorAttendeeManagement: React.FC = () => {
                 <SelectContent className="bg-white" align="start">
                   {events.map(event => (
                     <SelectItem key={event.id} value={event.id} className="hover:bg-orange-50">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{event.title}</span>
-                        <span className="text-xs sm:text-sm text-gray-500">
-                          {format(new Date(event.start_time), 'PPP')} • {event.location}
-                        </span>
-                      </div>
+                      <span className="font-medium truncate">
+                        {truncateText(event.title, window.innerWidth < 640 ? 20 : 50)}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -366,49 +371,49 @@ const CreatorAttendeeManagement: React.FC = () => {
           {selectedEvent && (
             <>
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 sm:mb-6">
                 <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-sm">
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="p-3 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-green-600 text-xs sm:text-sm font-medium">Checked In</p>
-                        <p className="text-xl sm:text-2xl font-bold text-green-700">{checkedInCount}</p>
+                        <p className="text-lg sm:text-2xl font-bold text-green-700">{checkedInCount}</p>
                       </div>
-                      <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+                      <CheckCircle className="h-5 w-5 sm:h-8 sm:w-8 text-green-600" />
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 shadow-sm">
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="p-3 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-orange-600 text-xs sm:text-sm font-medium">Pending</p>
-                        <p className="text-xl sm:text-2xl font-bold text-orange-700">{pendingCount}</p>
+                        <p className="text-lg sm:text-2xl font-bold text-orange-700">{pendingCount}</p>
                       </div>
-                      <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
+                      <Clock className="h-5 w-5 sm:h-8 sm:w-8 text-orange-600" />
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-sm">
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="p-3 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-purple-600 text-xs sm:text-sm font-medium">Total Attendees</p>
-                        <p className="text-xl sm:text-2xl font-bold text-purple-700">{attendees.length}</p>
+                        <p className="text-purple-600 text-xs sm:text-sm font-medium">Total</p>
+                        <p className="text-lg sm:text-2xl font-bold text-purple-700">{attendees.length}</p>
                       </div>
-                      <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                      <Users className="h-5 w-5 sm:h-8 sm:w-8 text-purple-600" />
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Search and Actions */}
-              <Card className="mb-6 bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
-                <CardContent className="p-4 sm:p-6">
+              <Card className="mb-4 sm:mb-6 bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
+                <CardContent className="p-3 sm:p-6">
                   <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-                    <div className="relative w-full sm:max-w-md">
+                    <div className="relative w-full">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         placeholder="Search attendees..."
@@ -455,12 +460,12 @@ const CreatorAttendeeManagement: React.FC = () => {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Users className="h-5 w-5 text-orange-600" />
-                      <CardTitle className="text-lg sm:text-xl">
+                      <CardTitle className="text-base sm:text-xl">
                         Attendee List
                       </CardTitle>
                       {selectedEventData && (
-                        <Badge variant="outline" className="ml-2">
-                          {selectedEventData.title}
+                        <Badge variant="outline" className="ml-2 hidden sm:flex">
+                          {truncateText(selectedEventData.title, 20)}
                         </Badge>
                       )}
                     </div>
@@ -470,7 +475,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                         onCheckedChange={handleSelectAll}
                         id="select-all"
                       />
-                      <label htmlFor="select-all" className="text-sm text-gray-600">
+                      <label htmlFor="select-all" className="text-xs sm:text-sm text-gray-600">
                         Select all
                       </label>
                     </div>
@@ -508,7 +513,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                           />
                         </PaginationItem>
                         <PaginationItem>
-                          <span className="text-sm text-gray-700 px-2">
+                          <span className="text-xs sm:text-sm text-gray-700 px-2">
                             Page {currentPage} of {totalPages}
                           </span>
                         </PaginationItem>
