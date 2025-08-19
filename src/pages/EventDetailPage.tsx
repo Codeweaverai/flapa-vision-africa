@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -142,7 +142,7 @@ const EventDetailPage = () => {
       loadRecommendedEvents();
       loadReviewStats();
     }
-  }, [id]);
+  }, [id, user]);
 
   const getCurrencyCode = (currency?: string): CurrencyCode => {
     if (!currency) return 'USD';
@@ -237,6 +237,13 @@ const EventDetailPage = () => {
   };
 
   const handleAddToCart = (ticketId: string, quantity: number) => {
+    // Check if user is logged in
+    if (!user) {
+      toast.error("Please sign in to purchase tickets");
+      navigate("/auth");
+      return;
+    }
+
     const ticket = event?.event_tickets.find(t => t.id === ticketId);
     if (!ticket || !event) return;
 
@@ -340,13 +347,13 @@ const EventDetailPage = () => {
         <div className="container mx-auto px-4 py-8">
           {/* Back Button */}
           <Button 
-           variant="ghost"
-          onClick={() => navigate('/explore-events')}
+            variant="ghost"
+            onClick={() => navigate('/explore-events')}
             className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white hover:text-white/90 transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
-           Back to Events
-            </Button>
+            Back to Events
+          </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
@@ -394,9 +401,20 @@ const EventDetailPage = () => {
 
                     {isRegistered && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                        <div className="flex items-center gap-2 text-green-800">
-                          <CheckCircle className="h-5 w-5" />
-                          <span className="font-medium">You're registered for this event!</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-green-800">
+                            <CheckCircle className="h-5 w-5" />
+                            <span className="font-medium">You're registered for this event!</span>
+                          </div>
+                          <Button 
+                            asChild
+                            variant="outline" 
+                            className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                          >
+                            <Link to="/my-events">
+                              View My Events
+                            </Link>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -722,7 +740,7 @@ const EventDetailPage = () => {
               )}
             </div>
 
-            {/* Sidebar - Removed sticky positioning */}
+            {/* Sidebar */}
             <div className="space-y-6">
               {/* Registration Card */}
               <Card className="shadow-lg">
@@ -733,7 +751,20 @@ const EventDetailPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {availableTickets.length === 0 ? (
+                  {isRegistered ? (
+                    <div className="text-center py-6">
+                      <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                      <p className="text-green-800 font-medium mb-4">You're registered for this event!</p>
+                      <Button 
+                        asChild
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                      >
+                        <Link to="/my-events">
+                          View My Events
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : availableTickets.length === 0 ? (
                     <div className="text-center py-6">
                       <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <p className="text-gray-600">No tickets available</p>
@@ -763,34 +794,32 @@ const EventDetailPage = () => {
                               <p className="text-sm text-gray-600 mb-3">{ticket.description}</p>
                             )}
                             
-                            {!isRegistered && (
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center border rounded">
-                                  <button
-                                    onClick={() => updateTicketQuantity(ticket.id, selectedQty - 1)}
-                                    className="px-3 py-1 hover:bg-gray-100"
-                                    disabled={selectedQty <= 0}
-                                  >
-                                    -
-                                  </button>
-                                  <span className="px-3 py-1 border-x">{selectedQty}</span>
-                                  <button
-                                    onClick={() => updateTicketQuantity(ticket.id, selectedQty + 1)}
-                                    className="px-3 py-1 hover:bg-gray-100"
-                                    disabled={selectedQty >= available}
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                                <Button
-                                  onClick={() => handleAddToCart(ticket.id, selectedQty || 1)}
-                                  disabled={selectedQty === 0}
-                                  className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600"
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center border rounded">
+                                <button
+                                  onClick={() => updateTicketQuantity(ticket.id, selectedQty - 1)}
+                                  className="px-3 py-1 hover:bg-gray-100"
+                                  disabled={selectedQty <= 0}
                                 >
-                                  Add to Cart
-                                </Button>
+                                  -
+                                </button>
+                                <span className="px-3 py-1 border-x">{selectedQty}</span>
+                                <button
+                                  onClick={() => updateTicketQuantity(ticket.id, selectedQty + 1)}
+                                  className="px-3 py-1 hover:bg-gray-100"
+                                  disabled={selectedQty >= available}
+                                >
+                                  +
+                                </button>
                               </div>
-                            )}
+                              <Button
+                                onClick={() => handleAddToCart(ticket.id, selectedQty || 1)}
+                                disabled={selectedQty === 0}
+                                className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600"
+                              >
+                                Add to Cart
+                              </Button>
+                            </div>
                           </div>
                         );
                       })}
