@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -15,29 +16,35 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import WishlistButton from '@/components/WishlistButton';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 import GiftCourseButton from '@/components/course/GiftCourseButton';
 
 interface Course {
   id: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   description: string;
-  image_url: string;
+  image_url?: string;
+  thumbnail_url?: string;
   price: number;
-  lessons_count: number;
-  duration: number;
+  lessons_count?: number;
+  duration?: number;
+  duration_minutes?: number;
   category: string;
-  level: string;
-  language: string;
+  level?: string;
+  difficulty_level?: string;
+  language?: string;
   instructor_id: string;
   created_at: string;
   updated_at: string;
-  promo_video_url: string;
-  promo_code: string;
-  status: string;
+  promo_video_url?: string;
+  promo_code?: string;
+  status?: string;
   instructor_name: string;
   instructor_avatar: string;
+  is_published?: boolean;
+  certificate_enabled?: boolean;
+  creator_id?: string;
 }
 
 const CourseDetailPage = () => {
@@ -66,14 +73,20 @@ const CourseDetailPage = () => {
         throw new Error('Failed to fetch course');
       }
 
-      // Extract instructor name and avatar from the profiles object
-      const instructorName = data?.profiles?.full_name || 'Unknown Instructor';
-      const instructorAvatar = data?.profiles?.avatar_url || '';
+      // Handle profiles data - it might be an array or single object
+      const profileData = Array.isArray(data?.profiles) ? data.profiles[0] : data?.profiles;
+      const instructorName = profileData?.full_name || 'Unknown Instructor';
+      const instructorAvatar = profileData?.avatar_url || '';
 
       return {
         ...data,
         instructor_name: instructorName,
         instructor_avatar: instructorAvatar,
+        subtitle: data.description, // Use description as subtitle if not provided
+        image_url: data.thumbnail_url || data.image_url,
+        lessons_count: data.lessons_count || 0,
+        duration: data.duration_minutes ? Math.ceil(data.duration_minutes / 60) : 0,
+        level: data.difficulty_level || 'Beginner',
       } as Course;
     },
   });
@@ -85,7 +98,7 @@ const CourseDetailPage = () => {
         .from('lessons')
         .select('*')
         .eq('course_id', id)
-        .order('order', { ascending: true });
+        .order('order_index', { ascending: true });
 
       if (error) {
         console.error('Error fetching lessons:', error);
@@ -201,7 +214,9 @@ const CourseDetailPage = () => {
                 </div>
               </div>
               <div className="md:w-1/3">
-                <img src={course.image_url} alt={course.title} className="rounded-lg shadow-md" />
+                {course.image_url && (
+                  <img src={course.image_url} alt={course.title} className="rounded-lg shadow-md" />
+                )}
               </div>
             </div>
           </div>
@@ -262,7 +277,6 @@ const CourseDetailPage = () => {
                   </div>
                   <Separator className="my-4" />
                   <p className="text-gray-600">
-                    {/* Instructor bio or additional information can be added here */}
                     Learn from one of the best instructors in the field.
                   </p>
                 </CardContent>
@@ -276,12 +290,14 @@ const CourseDetailPage = () => {
                 <CardContent>
                   <h2 className="text-xl font-semibold mb-4">Course Preview</h2>
                   <div className="aspect-w-16 aspect-h-9 mb-4">
-                    <iframe
-                      src={course.promo_video_url}
-                      title="Course Preview"
-                      allowFullScreen
-                      className="rounded-lg"
-                    />
+                    {course.promo_video_url && (
+                      <iframe
+                        src={course.promo_video_url}
+                        title="Course Preview"
+                        allowFullScreen
+                        className="rounded-lg"
+                      />
+                    )}
                   </div>
                   <p className="text-gray-600">Watch this short preview to get an idea of what you'll learn in this course.</p>
                 </CardContent>
@@ -349,7 +365,7 @@ const CourseDetailPage = () => {
                     <div className="flex items-center">
                       <Link2 className="h-4 w-4 mr-2 text-gray-600" />
                       <span className="font-medium">Language:</span>
-                      <span className="ml-auto">{course.language}</span>
+                      <span className="ml-auto">{course.language || 'English'}</span>
                     </div>
                   </div>
                 </CardContent>

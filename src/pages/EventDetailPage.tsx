@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -18,7 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/lib/supabaseClient';
-import WishlistButton from '@/components/WishlistButton';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 import GiftEventButton from '@/components/event/GiftEventButton';
 
 interface Event {
@@ -28,14 +29,22 @@ interface Event {
   start_time: string;
   end_time: string;
   location: string;
-  organizer: string;
-  category: string;
-  tags: string[];
-  is_online: boolean;
+  organizer?: string;
+  category?: string;
+  tags?: string[];
+  is_online?: boolean;
   url?: string;
   image_url?: string;
   created_at: string;
   updated_at: string;
+  event_type?: string;
+  currency?: string;
+  capacity?: number;
+  is_free?: boolean;
+  is_published?: boolean;
+  price?: number;
+  creator_id?: string;
+  workplace_id?: string;
 }
 
 interface EventTicket {
@@ -80,7 +89,16 @@ const EventDetailPage = () => {
         throw eventError;
       }
 
-      setEvent(eventData);
+      // Map the database event to our Event interface
+      const mappedEvent: Event = {
+        ...eventData,
+        organizer: eventData.creator_id || 'Unknown Organizer',
+        category: eventData.event_type || 'General',
+        tags: eventData.tags || [],
+        is_online: eventData.is_online || false,
+      };
+
+      setEvent(mappedEvent);
 
       const { data: ticketData, error: ticketError } = await supabase
         .from('event_tickets')
