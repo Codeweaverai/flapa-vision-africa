@@ -277,7 +277,7 @@ const CreatorAttendeeManagement: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-white/80">Ticket Code</p>
-              <p className="font-mono text-sm text-white truncate">{attendee.ticket_code}</p>
+              <p className="font-mono text-sm text-white">{attendee.ticket_code}</p>
             </div>
             <div>
               <p className="text-sm text-white/80">Check-in Status</p>
@@ -317,7 +317,7 @@ const CreatorAttendeeManagement: React.FC = () => {
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Check In</span>
+                  <span className="hidden sm:inline">Check me In</span>
                   <span className="sm:hidden">Check me In</span>
                 </>
               )}
