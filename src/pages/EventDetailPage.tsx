@@ -36,6 +36,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode } from '@/constants/currencies';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Event {
   id: string;
@@ -818,6 +819,20 @@ const EventDetailPage = () => {
                     <span className="text-gray-600">Language</span>
                     <span className="font-medium">English</span>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Wishlist Button */}
+              <Card className="shadow-lg">
+                <CardContent className="p-6">
+                  <WishlistButton
+                    itemId={event.id}
+                    itemType="event"
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    <Heart className="w-5 h-5 mr-2" />
+                    Save to Wishlist
+                  </WishlistButton>
                 </CardContent>
               </Card>
 
