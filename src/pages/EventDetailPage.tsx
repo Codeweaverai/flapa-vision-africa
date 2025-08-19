@@ -759,8 +759,8 @@ const EventDetailPage = () => {
                         asChild
                         className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                       >
-                        <Link to="/my-events">
-                          View My Events
+                        <Link to="/my-orders">
+                          View Event Ticket
                         </Link>
                       </Button>
                     </div>
