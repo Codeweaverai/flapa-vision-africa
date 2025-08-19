@@ -15,7 +15,8 @@ import {
   Play, 
   CheckCircle,
   Award,
-  ShoppingCart
+  ShoppingCart,
+  Heart
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CourseReviews from '@/components/course/CourseReviews';
@@ -24,6 +25,7 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import ReactPlayer from 'react-player';
+import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Course {
   id: string;
@@ -765,6 +767,18 @@ const CourseDetailPage = () => {
                         <span>Certificate of completion</span>
                       </div>
                     )}
+                  </div>
+                  
+                  {/* Wishlist Button */}
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <WishlistButton
+                      itemId={course.id}
+                      itemType="course"
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    >
+                      <Heart className="w-4 h-4 mr-2" />
+                      Add to Wishlist
+                    </WishlistButton>
                   </div>
                 </CardContent>
               </Card>
