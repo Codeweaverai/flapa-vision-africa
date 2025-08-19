@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -40,13 +39,7 @@ export const useWishlist = () => {
         
       if (error) throw error;
       
-      // Type cast the data to ensure proper typing
-      const typedData: WishlistItem[] = (data || []).map(item => ({
-        ...item,
-        item_type: item.item_type as 'course' | 'event'
-      }));
-      
-      setWishlistItems(typedData);
+      setWishlistItems(data || []);
     } catch (err) {
       console.error('Error fetching wishlist items:', err);
       setError(err as Error);
@@ -80,13 +73,7 @@ export const useWishlist = () => {
         throw error;
       }
       
-      // Type cast the new item
-      const newItem: WishlistItem = {
-        ...data,
-        item_type: data.item_type as 'course' | 'event'
-      };
-      
-      setWishlistItems(prev => [newItem, ...prev]);
+      setWishlistItems(prev => [data, ...prev]);
       toast.success('Added to wishlist');
       return true;
     } catch (err) {
