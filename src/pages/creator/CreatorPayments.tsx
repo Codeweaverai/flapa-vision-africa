@@ -634,86 +634,85 @@ const CreatorPayments: React.FC = () => {
           </div>
           
           {/* Payments & Payouts Tabs */}
-<div className="w-full max-w-[100vw] -mx-4 px-4 sm:mx-0 sm:px-0"> {/* Added container div for full mobile width */}
-  <Tabs defaultValue="transactions" className="w-full">
-    <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-orange-100 to-purple-100 p-1 h-auto rounded-lg border border-orange-200/50">
-      <TabsTrigger 
-        value="transactions" 
-        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all text-xs sm:text-sm"
-      >
-        Transactions
-      </TabsTrigger>
-      <TabsTrigger 
-        value="payouts"
-        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all text-xs sm:text-sm"
-      >
-        Payouts
-      </TabsTrigger>
-    </TabsList>
-    
-    <TabsContent value="transactions" className="space-y-3">
-      <Card className="bg-gradient-to-br from-orange-50 to-purple-50 shadow-sm border-orange-200/50 w-full">
-        <CardHeader>
-          <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent text-lg sm:text-xl">
-            Customer Transactions
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            View all completed payment transactions
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6"> {/* Adjusted padding for mobile */}
-          {loadingTransactions ? (
-            <div className="space-y-3">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 sm:h-32 w-full rounded-lg bg-gradient-to-r from-orange-100 to-purple-100" />
-              ))}
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground text-sm sm:text-base">
-              No payment transactions found
-            </div>
-          ) : (
-            <div className="space-y-3 w-full"> {/* Added w-full */}
-              {transactions.map(renderTransactionCard)}
-              {renderPagination(transactionsPage, transactionsTotal, setTransactionsPage)}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </TabsContent>
-    
-    <TabsContent value="payouts" className="space-y-3">
-      <Card className="bg-gradient-to-br from-purple-50 to-orange-50 shadow-sm border-purple-200/50 w-full">
-        <CardHeader>
-          <CardTitle className="bg-gradient-to-r from-purple-600 to-orange-600 bg-clip-text text-transparent text-lg sm:text-xl">
-            Payout History
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            Track your withdrawal requests
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6"> {/* Adjusted padding for mobile */}
-          {loadingPayouts ? (
-            <div className="space-y-3">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 sm:h-32 w-full rounded-lg bg-gradient-to-r from-purple-100 to-orange-100" />
-              ))}
-            </div>
-          ) : payouts.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground text-sm sm:text-base">
-              No payout requests found
-            </div>
-          ) : (
-            <div className="space-y-3 w-full"> {/* Added w-full */}
-              {payouts.map(renderPayoutCard)}
-              {renderPagination(payoutsPage, payoutsTotal, setPayoutsPage)}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </TabsContent>
-  </Tabs>
-</div>
+          <Tabs defaultValue="transactions" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-orange-100 to-purple-100 p-1 h-auto rounded-lg border border-orange-200/50">
+              <TabsTrigger 
+                value="transactions" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all text-xs sm:text-sm"
+              >
+                Transactions
+              </TabsTrigger>
+              <TabsTrigger 
+                value="payouts"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all text-xs sm:text-sm"
+              >
+                Payouts
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="transactions" className="space-y-3">
+              <Card className="bg-gradient-to-br from-orange-50 to-purple-50 shadow-sm border-orange-200/50">
+                <CardHeader>
+                  <CardTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent text-lg sm:text-xl">
+                    Customer Transactions
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    View all completed payment transactions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingTransactions ? (
+                    <div className="space-y-3">
+                      {Array.from({ length: 2 }).map((_, i) => (
+                        <Skeleton key={i} className="h-28 sm:h-32 w-full rounded-lg bg-gradient-to-r from-orange-100 to-purple-100" />
+                      ))}
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm sm:text-base">
+                      No payment transactions found
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {transactions.map(renderTransactionCard)}
+                      {renderPagination(transactionsPage, transactionsTotal, setTransactionsPage)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="payouts" className="space-y-3">
+              <Card className="bg-gradient-to-br from-purple-50 to-orange-50 shadow-sm border-purple-200/50">
+                <CardHeader>
+                  <CardTitle className="bg-gradient-to-r from-purple-600 to-orange-600 bg-clip-text text-transparent text-lg sm:text-xl">
+                    Payout History
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Track your withdrawal requests
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingPayouts ? (
+                    <div className="space-y-3">
+                      {Array.from({ length: 2 }).map((_, i) => (
+                        <Skeleton key={i} className="h-28 sm:h-32 w-full rounded-lg bg-gradient-to-r from-purple-100 to-orange-100" />
+                      ))}
+                    </div>
+                  ) : payouts.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm sm:text-base">
+                      No payout requests found
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {payouts.map(renderPayoutCard)}
+                      {renderPagination(payoutsPage, payoutsTotal, setPayoutsPage)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
 
         {/* Dialogs */}
         <EnhancedWithdrawDialog
