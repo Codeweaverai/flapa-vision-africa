@@ -455,83 +455,96 @@ const CreatorAttendeeManagement: React.FC = () => {
               </Card>
 
               {/* Attendee Cards with Pagination */}
-              <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
-                <CardHeader>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-orange-600" />
-                      <CardTitle className="text-base sm:text-xl">
-                        Attendee List
-                      </CardTitle>
-                      {selectedEventData && (
-                        <Badge variant="outline" className="ml-2 hidden sm:flex">
-                          {truncateText(selectedEventData.title, 20)}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={selectedAttendees.length === filteredAttendees.length && filteredAttendees.length > 0}
-                        onCheckedChange={handleSelectAll}
-                        id="select-all"
-                      />
-                      <label htmlFor="select-all" className="text-xs sm:text-sm text-gray-600">
-                        Select all
-                      </label>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="flex flex-col gap-4">
-                      {[1, 2, 3].map((i) => (
-                        <div 
-                          key={i} 
-                          className="h-24 bg-gradient-to-br from-orange-100 to-purple-100 rounded-lg border-2 border-white/30 animate-pulse"
-                        ></div>
-                      ))}
-                    </div>
-                  ) : filteredAttendees.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      {searchTerm ? 'No attendees found matching your search.' : 'No attendees found for this event.'}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {paginatedAttendees.map(renderAttendeeCard)}
-                    </div>
-                  )}
-                </CardContent>
-                {filteredAttendees.length > ITEMS_PER_PAGE && (
-                  <CardFooter className="flex justify-center">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className="cursor-pointer"
-                          />
-                        </PaginationItem>
-                        <PaginationItem>
-                          <span className="text-xs sm:text-sm text-gray-700 px-2">
-                            Page {currentPage} of {totalPages}
-                          </span>
-                        </PaginationItem>
-                        <PaginationItem>
-                          <PaginationNext
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages}
-                            className="cursor-pointer"
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </CardFooter>
-                )}
-              </Card>
-            </>
-          )}
-        </div>
+<Card className="w-full max-w-full sm:max-w-3xl mx-auto bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
+  <CardHeader>
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <Users className="h-5 w-5 text-orange-600" />
+        <CardTitle className="text-base sm:text-xl">
+          Attendee List
+        </CardTitle>
+        {selectedEventData && (
+          <Badge variant="outline" className="ml-2 hidden sm:flex">
+            {truncateText(selectedEventData.title, 20)}
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          checked={
+            selectedAttendees.length === filteredAttendees.length &&
+            filteredAttendees.length > 0
+          }
+          onCheckedChange={handleSelectAll}
+          id="select-all"
+        />
+        <label
+          htmlFor="select-all"
+          className="text-xs sm:text-sm text-gray-600"
+        >
+          Select all
+        </label>
+      </div>
+    </div>
+  </CardHeader>
+  <CardContent className="space-y-3 px-2 sm:px-4">
+    {loading ? (
+      <div className="flex flex-col gap-4">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-24 w-full bg-gradient-to-br from-orange-100 to-purple-100 rounded-lg border-2 border-white/30 animate-pulse"
+          ></div>
+        ))}
+      </div>
+    ) : filteredAttendees.length === 0 ? (
+      <div className="text-center py-8 text-gray-500">
+        {searchTerm
+          ? "No attendees found matching your search."
+          : "No attendees found for this event."}
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {paginatedAttendees.map(renderAttendeeCard)}
+      </div>
+    )}
+  </CardContent>
+  {filteredAttendees.length > ITEMS_PER_PAGE && (
+    <CardFooter className="flex justify-center">
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              onClick={() =>
+                setCurrentPage((prev) => Math.max(prev - 1, 1))
+              }
+              disabled={currentPage === 1}
+              className="cursor-pointer"
+            />
+          </PaginationItem>
+          <PaginationItem>
+            <span className="text-xs sm:text-sm text-gray-700 px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+          </PaginationItem>
+          <PaginationItem>
+            <PaginationNext
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+              className="cursor-pointer"
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    </CardFooter>
+  )}
+</Card>
+</>
+)}
+</div>
+</div>
       </div>
 
       {/* Bulk Announcement Modal */}
