@@ -4,11 +4,21 @@ import { toast } from 'sonner';
 
 export interface CartItem {
   itemId: string;
-  itemType: 'course' | 'event_ticket';
+  itemType: 'course' | 'event_ticket' | 'gift_course' | 'gift_event' | 'gift_card';
   itemName: string;
   price: number;
   quantity: number;
   ticketHolderNames?: string[];
+  giftMetadata?: {
+    senderName: string;
+    recipientName: string;
+    recipientEmail: string;
+    personalMessage?: string;
+    amount?: number;
+    eventTitle?: string;
+    eventDate?: string;
+    eventLocation?: string;
+  };
 }
 
 interface CartState {
@@ -26,10 +36,13 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
     case 'ADD_ITEM': {
       const existingItemIndex = state.items.findIndex(
-        item => item.itemId === action.payload.itemId && item.itemType === action.payload.itemType
+        item => item.itemId === action.payload.itemId && 
+                 item.itemType === action.payload.itemType &&
+                 // For gift items, treat each as unique
+                 !item.itemType.startsWith('gift')
       );
 
-      if (existingItemIndex >= 0) {
+      if (existingItemIndex >= 0 && !action.payload.itemType.startsWith('gift')) {
         const updatedItems = [...state.items];
         updatedItems[existingItemIndex] = {
           ...updatedItems[existingItemIndex],
@@ -105,7 +118,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = (item: CartItem) => {
     dispatch({ type: 'ADD_ITEM', payload: item });
-    toast.success(`${item.itemName} added to cart`);
+    
+    if (item.itemType.startsWith('gift')) {
+      toast.success(`${item.itemName} added to cart`);
+    } else {
+      toast.success(`${item.itemName} added to cart`);
+    }
   };
 
   const removeFromCart = (itemId: string) => {

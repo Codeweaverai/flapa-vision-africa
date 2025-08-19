@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -1699,6 +1699,181 @@ export type Database = {
           },
         ]
       }
+      gift_cards: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          expires_at: string
+          gift_card_code: string
+          id: string
+          order_id: string | null
+          personal_message: string | null
+          recipient_email: string
+          recipient_name: string
+          sender_email: string
+          sender_name: string
+          status: string
+          updated_at: string
+          used_amount: number
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          expires_at?: string
+          gift_card_code: string
+          id?: string
+          order_id?: string | null
+          personal_message?: string | null
+          recipient_email: string
+          recipient_name: string
+          sender_email: string
+          sender_name: string
+          status?: string
+          updated_at?: string
+          used_amount?: number
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          expires_at?: string
+          gift_card_code?: string
+          id?: string
+          order_id?: string | null
+          personal_message?: string | null
+          recipient_email?: string
+          recipient_name?: string
+          sender_email?: string
+          sender_name?: string
+          status?: string
+          updated_at?: string
+          used_amount?: number
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gift_cards_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gift_redemptions: {
+        Row: {
+          amount_used: number
+          created_at: string
+          gift_card_id: string
+          id: string
+          order_id: string
+          redeemed_by: string
+        }
+        Insert: {
+          amount_used: number
+          created_at?: string
+          gift_card_id: string
+          id?: string
+          order_id: string
+          redeemed_by: string
+        }
+        Update: {
+          amount_used?: number
+          created_at?: string
+          gift_card_id?: string
+          id?: string
+          order_id?: string
+          redeemed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gift_redemptions_gift_card_id_fkey"
+            columns: ["gift_card_id"]
+            isOneToOne: false
+            referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_redemptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gifts: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          expires_at: string
+          gift_code: string
+          id: string
+          item_id: string
+          item_type: string
+          order_id: string | null
+          personal_message: string | null
+          recipient_email: string
+          recipient_name: string
+          sender_email: string
+          sender_name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          expires_at?: string
+          gift_code: string
+          id?: string
+          item_id: string
+          item_type: string
+          order_id?: string | null
+          personal_message?: string | null
+          recipient_email: string
+          recipient_name: string
+          sender_email: string
+          sender_name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          expires_at?: string
+          gift_code?: string
+          id?: string
+          item_id?: string
+          item_type?: string
+          order_id?: string | null
+          personal_message?: string | null
+          recipient_email?: string
+          recipient_name?: string
+          sender_email?: string
+          sender_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gifts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       help_center_faqs: {
         Row: {
           answer: string
@@ -2646,10 +2821,13 @@ export type Database = {
       }
       orders: {
         Row: {
+          applied_gift_card_id: string | null
           created_at: string | null
           currency: string | null
           email: string
+          gift_card_discount: number | null
           id: string
+          is_gift_purchase: boolean | null
           payment_method: string
           payment_provider_id: string | null
           payment_status: string
@@ -2663,10 +2841,13 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          applied_gift_card_id?: string | null
           created_at?: string | null
           currency?: string | null
           email: string
+          gift_card_discount?: number | null
           id?: string
+          is_gift_purchase?: boolean | null
           payment_method: string
           payment_provider_id?: string | null
           payment_status?: string
@@ -2680,10 +2861,13 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          applied_gift_card_id?: string | null
           created_at?: string | null
           currency?: string | null
           email?: string
+          gift_card_discount?: number | null
           id?: string
+          is_gift_purchase?: boolean | null
           payment_method?: string
           payment_provider_id?: string | null
           payment_status?: string
@@ -2696,7 +2880,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_applied_gift_card_id_fkey"
+            columns: ["applied_gift_card_id"]
+            isOneToOne: false
+            referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_transactions: {
         Row: {
@@ -3458,6 +3650,30 @@ export type Database = {
           },
         ]
       }
+      wishlists: {
+        Row: {
+          added_at: string
+          id: string
+          item_id: string
+          item_type: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          item_id: string
+          item_type: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          item_id?: string
+          item_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       workplace_invitations: {
         Row: {
           accepted_at: string | null
@@ -3516,10 +3732,10 @@ export type Database = {
       broadcast_message_to_all_users: {
         Args: {
           p_admin_id: string
-          p_subject: string
           p_content: string
           p_message_type?: string
           p_priority?: string
+          p_subject: string
         }
         Returns: string
       }
@@ -3536,11 +3752,11 @@ export type Database = {
         Args: { creator_user_id: string }
         Returns: {
           available_balance: number
+          course_revenue: number
+          event_revenue: number
           pending_balance: number
           total_earnings: number
           total_platform_fees: number
-          course_revenue: number
-          event_revenue: number
         }[]
       }
       can_edit_workplace_content: {
@@ -3554,18 +3770,26 @@ export type Database = {
       count_bookings_by_event: {
         Args: Record<PropertyKey, never>
         Returns: {
-          event_id: string
           count: string
+          event_id: string
         }[]
       }
       count_registrations_by_event: {
         Args: Record<PropertyKey, never>
         Returns: {
-          event_id: string
           count: string
+          event_id: string
         }[]
       }
       generate_booking_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_gift_card_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_gift_code: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
@@ -3592,9 +3816,9 @@ export type Database = {
       get_user_emails: {
         Args: { user_ids: string[] }
         Returns: {
-          id: string
-          email: string
           created_at: string
+          email: string
+          id: string
         }[]
       }
       get_user_workplace_ids: {
@@ -3608,8 +3832,8 @@ export type Database = {
       is_creator_content_owner: {
         Args: {
           creator_uuid: string
-          item_type_param: string
           item_id_param: string
+          item_type_param: string
         }
         Returns: boolean
       }
@@ -3638,12 +3862,18 @@ export type Database = {
         Returns: undefined
       }
       update_ticket_inventory: {
-        Args: { p_ticket_id: string; p_quantity: number }
+        Args: { p_quantity: number; p_ticket_id: string }
         Returns: boolean
       }
       user_needs_otp_verification: {
         Args: { user_uuid: string }
         Returns: boolean
+      }
+      validate_creator_students: {
+        Args: { creator_id: string; student_ids: string[] }
+        Returns: {
+          student_id: string
+        }[]
       }
     }
     Enums: {
