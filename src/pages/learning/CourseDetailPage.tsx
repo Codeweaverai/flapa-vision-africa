@@ -26,6 +26,7 @@ import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+import { Separator } from '@/components/ui/separator';
 
 interface Course {
   id: string;
