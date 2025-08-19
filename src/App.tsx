@@ -31,8 +31,8 @@ import LocalContentPage from '@/pages/LocalContentPage';
 import EventDetailPage from '@/pages/EventDetailPage';
 import MyEventsPage from '@/pages/MyEventsPage';
 import WishlistPage from '@/pages/WishlistPage';
-import GiftRedeemPage from './pages/GiftRedeemPage'; 
-import GiftCardsPage from './pages/GiftCardsPage';
+import GiftCardsPage from '@/pages/GiftCardsPage';
+import GiftRedeemPage from '@/pages/GiftRedeemPage';
 
 // Import account pages
 import AccountPage from '@/pages/AccountPage';
