@@ -76,33 +76,112 @@ const TicketVerificationPage = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [activeTab, setActiveTab] = useState('manual');
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [audioInitialized, setAudioInitialized] = useState(false);
   
   // Audio references
   const successSoundRef = useRef<HTMLAudioElement>(null);
   const errorSoundRef = useRef<HTMLAudioElement>(null);
   const checkinSoundRef = useRef<HTMLAudioElement>(null);
 
+  // Initialize audio on user interaction (to bypass autoplay restrictions)
+  useEffect(() => {
+    const initializeAudio = () => {
+      if (audioInitialized) return;
+      
+      // Preload and initialize audio elements
+      if (successSoundRef.current) {
+        successSoundRef.current.volume = 0.7;
+        successSoundRef.current.load();
+      }
+      if (errorSoundRef.current) {
+        errorSoundRef.current.volume = 0.7;
+        errorSoundRef.current.load();
+      }
+      if (checkinSoundRef.current) {
+        checkinSoundRef.current.volume = 0.7;
+        checkinSoundRef.current.load();
+      }
+      
+      setAudioInitialized(true);
+    };
+
+    // Initialize audio on any user interaction
+    const handleUserInteraction = () => {
+      initializeAudio();
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [audioInitialized]);
+
+  // Improved sound playing function
+  const playSound = (soundRef: React.RefObject<HTMLAudioElement>) => {
+    if (!soundEnabled || !soundRef.current) return;
+    
+    try {
+      // Create a clone of the audio element to avoid conflicts
+      const clone = soundRef.current.cloneNode(true) as HTMLAudioElement;
+      clone.volume = 0.7;
+      
+      const playPromise = clone.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // Audio played successfully
+            // Remove the clone after it finishes playing
+            clone.onended = () => {
+              if (document.body.contains(clone)) {
+                document.body.removeChild(clone);
+              }
+            };
+          })
+          .catch(error => {
+            console.log('Audio play failed:', error);
+            // Fallback to original method
+            soundRef.current.currentTime = 0;
+            soundRef.current.play().catch(e => console.log('Fallback audio play failed:', e));
+          });
+      }
+    } catch (error) {
+      console.error('Error playing sound:', error);
+    }
+  };
+
   // Play success sound
   const playSuccessSound = () => {
-    if (soundEnabled && successSoundRef.current) {
-      successSoundRef.current.currentTime = 0;
-      successSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
-    }
+    playSound(successSoundRef);
   };
 
   // Play error sound
   const playErrorSound = () => {
-    if (soundEnabled && errorSoundRef.current) {
-      errorSoundRef.current.currentTime = 0;
-      errorSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
-    }
+    playSound(errorSoundRef);
   };
 
   // Play check-in sound
   const playCheckinSound = () => {
-    if (soundEnabled && checkinSoundRef.current) {
-      checkinSoundRef.current.currentTime = 0;
-      checkinSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
+    playSound(checkinSoundRef);
+  };
+
+  // Test sound function
+  const testSound = (type: 'success' | 'error' | 'checkin') => {
+    switch (type) {
+      case 'success':
+        playSuccessSound();
+        break;
+      case 'error':
+        playErrorSound();
+        break;
+      case 'checkin':
+        playCheckinSound();
+        break;
     }
   };
 
@@ -256,10 +335,25 @@ const TicketVerificationPage = () => {
 
   return (
     <Layout>
-      {/* Audio elements for sounds */}
-      <audio ref={successSoundRef} src="/lovable-uploads/success.mp3" preload="auto" />
-       <audio ref={errorSoundRef} src="/lovable-uploads/error.mp3" preload="auto" />
-       <audio ref={checkinSoundRef} src="/lovable-uploads/checkin.mp3" preload="auto" />
+      {/* Audio elements for sounds - with more attributes for better compatibility */}
+      <audio 
+        ref={successSoundRef} 
+        src="/lovable-uploads/success.mp3" 
+        preload="auto" 
+        className="hidden"
+      />
+      <audio 
+        ref={errorSoundRef} 
+        src="/lovable-uploads/error.mp3" 
+        preload="auto" 
+        className="hidden"
+      />
+      <audio 
+        ref={checkinSoundRef} 
+        src="/lovable-uploads/checkin.mp3" 
+        preload="auto" 
+        className="hidden"
+      />
       
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
         <div className="container mx-auto px-4">
@@ -280,8 +374,8 @@ const TicketVerificationPage = () => {
                 </p>
               )}
               
-              {/* Sound Toggle Button */}
-              <div className="mt-4 flex justify-center">
+              {/* Sound Toggle Button and Test Buttons */}
+              <div className="mt-4 flex flex-col items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -300,6 +394,34 @@ const TicketVerificationPage = () => {
                     </>
                   )}
                 </Button>
+                
+                {/* Test sound buttons - remove in production */}
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testSound('success')}
+                    className="text-xs"
+                  >
+                    Test Success
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testSound('error')}
+                    className="text-xs"
+                  >
+                    Test Error
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testSound('checkin')}
+                    className="text-xs"
+                  >
+                    Test Check-in
+                  </Button>
+                </div>
               </div>
             </div>
 
