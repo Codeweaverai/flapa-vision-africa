@@ -422,34 +422,34 @@ const CreatorAttendeeManagement: React.FC = () => {
                         className="pl-10 w-full"
                       />
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      {selectedAttendees.length > 0 && (
-                        <Button
-                          onClick={() => setShowAnnouncementModal(true)}
-                          className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white w-full sm:w-auto"
-                          size="sm"
-                        >
-                          <MessageSquare className="h-4 w-4 mr-1 sm:mr-2" />
-                          <span className="whitespace-nowrap">
-                            Send ({selectedAttendees.length})
-                          </span>
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open('/ticket-verification', '_blank')}
-                        className="flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-sm hover:shadow-md w-full sm:w-auto"
-                      >
-                        <QrCode className="h-4 w-4" />
-                        <span className="whitespace-nowrap">Scan</span>
-                      </Button>
-                      <AttendeeExportButton 
-                        eventId={selectedEvent} 
-                        eventTitle={selectedEventData?.title} 
-                        className="w-full sm:w-auto"
-                      />
-                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full">
+  {selectedAttendees.length > 0 && (
+    <Button
+      onClick={() => setShowAnnouncementModal(true)}
+      className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white w-full sm:w-auto"
+      size="sm"
+    >
+      <MessageSquare className="h-4 w-4 mr-1 sm:mr-2" />
+      <span className="whitespace-nowrap">
+        Send ({selectedAttendees.length})
+      </span>
+    </Button>
+  )}
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => window.open('/ticket-verification', '_blank')}
+    className="flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-sm hover:shadow-md w-full sm:w-auto"
+  >
+    <QrCode className="h-4 w-4" />
+    <span className="whitespace-nowrap">Scan</span>
+  </Button>
+  <AttendeeExportButton 
+    eventId={selectedEvent} 
+    eventTitle={selectedEventData?.title} 
+    className="w-full sm:w-auto"
+  />
+   </div>
                   </div>
                 </CardContent>
               </Card>
