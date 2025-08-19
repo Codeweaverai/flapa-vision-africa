@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -104,6 +104,7 @@ interface CreatorProfile {
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToCart } = useCart();
   const [course, setCourse] = useState<Course | null>(null);
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
@@ -111,12 +112,64 @@ const CourseDetailPage = () => {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check authentication status on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+        setAuthChecked(true);
+        
+        // If we have a user, check enrollment status
+        if (session?.user && id) {
+          const { data: enrollment } = await supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', id)
+            .eq('user_id', session.user.id)
+            .eq('payment_status', 'completed')
+            .single();
+
+          setIsEnrolled(!!enrollment);
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setAuthChecked(true);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user || null);
+      
+      // If user just signed in, check enrollment status
+      if (session?.user && id && event === 'SIGNED_IN') {
+        const { data: enrollment } = await supabase
+          .from('course_enrollments')
+          .select('id')
+          .eq('course_id', id)
+          .eq('user_id', session.user.id)
+          .eq('payment_status', 'completed')
+          .single();
+
+        setIsEnrolled(!!enrollment);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [id]);
 
   useEffect(() => {
-    if (id) {
+    if (id && authChecked) {
       fetchCourse();
     }
-  }, [id]);
+  }, [id, authChecked]);
 
   const fetchCourse = async () => {
     try {
@@ -268,19 +321,6 @@ const CourseDetailPage = () => {
       if (courseData.creator_id) {
         await fetchCreatorProfile(courseData.creator_id);
       }
-
-      // Check if user is enrolled
-      if (user) {
-        const { data: enrollment } = await supabase
-          .from('course_enrollments')
-          .select('id')
-          .eq('course_id', id)
-          .eq('user_id', user.id)
-          .eq('payment_status', 'completed')
-          .single();
-
-        setIsEnrolled(!!enrollment);
-      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('An error occurred while loading the course');
@@ -334,12 +374,19 @@ const CourseDetailPage = () => {
 
   const handleAddToCart = async () => {
     if (!user) {
-      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      // Store the current path for redirect after authentication
+      navigate('/auth', { state: { from: location.pathname } });
       return;
     }
 
-    setLoading(true);
+    if (isEnrolled) {
+      toast.info('You are already enrolled in this course');
+      navigate(`/learning/course/${course.id}`);
+      return;
+    }
+
     try {
+      setLoading(true);
       await addToCart({
         itemType: 'course',
         itemId: course.id,
@@ -348,6 +395,7 @@ const CourseDetailPage = () => {
         price: course.price,
         ticketHolderNames: []
       });
+      toast.success('Course added to cart successfully!');
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Failed to add course to cart');
@@ -358,14 +406,21 @@ const CourseDetailPage = () => {
 
   const handleEnrollNow = () => {
     if (!user) {
-      toast.error('Please sign in to enroll in courses');
-      navigate('/auth');
+      // Store the current path for redirect after authentication
+      navigate('/auth', { state: { from: location.pathname } });
+      return;
+    }
+
+    if (isEnrolled) {
+      toast.info('You are already enrolled in this course');
+      navigate(`/learning/course/${course.id}`);
       return;
     }
 
     if (course?.is_free) {
       handleFreeEnrollment();
     } else {
+      // For paid courses, add to cart and go to checkout
       handleAddToCart();
       navigate('/checkout');
     }
@@ -722,9 +777,10 @@ const CourseDetailPage = () => {
                         <Button 
                           className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
                           onClick={handleAddToCart}
+                          disabled={loading}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
-                          Add to Cart
+                          {loading ? 'Adding...' : 'Add to Cart'}
                         </Button>
                       )}
                     </div>
@@ -769,17 +825,19 @@ const CourseDetailPage = () => {
                     )}
                   </div>
                   
-                  {/* Wishlist Button */}
-                  <div className="mt-6 pt-4 border-t border-gray-200">
-                    <WishlistButton
-                      itemId={course.id}
-                      itemType="course"
-                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                    >
-                      <Heart className="w-4 h-4 mr-2" />
-                      Add to Wishlist
-                    </WishlistButton>
-                  </div>
+                  {/* Wishlist Button - Only show if not enrolled */}
+                  {!isEnrolled && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <WishlistButton
+                        itemId={course.id}
+                        itemType="course"
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                      >
+                        <Heart className="w-4 h-4 mr-2" />
+                        Add to Wishlist
+                      </WishlistButton>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
