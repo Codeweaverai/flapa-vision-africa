@@ -12,8 +12,7 @@ import ReactPlayer from 'react-player';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
-  CheckCircle2, GraduationCap, Eye, FileText, ChevronUp, ChevronDown,
-  Sun, Moon, ChevronLeft, ChevronRight
+  CheckCircle2, GraduationCap, Eye, FileText, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
@@ -143,21 +142,12 @@ const CourseLearningPage = () => {
   const [showResumeButton, setShowResumeButton] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
   const [showTranscript, setShowTranscript] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
-  const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   
   const isEnrolled = enrollment?.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
   const isNotComplete = progressPercentage < 100;
   const hasLessons = modules.some(module => module.lessons.length > 0);
   const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
-
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle('dark');
-  };
 
   const calculateCourseProgress = (completed: string[], total: number): number => {
     if (total === 0) return 0;
@@ -374,20 +364,6 @@ const CourseLearningPage = () => {
       if (initialLesson) {
         setSelectedLesson(initialLesson);
         setCurrentLessonId(initialLesson.id);
-        
-        // Find the index of the current lesson
-        let found = false;
-        for (let mIndex = 0; mIndex < modules.length; mIndex++) {
-          for (let lIndex = 0; lIndex < modules[mIndex].lessons.length; lIndex++) {
-            if (modules[mIndex].lessons[lIndex].id === initialLesson.id) {
-              setCurrentModuleIndex(mIndex);
-              setCurrentLessonIndex(lIndex);
-              found = true;
-              break;
-            }
-          }
-          if (found) break;
-        }
       }
     }
   }, [isEnrolled, modules, progress, completedLessons]);
@@ -491,65 +467,6 @@ const CourseLearningPage = () => {
   const handleLessonSelect = (lesson: CourseLesson) => {
     setCurrentLessonId(lesson.id);
     setSelectedLesson(lesson);
-    
-    // Find the index of the selected lesson
-    let found = false;
-    for (let mIndex = 0; mIndex < modules.length; mIndex++) {
-      for (let lIndex = 0; lIndex < modules[mIndex].lessons.length; lIndex++) {
-        if (modules[mIndex].lessons[lIndex].id === lesson.id) {
-          setCurrentModuleIndex(mIndex);
-          setCurrentLessonIndex(lIndex);
-          found = true;
-          break;
-        }
-      }
-      if (found) break;
-    }
-  };
-
-  const navigateToNextLesson = () => {
-    if (!modules.length) return;
-    
-    const nextLessonIndex = currentLessonIndex + 1;
-    
-    // If there are more lessons in the current module
-    if (nextLessonIndex < modules[currentModuleIndex].lessons.length) {
-      const nextLesson = modules[currentModuleIndex].lessons[nextLessonIndex];
-      handleLessonSelect(nextLesson);
-      return;
-    }
-    
-    // If we need to go to the next module
-    const nextModuleIndex = currentModuleIndex + 1;
-    if (nextModuleIndex < modules.length && modules[nextModuleIndex].lessons.length > 0) {
-      const nextLesson = modules[nextModuleIndex].lessons[0];
-      setCurrentModuleIndex(nextModuleIndex);
-      setCurrentLessonIndex(0);
-      handleLessonSelect(nextLesson);
-    }
-  };
-
-  const navigateToPrevLesson = () => {
-    if (!modules.length) return;
-    
-    const prevLessonIndex = currentLessonIndex - 1;
-    
-    // If there are previous lessons in the current module
-    if (prevLessonIndex >= 0) {
-      const prevLesson = modules[currentModuleIndex].lessons[prevLessonIndex];
-      handleLessonSelect(prevLesson);
-      return;
-    }
-    
-    // If we need to go to the previous module
-    const prevModuleIndex = currentModuleIndex - 1;
-    if (prevModuleIndex >= 0 && modules[prevModuleIndex].lessons.length > 0) {
-      const lastLessonIndex = modules[prevModuleIndex].lessons.length - 1;
-      const prevLesson = modules[prevModuleIndex].lessons[lastLessonIndex];
-      setCurrentModuleIndex(prevModuleIndex);
-      setCurrentLessonIndex(lastLessonIndex);
-      handleLessonSelect(prevLesson);
-    }
   };
 
   const handleSeekTo = (time: number) => {
@@ -580,8 +497,8 @@ const CourseLearningPage = () => {
   if (loading) {
     return (
       <Layout>
-        <main className="flex-grow flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 dark:border-purple-500"></div>
+        <main className="flex-grow flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
         </main>
       </Layout>
     );
@@ -590,10 +507,10 @@ const CourseLearningPage = () => {
   if (!courseId) {
     return (
       <Layout>
-        <main className="flex-grow flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <main className="flex-grow flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Invalid course URL</h1>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">The course ID is missing from the URL.</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid course URL</h1>
+            <p className="text-gray-600 mb-4">The course ID is missing from the URL.</p>
             <Link to="/explore-courses">
               <Button>Browse Courses</Button>
             </Link>
@@ -606,9 +523,9 @@ const CourseLearningPage = () => {
   if (!course) {
     return (
       <Layout>
-        <main className="flex-grow flex items-center justify-center bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <main className="flex-grow flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Course not found</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
             <Link to="/explore-courses">
               <Button>Browse Courses</Button>
             </Link>
@@ -618,27 +535,10 @@ const CourseLearningPage = () => {
     );
   }
 
-  return (
+ return (
     <Layout>
-      <main className={`flex-grow bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300`}>
+      <main className="flex-grow bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-6 sm:py-8">
-          {/* Dark Mode Toggle */}
-          <div className="flex justify-end mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleDarkMode}
-              className="rounded-full p-2 h-10 w-10"
-              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {darkMode ? (
-                <Sun className="h-5 w-5 text-yellow-400" />
-              ) : (
-                <Moon className="h-5 w-5 text-gray-600" />
-              )}
-            </Button>
-          </div>
-
           {/* Resume Button */}
           {showResumeButton && resumeLesson && (
             <div className="mb-4">
@@ -658,15 +558,15 @@ const CourseLearningPage = () => {
           {/* Course Header */}
           <div className="mb-6 sm:mb-8">
             <div className="flex flex-wrap items-center gap-2 mb-3 sm:mb-4">
-              <Badge variant="secondary" className="text-xs sm:text-sm dark:bg-gray-700 dark:text-gray-200">{course.category}</Badge>
-              <Badge variant="outline" className="text-xs sm:text-sm dark:border-gray-600 dark:text-gray-200">{course.difficulty_level}</Badge>
-              {course.is_free && <Badge className="bg-green-500 text-xs sm:text-sm dark:bg-green-600">Free</Badge>}
+              <Badge variant="secondary" className="text-xs sm:text-sm">{course.category}</Badge>
+              <Badge variant="outline" className="text-xs sm:text-sm">{course.difficulty_level}</Badge>
+              {course.is_free && <Badge className="bg-green-500 text-xs sm:text-sm">Free</Badge>}
             </div>
             
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-4">{course.title}</h1>
-            <p className="text-base sm:text-xl text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">{course.summary}</p>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2 sm:mb-4">{course.title}</h1>
+            <p className="text-base sm:text-xl text-gray-600 mb-4 sm:mb-6">{course.summary}</p>
             
-            <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm sm:text-base text-gray-600">
               <div className="flex items-center gap-1 sm:gap-2">
                 <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span>{course.duration_minutes} min</span>
@@ -688,15 +588,15 @@ const CourseLearningPage = () => {
 
           {/* Progress Card */}
           {isEnrolled && (
-            <Card className="mb-6 sm:mb-8 bg-gradient-to-r from-orange-100 to-purple-100 dark:from-gray-800 dark:to-gray-700 border-0 dark:border-gray-600">
+            <Card className="mb-6 sm:mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="text-base sm:text-lg font-semibold dark:text-white">Your Progress</h3>
-                  <span className="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400">{progressPercentage}%</span>
+                  <h3 className="text-base sm:text-lg font-semibold">Your Progress</h3>
+                  <span className="text-xl sm:text-2xl font-bold text-orange-600">{progressPercentage}%</span>
                 </div>
-                <Progress value={progressPercentage} className="h-2 sm:h-3 bg-gray-200 dark:bg-gray-600" />
+                <Progress value={progressPercentage} className="h-2 sm:h-3" />
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-3 sm:mt-4 gap-2">
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+                  <p className="text-xs sm:text-sm text-gray-600">
                     {progressPercentage < 50 ? 'Keep going! You\'re doing great.' : 
                      progressPercentage < 80 ? 'You\'re making excellent progress!' :
                      'Almost there! Finish strong!'}
@@ -707,7 +607,7 @@ const CourseLearningPage = () => {
                         onClick={markAllLessonsComplete}
                         disabled={markingComplete}
                         size="xs"
-                        className="bg-green-600 hover:bg-green-700 text-white text-xs dark:bg-green-700 dark:hover:bg-green-800"
+                        className="bg-green-600 hover:bg-green-700 text-white text-xs"
                       >
                         {markingComplete ? (
                           <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
@@ -722,7 +622,7 @@ const CourseLearningPage = () => {
                       <Button
                         onClick={handleTakeExam}
                         size="sm"
-                        className="bg-orange-600 hover:bg-orange-700 text-white text-sm py-1 px-3 dark:bg-orange-700 dark:hover:bg-orange-800"
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-sm py-1 px-3"
                       >
                         <GraduationCap className="h-4 w-4 mr-2" />
                         Final Exam
@@ -733,7 +633,7 @@ const CourseLearningPage = () => {
                       <Button
                         onClick={navigateToCourseResults}
                         size="sm"
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-sm py-1 px-3 dark:bg-purple-700 dark:hover:bg-purple-800"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-sm py-1 px-3"
                       >
                         <Eye className="h-4 w-4 mr-2" />
                         View Results
@@ -749,9 +649,9 @@ const CourseLearningPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
             {/* Course Curriculum */}
             <div className="lg:col-span-4">
-              <Card className="sticky top-4 dark:bg-gray-800 dark:border-gray-700">
+              <Card className="sticky top-4">
                 <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg dark:text-white">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                     <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
                     Curriculum
                   </CardTitle>
@@ -774,24 +674,24 @@ const CourseLearningPage = () => {
             {/* Content Tabs */}
             <div className="lg:col-span-8">
               <Tabs defaultValue="content" className="w-full">
-                <TabsList className="grid w-full grid-cols-5 h-10 sm:h-12 bg-gray-100 dark:bg-gray-700">
-                  <TabsTrigger value="content" className="text-xs sm:text-sm p-1 sm:p-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-white dark:text-gray-300">
+                <TabsList className="grid w-full grid-cols-5 h-10 sm:h-12">
+                  <TabsTrigger value="content" className="text-xs sm:text-sm p-1 sm:p-2">
                     <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Content
                   </TabsTrigger>
-                  <TabsTrigger value="lesson-notes" className="text-xs sm:text-sm p-1 sm:p-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-white dark:text-gray-300">
+                  <TabsTrigger value="lesson-notes" className="text-xs sm:text-sm p-1 sm:p-2">
                     <StickyNote className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Notes
                   </TabsTrigger>
-                  <TabsTrigger value="transcripts" className="text-xs sm:text-sm p-1 sm:p-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-white dark:text-gray-300">
+                  <TabsTrigger value="transcripts" className="text-xs sm:text-sm p-1 sm:p-2">
                     <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Transcript
                   </TabsTrigger>
-                  <TabsTrigger value="reviews" className="text-xs sm:text-sm p-1 sm:p-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-white dark:text-gray-300">
+                  <TabsTrigger value="reviews" className="text-xs sm:text-sm p-1 sm:p-2">
                     <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Reviews
                   </TabsTrigger>
-                  <TabsTrigger value="discussion" className="text-xs sm:text-sm p-1 sm:p-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-white dark:text-gray-300">
+                  <TabsTrigger value="discussion" className="text-xs sm:text-sm p-1 sm:p-2">
                     <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Discuss
                   </TabsTrigger>
@@ -799,15 +699,15 @@ const CourseLearningPage = () => {
                 
                 <TabsContent value="content" className="space-y-6">
                   {isEnrolled ? (
-                    <Card className="dark:bg-gray-800 dark:border-gray-700">
+                    <Card>
                       <CardContent className="p-4 sm:p-6">
                         {selectedLesson || modules[0]?.lessons[0] ? (
                           <div>
-                            <h3 className="text-lg sm:text-xl font-semibold mb-4 dark:text-white">
+                            <h3 className="text-lg sm:text-xl font-semibold mb-4">
                               {selectedLesson?.title || modules[0]?.lessons[0]?.title}
                             </h3>
                             {(selectedLesson?.description || modules[0]?.lessons[0]?.description) && (
-                              <p className="text-gray-600 mb-4 text-sm sm:text-base dark:text-gray-300">
+                              <p className="text-gray-600 mb-4 text-sm sm:text-base">
                                 {selectedLesson?.description || modules[0]?.lessons[0]?.description}
                               </p>
                             )}
@@ -838,18 +738,18 @@ const CourseLearningPage = () => {
                                     className="flex items-center justify-between cursor-pointer mb-3"
                                     onClick={() => setShowTranscript(!showTranscript)}
                                   >
-                                    <h4 className="text-lg font-semibold flex items-center dark:text-white">
+                                    <h4 className="text-lg font-semibold flex items-center">
                                       <FileText className="h-5 w-5 mr-2 text-orange-600" />
                                       Video Transcript
                                     </h4>
                                     {showTranscript ? (
-                                      <ChevronUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                                      <ChevronUp className="h-5 w-5 text-gray-500" />
                                     ) : (
-                                      <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                                      <ChevronDown className="h-5 w-5 text-gray-500" />
                                     )}
                                   </div>
                                   {showTranscript && (
-                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 dark:bg-gray-700 dark:border-gray-600">
+                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                       <VideoTranscripts 
                                         lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
                                         currentTime={currentVideoTime}
@@ -862,50 +762,26 @@ const CourseLearningPage = () => {
                               </>
                             )}
                             {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
-                              <div className="prose max-w-none mt-6 text-sm sm:text-base dark:prose-invert">
+                              <div className="prose max-w-none mt-6 text-sm sm:text-base">
                                 {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
                                   ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
                                   : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
                                 }
                               </div>
                             )}
-                            
-                            {/* Mobile Navigation - Only visible on mobile */}
-                            <div className="lg:hidden flex justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
-                              <Button 
-                                variant="outline" 
-                                onClick={navigateToPrevLesson}
-                                disabled={currentModuleIndex === 0 && currentLessonIndex === 0}
-                                className="flex items-center gap-2 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700"
-                              >
-                                <ChevronLeft className="h-4 w-4" />
-                                Previous
-                              </Button>
-                              <Button 
-                                onClick={navigateToNextLesson}
-                                disabled={
-                                  currentModuleIndex === modules.length - 1 && 
-                                  currentLessonIndex === modules[currentModuleIndex]?.lessons.length - 1
-                                }
-                                className="bg-orange-600 hover:bg-orange-700 text-white dark:bg-orange-700 dark:hover:bg-orange-800"
-                              >
-                                Next
-                                <ChevronRight className="h-4 w-4 ml-2" />
-                              </Button>
-                            </div>
                           </div>
                         ) : (
-                          <p className="text-gray-500 dark:text-gray-400">This course doesn't have any lessons yet</p>
+                          <p className="text-gray-500">This course doesn't have any lessons yet</p>
                         )}
                       </CardContent>
                     </Card>
                   ) : (
-                    <Card className="dark:bg-gray-800 dark:border-gray-700">
+                    <Card>
                       <CardContent className="text-center py-8">
-                        <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
-                        <p className="text-gray-500 mb-4 dark:text-gray-400">Enroll in this course to access lesson content</p>
+                        <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-500 mb-4">Enroll in this course to access lesson content</p>
                         <Button 
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 dark:from-orange-600 dark:to-purple-700 dark:hover:from-orange-700 dark:hover:to-purple-800"
+                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                           onClick={() => navigate(`/course/${courseId}/enroll`)}
                         >
                           Enroll Now
@@ -921,12 +797,12 @@ const CourseLearningPage = () => {
                       lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
                     />
                   ) : (
-                    <Card className="dark:bg-gray-800 dark:border-gray-700">
+                    <Card>
                       <CardContent className="text-center py-8">
-                        <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
-                        <p className="text-gray-500 mb-4 dark:text-gray-400">Enroll in this course to start taking lesson notes</p>
+                        <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-500 mb-4">Enroll in this course to start taking lesson notes</p>
                         <Button 
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 dark:from-orange-600 dark:to-purple-700 dark:hover:from-orange-700 dark:hover:to-purple-800"
+                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                           onClick={() => navigate(`/course/${courseId}/enroll`)}
                         >
                           Enroll Now
@@ -944,12 +820,12 @@ const CourseLearningPage = () => {
                       onSeekTo={handleSeekTo}
                     />
                   ) : (
-                    <Card className="dark:bg-gray-800 dark:border-gray-700">
+                    <Card>
                       <CardContent className="text-center py-8">
-                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
-                        <p className="text-gray-500 mb-4 dark:text-gray-400">Enroll in this course to access video transcripts</p>
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-500 mb-4">Enroll in this course to access video transcripts</p>
                         <Button 
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 dark:from-orange-600 dark:to-purple-700 dark:hover:from-orange-700 dark:hover:to-purple-800"
+                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                           onClick={() => navigate(`/course/${courseId}/enroll`)}
                         >
                           Enroll Now
@@ -972,21 +848,21 @@ const CourseLearningPage = () => {
 
           {/* Enrollment Card */}
           {!isEnrolled && (
-            <Card className="mt-6 sm:mt-8 sticky bottom-4 dark:bg-gray-800 dark:border-gray-700">
+            <Card className="mt-6 sm:mt-8 sticky bottom-4">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
-                    <div className="text-xl sm:text-3xl font-bold text-orange-600 dark:text-orange-500 mb-1 sm:mb-2">
+                    <div className="text-xl sm:text-3xl font-bold text-orange-600 mb-1 sm:mb-2">
                       {course.is_free ? 'Free' : (
                         <PriceDisplay 
                           amount={course.price} 
                           originalCurrency="USD" 
-                          className="text-orange-600 dark:text-orange-500"
+                          className="text-orange-600"
                         />
                       )}
                     </div>
                     {!course.is_free && (
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">One-time payment</p>
+                      <p className="text-xs sm:text-sm text-gray-600">One-time payment</p>
                     )}
                   </div>
                   {user ? (
@@ -1001,7 +877,7 @@ const CourseLearningPage = () => {
                         />
                       )}
                       <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm dark:from-orange-600 dark:to-purple-700 dark:hover:from-orange-700 dark:hover:to-purple-800"
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm"
                         size="sm"
                         onClick={() => navigate(`/course/${courseId}/enroll`)}
                       >
@@ -1010,7 +886,7 @@ const CourseLearningPage = () => {
                     </div>
                   ) : (
                     <Button 
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm dark:from-orange-600 dark:to-purple-700 dark:hover:from-orange-700 dark:hover:to-purple-800"
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm"
                       size="sm"
                       onClick={() => navigate('/auth')}
                     >
