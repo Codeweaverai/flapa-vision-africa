@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 
@@ -50,6 +51,11 @@ const Footer = () => {
               <li>
                 <Link to="/media" className="text-gray-300 hover:text-indigo-300 transition-colors">
                   Media
+                </Link>
+              </li>
+              <li>
+                <Link to="/gift-cards" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Gift Cards
                 </Link>
               </li>
               <li>

@@ -208,6 +208,8 @@ function App() {
                   <Route path="/events/:id" element={<EventDetailPage />} />
                   <Route path="/my-events" element={<ProtectedRoute><MyEventsPage /></ProtectedRoute>} />
                   <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
+                  
+                  {/* Gift Routes */}
                   <Route path="/gift-cards" element={<GiftCardsPage />} />
                   <Route path="/redeem-gift" element={<GiftRedeemPage />} />
 
