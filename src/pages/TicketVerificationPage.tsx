@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,9 @@ import {
   Shield,
   Camera,
   Smartphone,
-  Scan
+  Scan,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -74,6 +75,36 @@ const TicketVerificationPage = () => {
   const [checkingIn, setCheckingIn] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [activeTab, setActiveTab] = useState('manual');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  
+  // Audio references
+  const successSoundRef = useRef<HTMLAudioElement>(null);
+  const errorSoundRef = useRef<HTMLAudioElement>(null);
+  const checkinSoundRef = useRef<HTMLAudioElement>(null);
+
+  // Play success sound
+  const playSuccessSound = () => {
+    if (soundEnabled && successSoundRef.current) {
+      successSoundRef.current.currentTime = 0;
+      successSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
+    }
+  };
+
+  // Play error sound
+  const playErrorSound = () => {
+    if (soundEnabled && errorSoundRef.current) {
+      errorSoundRef.current.currentTime = 0;
+      errorSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
+    }
+  };
+
+  // Play check-in sound
+  const playCheckinSound = () => {
+    if (soundEnabled && checkinSoundRef.current) {
+      checkinSoundRef.current.currentTime = 0;
+      checkinSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
+    }
+  };
 
   const handleVerifyTicket = async () => {
     if (!ticketCode.trim() && !bookingCode.trim()) {
@@ -108,6 +139,7 @@ const TicketVerificationPage = () => {
           setVerificationStatus('already_checked_in');
         } else {
           setVerificationStatus('success');
+          playSuccessSound();
         }
         toast.success('Ticket verified successfully!');
       } else {
@@ -118,12 +150,14 @@ const TicketVerificationPage = () => {
         } else {
           setErrorMessage(data.message || 'Ticket verification failed');
         }
+        playErrorSound();
         toast.error(data.message || 'Ticket verification failed');
       }
     } catch (error) {
       console.error('Verification error:', error);
       setVerificationStatus('error');
       setErrorMessage('Failed to verify ticket. Please try again.');
+      playErrorSound();
       toast.error('Failed to verify ticket. Please try again.');
     } finally {
       setLoading(false);
@@ -170,6 +204,7 @@ const TicketVerificationPage = () => {
         setVerifiedTicket(prev => prev ? { ...prev, checked_in: true } : null);
         setVerificationStatus('already_checked_in');
         setShowCheckinModal(false);
+        playCheckinSound();
         toast.success('✅ Ticket checked in successfully!');
       } else {
         throw new Error(data.message || 'Check-in failed');
@@ -221,6 +256,11 @@ const TicketVerificationPage = () => {
 
   return (
     <Layout>
+      {/* Audio elements for sounds */}
+      <audio ref={successSoundRef} src="/sounds/success.mp3" preload="auto" />
+      <audio ref={errorSoundRef} src="/sounds/error.mp3" preload="auto" />
+      <audio ref={checkinSoundRef} src="/sounds/checkin.mp3" preload="auto" />
+      
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
@@ -239,6 +279,28 @@ const TicketVerificationPage = () => {
                   You can only verify tickets for events you have created
                 </p>
               )}
+              
+              {/* Sound Toggle Button */}
+              <div className="mt-4 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className="flex items-center gap-2"
+                >
+                  {soundEnabled ? (
+                    <>
+                      <Volume2 className="h-4 w-4" />
+                      Sound On
+                    </>
+                  ) : (
+                    <>
+                      <VolumeX className="h-4 w-4" />
+                      Sound Off
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {/* Enhanced Verification Form */}
@@ -378,7 +440,7 @@ const TicketVerificationPage = () => {
               </CardContent>
             </Card>
 
-                      {/* Mobile-Optimized Verification Results */}
+            {/* Mobile-Optimized Verification Results */}
             {verificationStatus !== 'idle' && (
               <Card className={`${getStatusColor()} transition-all duration-300 shadow-2xl border-0 mx-0 sm:mx-0`}>
                 <CardContent className="p-4 sm:p-8">
@@ -507,7 +569,7 @@ const TicketVerificationPage = () => {
         </div>
       </div>
 
-      {/* Barcode Scanner Modal (unchanged) */}
+      {/* Barcode Scanner Modal */}
       <Dialog open={showScanner} onOpenChange={setShowScanner}>
         <DialogContent className="sm:max-w-md">
           <BarcodeScanner
@@ -517,7 +579,7 @@ const TicketVerificationPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Check-in Confirmation Modal (unchanged) */}
+      {/* Check-in Confirmation Modal */}
       <Dialog open={showCheckinModal} onOpenChange={setShowCheckinModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
