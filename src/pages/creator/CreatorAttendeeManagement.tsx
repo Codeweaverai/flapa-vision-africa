@@ -455,7 +455,7 @@ const CreatorAttendeeManagement: React.FC = () => {
               </Card>
 
               {/* Attendee Cards with Pagination */}
-              <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm">
+                <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-sm w-full max-w-[95vw] mx-auto">
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -481,7 +481,7 @@ const CreatorAttendeeManagement: React.FC = () => {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-6">
                   {loading ? (
                     <div className="flex flex-col gap-4">
                       {[1, 2, 3].map((i) => (
@@ -496,13 +496,13 @@ const CreatorAttendeeManagement: React.FC = () => {
                       {searchTerm ? 'No attendees found matching your search.' : 'No attendees found for this event.'}
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 w-full">
                       {paginatedAttendees.map(renderAttendeeCard)}
                     </div>
                   )}
                 </CardContent>
                 {filteredAttendees.length > ITEMS_PER_PAGE && (
-                  <CardFooter className="flex justify-center">
+                  <CardFooter className="flex justify-center px-2 sm:px-6">
                     <Pagination>
                       <PaginationContent>
                         <PaginationItem>
