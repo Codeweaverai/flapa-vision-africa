@@ -257,9 +257,9 @@ const TicketVerificationPage = () => {
   return (
     <Layout>
       {/* Audio elements for sounds */}
-      <audio ref={successSoundRef} src="/sounds/success.mp3" preload="auto" />
-      <audio ref={errorSoundRef} src="/sounds/error.mp3" preload="auto" />
-      <audio ref={checkinSoundRef} src="/sounds/checkin.mp3" preload="auto" />
+      <audio ref={successSoundRef} src="/lovable-uploads/success.mp3" preload="auto" />
+       <audio ref={errorSoundRef} src="/lovable-uploads/error.mp3" preload="auto" />
+       <audio ref={checkinSoundRef} src="/lovable-uploads/checkin.mp3" preload="auto" />
       
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
         <div className="container mx-auto px-4">
