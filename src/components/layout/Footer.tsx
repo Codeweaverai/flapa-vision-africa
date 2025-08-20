@@ -1,89 +1,108 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Linkedin, Youtube, Mail, Phone, MapPin } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { Mail } from 'lucide-react';
 
 const Footer = () => {
+  const currentYear = new Date().getFullYear();
+
   return (
-    <footer className="bg-gray-900 text-white">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Company Info */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">SP</span>
-              </div>
-              <span className="text-xl font-bold">SkillPulse</span>
-            </div>
-            <p className="text-gray-400 text-sm">
-              Empowering minds through innovative learning experiences. Join thousands of learners worldwide in their journey to success.
+    <footer className="bg-[#1e1b4b] text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="col-span-1 md:col-span-2">
+            <Link to="/" className="text-2xl font-bold text-white hover:text-indigo-300 transition-colors">
+              SkillPulse
+            </Link>
+            <p className="mt-4 max-w-md text-gray-300">
+              Skills and Event Booking Platform Marketplace. Connecting expertise with opportunity, 
+              facilitating professional growth and development.
             </p>
-            <div className="flex space-x-4">
-              <Facebook className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
-              <Twitter className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
-              <Instagram className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
-              <Linkedin className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
-              <Youtube className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
+            <div className="mt-6 flex items-center">
+              <Mail size={16} className="mr-2 text-indigo-300" />
+              <a href="mailto:help@skillpulse.cloud" className="hover:text-indigo-300 transition-colors">
+                help@skillpulse.cloud
+              </a>
             </div>
           </div>
-
-          {/* Quick Links */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Quick Links</h3>
-            <div className="space-y-2">
-              <Link to="/courses" className="block text-gray-400 hover:text-white text-sm">Courses</Link>
-              <Link to="/events" className="block text-gray-400 hover:text-white text-sm">Events</Link>
-              <Link to="/creators" className="block text-gray-400 hover:text-white text-sm">Creators</Link>
-              <Link to="/about" className="block text-gray-400 hover:text-white text-sm">About</Link>
-              <Link to="/gift-cards" className="block text-gray-400 hover:text-white text-sm">Gift Cards</Link>
-              <Link to="/help" className="block text-gray-400 hover:text-white text-sm">Help Center</Link>
-            </div>
+          
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-indigo-200">Quick Links</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link to="/" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link to="/about" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  About
+                </Link>
+              </li>
+              <li>
+                <Link to="/help" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Help Center
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Contact Us
+                </Link>
+              </li>
+              <li>
+                <Link to="/media" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Media
+                </Link>
+              </li>
+              <li>
+                <Link to="/verify" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Verify Certificate
+                </Link>
+              </li>
+            </ul>
           </div>
-
-          {/* Learning */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Learning</h3>
-            <div className="space-y-2">
-              <Link to="/my-courses" className="block text-gray-400 hover:text-white text-sm">My Courses</Link>
-              <Link to="/my-events" className="block text-gray-400 hover:text-white text-sm">My Events</Link>
-              <Link to="/wishlist" className="block text-gray-400 hover:text-white text-sm">Wishlist</Link>
-              <Link to="/community" className="block text-gray-400 hover:text-white text-sm">Community</Link>
-              <Link to="/become-creator" className="block text-gray-400 hover:text-white text-sm">Become Creator</Link>
-            </div>
-          </div>
-
-          {/* Contact */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Contact</h3>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2 text-gray-400 text-sm">
-                <Mail className="h-4 w-4" />
-                <span>hello@skillpulse.cloud</span>
-              </div>
-              <div className="flex items-center space-x-2 text-gray-400 text-sm">
-                <Phone className="h-4 w-4" />
-                <span>+1 (555) 123-4567</span>
-              </div>
-              <div className="flex items-center space-x-2 text-gray-400 text-sm">
-                <MapPin className="h-4 w-4" />
-                <span>San Francisco, CA</span>
-              </div>
-            </div>
+          
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-indigo-200">Resources</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link to="/learning" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  My Learning
+                </Link>
+              </li>
+              <li>
+                <Link to="/careers" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Careers
+                </Link>
+              </li>
+              <li>
+                <Link to="/explore-events" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Explore Events
+                </Link>
+              </li>
+              <li>
+                <Link to="/explore-courses" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Explore Courses
+                </Link>
+              </li>
+              <li>
+                <Link to="/community" className="text-gray-300 hover:text-indigo-300 transition-colors">
+                  Community
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
-
-        <Separator className="my-8 bg-gray-800" />
-
-        {/* Bottom Footer */}
-        <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-          <div className="text-gray-400 text-sm">
-            © 2024 SkillPulse. All rights reserved.
-          </div>
-          <div className="flex space-x-6">
-            <Link to="/privacy" className="text-gray-400 hover:text-white text-sm">Privacy Policy</Link>
-            <Link to="/terms" className="text-gray-400 hover:text-white text-sm">Terms of Service</Link>
-            <Link to="/contact" className="text-gray-400 hover:text-white text-sm">Contact</Link>
+        
+        <div className="mt-12 pt-8 border-t border-indigo-700">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400">© {currentYear} SkillPulse. All rights reserved.</p>
+            <div className="mt-4 md:mt-0 flex space-x-4">
+              <Link to="/privacy" className="text-gray-400 hover:text-indigo-300 transition-colors">
+                Privacy Policy
+              </Link>
+              <Link to="/terms" className="text-gray-400 hover:text-indigo-300 transition-colors">
+                Terms of Service
+              </Link>
+            </div>
           </div>
         </div>
       </div>

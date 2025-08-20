@@ -27,7 +27,6 @@ import PriceDisplay from '@/components/currency/PriceDisplay';
 import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
 
-
 interface Course {
   id: string;
   title: string;
