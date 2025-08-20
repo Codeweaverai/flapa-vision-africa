@@ -876,10 +876,13 @@ const EventDetailPage = () => {
                           
                           if (ticket.ticket_type?.toLowerCase().includes('vip')) {
                             buttonStyle = "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0";
-                            buttonText = "Gift VIP Ticket";
+                            buttonText = "Gift VIP";
                           } else if (ticket.ticket_type?.toLowerCase().includes('early') || ticket.name.toLowerCase().includes('early')) {
                             buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
                             buttonText = "Gift Early Bird";
+                          } else if (ticket.ticket_type?.toLowerCase().includes('ordinary') || ticket.name.toLowerCase().includes('ordinary')) {
+                            buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
+                            buttonText = "Gift Ordinary";
                           } else if (ticket.ticket_type?.toLowerCase().includes('standard') || ticket.name.toLowerCase().includes('standard')) {
                             buttonStyle = "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0";
                             buttonText = "Gift Standard";
