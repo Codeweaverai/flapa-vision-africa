@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode } from '@/constants/currencies';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+import GiftEventButton from '@/components/event/GiftEventButton'; // Add this import
 
 interface Event {
   id: string;
@@ -851,17 +852,36 @@ const EventDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Wishlist Button */}
+              {/* Wishlist Button with Gift Event Buttons */}
               <Card className="shadow-lg">
                 <CardContent className="p-6">
                   <WishlistButton
                     itemId={event.id}
                     itemType="event"
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 mb-3"
                   >
                     <Heart className="w-5 h-5 mr-2" />
                     Save to Wishlist
                   </WishlistButton>
+                  
+                  {/* Gift Event Buttons - Only show if not registered and tickets are available */}
+                  {!isRegistered && availableTickets.length > 0 && (
+                    <div className="space-y-3 pt-3 border-t border-gray-200">
+                      <h4 className="font-semibold text-sm text-gray-700 mb-2">Gift Tickets</h4>
+                      {availableTickets.map((ticket) => (
+                        <GiftEventButton
+                          key={ticket.id}
+                          event={{
+                            id: event.id,
+                            title: event.title,
+                            start_time: event.start_time,
+                            location: event.location
+                          }}
+                          ticket={ticket}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
