@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -35,14 +34,18 @@ type CartAction =
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
     case 'ADD_ITEM': {
+      // For gift items, always treat as unique (don't combine quantities)
+      if (action.payload.itemType.startsWith('gift')) {
+        return { ...state, items: [...state.items, action.payload] };
+      }
+
+      // For non-gift items, check for existing items to combine quantities
       const existingItemIndex = state.items.findIndex(
         item => item.itemId === action.payload.itemId && 
-                 item.itemType === action.payload.itemType &&
-                 // For gift items, treat each as unique
-                 !item.itemType.startsWith('gift')
+                 item.itemType === action.payload.itemType
       );
 
-      if (existingItemIndex >= 0 && !action.payload.itemType.startsWith('gift')) {
+      if (existingItemIndex >= 0) {
         const updatedItems = [...state.items];
         updatedItems[existingItemIndex] = {
           ...updatedItems[existingItemIndex],
