@@ -206,8 +206,11 @@ const CheckoutPage = () => {
                             <h4 className="font-medium">{item.itemName}</h4>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge variant="secondary">
-                                {item.itemType === 'course' ? 'Course' : 'Event Ticket'}
-                              </Badge>
+                               {item.itemType === 'course' || item.itemType === 'gift_course' ? 'Course' : 
+                           item.itemType === 'event_ticket' || item.itemType === 'gift_event' ? 'Event Ticket' :
+                           item.itemType === 'gift_card' ? 'Gift Card' : 
+                           item.itemType}
+                           </Badge>
                             </div>
                             <div className="mt-2 space-y-1">
                               <div className="text-lg font-semibold">
