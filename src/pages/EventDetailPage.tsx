@@ -864,11 +864,11 @@ const EventDetailPage = () => {
                     Save to Wishlist
                   </WishlistButton>
                   
-                 {/* Gift Event Buttons - Only show if not registered and tickets are available */}
+               {/* Gift Event Buttons - Only show if not registered and tickets are available */}
 {!isRegistered && availableTickets.length > 0 && (
   <div className="space-y-3 pt-3 border-t border-gray-200">
     <h4 className="font-semibold text-sm text-gray-700 mb-2">Gift Tickets</h4>
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div className="flex flex-col gap-3">
       {availableTickets.slice(0, 3).map((ticket) => {
         // Determine button style based on ticket type
         let buttonStyle = "";
@@ -893,19 +893,18 @@ const EventDetailPage = () => {
         }
 
         return (
-          <div key={ticket.id} className="flex flex-col">
-            <GiftEventButton
-              event={{
-                id: event.id,
-                title: event.title,
-                start_time: event.start_time,
-                location: event.location
-              }}
-              ticket={ticket}
-              className={`w-full ${buttonStyle} font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm min-h-[44px] flex items-center justify-center`}
-              buttonText={buttonText}
-            />
-          </div>
+          <GiftEventButton
+            key={ticket.id}
+            event={{
+              id: event.id,
+              title: event.title,
+              start_time: event.start_time,
+              location: event.location
+            }}
+            ticket={ticket}
+            className={`w-full ${buttonStyle} font-medium py-3 px-4 rounded-lg transition-all duration-200 text-sm min-h-[48px] flex items-center justify-center`}
+            buttonText={buttonText}
+          />
         );
       })}
     </div>
@@ -917,8 +916,8 @@ const EventDetailPage = () => {
       </p>
     )}
   </div>
-  )}
-    </CardContent>
+)}
+</CardContent>
               </Card>
 
               {/* Creator Profile Card */}
