@@ -632,137 +632,113 @@ const EventDetailPage = () => {
                 </Card>
               )}
 
-             {/* Improved Recommended Events */}
-  {recommendedEvents.length > 0 && (
-  <Card className="shadow-lg">
-    <CardHeader>
-      <CardTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-        Recommended Events
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {recommendedEvents
-          .filter(recEvent => new Date(recEvent.start_time) > new Date()) // Only upcoming events
-          .sort((a, b) => {
-            // Smart sorting algorithm: prioritize similar event type and higher ratings
-            const currentEventType = event?.event_type || '';
-            
-            // Score events based on relevance
-            const scoreA = calculateRelevanceScore(a, currentEventType);
-            const scoreB = calculateRelevanceScore(b, currentEventType);
-            
-            return scoreB - scoreA; // Sort by relevance score descending
-          })
-          .slice(0, 3) // Show only top 3 most relevant events
-          .map((recEvent) => (
-            <Card key={recEvent.id} className="group overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 border-0 hover:scale-[1.02] cursor-pointer"
-                   onClick={() => navigate(`/event-detail/${recEvent.id}`)}>
-              <div className="relative overflow-hidden">
-                {recEvent.image_url ? (
-                  <img
-                    src={recEvent.image_url}
-                    alt={recEvent.title}
-                    className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-48 bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center">
-                    <Calendar className="h-16 w-16 text-white opacity-80" />
-                  </div>
-                )}
-                
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                
-                {/* Price badge */}
-                <div className="absolute top-3 left-3">
-                  <Badge className={`px-2 py-1 text-xs font-semibold shadow-lg ${
-                    recEvent.is_free 
-                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-0' 
-                      : 'bg-orange-500 hover:bg-orange-600 text-white border-0'
-                  }`}>
-                    {recEvent.is_free ? "Free" : (
-                      <PriceDisplay 
-                        amount={recEvent.price || 0} 
-                        originalCurrency={getCurrencyCode(recEvent.currency)} 
-                      />
-                    )}
-                  </Badge>
-                </div>
+              {/* Improved Recommended Events */}
+              {recommendedEvents.length > 0 && (
+                <Card className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                      Recommended Events
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {recommendedEvents.map((recEvent) => (
+                        <Card key={recEvent.id} className="group overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 border-0 hover:scale-[1.02] cursor-pointer"
+                               onClick={() => navigate(`/event-detail/${recEvent.id}`)}>
+                          <div className="relative overflow-hidden">
+                            {recEvent.image_url ? (
+                              <img
+                                src={recEvent.image_url}
+                                alt={recEvent.title}
+                                className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
+                              />
+                            ) : (
+                              <div className="w-full h-48 bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex items-center justify-center">
+                                <Calendar className="h-16 w-16 text-white opacity-80" />
+                              </div>
+                            )}
+                            
+                            {/* Gradient overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                            
+                            {/* Price badge */}
+                            <div className="absolute top-3 left-3">
+                              <Badge className={`px-2 py-1 text-xs font-semibold shadow-lg ${
+                                recEvent.is_free 
+                                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-0' 
+                                  : 'bg-orange-500 hover:bg-orange-600 text-white border-0'
+                              }`}>
+                                {recEvent.is_free ? "Free" : (
+                                  <PriceDisplay 
+                                    amount={recEvent.price || 0} 
+                                    originalCurrency={getCurrencyCode(recEvent.currency)} 
+                                  />
+                                )}
+                              </Badge>
+                            </div>
 
-                {/* Event type badge */}
-                <div className="absolute top-3 right-3">
-                  <Badge variant="secondary" className="bg-white/20 backdrop-blur-sm text-white border-white/20 hover:bg-white/30 text-xs">
-                    {recEvent.event_type.charAt(0).toUpperCase() + recEvent.event_type.slice(1)}
-                  </Badge>
-                </div>
+                            {/* Event type badge */}
+                            <div className="absolute top-3 right-3">
+                              <Badge variant="secondary" className="bg-white/20 backdrop-blur-sm text-white border-white/20 hover:bg-white/30 text-xs">
+                                {recEvent.event_type.charAt(0).toUpperCase() + recEvent.event_type.slice(1)}
+                              </Badge>
+                            </div>
 
-                {/* Rating badge (if available) */}
-                {recEvent.average_rating > 0 && (
-                  <div className="absolute top-12 left-3">
-                    <Badge className="bg-blue-500 hover:bg-blue-600 text-white border-0 flex items-center gap-1 text-xs">
-                      <Star className="h-3 w-3 fill-current" />
-                      <span>{recEvent.average_rating.toFixed(1)}</span>
-                    </Badge>
-                  </div>
-                )}
-
-                {/* Bottom overlay content */}
-                <div className="absolute bottom-3 left-3 right-3 text-white">
-                  <div className="flex items-center gap-2 text-xs mb-1">
-                    <Calendar className="h-3 w-3" />
-                    <span className="font-medium">{format(new Date(recEvent.start_time), 'MMM d, yyyy')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <Clock className="h-3 w-3" />
-                    <span>{format(new Date(recEvent.start_time), 'h:mm a')}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <CardContent className="p-4">
-                <div className="mb-3">
-                  <h3 className="font-bold text-lg mb-2 text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
-                    {recEvent.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed mb-3">
-                    {recEvent.description}
-                  </p>
-                </div>
-                
-                <div className="space-y-2 mb-4">
-                  {recEvent.location && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <div className="w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center">
-                        <MapPin className="h-3 w-3 text-blue-600" />
-                      </div>
-                      <span className="text-xs line-clamp-1 flex-1">{recEvent.location}</span>
+                            {/* Bottom overlay content */}
+                            <div className="absolute bottom-3 left-3 right-3 text-white">
+                              <div className="flex items-center gap-2 text-xs mb-1">
+                                <Calendar className="h-3 w-3" />
+                                <span className="font-medium">{format(new Date(recEvent.start_time), 'MMM d, yyyy')}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <Clock className="h-3 w-3" />
+                                <span>{format(new Date(recEvent.start_time), 'h:mm a')}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <CardContent className="p-4">
+                            <div className="mb-3">
+                              <h3 className="font-bold text-lg mb-2 text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
+                                {recEvent.title}
+                              </h3>
+                              <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed mb-3">
+                                {recEvent.description}
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-2 mb-4">
+                              {recEvent.location && (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <div className="w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center">
+                                    <MapPin className="h-3 w-3 text-blue-600" />
+                                  </div>
+                                  <span className="text-xs line-clamp-1 flex-1">{recEvent.location}</span>
+                                </div>
+                              )}
+                              {recEvent.capacity && (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <div className="w-6 h-6 bg-green-50 rounded-full flex items-center justify-center">
+                                    <Users className="h-3 w-3 text-green-600" />
+                                  </div>
+                                  <span className="text-xs">{recEvent.capacity} max attendees</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 group text-sm">
+                              <span className="flex items-center justify-center gap-2">
+                                View Event Details
+                                <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
+                              </span>
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  )}
-                  {recEvent.capacity && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <div className="w-6 h-6 bg-green-50 rounded-full flex items-center justify-center">
-                        <Users className="h-3 w-3 text-green-600" />
-                      </div>
-                      <span className="text-xs">{recEvent.capacity} max attendees</span>
-                    </div>
-                  )}
-                </div>
-                
-                <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 group text-sm">
-                  <span className="flex items-center justify-center gap-2">
-                    View Event Details
-                    <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
-                  </span>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-      </div>
-    </CardContent>
-           </Card>
-             )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Sidebar */}
