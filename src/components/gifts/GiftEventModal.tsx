@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { useCart } from '@/contexts/CartContext';
 import { toast } from 'sonner';
 import { Gift, Calendar, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
+import PriceDisplay from '@/components/currency/PriceDisplay'; // Add this import
 
 interface GiftEventModalProps {
   isOpen: boolean;
@@ -106,7 +106,9 @@ const GiftEventModal: React.FC<GiftEventModalProps> = ({ isOpen, onClose, event,
             </div>
             <div className="mt-2">
               <span className="text-sm font-medium">{ticket.name}</span>
-              <span className="text-sm text-gray-600 ml-2">${ticket.price.toFixed(2)}</span>
+              <span className="text-sm text-gray-600 ml-2">
+                <PriceDisplay amount={ticket.price} originalCurrency="USD" />
+              </span>
             </div>
           </div>
 
