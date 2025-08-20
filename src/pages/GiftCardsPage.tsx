@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from 'sonner';
 import { Gift, Star, Heart, Sparkles } from 'lucide-react';
+import PriceDisplay from '@/components/currency/PriceDisplay';
+import { CurrencyCode } from '@/constants/currencies';
 
 const GiftCardsPage = () => {
   const { addToCart } = useCart();
@@ -121,7 +122,14 @@ const GiftCardsPage = () => {
                     </div>
                     
                     <div className="mb-6">
-                      <div className="text-3xl font-bold mb-1">${amount.toFixed(2)}</div>
+                      <div className="text-3xl font-bold mb-1">
+                        <PriceDisplay 
+                          amount={amount} 
+                          originalCurrency="USD" 
+                          showCurrencySymbol={true}
+                          className="text-white"
+                        />
+                      </div>
                       <div className="text-sm text-white/80">Gift Card Value</div>
                     </div>
                     
@@ -177,22 +185,37 @@ const GiftCardsPage = () => {
                           onClick={() => handleAmountSelect(preAmount)}
                           className="h-12"
                         >
-                          ${preAmount}
+                          <PriceDisplay 
+                            amount={preAmount} 
+                            originalCurrency="USD" 
+                            showCurrencySymbol={true}
+                          />
                         </Button>
                       ))}
                     </div>
                     
                     <div className="mt-3">
                       <Label htmlFor="customAmount" className="text-sm">Or enter custom amount</Label>
-                      <Input
-                        id="customAmount"
-                        type="number"
-                        value={customAmount}
-                        onChange={(e) => handleCustomAmountChange(e.target.value)}
-                        placeholder="Enter amount"
-                        min="1"
-                        step="0.01"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                          <PriceDisplay 
+                            amount={0} 
+                            originalCurrency="USD" 
+                            showCurrencySymbol={true}
+                            showAmount={false}
+                          />
+                        </span>
+                        <Input
+                          id="customAmount"
+                          type="number"
+                          value={customAmount}
+                          onChange={(e) => handleCustomAmountChange(e.target.value)}
+                          placeholder="Enter amount"
+                          min="1"
+                          step="0.01"
+                          className="pl-10"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -246,7 +269,18 @@ const GiftCardsPage = () => {
                     disabled={isLoading}
                     className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                   >
-                    {isLoading ? 'Adding...' : `Add $${amount.toFixed(2)} Gift Card to Cart`}
+                    {isLoading ? 'Adding...' : (
+                      <>
+                        Add{' '}
+                        <PriceDisplay 
+                          amount={amount} 
+                          originalCurrency="USD" 
+                          showCurrencySymbol={true}
+                          className="ml-1"
+                        />{' '}
+                        Gift Card to Cart
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
