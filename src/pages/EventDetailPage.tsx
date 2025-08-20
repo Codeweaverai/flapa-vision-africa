@@ -864,60 +864,61 @@ const EventDetailPage = () => {
                     Save to Wishlist
                   </WishlistButton>
                   
-                  {/* Gift Event Buttons - Only show if not registered and tickets are available */}
-                  {!isRegistered && availableTickets.length > 0 && (
-                    <div className="space-y-3 pt-3 border-t border-gray-200">
-                      <h4 className="font-semibold text-sm text-gray-700 mb-2">Gift Tickets</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {availableTickets.slice(0, 3).map((ticket) => {
-                          // Determine button style based on ticket type
-                          let buttonStyle = "";
-                          let buttonText = "Gift This Ticket";
-                          
-                          if (ticket.ticket_type?.toLowerCase().includes('vip')) {
-                            buttonStyle = "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0";
-                            buttonText = "Gift VIP";
-                          } else if (ticket.ticket_type?.toLowerCase().includes('early') || ticket.name.toLowerCase().includes('early')) {
-                            buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
-                            buttonText = "Gift Early Bird";
-                          } else if (ticket.ticket_type?.toLowerCase().includes('ordinary') || ticket.name.toLowerCase().includes('ordinary')) {
-                            buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
-                            buttonText = "Gift Ordinary";
-                          } else if (ticket.ticket_type?.toLowerCase().includes('standard') || ticket.name.toLowerCase().includes('standard')) {
-                            buttonStyle = "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0";
-                            buttonText = "Gift Standard";
-                          } else {
-                            // Default style for other ticket types
-                            buttonStyle = "bg-gradient-to-r from-orange-600 to-purple-600 hover:from-orange-700 hover:to-purple-700 text-white border-0";
-                            buttonText = `Gift ${ticket.name}`;
-                          }
+                 {/* Gift Event Buttons - Only show if not registered and tickets are available */}
+{!isRegistered && availableTickets.length > 0 && (
+  <div className="space-y-3 pt-3 border-t border-gray-200">
+    <h4 className="font-semibold text-sm text-gray-700 mb-2">Gift Tickets</h4>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {availableTickets.slice(0, 3).map((ticket) => {
+        // Determine button style based on ticket type
+        let buttonStyle = "";
+        let buttonText = "Gift This Ticket";
+        
+        if (ticket.ticket_type?.toLowerCase().includes('vip')) {
+          buttonStyle = "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0";
+          buttonText = "Gift VIP";
+        } else if (ticket.ticket_type?.toLowerCase().includes('early') || ticket.name.toLowerCase().includes('early')) {
+          buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
+          buttonText = "Gift Early Bird";
+        } else if (ticket.ticket_type?.toLowerCase().includes('ordinary') || ticket.name.toLowerCase().includes('ordinary')) {
+          buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
+          buttonText = "Gift Ordinary";
+        } else if (ticket.ticket_type?.toLowerCase().includes('standard') || ticket.name.toLowerCase().includes('standard')) {
+          buttonStyle = "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0";
+          buttonText = "Gift Standard";
+        } else {
+          // Default style for other ticket types
+          buttonStyle = "bg-gradient-to-r from-orange-600 to-purple-600 hover:from-orange-700 hover:to-purple-700 text-white border-0";
+          buttonText = `Gift ${ticket.name}`;
+        }
 
-                          return (
-                            <GiftEventButton
-                              key={ticket.id}
-                              event={{
-                                id: event.id,
-                                title: event.title,
-                                start_time: event.start_time,
-                                location: event.location
-                              }}
-                              ticket={ticket}
-                              className={`w-full ${buttonStyle} font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm`}
-                              buttonText={buttonText}
-                            />
-                          );
-                        })}
-                      </div>
-                      
-                      {/* Show message if there are more than 3 ticket types */}
-                      {availableTickets.length > 3 && (
-                        <p className="text-xs text-gray-500 text-center mt-2">
-                          +{availableTickets.length - 3} more ticket types available
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
+        return (
+          <div key={ticket.id} className="flex flex-col">
+            <GiftEventButton
+              event={{
+                id: event.id,
+                title: event.title,
+                start_time: event.start_time,
+                location: event.location
+              }}
+              ticket={ticket}
+              className={`w-full ${buttonStyle} font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm min-h-[44px] flex items-center justify-center`}
+              buttonText={buttonText}
+            />
+          </div>
+        );
+      })}
+    </div>
+    
+    {/* Show message if there are more than 3 ticket types */}
+    {availableTickets.length > 3 && (
+      <p className="text-xs text-gray-500 text-center mt-2">
+        +{availableTickets.length - 3} more ticket types available
+      </p>
+    )}
+  </div>
+  )}
+    </CardContent>
               </Card>
 
               {/* Creator Profile Card */}
