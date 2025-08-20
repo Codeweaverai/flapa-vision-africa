@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from 'sonner';
 import { Gift } from 'lucide-react';
+import PriceDisplay from '@/components/currency/PriceDisplay'; // Add this import
 
 interface GiftCourseModalProps {
   isOpen: boolean;
@@ -84,7 +84,9 @@ const GiftCourseModal: React.FC<GiftCourseModalProps> = ({ isOpen, onClose, cour
         <div className="space-y-4">
           <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
             <h4 className="font-semibold text-sm">{course.title}</h4>
-            <p className="text-sm text-gray-600">${course.price.toFixed(2)}</p>
+            <p className="text-sm text-gray-600">
+              <PriceDisplay amount={course.price} originalCurrency="USD" />
+            </p>
           </div>
 
           <div className="space-y-3">
