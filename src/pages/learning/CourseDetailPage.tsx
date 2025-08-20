@@ -26,6 +26,7 @@ import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+import GiftCourseButton from '@/components/course/GiftCourseButton';
 
 interface Course {
   id: string;
@@ -827,7 +828,7 @@ const CourseDetailPage = () => {
                   
                   {/* Wishlist Button - Only show if not enrolled */}
                   {!isEnrolled && (
-                    <div className="mt-6 pt-4 border-t border-gray-200">
+                    <div className="mt-6 pt-4 border-t border-gray-200 space-y-3">
                       <WishlistButton
                         itemId={course.id}
                         itemType="course"
@@ -836,6 +837,15 @@ const CourseDetailPage = () => {
                         <Heart className="w-4 h-4 mr-2" />
                         Add to Wishlist
                       </WishlistButton>
+                      
+                      {/* Gift Course Button */}
+                      <GiftCourseButton
+                        course={{
+                          id: course.id,
+                          title: course.title,
+                          price: course.price
+                        }}
+                      />
                     </div>
                   )}
                 </CardContent>
