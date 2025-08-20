@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Gift } from 'lucide-react';
@@ -15,10 +14,18 @@ interface GiftEventButtonProps {
     id: string;
     name: string;
     price: number;
+    ticket_type?: string;
   };
+  className?: string;
+  buttonText?: string;
 }
 
-const GiftEventButton: React.FC<GiftEventButtonProps> = ({ event, ticket }) => {
+const GiftEventButton: React.FC<GiftEventButtonProps> = ({ 
+  event, 
+  ticket, 
+  className = "border-orange-200 text-orange-700 hover:bg-orange-50",
+  buttonText = "Gift This Ticket"
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -26,10 +33,10 @@ const GiftEventButton: React.FC<GiftEventButtonProps> = ({ event, ticket }) => {
       <Button
         variant="outline"
         onClick={() => setIsModalOpen(true)}
-        className="border-orange-200 text-orange-700 hover:bg-orange-50"
+        className={className}
       >
         <Gift className="h-4 w-4 mr-2" />
-        Gift This Ticket
+        {buttonText}
       </Button>
       
       <GiftEventModal
