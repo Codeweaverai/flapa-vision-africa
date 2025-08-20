@@ -482,6 +482,12 @@ const AccountPage = () => {
                       <ChevronRight className="h-4 w-4 ml-auto" />
                     </a>
                   </Button>
+                  <Button variant="outline" className="w-full justify-start" asChild>
+                    <a href="/gift-cards">
+                      Buy a Gift for your Special one
+                      <ChevronRight className="h-4 w-4 ml-auto" />
+                    </a>
+                  </Button>
                 </CardContent>
               </Card>
             </div>
