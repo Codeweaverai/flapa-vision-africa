@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, X, Plus, Minus, User } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, User, Gift } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
@@ -51,6 +50,24 @@ const CartIcon = () => {
     navigate('/checkout');
   };
 
+  // Function to get display text for item type
+  const getItemTypeDisplay = (itemType: string) => {
+    switch (itemType) {
+      case 'course':
+        return 'Course';
+      case 'gift_course':
+        return 'Gift Course';
+      case 'event_ticket':
+        return 'Event Ticket';
+      case 'gift_event':
+        return 'Gift Event Ticket';
+      case 'gift_card':
+        return 'Gift Card';
+      default:
+        return itemType;
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
@@ -89,9 +106,17 @@ const CartIcon = () => {
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm truncate">{item.itemName}</h4>
-                          <p className="text-xs text-gray-500">
-                            {item.itemType === 'course' ? 'Course' : 'Event Ticket'}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-gray-500">
+                              {getItemTypeDisplay(item.itemType)}
+                            </p>
+                            {item.itemType.startsWith('gift_') && (
+                              <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-200">
+                                <Gift className="h-3 w-3 mr-1" />
+                                Gift
+                              </Badge>
+                            )}
+                          </div>
                           <div className="mt-1">
                             <PriceDisplay 
                               amount={item.price} 
@@ -115,7 +140,8 @@ const CartIcon = () => {
                         </Button>
                       </div>
                       
-                      {item.itemType === 'event_ticket' && (
+                      {/* Only show quantity controls for event tickets (not gift items) */}
+                      {(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && (
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-500">Quantity:</span>
