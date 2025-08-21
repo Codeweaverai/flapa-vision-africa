@@ -6,13 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, Loader2, Gift, CreditCard, User, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
 import html2pdf from 'html2pdf.js';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 declare global {
   interface Window {
@@ -36,6 +36,15 @@ interface Order {
     unit_price: number;
     total_price: number;
     item_id: string;
+    gift_metadata?: {
+      senderName: string;
+      recipientName: string;
+      recipientEmail: string;
+      personalMessage?: string;
+      eventTitle?: string;
+      eventDate?: string;
+      eventLocation?: string;
+    };
   }[];
   event_bookings: {
     id: string;
@@ -64,6 +73,16 @@ interface Order {
       thumbnail_url: string;
       creator_id: string;
     };
+  }[];
+  gift_cards: {
+    id: string;
+    amount: number;
+    code: string;
+    recipient_email: string;
+    recipient_name: string;
+    message: string;
+    status: string;
+    created_at: string;
   }[];
   user_name?: string;
 }
@@ -96,6 +115,7 @@ interface TicketData {
 
 const MyOrdersPage = () => {
   const { user } = useAuth();
+  const { currentCurrency } = useCurrency();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBookings, setSelectedBookings] = useState<TicketData[]>([]);
@@ -165,7 +185,8 @@ const MyOrdersPage = () => {
               thumbnail_url,
               creator_id
             )
-          )
+          ),
+          gift_cards (*)
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -191,7 +212,10 @@ const MyOrdersPage = () => {
       confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmed' },
       pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
       cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' },
-      completed: { color: 'bg-green-100 text-green-800', label: 'Completed' }
+      completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+      active: { color: 'bg-green-100 text-green-800', label: 'Active' },
+      redeemed: { color: 'bg-blue-100 text-blue-800', label: 'Redeemed' },
+      paid: { color: 'bg-green-100 text-green-800', label: 'Paid' }
     };
     
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
@@ -200,6 +224,18 @@ const MyOrdersPage = () => {
         {statusInfo.label}
       </Badge>
     );
+  };
+
+  const getItemTypeDisplay = (itemType: string) => {
+    const typeMap = {
+      course: { icon: BookOpen, label: 'Course', color: 'text-purple-600' },
+      gift_course: { icon: Gift, label: 'Gift Course', color: 'text-orange-600' },
+      event_ticket: { icon: Ticket, label: 'Event Ticket', color: 'text-blue-600' },
+      gift_event: { icon: Gift, label: 'Gift Event', color: 'text-orange-600' },
+      gift_card: { icon: CreditCard, label: 'Gift Card', color: 'text-pink-600' }
+    };
+    
+    return typeMap[itemType as keyof typeof typeMap] || { icon: FileText, label: itemType, color: 'text-gray-600' };
   };
 
   const fetchDetailedTickets = async (order: Order): Promise<TicketData[]> => {
@@ -313,7 +349,7 @@ const MyOrdersPage = () => {
             qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code Error</div>';
           }
         } else if (qrContainer) {
-          qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">Loading QR...</div>';
+          qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: '6b7280';">Loading QR...</div>';
         }
       });
     }, 100);
@@ -812,7 +848,7 @@ const MyOrdersPage = () => {
           <div className="max-w-6xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">My Orders</h1>
-              <p className="text-gray-600">View and manage all your orders, tickets and course purchases</p>
+              <p className="text-gray-600">View and manage all your orders, tickets, courses, and gift purchases</p>
             </div>
 
             {orders.length === 0 ? (
@@ -851,7 +887,10 @@ const MyOrdersPage = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold">
-                            <PriceDisplay amount={order.total_amount} originalCurrency={order.currency} />
+                            <PriceDisplay 
+                              amount={order.total_amount} 
+                              originalCurrency={order.currency as any} 
+                            />
                           </div>
                           {getStatusBadge(order.payment_status)}
                         </div>
@@ -859,6 +898,90 @@ const MyOrdersPage = () => {
                     </CardHeader>
                     
                     <CardContent className="p-6">
+                      {/* Order Items Section */}
+                      {order.order_items?.length > 0 && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold mb-4">Order Items ({order.order_items.length})</h3>
+                          <div className="space-y-4">
+                            {order.order_items.map((item) => {
+                              const itemTypeInfo = getItemTypeDisplay(item.item_type);
+                              const IconComponent = itemTypeInfo.icon;
+                              
+                              return (
+                                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <IconComponent className={`h-5 w-5 ${itemTypeInfo.color}`} />
+                                    <span className="font-medium">{item.item_name}</span>
+                                    {item.item_type.startsWith('gift_') && (
+                                      <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                                        <Gift className="h-3 w-3 mr-1" />
+                                        Gift
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="text-gray-600">Type:</span>
+                                      <p className="font-medium">{itemTypeInfo.label}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Quantity:</span>
+                                      <p className="font-medium">{item.quantity}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Unit Price:</span>
+                                      <p className="font-medium">
+                                        <PriceDisplay 
+                                          amount={item.unit_price} 
+                                          originalCurrency={order.currency as any} 
+                                        />
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Total:</span>
+                                      <p className="font-medium">
+                                        <PriceDisplay 
+                                          amount={item.total_price} 
+                                          originalCurrency={order.currency as any} 
+                                        />
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Gift metadata */}
+                                  {item.gift_metadata && (
+                                    <div className="mt-3 p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded border border-orange-200">
+                                      <p className="text-sm font-medium text-orange-800">Gift Details:</p>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                                        <div className="flex items-center gap-2">
+                                          <User className="h-4 w-4 text-orange-600" />
+                                          <span className="text-sm">To: {item.gift_metadata.recipientName}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Mail className="h-4 w-4 text-orange-600" />
+                                          <span className="text-sm">{item.gift_metadata.recipientEmail}</span>
+                                        </div>
+                                      </div>
+                                      {item.gift_metadata.personalMessage && (
+                                        <p className="text-xs text-orange-700 mt-2">
+                                          Message: "{item.gift_metadata.personalMessage}"
+                                        </p>
+                                      )}
+                                      {item.gift_metadata.eventTitle && (
+                                        <p className="text-xs text-orange-600 mt-1">
+                                          Event: {item.gift_metadata.eventTitle}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Event Tickets Section */}
                       {order.event_bookings?.length > 0 && (
                         <div className="mb-6">
@@ -954,7 +1077,53 @@ const MyOrdersPage = () => {
                         </div>
                       )}
 
-                      {/* Courses Section */}
+                      {/* Gift Cards Section */}
+                      {order.gift_cards?.length > 0 && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-pink-600" />
+                            Gift Cards ({order.gift_cards.length})
+                          </h3>
+                          <div className="space-y-4">
+                            {order.gift_cards.map((giftCard) => (
+                              <div key={giftCard.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-pink-50">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900">Gift Card</h4>
+                                    <p className="text-sm text-gray-600">Code: {giftCard.code}</p>
+                                  </div>
+                                  {getStatusBadge(giftCard.status)}
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                  <div>
+                                    <span className="text-sm text-gray-600">Amount:</span>
+                                    <p className="font-semibold">
+                                      <PriceDisplay 
+                                        amount={giftCard.amount} 
+                                        originalCurrency={order.currency as any} 
+                                      />
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <span className="text-sm text-gray-600">Recipient:</span>
+                                    <p className="font-medium">{giftCard.recipient_name}</p>
+                                    <p className="text-xs text-gray-500">{giftCard.recipient_email}</p>
+                                  </div>
+                                </div>
+                                
+                                {giftCard.message && (
+                                  <div className="p-2 bg-white rounded border border-pink-200">
+                                    <p className="text-sm text-pink-800">"{giftCard.message}"</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Course Enrollments Section */}
                       {order.course_enrollments?.length > 0 && (
                         <div className="mb-6">
                           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -1004,7 +1173,10 @@ const MyOrdersPage = () => {
                       )}
 
                       {/* Empty state if no items */}
-                      {order.event_bookings?.length === 0 && order.course_enrollments?.length === 0 && (
+                      {order.order_items?.length === 0 && 
+                       order.event_bookings?.length === 0 && 
+                       order.course_enrollments?.length === 0 &&
+                       order.gift_cards?.length === 0 && (
                         <div className="text-center py-8 text-gray-500">
                           <p>No items found in this order</p>
                         </div>
@@ -1015,7 +1187,10 @@ const MyOrdersPage = () => {
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm text-gray-600">Order Total:</span>
                           <span className="font-semibold">
-                            <PriceDisplay amount={order.total_amount} originalCurrency={order.currency} />
+                            <PriceDisplay 
+                              amount={order.total_amount} 
+                              originalCurrency={order.currency as any} 
+                            />
                           </span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-gray-600">
@@ -1028,7 +1203,7 @@ const MyOrdersPage = () => {
                       <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                         <Button
                           onClick={() => handleViewReceipt(order)}
-                          variant="outline"
+                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
                           size="sm"
                         >
                           <FileText className="h-4 w-4 mr-2" />
@@ -1039,10 +1214,10 @@ const MyOrdersPage = () => {
                           <Button 
                             onClick={() => handleViewTickets(order)}
                             size="sm"
-                            className="bg-gradient-to-r from-orange-500 to-purple-600"
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            View All Tickets
+                            View Tickets
                           </Button>
                         )}
                       </div>
@@ -1202,7 +1377,7 @@ const MyOrdersPage = () => {
             <Button 
               onClick={handlePrintReceipt} 
               size="sm"
-              className="bg-gradient-to-r from-orange-500 to-purple-600"
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
             >
               <Printer className="h-4 w-4 mr-2" />
               Print Receipt
@@ -1220,7 +1395,7 @@ const MyOrdersPage = () => {
                   </div>
                   <div>
                     <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                    <p><strong>Total:</strong> <PriceDisplay amount={selectedOrder.total_amount} originalCurrency={selectedOrder.currency} /></p>
+                    <p><strong>Total:</strong> <PriceDisplay amount={selectedOrder.total_amount} originalCurrency={selectedOrder.currency as any} /></p>
                   </div>
                 </div>
               </div>
@@ -1235,7 +1410,7 @@ const MyOrdersPage = () => {
                         <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                       </div>
                       <p className="font-semibold">
-                        <PriceDisplay amount={item.total_price} originalCurrency={selectedOrder.currency} />
+                        <PriceDisplay amount={item.total_price} originalCurrency={selectedOrder.currency as any} />
                       </p>
                     </div>
                   ))}
