@@ -33,56 +33,86 @@ export interface CreatorTransaction {
 // Platform fee rate (8%)
 const PLATFORM_FEE_RATE = 0.08;
 
+// Helper function to get all content IDs for a creator
+async function getCreatorContentIds(creatorId: string) {
+  // Get creator's course IDs
+  const { data: creatorCourses, error: coursesError } = await supabase
+    .from('courses')
+    .select('id, title')
+    .eq('creator_id', creatorId);
+
+  if (coursesError) {
+    console.error('Error fetching creator courses:', coursesError);
+  }
+
+  const courseIds = creatorCourses?.map(c => c.id) || [];
+  const courseMap = new Map(creatorCourses?.map(c => [c.id, c.title]) || []);
+
+  // Get creator's event IDs
+  const { data: creatorEvents, error: eventsError } = await supabase
+    .from('events')
+    .select('id, title')
+    .eq('creator_id', creatorId);
+
+  if (eventsError) {
+    console.error('Error fetching creator events:', eventsError);
+  }
+
+  const eventIds = creatorEvents?.map(e => e.id) || [];
+  const eventMap = new Map(creatorEvents?.map(e => [e.id, e.title]) || []);
+
+  // Get event ticket IDs for creator's events
+  let eventTicketIds: string[] = [];
+  let ticketToEventMap = new Map();
+  
+  if (eventIds.length > 0) {
+    const { data: eventTickets, error: ticketsError } = await supabase
+      .from('event_tickets')
+      .select('id, event_id')
+      .in('event_id', eventIds);
+
+    if (ticketsError) {
+      console.error('Error fetching event tickets:', ticketsError);
+    } else {
+      eventTicketIds = eventTickets?.map(t => t.id) || [];
+      ticketToEventMap = new Map(eventTickets?.map(t => [t.id, t.event_id]) || []);
+    }
+  }
+
+  // Get creator's consultation IDs
+  const { data: creatorConsultations, error: consultationsError } = await supabase
+    .from('consultations')
+    .select('id, title')
+    .eq('creator_id', creatorId);
+
+  if (consultationsError) {
+    console.error('Error fetching creator consultations:', consultationsError);
+  }
+
+  const consultationIds = creatorConsultations?.map(c => c.id) || [];
+  const consultationMap = new Map(creatorConsultations?.map(c => [c.id, c.title]) || []);
+
+  return {
+    courseIds,
+    courseMap,
+    eventIds,
+    eventMap,
+    eventTicketIds,
+    ticketToEventMap,
+    consultationIds,
+    consultationMap
+  };
+}
+
 export async function calculateCreatorEarningsFromOrders(creatorId: string): Promise<CreatorEarningsData> {
   try {
-    // Get all order items for this creator's content in a single query
-    const { data: orderItems, error } = await supabase
-      .from('order_items')
-      .select(`
-        *,
-        orders!inner(
-          id,
-          user_id,
-          email,
-          total_amount,
-          currency,
-          payment_status,
-          payment_method,
-          created_at,
-          updated_at,
-          tax_amount,
-          stripe_payment_intent_id
-        ),
-        courses!left(
-          id,
-          title,
-          creator_id
-        ),
-        events!left(
-          id,
-          title,
-          creator_id
-        ),
-        event_tickets!left(
-          id,
-          event_id,
-          events!inner(
-            id,
-            title,
-            creator_id
-          )
-        ),
-        consultations!left(
-          id,
-          title,
-          creator_id
-        )
-      `)
-      .or(`courses.creator_id.eq.${creatorId},events.creator_id.eq.${creatorId},event_tickets.events.creator_id.eq.${creatorId},consultations.creator_id.eq.${creatorId}`)
-      .eq('orders.payment_status', 'completed');
+    const {
+      courseIds,
+      eventTicketIds,
+      consultationIds
+    } = await getCreatorContentIds(creatorId);
 
-    if (error) {
-      console.error('Error calculating creator earnings:', error);
+    if (courseIds.length === 0 && eventTicketIds.length === 0 && consultationIds.length === 0) {
       return {
         available_balance: 0,
         pending_balance: 0,
@@ -94,7 +124,97 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       };
     }
 
-    if (!orderItems || orderItems.length === 0) {
+    // Build queries for each content type
+    const queries = [];
+
+    // Course orders
+    if (courseIds.length > 0) {
+      queries.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              updated_at,
+              tax_amount,
+              stripe_payment_intent_id
+            )
+          `)
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'course')
+          .in('item_id', courseIds)
+      );
+    }
+
+    // Event ticket orders
+    if (eventTicketIds.length > 0) {
+      queries.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              updated_at,
+              tax_amount,
+              stripe_payment_intent_id
+            )
+          `)
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'event_ticket')
+          .in('item_id', eventTicketIds)
+      );
+    }
+
+    // Consultation orders
+    if (consultationIds.length > 0) {
+      queries.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              updated_at,
+              tax_amount,
+              stripe_payment_intent_id
+            )
+          `)
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'consultation')
+          .in('item_id', consultationIds)
+      );
+    }
+
+    // Execute all queries
+    const results = await Promise.all(queries);
+    
+    // Combine all order items
+    const allOrderItems = results.flatMap(result => result.data || []);
+
+    if (allOrderItems.length === 0) {
       return {
         available_balance: 0,
         pending_balance: 0,
@@ -116,7 +236,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
     const now = new Date();
 
-    orderItems.forEach(item => {
+    allOrderItems.forEach(item => {
       const itemTotal = Number(item.total_price);
       const orderTotal = Number(item.orders.total_amount);
       const orderTax = Number(item.orders.tax_amount) || 0;
@@ -131,13 +251,12 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       totalEarnings += creatorEarning;
       totalPlatformFees += platformFee;
 
-      // Check if this is a course, event, or consultation
-      if (item.courses && item.courses.creator_id === creatorId) {
+      // Categorize revenue
+      if (item.item_type === 'course') {
         courseRevenue += creatorEarning;
-      } else if ((item.events && item.events.creator_id === creatorId) || 
-                 (item.event_tickets && item.event_tickets.events.creator_id === creatorId)) {
+      } else if (item.item_type === 'event_ticket') {
         eventRevenue += creatorEarning;
-      } else if (item.consultations && item.consultations.creator_id === creatorId) {
+      } else if (item.item_type === 'consultation') {
         consultationRevenue += creatorEarning;
       }
 
@@ -205,65 +324,125 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
 export async function fetchCreatorTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorTransaction[], total: number }> {
   try {
-    // Get all order items for this creator's content in a single query
-    const { data: orderItems, error, count } = await supabase
-      .from('order_items')
-      .select(`
-        *,
-        orders!inner(
-          id,
-          user_id,
-          email,
-          total_amount,
-          currency,
-          payment_status,
-          payment_method,
-          created_at,
-          updated_at,
-          tax_amount,
-          stripe_payment_intent_id
-        ),
-        courses!left(
-          id,
-          title,
-          creator_id
-        ),
-        events!left(
-          id,
-          title,
-          creator_id
-        ),
-        event_tickets!left(
-          id,
-          event_id,
-          events!inner(
-            id,
-            title,
-            creator_id
-          )
-        ),
-        consultations!left(
-          id,
-          title,
-          creator_id
-        )
-      `, { count: 'exact' })
-      .or(`courses.creator_id.eq.${creatorId},events.creator_id.eq.${creatorId},event_tickets.events.creator_id.eq.${creatorId},consultations.creator_id.eq.${creatorId}`)
-      .eq('orders.payment_status', 'completed')
-      .order('orders.created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const {
+      courseIds,
+      courseMap,
+      eventTicketIds,
+      eventMap,
+      ticketToEventMap,
+      consultationIds,
+      consultationMap
+    } = await getCreatorContentIds(creatorId);
 
-    if (error) {
-      console.error('Error fetching creator transactions:', error);
+    if (courseIds.length === 0 && eventTicketIds.length === 0 && consultationIds.length === 0) {
       return { transactions: [], total: 0 };
     }
 
-    if (!orderItems || orderItems.length === 0) {
-      return { transactions: [], total: 0 };
+    // Build queries for each content type
+    const queries = [];
+
+    // Course orders
+    if (courseIds.length > 0) {
+      queries.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              updated_at,
+              tax_amount,
+              stripe_payment_intent_id
+            )
+          `, { count: 'exact' })
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'course')
+          .in('item_id', courseIds)
+          .order('orders.created_at', { ascending: false })
+      );
+    }
+
+    // Event ticket orders
+    if (eventTicketIds.length > 0) {
+      queries.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              updated_at,
+              tax_amount,
+              stripe_payment_intent_id
+            )
+          `, { count: 'exact' })
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'event_ticket')
+          .in('item_id', eventTicketIds)
+          .order('orders.created_at', { ascending: false })
+      );
+    }
+
+    // Consultation orders
+    if (consultationIds.length > 0) {
+      queries.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              updated_at,
+              tax_amount,
+              stripe_payment_intent_id
+            )
+          `, { count: 'exact' })
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'consultation')
+          .in('item_id', consultationIds)
+          .order('orders.created_at', { ascending: false })
+      );
+    }
+
+    // Execute all queries
+    const results = await Promise.all(queries);
+    
+    // Combine all order items and sort by date
+    const allOrderItems = results.flatMap(result => result.data || []);
+    allOrderItems.sort((a, b) => 
+      new Date(b.orders.created_at).getTime() - new Date(a.orders.created_at).getTime()
+    );
+
+    const totalCount = allOrderItems.length;
+    const paginatedItems = allOrderItems.slice(offset, offset + limit);
+
+    if (paginatedItems.length === 0) {
+      return { transactions: [], total: totalCount };
     }
 
     // Get user profiles for customer names
-    const userIds = [...new Set(orderItems.map(item => item.orders.user_id))];
+    const userIds = [...new Set(paginatedItems.map(item => item.orders.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, username, full_name')
@@ -272,7 +451,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
     // Process transactions
     const creatorTransactions: CreatorTransaction[] = [];
     
-    for (const item of orderItems) {
+    for (const item of paginatedItems) {
       const profile = profiles?.find(p => p.id === item.orders.user_id);
       const itemTotal = Number(item.total_price);
       const orderTotal = Number(item.orders.total_amount);
@@ -288,20 +467,14 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       const creatorEarning = itemTotal - platformFee - itemTaxAllocation;
       
       let itemName = 'Unknown Item';
-      let itemType: 'course' | 'event_ticket' | 'consultation' = 'course';
       
-      if (item.courses && item.courses.creator_id === creatorId) {
-        itemName = item.courses.title || 'Unknown Course';
-        itemType = 'course';
-      } else if (item.events && item.events.creator_id === creatorId) {
-        itemName = item.events.title || 'Unknown Event';
-        itemType = 'event_ticket';
-      } else if (item.event_tickets && item.event_tickets.events.creator_id === creatorId) {
-        itemName = item.event_tickets.events.title || 'Unknown Event';
-        itemType = 'event_ticket';
-      } else if (item.consultations && item.consultations.creator_id === creatorId) {
-        itemName = item.consultations.title || 'Unknown Consultation';
-        itemType = 'consultation';
+      if (item.item_type === 'course') {
+        itemName = courseMap.get(item.item_id) || 'Unknown Course';
+      } else if (item.item_type === 'event_ticket') {
+        const eventId = ticketToEventMap.get(item.item_id);
+        itemName = eventId ? eventMap.get(eventId) || 'Unknown Event' : 'Unknown Event';
+      } else if (item.item_type === 'consultation') {
+        itemName = consultationMap.get(item.item_id) || 'Unknown Consultation';
       }
       
       // Set payout eligible date (7 days from order creation)
@@ -314,7 +487,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         order_id: item.orders.id,
         customer_email: item.orders.email,
         customer_name: profile?.username || profile?.full_name || 'Unknown Customer',
-        item_type: itemType,
+        item_type: item.item_type,
         item_name: itemName,
         item_id: item.item_id,
         quantity: item.quantity,
@@ -330,7 +503,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       });
     }
 
-    return { transactions: creatorTransactions, total: count || 0 };
+    return { transactions: creatorTransactions, total: totalCount };
   } catch (error) {
     console.error('Error fetching creator transactions:', error);
     return { transactions: [], total: 0 };
