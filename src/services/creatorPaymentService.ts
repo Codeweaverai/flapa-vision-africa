@@ -13,7 +13,6 @@ export interface CreatorEarnings {
   total_platform_fees: number;
   course_revenue: number;
   event_revenue: number;
-  consultation_revenue: number;
 }
 
 export interface CreatorPaymentTransaction extends CreatorTransaction {}
