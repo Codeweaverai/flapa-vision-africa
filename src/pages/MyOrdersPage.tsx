@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import TicketDisplay from '@/components/tickets/TicketDisplay';
 import { QRCodeSVG } from 'qrcode.react';
 import html2pdf from 'html2pdf.js';
 import PriceDisplay from '@/components/currency/PriceDisplay';
@@ -102,7 +103,6 @@ const MyOrdersPage = () => {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [loadingTickets, setLoadingTickets] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -319,64 +319,6 @@ const MyOrdersPage = () => {
     }, 100);
   };
 
-  const handleViewSingleTicket = async (booking: any, order: Order) => {
-    setLoadingTickets(prev => new Set(prev).add(booking.id));
-    try {
-      const tickets = await fetchDetailedTickets(order);
-      const singleTicket = tickets.find(t => t.booking_id === booking.id);
-      if (singleTicket) {
-        setSelectedBookings([singleTicket]);
-        setShowTicketModal(true);
-        
-        setTimeout(() => {
-          const qrContainer = document.getElementById(`qr-code-${singleTicket.ticket_code || singleTicket.booking_code}-0`);
-          if (qrContainer && window.QRCode) {
-            qrContainer.innerHTML = '';
-            try {
-              new window.QRCode(qrContainer, {
-                text: singleTicket.qr_code_data,
-                width: 150,
-                height: 150,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: window.QRCode.CorrectLevel.M
-              });
-            } catch (err) {
-              console.error('QR Code generation error:', err);
-              qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code Error</div>';
-            }
-          }
-        }, 100);
-      }
-    } finally {
-      setLoadingTickets(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(booking.id);
-        return newSet;
-      });
-    }
-  };
-
-  const handleDownloadSingleTicket = async (booking: any, order: Order) => {
-    setLoadingTickets(prev => new Set(prev).add(booking.id));
-    try {
-      const tickets = await fetchDetailedTickets(order);
-      const singleTicket = tickets.find(t => t.booking_id === booking.id);
-      if (singleTicket) {
-        setSelectedBookings([singleTicket]);
-        setTimeout(() => {
-          handleDownloadTicketsPDF();
-        }, 500);
-      }
-    } finally {
-      setLoadingTickets(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(booking.id);
-        return newSet;
-      });
-    }
-  };
-
   const handleViewReceipt = (order: Order) => {
     setSelectedOrder(order);
     setShowReceiptModal(true);
@@ -486,7 +428,6 @@ const MyOrdersPage = () => {
               
               .detail-item {
                 margin-bottom: 20px;
-                page-break-inside: avoid;
               }
               
               .detail-label {
@@ -510,7 +451,6 @@ const MyOrdersPage = () => {
                 background: linear-gradient(135deg, #f8fafc, #f1f5f9);
                 border-radius: 15px;
                 margin-bottom: 20px;
-                page-break-inside: avoid;
               }
               
               .qr-container {
@@ -564,7 +504,6 @@ const MyOrdersPage = () => {
                 .ticket-container {
                   box-shadow: none;
                   border: 1px solid #e5e7eb;
-                  page-break-inside: avoid;
                 }
                 
                 .ticket-header {
@@ -575,12 +514,6 @@ const MyOrdersPage = () => {
                 
                 .ticket-info-badge {
                   background: linear-gradient(135deg, #fef7ed, #faf5ff) !important;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                
-                .qr-section {
-                  background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
                   -webkit-print-color-adjust: exact;
                   print-color-adjust: exact;
                 }
@@ -637,6 +570,112 @@ const MyOrdersPage = () => {
       console.error('PDF generation error:', error);
       toast.error('Failed to generate PDF. Please try again.');
     }
+  };
+
+  const generateTicketHTML = (ticket: TicketData, index: number) => {
+    return `
+      <div style="max-width: 800px; margin: 0 auto 30px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); font-family: Arial, sans-serif;">
+        <!-- Header with gradient -->
+        <div style="background: linear-gradient(135deg, #f97316 0%, #a855f7 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold;">🎫 EVENT TICKET</h1>
+          <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block;">
+            <span style="font-size: 14px; font-weight: 500;">#${ticket.ticket_code || ticket.booking_code}</span>
+          </div>
+        </div>
+
+        <div style="padding: 40px;">
+          <!-- Event Image and Title -->
+          <div style="display: flex; gap: 20px; margin-bottom: 30px; align-items: center;">
+            ${ticket.event?.image_url ? `
+              <div style="width: 120px; height: 120px; border-radius: 15px; overflow: hidden; flex-shrink: 0; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+                <img src="${ticket.event.image_url}" alt="${ticket.event?.title || 'Event'}" style="width: 100%; height: 100%; object-fit: cover;" />
+              </div>
+            ` : ''}
+            <div style="flex: 1;">
+              <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #1f2937; font-weight: bold;">${ticket.event?.title || 'Event Title'}</h2>
+              <div style="background: linear-gradient(135deg, #fef7ed, #faf5ff); padding: 12px 16px; border-radius: 10px; border-left: 4px solid #f97316;">
+                <div style="font-weight: 600; color: #ea580c; margin-bottom: 5px;">${ticket.event_ticket?.name || 'Standard Ticket'}</div>
+                <div style="font-size: 14px; color: #7c2d12;">${ticket.event_ticket?.ticket_type || 'Regular'}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Event Details Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+            <div>
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  📅 Date & Time
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br>
+                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'h:mm a') : ''} ${ticket.event?.end_time ? '- ' + format(new Date(ticket.event.end_time), 'h:mm a') : ''}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  📍 Location
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.event?.location || 'TBD'}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  👤 Ticket Holder
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
+                  ${ticket.ticket_holder_email ? `<br><span style="font-size: 14px;">${ticket.ticket_holder_email}</span>` : ''}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  ✅ Status
+                </div>
+                <div>
+                  <span style="background: #dcfce7; color: #166534; padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">
+                    ${(ticket.status || 'confirmed').toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- QR Code Section -->
+          <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 15px; margin-bottom: 20px;">
+            <div style="margin-bottom: 15px;">
+              <div style="width: 150px; height: 150px; margin: 0 auto; padding: 15px; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                <div id="qr-code-${ticket.ticket_code || ticket.booking_code}-${index}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">
+                    Loading QR...
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 14px; color: #6b7280; margin-bottom: 10px;">Scan this code at the event entrance</div>
+            <div style="font-family: monospace; font-size: 16px; font-weight: bold; color: #f97316; letter-spacing: 1px;">
+              ${ticket.ticket_code || ticket.booking_code}
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; padding: 20px; border-top: 2px dashed #e5e7eb; color: #6b7280; font-size: 14px; line-height: 1.6;">
+            <div style="margin-bottom: 10px;">
+              <strong style="color: #374151;">Important:</strong> Please bring this ticket (digital or printed) to the event.
+            </div>
+            <div>
+              For questions, contact us at support@skillpulse.com
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   };
 
   const handlePrintReceipt = () => {
@@ -770,8 +809,8 @@ const MyOrdersPage = () => {
                 <tr>
                   <td>${item.item_name}</td>
                   <td>${item.quantity}</td>
-                  <td>${item.unit_price.toFixed(2)} ${selectedOrder.currency}</td>
-                  <td>${item.total_price.toFixed(2)} ${selectedOrder.currency}</td>
+                  <td><PriceDisplay amount={${item.unit_price}} originalCurrency="${selectedOrder.currency}" /></td>
+                  <td><PriceDisplay amount={${item.total_price}} originalCurrency="${selectedOrder.currency}" /></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -779,7 +818,7 @@ const MyOrdersPage = () => {
 
           <div class="total-section">
             <div class="total-amount">
-              Total: ${selectedOrder.total_amount.toFixed(2)} ${selectedOrder.currency}
+              Total: <PriceDisplay amount={${selectedOrder.total_amount}} originalCurrency="${selectedOrder.currency}" />
             </div>
           </div>
         </div>
@@ -859,190 +898,119 @@ const MyOrdersPage = () => {
                     </CardHeader>
                     
                     <CardContent className="p-6">
-                      {/* Event Tickets Section */}
-                      {order.event_bookings?.length > 0 && (
-                        <div className="mb-6">
-                          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Ticket className="h-5 w-5 text-orange-600" />
-                            Event Tickets ({order.event_bookings.length})
-                          </h3>
-                          <div className="space-y-4">
-                            {order.event_bookings.filter(booking => booking.event && booking.event_ticket).map((booking) => (
-                              <div key={booking.id} className="border border-gray-200 rounded-lg p-4">
-                                <div className="flex flex-col sm:flex-row gap-4 items-start">
-                                  {booking.event?.image_url && (
-                                    <div className="sm:w-32 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                                      <img
-                                        src={booking.event.image_url}
-                                        alt={booking.event.title}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                  )}
-                                  
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-gray-900 mb-2">
-                                      {booking.event?.title || 'Event'}
-                                    </h4>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                                      {booking.event?.start_time && (
-                                        <div className="flex items-center gap-1 text-sm text-gray-600">
-                                          <Calendar className="h-3 w-3" />
-                                          <span>{format(new Date(booking.event.start_time), 'MMM d, yyyy')}</span>
-                                        </div>
-                                      )}
-                                      {booking.event?.location && (
-                                        <div className="flex items-center gap-1 text-sm text-gray-600">
-                                          <MapPin className="h-3 w-3" />
-                                          <span>{booking.event.location}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="bg-orange-50 p-3 rounded border border-orange-200 mb-3">
-                                      <p className="text-sm font-medium text-orange-800">
-                                        {booking.event_ticket?.name || 'Standard Ticket'}
-                                      </p>
-                                      <p className="text-xs text-orange-600">
-                                        {booking.event_ticket?.ticket_type || 'Regular'} • Qty: {booking.ticket_quantity}
-                                      </p>
-                                      <p className="text-xs font-mono text-orange-700 mt-1">
-                                        Code: {booking.booking_code}
-                                      </p>
-                                    </div>
-                                    
-                                    {/* Individual ticket actions */}
-                                    <div className="flex gap-2">
-                                      <Button
-                                        onClick={() => handleViewSingleTicket(booking, order)}
-                                        size="sm"
-                                        className="bg-gradient-to-r from-orange-500 to-purple-600 text-white"
-                                        disabled={loadingTickets.has(booking.id)}
-                                      >
-                                        {loadingTickets.has(booking.id) ? (
-                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                        ) : (
-                                          <Eye className="h-3 w-3 mr-1" />
-                                        )}
-                                        View Ticket
-                                      </Button>
-                                      <Button
-                                        onClick={() => handleDownloadSingleTicket(booking, order)}
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={loadingTickets.has(booking.id)}
-                                      >
-                                        {loadingTickets.has(booking.id) ? (
-                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                        ) : (
-                                          <Download className="h-3 w-3 mr-1" />
-                                        )}
-                                        Download
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Status badge */}
-                                  <div className="self-start">
-                                    {getStatusBadge(booking.status)}
-                                  </div>
-                                </div>
+                      {/* Event Bookings */}
+                      {order.event_bookings?.filter(booking => booking.event && booking.event_ticket).map((booking) => (
+                        <div key={booking.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
+                          <div className="flex flex-col lg:flex-row gap-6">
+                            {booking.event?.image_url && (
+                              <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                <img
+                                  src={booking.event.image_url}
+                                  alt={booking.event.title}
+                                  className="w-full h-full object-cover"
+                                />
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Courses Section */}
-                      {order.course_enrollments?.length > 0 && (
-                        <div className="mb-6">
-                          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <BookOpen className="h-5 w-5 text-purple-600" />
-                            Course Enrollments ({order.course_enrollments.length})
-                          </h3>
-                          <div className="space-y-4">
-                            {order.course_enrollments.filter(enrollment => enrollment.course).map((enrollment) => (
-                              <div key={enrollment.id} className="border border-gray-200 rounded-lg p-4">
-                                <div className="flex flex-col sm:flex-row gap-4 items-start">
-                                  {enrollment.course?.thumbnail_url && (
-                                    <div className="sm:w-32 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                                      <img
-                                        src={enrollment.course.thumbnail_url}
-                                        alt={enrollment.course.title}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                  )}
-                                  
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-start mb-3">
-                                      <h4 className="text-lg font-semibold text-gray-900">
-                                        {enrollment.course?.title || 'Course'}
-                                      </h4>
-                                      {getStatusBadge('completed')}
-                                    </div>
-                                    
-                                    <p className="text-gray-600 mb-4 line-clamp-2">
-                                      {enrollment.course?.description || 'No description available'}
+                            )}
+                            
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start mb-3">
+                                <h3 className="text-xl font-semibold text-gray-900">
+                                  {booking.event?.title || 'Event'}
+                                </h3>
+                                {getStatusBadge(booking.status)}
+                              </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                {booking.event?.start_time && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <Calendar className="h-4 w-4" />
+                                    <span>{format(new Date(booking.event.start_time), 'PPP p')}</span>
+                                  </div>
+                                )}
+                                {booking.event?.location && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{booking.event.location}</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg mb-4 border border-orange-200">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <p className="font-medium text-orange-800">{booking.event_ticket?.name || 'Standard Ticket'}</p>
+                                    <p className="text-sm text-orange-600">
+                                      {booking.event_ticket?.ticket_type || 'Regular'} • Quantity: {booking.ticket_quantity}
                                     </p>
-                                    
-                                    <div className="flex gap-3">
-                                      <Link to={`/learning/course/${enrollment.course?.id}`}>
-                                        <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
-                                          <BookOpen className="h-4 w-4 mr-2" />
-                                          Start Learning
-                                        </Button>
-                                      </Link>
-                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-mono text-sm text-orange-700 font-medium">
+                                      Code: {booking.booking_code}
+                                    </p>
                                   </div>
                                 </div>
                               </div>
-                            ))}
+                            </div>
                           </div>
                         </div>
-                      )}
+                      ))}
 
-                      {/* Empty state if no items */}
-                      {order.event_bookings?.length === 0 && order.course_enrollments?.length === 0 && (
-                        <div className="text-center py-8 text-gray-500">
-                          <p>No items found in this order</p>
+                      {/* Course Enrollments */}
+                      {order.course_enrollments?.filter(enrollment => enrollment.course).map((enrollment) => (
+                        <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
+                          <div className="flex flex-col lg:flex-row gap-6">
+                            {enrollment.course?.thumbnail_url && (
+                              <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                <img
+                                  src={enrollment.course.thumbnail_url}
+                                  alt={enrollment.course.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start mb-3">
+                                <h3 className="text-xl font-semibold text-gray-900">
+                                  {enrollment.course?.title || 'Course'}
+                                </h3>
+                                {getStatusBadge('completed')}
+                              </div>
+                              
+                              <p className="text-gray-600 mb-4 line-clamp-2">
+                                {enrollment.course?.description || 'No description available'}
+                              </p>
+                              
+                              <div className="flex gap-3">
+                                <Link to={`/learning/course/${enrollment.course?.id}`}>
+                                  <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
+                                    <BookOpen className="h-4 w-4 mr-2" />
+                                    Start Learning
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      )}
+                      ))}
 
-                      {/* Order Summary */}
-                      <div className="border-t pt-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm text-gray-600">Order Total:</span>
-                          <span className="font-semibold">
-                            <PriceDisplay amount={order.total_amount} originalCurrency={order.currency} />
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm text-gray-600">
-                          <span>Payment Status:</span>
-                          {getStatusBadge(order.payment_status)}
-                        </div>
-                      </div>
-
-                      {/* Order-level Actions */}
+                      {/* Action Buttons */}
                       <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                         <Button
                           onClick={() => handleViewReceipt(order)}
-                          variant="outline"
-                          size="sm"
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                         >
                           <FileText className="h-4 w-4 mr-2" />
                           View Receipt
                         </Button>
                         
-                        {order.event_bookings?.length > 0 && (
+                        {(order.event_bookings && order.event_bookings.length > 0) && (
                           <Button 
                             onClick={() => handleViewTickets(order)}
-                            size="sm"
-                            className="bg-gradient-to-r from-orange-500 to-purple-600"
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            View All Tickets
+                            View Tickets
                           </Button>
                         )}
                       </div>
@@ -1058,24 +1026,24 @@ const MyOrdersPage = () => {
         <Modal 
           isOpen={showTicketModal}
           onClose={() => setShowTicketModal(false)}
-          title={selectedBookings.length === 1 ? 'Event Ticket' : 'Event Tickets'}
+          title="Event Tickets"
           actions={
             <div className="flex gap-3">
               <Button 
                 onClick={handleDownloadTicketsPDF}
                 size="sm"
-                variant="outline"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Download {selectedBookings.length === 1 ? 'Ticket' : 'All'}
+                Download PDF
               </Button>
               <Button 
                 onClick={handlePrintTickets} 
                 size="sm"
-                className="bg-gradient-to-r from-orange-500 to-purple-600"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
               >
                 <Printer className="h-4 w-4 mr-2" />
-                Print {selectedBookings.length === 1 ? 'Ticket' : 'All'}
+                Print All Tickets
               </Button>
             </div>
           }
@@ -1202,7 +1170,7 @@ const MyOrdersPage = () => {
             <Button 
               onClick={handlePrintReceipt} 
               size="sm"
-              className="bg-gradient-to-r from-orange-500 to-purple-600"
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
             >
               <Printer className="h-4 w-4 mr-2" />
               Print Receipt
