@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -78,21 +77,18 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
     setUploadingVideo(true);
     
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `lesson-video-${Date.now()}.${fileExt}`;
+      // Import the upload function dynamically to avoid import issues
+      const { uploadFileWithFallback } = await import('@/services/wasabiService');
       
-      const { data, error } = await supabase.storage
-        .from('course-videos')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('course-videos')
-        .getPublicUrl(fileName);
-
-      setVideoUrl(publicUrl);
-      toast.success('Video uploaded successfully');
+      const result = await uploadFileWithFallback(file, 'video');
+      
+      if (result.success && result.url) {
+        setVideoUrl(result.url);
+        const storageType = result.storage;
+        toast.success(`Video uploaded successfully via ${storageType === 'wasabi' ? 'Wasabi' : 'Supabase fallback'}`);
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
     } catch (error) {
       console.error('Error uploading video:', error);
       toast.error('Failed to upload video');
@@ -108,21 +104,17 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
     setUploadingMaterials(true);
     
     try {
+      // Import the upload function dynamically
+      const { uploadFileWithFallback } = await import('@/services/wasabiService');
+      
       const uploadPromises = Array.from(files).map(async (file) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `lesson-material-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const result = await uploadFileWithFallback(file, 'material');
         
-        const { data, error } = await supabase.storage
-          .from('course-materials')
-          .upload(fileName, file);
-
-        if (error) throw error;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('course-materials')
-          .getPublicUrl(fileName);
-
-        return publicUrl;
+        if (result.success && result.url) {
+          return result.url;
+        } else {
+          throw new Error(`Failed to upload ${file.name}: ${result.error}`);
+        }
       });
 
       const uploadedUrls = await Promise.all(uploadPromises);
@@ -130,7 +122,7 @@ const LessonFormDialog: React.FC<LessonFormProps> = ({
       toast.success(`${uploadedUrls.length} material(s) uploaded successfully`);
     } catch (error) {
       console.error('Error uploading materials:', error);
-      toast.error('Failed to upload materials');
+      toast.error('Failed to upload some materials');
     } finally {
       setUploadingMaterials(false);
     }
