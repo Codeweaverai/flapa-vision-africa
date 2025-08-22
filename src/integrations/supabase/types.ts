@@ -3781,6 +3781,10 @@ export type Database = {
           event_id: string
         }[]
       }
+      creator_owns_order_content: {
+        Args: { creator_uuid: string; order_uuid: string }
+        Returns: boolean
+      }
       generate_booking_code: {
         Args: Record<PropertyKey, never>
         Returns: string
