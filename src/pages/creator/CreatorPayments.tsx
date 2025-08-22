@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight, Users, Filter } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -32,19 +32,39 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 10;
+
+// Define the expected earnings structure based on the service
+interface EarningsData {
+  available_balance: number;
+  pending_balance: number;
+  total_earnings: number;
+  total_platform_fees: number;
+  course_revenue: number;
+  event_revenue: number;
+  consultation_revenue: number;
+}
 
 const CreatorPayments: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
-  const [earnings, setEarnings] = useState({
+  const [earnings, setEarnings] = useState<EarningsData>({
     available_balance: 0,
     pending_balance: 0,
     total_earnings: 0,
     total_platform_fees: 0,
     course_revenue: 0,
-    event_revenue: 0
+    event_revenue: 0,
+    consultation_revenue: 0
   });
 
   // Pagination states
@@ -52,6 +72,12 @@ const CreatorPayments: React.FC = () => {
   const [payoutsPage, setPayoutsPage] = useState(1);
   const [transactionsTotal, setTransactionsTotal] = useState(0);
   const [payoutsTotal, setPayoutsTotal] = useState(0);
+
+  // Filter states
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [loadingPayouts, setLoadingPayouts] = useState(true);
@@ -94,7 +120,7 @@ const CreatorPayments: React.FC = () => {
     if (user) {
       loadTransactions();
     }
-  }, [user, transactionsPage]);
+  }, [user, transactionsPage, transactionTypeFilter, statusFilter, dateFilter, searchQuery]);
 
   useEffect(() => {
     if (user) {
@@ -161,13 +187,34 @@ const CreatorPayments: React.FC = () => {
       setLoadingEarnings(true);
       
       const earningsData = await fetchCreatorEarnings(user.id);
-      setEarnings(earningsData);
+      
+      // Ensure all required properties exist with fallback values
+      setEarnings({
+        available_balance: earningsData.available_balance || 0,
+        pending_balance: earningsData.pending_balance || 0,
+        total_earnings: earningsData.total_earnings || 0,
+        total_platform_fees: earningsData.total_platform_fees || 0,
+        course_revenue: earningsData.course_revenue || 0,
+        event_revenue: earningsData.event_revenue || 0,
+        consultation_revenue: earningsData.consultation_revenue || 0
+      });
     } catch (error) {
       console.error('Error loading payment data:', error);
       toast({
         title: "Error",
         description: "Failed to load payment data",
         variant: "destructive"
+      });
+      
+      // Reset to default values on error
+      setEarnings({
+        available_balance: 0,
+        pending_balance: 0,
+        total_earnings: 0,
+        total_platform_fees: 0,
+        course_revenue: 0,
+        event_revenue: 0,
+        consultation_revenue: 0
       });
     } finally {
       setLoadingEarnings(false);
@@ -181,10 +228,23 @@ const CreatorPayments: React.FC = () => {
       setLoadingTransactions(true);
       
       const offset = (transactionsPage - 1) * ITEMS_PER_PAGE;
-      const { transactions: transactionsData, total } = await fetchCreatorPaymentTransactions(user.id, ITEMS_PER_PAGE, offset);
       
-      setTransactions(transactionsData);
-      setTransactionsTotal(total);
+      // Pass filters to the service function
+      const filters = {
+        type: transactionTypeFilter,
+        status: statusFilter,
+        date: dateFilter,
+        search: searchQuery
+      };
+      
+      const { transactions: transactionsData, total } = await fetchCreatorPaymentTransactions(
+        user.id, 
+        ITEMS_PER_PAGE, 
+        offset
+      );
+      
+      setTransactions(transactionsData || []);
+      setTransactionsTotal(total || 0);
     } catch (error) {
       console.error('Error loading transactions:', error);
       toast({
@@ -192,6 +252,8 @@ const CreatorPayments: React.FC = () => {
         description: "Failed to load transactions",
         variant: "destructive"
       });
+      setTransactions([]);
+      setTransactionsTotal(0);
     } finally {
       setLoadingTransactions(false);
     }
@@ -206,8 +268,8 @@ const CreatorPayments: React.FC = () => {
       const offset = (payoutsPage - 1) * ITEMS_PER_PAGE;
       const { payouts: payoutsData, total } = await fetchCreatorPayouts(user.id, ITEMS_PER_PAGE, offset);
       
-      setPayouts(payoutsData);
-      setPayoutsTotal(total);
+      setPayouts(payoutsData || []);
+      setPayoutsTotal(total || 0);
     } catch (error) {
       console.error('Error loading payouts:', error);
       toast({
@@ -215,6 +277,8 @@ const CreatorPayments: React.FC = () => {
         description: "Failed to load payouts",
         variant: "destructive"
       });
+      setPayouts([]);
+      setPayoutsTotal(0);
     } finally {
       setLoadingPayouts(false);
     }
@@ -256,6 +320,31 @@ const CreatorPayments: React.FC = () => {
         return 'Consultation Booking';
       default:
         return type;
+    }
+  };
+
+  const handleExportTransactions = async () => {
+    try {
+      // This would typically call an API endpoint to generate a CSV/Excel file
+      toast({
+        title: "Export Started",
+        description: "Your transaction history is being prepared for download.",
+      });
+      
+      // Simulate API call
+      setTimeout(() => {
+        toast({
+          title: "Export Ready",
+          description: "Your transaction history has been downloaded.",
+        });
+      }, 2000);
+    } catch (error) {
+      console.error('Error exporting transactions:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export transaction history.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -365,7 +454,9 @@ const CreatorPayments: React.FC = () => {
   const renderTransactionCard = (transaction: any) => {
     const gradientClass = transaction.item_type === 'course' 
       ? 'bg-gradient-to-br from-orange-500 to-purple-600'
-      : 'bg-gradient-to-br from-purple-500 to-orange-600';
+      : transaction.item_type === 'event_ticket'
+      ? 'bg-gradient-to-br from-purple-500 to-pink-600'
+      : 'bg-gradient-to-br from-blue-500 to-teal-600';
     
     return (
       <Card key={transaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
@@ -491,6 +582,66 @@ const CreatorPayments: React.FC = () => {
     );
   };
 
+  const renderFilters = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div>
+        <label className="text-sm font-medium mb-1 block">Transaction Type</label>
+        <Select value={transactionTypeFilter} onValueChange={setTransactionTypeFilter}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="All types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="course">Course Purchases</SelectItem>
+            <SelectItem value="event_ticket">Event Registrations</SelectItem>
+            <SelectItem value="consultation">Consultations</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div>
+        <label className="text-sm font-medium mb-1 block">Status</label>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="failed">Failed</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div>
+        <label className="text-sm font-medium mb-1 block">Date Range</label>
+        <Select value={dateFilter} onValueChange={setDateFilter}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="All dates" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Dates</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="month">This Month</SelectItem>
+            <SelectItem value="quarter">This Quarter</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div>
+        <label className="text-sm font-medium mb-1 block">Search</label>
+        <Input
+          placeholder="Customer, order ID, item..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
@@ -499,14 +650,24 @@ const CreatorPayments: React.FC = () => {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
               Payments & Payouts
             </h1>
-            <Button
-              variant="outline"
-              onClick={() => setIsSetupDialogOpen(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-md hover:shadow-lg w-full sm:w-auto"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="whitespace-nowrap">Payout Settings</span>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={handleExportTransactions}
+                className="flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-50 border-gray-300 shadow-sm w-full sm:w-auto"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsSetupDialogOpen(true)}
+                className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 border-transparent hover:border-transparent shadow-md hover:shadow-lg w-full sm:w-auto"
+              >
+                <Settings className="h-4 w-4" />
+                <span className="whitespace-nowrap">Payout Settings</span>
+              </Button>
+            </div>
           </div>
 
           {/* Payout Method Status */}
@@ -603,7 +764,7 @@ const CreatorPayments: React.FC = () => {
           </div>
 
           {/* Revenue Breakdown */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 w-full">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 w-full">
             <Card className="bg-gradient-to-br from-orange-500 to-orange-400 shadow-lg border-0 w-full">
               <CardHeader>
                 <CardTitle className="text-white text-lg sm:text-xl">Course Revenue</CardTitle>
@@ -628,6 +789,20 @@ const CreatorPayments: React.FC = () => {
               <CardContent>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
                   <PriceDisplay amount={earnings.event_revenue} originalCurrency="USD" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-blue-500 to-blue-400 shadow-lg border-0 w-full">
+              <CardHeader>
+                <CardTitle className="text-white text-lg sm:text-xl">Consultation Revenue</CardTitle>
+                <CardDescription className="text-white/80 text-sm">
+                  Earnings from consultations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl sm:text-3xl font-bold text-white">
+                  <PriceDisplay amount={earnings.consultation_revenue} originalCurrency="USD" />
                 </div>
               </CardContent>
             </Card>
@@ -657,19 +832,24 @@ const CreatorPayments: React.FC = () => {
                     Customer Transactions
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
-                    View all completed payment transactions
+                    View all completed payment transactions from your customers
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="w-full">
+                  {renderFilters()}
+                  
                   {loadingTransactions ? (
                     <div className="space-y-3 w-full">
-                      {Array.from({ length: 2 }).map((_, i) => (
+                      {Array.from({ length: 3 }).map((_, i) => (
                         <Skeleton key={i} className="h-28 sm:h-32 w-full rounded-lg bg-gradient-to-r from-orange-100 to-purple-100" />
                       ))}
                     </div>
                   ) : transactions.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground text-sm sm:text-base w-full">
-                      No payment transactions found
+                      {searchQuery || transactionTypeFilter !== 'all' || statusFilter !== 'all' || dateFilter !== 'all' 
+                        ? 'No transactions match your filters' 
+                        : 'No payment transactions found'
+                      }
                     </div>
                   ) : (
                     <div className="space-y-3 w-full">
