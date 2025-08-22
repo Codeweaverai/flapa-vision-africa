@@ -7,6 +7,7 @@ export interface CreatorEarningsData {
   total_platform_fees: number;
   course_revenue: number;
   event_revenue: number;
+  consultation_revenue: number;
 }
 
 export interface CreatorTransaction {
@@ -14,7 +15,7 @@ export interface CreatorTransaction {
   order_id: string;
   customer_email: string;
   customer_name?: string;
-  item_type: 'course' | 'event_ticket';
+  item_type: 'course' | 'event_ticket' | 'consultation';
   item_name: string;
   item_id: string;
   quantity: number;
@@ -34,118 +35,64 @@ const PLATFORM_FEE_RATE = 0.08;
 
 export async function calculateCreatorEarningsFromOrders(creatorId: string): Promise<CreatorEarningsData> {
   try {
-    // Get creator's course IDs
-    const { data: creatorCourses, error: coursesError } = await supabase
-      .from('courses')
-      .select('id')
-      .eq('creator_id', creatorId);
+    // Get all order items for this creator's content in a single query
+    const { data: orderItems, error } = await supabase
+      .from('order_items')
+      .select(`
+        *,
+        orders!inner(
+          id,
+          user_id,
+          email,
+          total_amount,
+          currency,
+          payment_status,
+          payment_method,
+          created_at,
+          updated_at,
+          tax_amount,
+          stripe_payment_intent_id
+        ),
+        courses!left(
+          id,
+          title,
+          creator_id
+        ),
+        events!left(
+          id,
+          title,
+          creator_id
+        ),
+        event_tickets!left(
+          id,
+          event_id,
+          events!inner(
+            id,
+            title,
+            creator_id
+          )
+        ),
+        consultations!left(
+          id,
+          title,
+          creator_id
+        )
+      `)
+      .or(`courses.creator_id.eq.${creatorId},events.creator_id.eq.${creatorId},event_tickets.events.creator_id.eq.${creatorId},consultations.creator_id.eq.${creatorId}`)
+      .eq('orders.payment_status', 'completed');
 
-    if (coursesError) {
-      console.log('Error fetching creator courses:', coursesError);
-    }
-
-    const courseIds = creatorCourses?.map(c => c.id) || [];
-
-    // Get creator's event IDs
-    const { data: creatorEvents, error: eventsError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('creator_id', creatorId);
-
-    if (eventsError) {
-      console.log('Error fetching creator events:', eventsError);
-    }
-
-    const eventIds = creatorEvents?.map(e => e.id) || [];
-
-    // Get event ticket IDs for creator's events
-    let eventTicketIds: string[] = [];
-    if (eventIds.length > 0) {
-      const { data: eventTickets, error: ticketsError } = await supabase
-        .from('event_tickets')
-        .select('id')
-        .in('event_id', eventIds);
-
-      if (ticketsError) {
-        console.log('Error fetching event tickets:', ticketsError);
-      } else {
-        eventTicketIds = eventTickets?.map(t => t.id) || [];
-      }
-    }
-
-    if (courseIds.length === 0 && eventTicketIds.length === 0) {
+    if (error) {
+      console.error('Error calculating creator earnings:', error);
       return {
         available_balance: 0,
         pending_balance: 0,
         total_earnings: 0,
         total_platform_fees: 0,
         course_revenue: 0,
-        event_revenue: 0
+        event_revenue: 0,
+        consultation_revenue: 0
       };
     }
-
-    // Fetch order items for courses
-    let courseOrderItems: any[] = [];
-    if (courseIds.length > 0) {
-      const { data: courseItems, error: courseError } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          orders!inner(
-            id,
-            user_id,
-            email,
-            total_amount,
-            currency,
-            payment_status,
-            payment_method,
-            created_at,
-            tax_amount
-          )
-        `)
-        .eq('orders.payment_status', 'completed')
-        .eq('item_type', 'course')
-        .in('item_id', courseIds);
-
-      if (courseError) {
-        console.error('Error fetching course order items:', courseError);
-      } else {
-        courseOrderItems = courseItems || [];
-      }
-    }
-
-    // Fetch order items for event tickets
-    let eventOrderItems: any[] = [];
-    if (eventTicketIds.length > 0) {
-      const { data: eventItems, error: eventError } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          orders!inner(
-            id,
-            user_id,
-            email,
-            total_amount,
-            currency,
-            payment_status,
-            payment_method,
-            created_at,
-            tax_amount
-          )
-        `)
-        .eq('orders.payment_status', 'completed')
-        .eq('item_type', 'event_ticket')
-        .in('item_id', eventTicketIds);
-
-      if (eventError) {
-        console.error('Error fetching event order items:', eventError);
-      } else {
-        eventOrderItems = eventItems || [];
-      }
-    }
-
-    // Combine all order items
-    const orderItems = [...courseOrderItems, ...eventOrderItems];
 
     if (!orderItems || orderItems.length === 0) {
       return {
@@ -154,7 +101,8 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
         total_earnings: 0,
         total_platform_fees: 0,
         course_revenue: 0,
-        event_revenue: 0
+        event_revenue: 0,
+        consultation_revenue: 0
       };
     }
 
@@ -162,6 +110,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     let totalPlatformFees = 0;
     let courseRevenue = 0;
     let eventRevenue = 0;
+    let consultationRevenue = 0;
     let availableBalance = 0;
     let pendingBalance = 0;
 
@@ -182,11 +131,14 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       totalEarnings += creatorEarning;
       totalPlatformFees += platformFee;
 
-      // Check if this is a course or event
-      if (item.item_type === 'course') {
+      // Check if this is a course, event, or consultation
+      if (item.courses && item.courses.creator_id === creatorId) {
         courseRevenue += creatorEarning;
-      } else if (item.item_type === 'event_ticket') {
+      } else if ((item.events && item.events.creator_id === creatorId) || 
+                 (item.event_tickets && item.event_tickets.events.creator_id === creatorId)) {
         eventRevenue += creatorEarning;
+      } else if (item.consultations && item.consultations.creator_id === creatorId) {
+        consultationRevenue += creatorEarning;
       }
 
       // Set payout eligible date (7 days from order creation)
@@ -234,161 +186,93 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       total_earnings: totalEarnings,
       total_platform_fees: totalPlatformFees,
       course_revenue: courseRevenue,
-      event_revenue: eventRevenue
+      event_revenue: eventRevenue,
+      consultation_revenue: consultationRevenue
     };
   } catch (error) {
-    console.error('Error calculating creator earnings from orders:', error);
+    console.error('Error calculating creator earnings:', error);
     return {
       available_balance: 0,
       pending_balance: 0,
       total_earnings: 0,
       total_platform_fees: 0,
       course_revenue: 0,
-      event_revenue: 0
+      event_revenue: 0,
+      consultation_revenue: 0
     };
   }
 }
 
 export async function fetchCreatorTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorTransaction[], total: number }> {
   try {
-    // Get creator's course IDs and titles
-    const { data: creatorCourses, error: coursesError } = await supabase
-      .from('courses')
-      .select('id, title')
-      .eq('creator_id', creatorId);
-
-    if (coursesError) {
-      console.error('Error fetching courses for transactions:', coursesError);
-      return { transactions: [], total: 0 };
-    }
-
-    const courseIds = creatorCourses?.map(c => c.id) || [];
-    const courseMap = new Map(creatorCourses?.map(c => [c.id, c.title]) || []);
-
-    // Get creator's event IDs and titles
-    const { data: creatorEvents, error: eventsError } = await supabase
-      .from('events')
-      .select('id, title')
-      .eq('creator_id', creatorId);
-
-    if (eventsError) {
-      console.error('Error fetching events for transactions:', eventsError);
-      return { transactions: [], total: 0 };
-    }
-
-    const eventIds = creatorEvents?.map(e => e.id) || [];
-    const eventMap = new Map(creatorEvents?.map(e => [e.id, e.title]) || []);
-
-    // Get event ticket IDs for creator's events
-    let eventTicketIds: string[] = [];
-    let ticketToEventMap = new Map();
-    
-    if (eventIds.length > 0) {
-      const { data: eventTickets, error: ticketsError } = await supabase
-        .from('event_tickets')
-        .select('id, event_id')
-        .in('event_id', eventIds);
-
-      if (ticketsError) {
-        console.error('Error fetching tickets for transactions:', ticketsError);
-      } else {
-        eventTicketIds = eventTickets?.map(t => t.id) || [];
-        ticketToEventMap = new Map(eventTickets?.map(t => [t.id, t.event_id]) || []);
-      }
-    }
-
-    if (courseIds.length === 0 && eventTicketIds.length === 0) {
-      return { transactions: [], total: 0 };
-    }
-
-    // Fetch course order items with detailed order information
-    let courseOrderItems: any[] = [];
-    if (courseIds.length > 0) {
-      const { data: courseItems, error: courseError } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          orders!inner(
+    // Get all order items for this creator's content in a single query
+    const { data: orderItems, error, count } = await supabase
+      .from('order_items')
+      .select(`
+        *,
+        orders!inner(
+          id,
+          user_id,
+          email,
+          total_amount,
+          currency,
+          payment_status,
+          payment_method,
+          created_at,
+          updated_at,
+          tax_amount,
+          stripe_payment_intent_id
+        ),
+        courses!left(
+          id,
+          title,
+          creator_id
+        ),
+        events!left(
+          id,
+          title,
+          creator_id
+        ),
+        event_tickets!left(
+          id,
+          event_id,
+          events!inner(
             id,
-            user_id,
-            email,
-            total_amount,
-            currency,
-            payment_status,
-            payment_method,
-            created_at,
-            updated_at,
-            tax_amount,
-            stripe_payment_intent_id
+            title,
+            creator_id
           )
-        `)
-        .eq('orders.payment_status', 'completed')
-        .eq('item_type', 'course')
-        .in('item_id', courseIds)
-        .order('created_at', { ascending: false });
+        ),
+        consultations!left(
+          id,
+          title,
+          creator_id
+        )
+      `, { count: 'exact' })
+      .or(`courses.creator_id.eq.${creatorId},events.creator_id.eq.${creatorId},event_tickets.events.creator_id.eq.${creatorId},consultations.creator_id.eq.${creatorId}`)
+      .eq('orders.payment_status', 'completed')
+      .order('orders.created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-      if (courseError) {
-        console.error('Error fetching course transactions:', courseError);
-      } else {
-        courseOrderItems = courseItems || [];
-      }
+    if (error) {
+      console.error('Error fetching creator transactions:', error);
+      return { transactions: [], total: 0 };
     }
 
-    // Fetch event order items with detailed order information
-    let eventOrderItems: any[] = [];
-    if (eventTicketIds.length > 0) {
-      const { data: eventItems, error: eventError } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          orders!inner(
-            id,
-            user_id,
-            email,
-            total_amount,
-            currency,
-            payment_status,
-            payment_method,
-            created_at,
-            updated_at,
-            tax_amount,
-            stripe_payment_intent_id
-          )
-        `)
-        .eq('orders.payment_status', 'completed')
-        .eq('item_type', 'event_ticket')
-        .in('item_id', eventTicketIds)
-        .order('created_at', { ascending: false });
-
-      if (eventError) {
-        console.error('Error fetching event transactions:', eventError);
-      } else {
-        eventOrderItems = eventItems || [];
-      }
-    }
-
-    // Combine and sort by date, then apply pagination
-    const allOrderItems = [...courseOrderItems, ...eventOrderItems]
-      .sort((a, b) => new Date(b.orders.created_at).getTime() - new Date(a.orders.created_at).getTime());
-
-    const totalCount = allOrderItems.length;
-    const paginatedItems = allOrderItems.slice(offset, offset + limit);
-
-    if (!paginatedItems || paginatedItems.length === 0) {
-      return { transactions: [], total: totalCount };
+    if (!orderItems || orderItems.length === 0) {
+      return { transactions: [], total: 0 };
     }
 
     // Get user profiles for customer names
-    const userIds = [...new Set(paginatedItems.map(item => item.orders.user_id))];
+    const userIds = [...new Set(orderItems.map(item => item.orders.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, username, full_name')
       .in('id', userIds);
 
-    // Process transactions with proper tax calculation
+    // Process transactions
     const creatorTransactions: CreatorTransaction[] = [];
     
-    for (const item of paginatedItems) {
+    for (const item of orderItems) {
       const profile = profiles?.find(p => p.id === item.orders.user_id);
       const itemTotal = Number(item.total_price);
       const orderTotal = Number(item.orders.total_amount);
@@ -404,15 +288,20 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       const creatorEarning = itemTotal - platformFee - itemTaxAllocation;
       
       let itemName = 'Unknown Item';
-      let itemType: 'course' | 'event_ticket' = 'course';
+      let itemType: 'course' | 'event_ticket' | 'consultation' = 'course';
       
-      if (item.item_type === 'course') {
-        itemName = courseMap.get(item.item_id) || 'Unknown Course';
+      if (item.courses && item.courses.creator_id === creatorId) {
+        itemName = item.courses.title || 'Unknown Course';
         itemType = 'course';
-      } else if (item.item_type === 'event_ticket') {
-        const eventId = ticketToEventMap.get(item.item_id);
-        itemName = eventId ? eventMap.get(eventId) || 'Unknown Event' : 'Unknown Event';
+      } else if (item.events && item.events.creator_id === creatorId) {
+        itemName = item.events.title || 'Unknown Event';
         itemType = 'event_ticket';
+      } else if (item.event_tickets && item.event_tickets.events.creator_id === creatorId) {
+        itemName = item.event_tickets.events.title || 'Unknown Event';
+        itemType = 'event_ticket';
+      } else if (item.consultations && item.consultations.creator_id === creatorId) {
+        itemName = item.consultations.title || 'Unknown Consultation';
+        itemType = 'consultation';
       }
       
       // Set payout eligible date (7 days from order creation)
@@ -431,7 +320,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
         total_amount: itemTotal,
-        creator_earning: Math.max(0, creatorEarning), // Ensure non-negative
+        creator_earning: Math.max(0, creatorEarning),
         platform_fee: platformFee,
         payment_status: item.orders.payment_status,
         created_at: item.orders.created_at,
@@ -441,9 +330,9 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       });
     }
 
-    return { transactions: creatorTransactions, total: totalCount };
+    return { transactions: creatorTransactions, total: count || 0 };
   } catch (error) {
-    console.error('Error fetching creator transactions from orders:', error);
+    console.error('Error fetching creator transactions:', error);
     return { transactions: [], total: 0 };
   }
 }
