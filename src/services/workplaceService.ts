@@ -181,3 +181,24 @@ export async function linkEventToWorkplace(eventId: string, workplaceId: string)
     return false;
   }
 }
+
+export async function getEditableWorkplaceIds(): Promise<string[]> {
+  try {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) return [];
+
+    const { data: memberships, error } = await supabase
+      .from('creator_workplace_members')
+      .select('workplace_id')
+      .eq('user_id', user.user.id)
+      .in('role', ['owner', 'editor'])
+      .eq('status', 'active');
+
+    if (error) throw error;
+
+    return (memberships || []).map(m => m.workplace_id);
+  } catch (error) {
+    console.error('Error fetching editable workplace IDs:', error);
+    return [];
+  }
+}

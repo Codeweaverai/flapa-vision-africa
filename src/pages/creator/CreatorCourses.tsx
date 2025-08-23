@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import PaginationControls from '@/components/creator/PaginationControls';
 import CoursePreviewDialog from '@/components/creator/CoursePreviewDialog';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { getEditableWorkplaceIds } from '@/services/workplaceService';
 
 const COURSES_PER_PAGE = 6; // 2 rows × 3 cards per row
 
@@ -56,14 +57,37 @@ const CreatorCourses = () => {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch own courses
+      const { data: ownCourses, error: ownError } = await supabase
         .from('courses')
         .select('*')
         .eq('creator_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCourses(data || []);
+      if (ownError) throw ownError;
+
+      // Fetch editable workplace IDs
+      const editableWorkplaceIds = await getEditableWorkplaceIds();
+      
+      let workplaceCourses: Course[] = [];
+      if (editableWorkplaceIds.length > 0) {
+        const { data: wpCourses, error: wpError } = await supabase
+          .from('courses')
+          .select('*')
+          .in('workplace_id', editableWorkplaceIds)
+          .order('created_at', { ascending: false });
+
+        if (wpError) throw wpError;
+        workplaceCourses = wpCourses || [];
+      }
+
+      // Merge and remove duplicates by id
+      const allCourses = [...(ownCourses || []), ...workplaceCourses];
+      const uniqueCourses = allCourses.filter((course, index, self) => 
+        index === self.findIndex(c => c.id === course.id)
+      );
+
+      setCourses(uniqueCourses);
     } catch (error) {
       console.error('Error loading courses:', error);
       toast.error('Failed to load courses');

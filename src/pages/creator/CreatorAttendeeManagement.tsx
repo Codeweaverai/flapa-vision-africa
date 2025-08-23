@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -13,6 +14,7 @@ import { format } from 'date-fns';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import AttendeeExportButton from '@/components/creator/AttendeeExportButton';
 import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
+import { getEditableWorkplaceIds } from '@/services/workplaceService';
 import {
   Pagination,
   PaginationContent,
@@ -76,17 +78,40 @@ const CreatorAttendeeManagement: React.FC = () => {
 
   const fetchCreatorEvents = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch own events
+      const { data: ownEvents, error: ownError } = await supabase
         .from('events')
         .select('id, title, start_time, end_time, location')
         .eq('creator_id', user?.id)
         .order('start_time', { ascending: false });
 
-      if (error) throw error;
-      setEvents(data || []);
+      if (ownError) throw ownError;
+
+      // Fetch editable workplace IDs
+      const editableWorkplaceIds = await getEditableWorkplaceIds();
       
-      if (data && data.length > 0) {
-        setSelectedEvent(data[0].id);
+      let workplaceEvents: Event[] = [];
+      if (editableWorkplaceIds.length > 0) {
+        const { data: wpEvents, error: wpError } = await supabase
+          .from('events')
+          .select('id, title, start_time, end_time, location')
+          .in('workplace_id', editableWorkplaceIds)
+          .order('start_time', { ascending: false });
+
+        if (wpError) throw wpError;
+        workplaceEvents = wpEvents || [];
+      }
+
+      // Merge and remove duplicates by id
+      const allEvents = [...(ownEvents || []), ...workplaceEvents];
+      const uniqueEvents = allEvents.filter((event, index, self) => 
+        index === self.findIndex(e => e.id === event.id)
+      );
+
+      setEvents(uniqueEvents);
+      
+      if (uniqueEvents && uniqueEvents.length > 0) {
+        setSelectedEvent(uniqueEvents[0].id);
       }
     } catch (error) {
       console.error('Error fetching creator events:', error);
@@ -447,7 +472,6 @@ const CreatorAttendeeManagement: React.FC = () => {
   <AttendeeExportButton 
     eventId={selectedEvent} 
     eventTitle={selectedEventData?.title} 
-    className="w-full sm:w-auto"
   />
    </div>
                   </div>
