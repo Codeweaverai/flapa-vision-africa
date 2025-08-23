@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -28,12 +29,14 @@ import {
   XCircle, 
   Mail, 
   Trash2,
-  Users
+  Users,
+  BookOpen
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserProfiles, UserProfile } from '@/utils/userUtils';
+import WorkspaceContentTab from './WorkspaceContentTab';
 
 interface Workplace {
   id: string;
@@ -208,174 +211,202 @@ const WorkspaceDetailView: React.FC<WorkspaceDetailViewProps> = ({ workplace, on
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Pending Invitations */}
-      {invitations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4" />
-              Pending Invitations ({invitations.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Invited</TableHead>
-                  {isOwner && <TableHead>Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invitations.map((invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell>{invitation.invited_email}</TableCell>
-                    <TableCell>
-                      <Badge className={getRoleColor(invitation.role)}>
-                        {invitation.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-orange-600">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Pending
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(invitation.created_at).toLocaleDateString()}
-                    </TableCell>
-                    {isOwner && (
+    <div className="p-6">
+      <Tabs defaultValue="members" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="members">
+            <Users className="h-4 w-4 mr-2" />
+            Members
+          </TabsTrigger>
+          <TabsTrigger value="content">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Content
+          </TabsTrigger>
+          <TabsTrigger value="invitations" disabled={invitations.length === 0}>
+            <Clock className="h-4 w-4 mr-2" />
+            Invitations ({invitations.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="members" className="space-y-6">
+          {/* Active Members */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <CheckCircle className="h-4 w-4" />
+                Active Members ({members.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Joined</TableHead>
+                    {isOwner && <TableHead>Actions</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {members.map((member) => (
+                    <TableRow key={member.id}>
                       <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleResendInvitation(invitation)}
-                          >
-                            <Mail className="h-3 w-3 mr-1" />
-                            Resend
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Cancel
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to cancel the invitation to {invitation.invited_email}?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleCancelInvitation(invitation.id)}
-                                >
-                                  Cancel Invitation
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                        <div>
+                          <div className="font-medium">
+                            {member.profile?.display_name || 'Unknown User'}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {member.user_id === user?.id ? 'You' : 'Member'}
+                          </div>
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Active Members */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <CheckCircle className="h-4 w-4" />
-            Active Members ({members.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
-                {isOwner && <TableHead>Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">
-                        {member.profile?.display_name || 'Unknown User'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {member.user_id === user?.id ? 'You' : 'Member'}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getRoleColor(member.role)}>
-                      {member.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-green-600">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Active
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(member.joined_at).toLocaleDateString()}
-                  </TableCell>
-                  {isOwner && (
-                    <TableCell>
-                      {member.user_id !== user?.id && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="text-red-600">
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Remove
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remove Member</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to remove this member from the workplace? They will lose access to all workspace content.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleRemoveMember(member.id)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                Remove Member
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                      <TableCell>
+                        <Badge className={getRoleColor(member.role)}>
+                          {member.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-green-600">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(member.joined_at).toLocaleDateString()}
+                      </TableCell>
+                      {isOwner && (
+                        <TableCell>
+                          {member.user_id !== user?.id && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-red-600">
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Remove
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to remove this member from the workplace? They will lose access to all workspace content.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleRemoveMember(member.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Remove Member
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </TableCell>
                       )}
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="content">
+          <WorkspaceContentTab 
+            workplaceId={workplace.id}
+            userRole={workplace.user_role}
+          />
+        </TabsContent>
+
+        <TabsContent value="invitations" className="space-y-6">
+          {/* Pending Invitations */}
+          {invitations.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4" />
+                  Pending Invitations ({invitations.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Invited</TableHead>
+                      {isOwner && <TableHead>Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invitations.map((invitation) => (
+                      <TableRow key={invitation.id}>
+                        <TableCell>{invitation.invited_email}</TableCell>
+                        <TableCell>
+                          <Badge className={getRoleColor(invitation.role)}>
+                            {invitation.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-orange-600">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pending
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(invitation.created_at).toLocaleDateString()}
+                        </TableCell>
+                        {isOwner && (
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleResendInvitation(invitation)}
+                              >
+                                <Mail className="h-3 w-3 mr-1" />
+                                Resend
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Cancel
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to cancel the invitation to {invitation.invited_email}?
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleCancelInvitation(invitation.id)}
+                                    >
+                                      Cancel Invitation
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

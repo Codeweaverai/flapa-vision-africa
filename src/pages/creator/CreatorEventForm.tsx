@@ -1,553 +1,366 @@
 import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import CreatorLayout from '@/components/creator/CreatorLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DateTimePicker } from '@/components/ui/date-time-picker';
-import { Upload, X } from 'lucide-react';
 import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage,
-  FormDescription
-} from '@/components/ui/form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { supabase } from '@/lib/supabaseClient';
-import { VALID_EVENT_TYPES, createEventWithCreator, Event } from '@/services/eventService';
+  createEventWithCreator, 
+  fetchEventById,
+  VALID_EVENT_TYPES 
+} from '@/services/eventService';
+import { fetchUserWorkplaces, type UserWorkplace } from '@/services/workplaceService';
+import { ArrowLeft, Building2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-// Define the form schema
-const eventSchema = z.object({
-  title: z.string().min(3, { message: 'Title must be at least 3 characters' }),
-  description: z.string().optional(),
-  event_type: z.string().min(1, { message: 'Event type is required' }),
-  start_time: z.date({ required_error: 'Start time is required' }),
-  end_time: z.date({ required_error: 'End time is required' }),
-  location: z.string().optional(),
-  online_meeting_link: z.string().optional(),
-  capacity: z.number().int().positive().optional(),
-  is_free: z.boolean().default(false),
-  price: z.number().nonnegative().optional(),
-  currency: z.string().optional(),
-  image_url: z.string().optional(),
-});
-
-type EventFormValues = z.infer<typeof eventSchema>;
+import { supabase } from '@/lib/supabaseClient';
 
 const CreatorEventForm = () => {
-  const navigate = useNavigate();
   const { id } = useParams();
-  const isEditing = !!id;
-  const [loading, setLoading] = useState(false);
-  const [initialEvent, setInitialEvent] = useState<Event | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const isEdit = Boolean(id);
 
-  // Initialize form
-  const form = useForm<EventFormValues>({
-    resolver: zodResolver(eventSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      event_type: 'webinar',
-      start_time: new Date(),
-      end_time: new Date(Date.now() + 3600000), // Default 1 hour later
-      is_free: true,
-      price: 0,
-      currency: 'USD',
-    },
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    start_time: new Date().toISOString().slice(0, 16),
+    end_time: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+    location: '',
+    event_type: 'webinar',
+    image_url: '',
+    price: 0,
+    is_free: true,
+    currency: 'USD',
+    capacity: 100,
+    online_meeting_link: '',
+    is_published: false
   });
+  const [loading, setLoading] = useState(false);
 
-  const { watch, setValue } = form;
-  const isFree = watch('is_free');
+  const [workplaces, setWorkplaces] = useState<UserWorkplace[]>([]);
+  const [selectedWorkplace, setSelectedWorkplace] = useState<string>('');
 
-  // Fetch event data if editing
   useEffect(() => {
-    if (isEditing && id) {
-      const fetchEvent = async () => {
-        setLoading(true);
-        try {
-          const { data, error } = await supabase
-            .from('events')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-          if (error) throw error;
-          
-          setInitialEvent(data);
-          
-          // Format dates
-          const event = {
-            ...data,
-            start_time: new Date(data.start_time),
-            end_time: new Date(data.end_time),
-            capacity: data.capacity || undefined,
-            price: data.price || 0,
-          };
-          
-          // Set form values
-          Object.entries(event).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-              setValue(key as any, value);
-            }
-          });
-
-          if (data.image_url) {
-            setImagePreview(data.image_url);
-          }
-        } catch (error) {
-          console.error('Error fetching event:', error);
-          toast.error('Failed to load event data');
-        } finally {
-          setLoading(false);
-        }
-      };
-      
-      fetchEvent();
+    loadWorkplaces();
+    if (isEdit && id) {
+      loadEvent();
     }
-  }, [id, isEditing, setValue]);
+  }, [isEdit, id]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+  const loadWorkplaces = async () => {
+    const userWorkplaces = await fetchUserWorkplaces();
+    setWorkplaces(userWorkplaces);
   };
 
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setValue('image_url', '');
-  };
-
-  const uploadImage = async (): Promise<string | null> => {
-    if (!imageFile) return form.getValues('image_url') || null;
-
+  const loadEvent = async () => {
+    if (!id) return;
+    
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `event-images/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('event-images')
-        .upload(filePath, imageFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('event-images')
-        .getPublicUrl(filePath);
-
-      return urlData.publicUrl;
+      const event = await fetchEventById(id);
+      if (event) {
+        setFormData({
+          title: event.title,
+          description: event.description,
+          start_time: new Date(event.start_time).toISOString().slice(0, 16),
+          end_time: new Date(event.end_time).toISOString().slice(0, 16),
+          location: event.location,
+          event_type: event.event_type,
+          image_url: event.image_url || '',
+          price: event.price || 0,
+          is_free: event.is_free,
+          currency: event.currency || 'USD',
+          capacity: event.capacity || 100,
+          online_meeting_link: event.online_meeting_link || '',
+          is_published: event.is_published || false
+        });
+        setSelectedWorkspace(event.workplace_id || '');
+      }
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
-      return null;
+      console.error('Error loading event:', error);
+      toast.error('Failed to load event');
     }
   };
 
-  const onSubmit = async (values: EventFormValues) => {
-    if (!user) {
-      toast.error('You must be logged in to create or edit an event');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.title.trim() || !formData.description.trim()) {
+      toast.error('Please fill in all required fields');
       return;
     }
-    
+
+    if (!user) {
+      toast.error('You must be logged in to create an event');
+      return;
+    }
+
     setLoading(true);
     try {
-      // Upload image if provided
-      const imageUrl = await uploadImage();
-
-      // Prepare event data
       const eventData = {
-        ...values,
-        // Convert Date objects to ISO strings
-        start_time: values.start_time.toISOString(),
-        end_time: values.end_time.toISOString(),
-        price: values.is_free ? null : values.price,
-        currency: values.is_free ? null : values.currency,
-        image_url: imageUrl,
+        ...formData,
+        workplace_id: selectedWorkplace || null,
+        price: formData.is_free ? 0 : formData.price,
+        currency: formData.is_free ? null : (formData.currency || 'USD')
       };
 
-      if (isEditing && id) {
+      if (isEdit && id) {
         // Update existing event
         const { error } = await supabase
           .from('events')
           .update(eventData)
           .eq('id', id);
-          
+
         if (error) throw error;
-        
         toast.success('Event updated successfully');
       } else {
-        // Create new event
-        const result = await createEventWithCreator({
-          ...eventData,
-          start_time: eventData.start_time,
-          end_time: eventData.end_time,
-        }, user.id);
-        
-        if (!result) {
-          throw new Error('Failed to create event');
-        }
-        
+        await createEventWithCreator(eventData, user.id);
         toast.success('Event created successfully');
       }
       
-      // Navigate back to events list
       navigate('/creator/events');
     } catch (error) {
       console.error('Error saving event:', error);
-      toast.error(`Failed to ${isEditing ? 'update' : 'create'} event`);
+      toast.error('Failed to save event');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <CreatorLayout title={isEditing ? "Edit Event" : "Create New Event"}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{isEditing ? 'Edit Event' : 'Create New Event'}</CardTitle>
-          <CardDescription>
-            {isEditing 
-              ? 'Update your event details below' 
-              : 'Enter the details for your new event'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Event Title*</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter event title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Provide a description of your event" 
-                        className="min-h-[120px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    <div className="container mx-auto py-6 max-w-4xl">
+      <div className="flex items-center gap-4 mb-6">
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => navigate('/creator/events')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Events
+        </Button>
+        <h1 className="text-2xl font-bold">
+          {isEdit ? 'Edit Event' : 'Create New Event'}
+        </h1>
+      </div>
 
-              {/* Event Image Upload */}
-              <div>
-                <Label htmlFor="image">Event Image</Label>
-                <div className="space-y-4">
-                  {imagePreview ? (
-                    <div className="relative inline-block">
-                      <img 
-                        src={imagePreview} 
-                        alt="Event image preview" 
-                        className="max-h-48 rounded-md border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute -top-2 -right-2 h-6 w-6"
-                        onClick={removeImage}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="mt-4">
-                        <Label htmlFor="image" className="cursor-pointer">
-                          <span className="text-sm text-gray-600">Click to upload event image</span>
-                          <Input
-                            id="image"
-                            name="image"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange}
-                            className="hidden"
-                          />
-                        </Label>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Event Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Workspace Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="workplace">
+                <Building2 className="h-4 w-4 inline mr-2" />
+                Workspace (Optional)
+              </Label>
+              <Select value={selectedWorkspace} onValueChange={setSelectedWorkspace}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a workspace or leave empty for personal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Personal (No Workspace)</SelectItem>
+                  {workplaces.map((workspace) => (
+                    <SelectItem key={workspace.id} value={workspace.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{workspace.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {workspace.role}
+                        </Badge>
                       </div>
-                    </div>
-                  )}
-                  
-                  {!imagePreview && (
-                    <Input
-                      id="image"
-                      name="image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-                  )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Assign this event to a workspace to allow collaborative editing
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Event title"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Event description"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="event_type">Event Type</Label>
+              <Select
+                value={formData.event_type}
+                onValueChange={(value) => setFormData({ ...formData, event_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an event type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VALID_EVENT_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="Event location"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start_time">Start Time</Label>
+                <Input
+                  id="start_time"
+                  type="datetime-local"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="end_time">End Time</Label>
+                <Input
+                  id="end_time"
+                  type="datetime-local"
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Pricing</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="is_free">Is Free</Label>
+              <Switch
+                id="is_free"
+                checked={formData.is_free}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_free: checked })}
+              />
+            </div>
+
+            {!formData.is_free && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                    placeholder="Event price"
+                  />
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="event_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Event Type*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select event type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {VALID_EVENT_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type.charAt(0).toUpperCase() + type.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Capacity (optional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="Maximum number of attendees" 
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            field.onChange(!isNaN(value) ? value : undefined);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="start_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Time*</FormLabel>
-                      <FormControl>
-                        <DateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="end_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Time*</FormLabel>
-                      <FormControl>
-                        <DateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location (For in-person events)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Event location" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="online_meeting_link"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Online Meeting Link (For virtual events)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Zoom/Meet link" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="is_free"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Free Event</FormLabel>
-                        <FormDescription>
-                          Toggle if this is a free event or requires payment
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                
-                {!isFree && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price*</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              placeholder="Event price" 
-                              {...field}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value);
-                                field.onChange(!isNaN(value) ? value : 0);
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Currency*</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value || 'USD'}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select currency" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="USD">USD - US Dollar</SelectItem>
-                              <SelectItem value="EUR">EUR - Euro</SelectItem>
-                              <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                              <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                              <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
-                              <SelectItem value="ZMW">ZMW - Zambian Kwacha</SelectItem>
-                              <SelectItem value="XOF">XOF - West African CFA Franc (Benin, Burkina Faso, Ivory Coast, Senegal)</SelectItem>
-                              <SelectItem value="XAF">XAF - Central African CFA Franc (Cameroon, Congo-Brazzaville, DRC, Gabon)</SelectItem>
-                              <SelectItem value="GHS">GHS - Ghanaian Cedi</SelectItem>
-                              <SelectItem value="KES">KES - Kenyan Shilling</SelectItem>
-                              <SelectItem value="LSL">LSL - Lesotho Loti</SelectItem>
-                              <SelectItem value="MWK">MWK - Malawian Kwacha</SelectItem>
-                              <SelectItem value="MZN">MZN - Mozambican Metical</SelectItem>
-                              <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                              <SelectItem value="RWF">RWF - Rwandan Franc</SelectItem>
-                              <SelectItem value="SLL">SLL - Sierra Leonean Leone</SelectItem>
-                              <SelectItem value="TZS">TZS - Tanzanian Shilling</SelectItem>
-                              <SelectItem value="UGX">UGX - Ugandan Shilling</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/creator/events')}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Saving...' : isEditing ? 'Update Event' : 'Create Event'}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </CreatorLayout>
+
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select
+                    value={formData.currency}
+                    onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="capacity">Capacity</Label>
+              <Input
+                id="capacity"
+                type="number"
+                value={formData.capacity}
+                onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
+                placeholder="Event capacity"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="online_meeting_link">Online Meeting Link</Label>
+              <Input
+                id="online_meeting_link"
+                type="url"
+                value={formData.online_meeting_link}
+                onChange={(e) => setFormData({ ...formData, online_meeting_link: e.target.value })}
+                placeholder="Online meeting link"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="is_published">Publish Event</Label>
+              <Switch
+                id="is_published"
+                checked={formData.is_published}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_published: checked })}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-end gap-4">
+          <Button variant="outline" onClick={() => navigate('/creator/events')}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Saving...' : 'Save Event'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
 
