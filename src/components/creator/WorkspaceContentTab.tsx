@@ -4,6 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -20,7 +35,15 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { fetchWorkplaceContent } from '@/services/workplaceService';
+import { 
+  fetchWorkplaceContent, 
+  fetchCreatorCoursesForSelection,
+  fetchCreatorEventsForSelection,
+  linkCourseToWorkplace,
+  linkEventToWorkplace,
+  CreatorCourse,
+  CreatorEvent
+} from '@/services/workplaceService';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -50,9 +73,18 @@ const WorkspaceContentTab: React.FC<WorkspaceContentTabProps> = ({
   const [courses, setCourses] = useState<WorkplaceCourse[]>([]);
   const [events, setEvents] = useState<WorkplaceEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSelectCourse, setShowSelectCourse] = useState(false);
+  const [showSelectEvent, setShowSelectEvent] = useState(false);
+  const [availableCourses, setAvailableCourses] = useState<CreatorCourse[]>([]);
+  const [availableEvents, setAvailableEvents] = useState<CreatorEvent[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [linkingCourse, setLinkingCourse] = useState(false);
+  const [linkingEvent, setLinkingEvent] = useState(false);
   const navigate = useNavigate();
 
   const canEdit = userRole === 'owner' || userRole === 'editor';
+  const canSelect = userRole === 'owner'; // Only owners can select/assign content
 
   useEffect(() => {
     loadContent();
@@ -72,6 +104,98 @@ const WorkspaceContentTab: React.FC<WorkspaceContentTabProps> = ({
     }
   };
 
+  const loadAvailableCourses = async () => {
+    try {
+      const courses = await fetchCreatorCoursesForSelection();
+      setAvailableCourses(courses);
+    } catch (error) {
+      console.error('Error loading available courses:', error);
+      toast.error('Failed to load available courses');
+    }
+  };
+
+  const loadAvailableEvents = async () => {
+    try {
+      const events = await fetchCreatorEventsForSelection();
+      setAvailableEvents(events);
+    } catch (error) {
+      console.error('Error loading available events:', error);
+      toast.error('Failed to load available events');
+    }
+  };
+
+  const handleSelectCourse = () => {
+    setShowSelectCourse(true);
+    loadAvailableCourses();
+  };
+
+  const handleSelectEvent = () => {
+    setShowSelectEvent(true);
+    loadAvailableEvents();
+  };
+
+  const handleLinkCourse = async () => {
+    if (!selectedCourseId) return;
+
+    setLinkingCourse(true);
+    try {
+      const success = await linkCourseToWorkplace(selectedCourseId, workplaceId);
+      if (success) {
+        toast.success('Course linked to workspace successfully');
+        setShowSelectCourse(false);
+        setSelectedCourseId('');
+        loadContent(); // Reload content
+      } else {
+        toast.error('Failed to link course to workspace');
+      }
+    } catch (error) {
+      console.error('Error linking course:', error);
+      toast.error('Failed to link course to workspace');
+    } finally {
+      setLinkingCourse(false);
+    }
+  };
+
+  const handleLinkEvent = async () => {
+    if (!selectedEventId) return;
+
+    setLinkingEvent(true);
+    try {
+      const success = await linkEventToWorkplace(selectedEventId, workplaceId);
+      if (success) {
+        toast.success('Event linked to workspace successfully');
+        setShowSelectEvent(false);
+        setSelectedEventId('');
+        loadContent(); // Reload content
+      } else {
+        toast.error('Failed to link event to workspace');
+      }
+    } catch (error) {
+      console.error('Error linking event:', error);
+      toast.error('Failed to link event to workspace');
+    } finally {
+      setLinkingEvent(false);
+    }
+  };
+
+  const getAssignmentBadge = (item: CreatorCourse | CreatorEvent, currentWorkplaceId: string) => {
+    if (!item.workplace_id) {
+      return <Badge variant="outline" className="text-green-600">Unassigned</Badge>;
+    }
+    if (item.workplace_id === currentWorkplaceId) {
+      return <Badge variant="default" className="bg-blue-100 text-blue-800">Already in this workspace</Badge>;
+    }
+    return (
+      <Badge variant="secondary" className="text-orange-600">
+        Assigned to {item.workplace_name}
+      </Badge>
+    );
+  };
+
+  const isItemSelectable = (item: CreatorCourse | CreatorEvent, currentWorkplaceId: string) => {
+    return !item.workplace_id || item.workplace_id === currentWorkplaceId;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -84,23 +208,23 @@ const WorkspaceContentTab: React.FC<WorkspaceContentTabProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Workspace Content</h3>
-        {canEdit && (
+        {canSelect && (
           <div className="flex gap-2">
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => navigate('/creator/courses/create')}
+              onClick={handleSelectCourse}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Course
+              Select Course
             </Button>
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => navigate('/creator/events/create')}
+              onClick={handleSelectEvent}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Event
+              Select Event
             </Button>
           </div>
         )}
@@ -128,13 +252,13 @@ const WorkspaceContentTab: React.FC<WorkspaceContentTabProps> = ({
                 <div className="text-center py-8 text-muted-foreground">
                   <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No courses assigned to this workspace yet.</p>
-                  {canEdit && (
+                  {canSelect && (
                     <Button 
                       variant="outline" 
                       className="mt-4"
-                      onClick={() => navigate('/creator/courses/create')}
+                      onClick={handleSelectCourse}
                     >
-                      Create First Course
+                      Select First Course
                     </Button>
                   )}
                 </div>
@@ -210,13 +334,13 @@ const WorkspaceContentTab: React.FC<WorkspaceContentTabProps> = ({
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No events assigned to this workspace yet.</p>
-                  {canEdit && (
+                  {canSelect && (
                     <Button 
                       variant="outline" 
                       className="mt-4"
-                      onClick={() => navigate('/creator/events/create')}
+                      onClick={handleSelectEvent}
                     >
-                      Create First Event
+                      Select First Event
                     </Button>
                   )}
                 </div>
@@ -272,6 +396,99 @@ const WorkspaceContentTab: React.FC<WorkspaceContentTabProps> = ({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Select Course Dialog */}
+      <Dialog open={showSelectCourse} onOpenChange={setShowSelectCourse}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Course</DialogTitle>
+            <DialogDescription>
+              Choose a course from your created courses to assign to this workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a course..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCourses.map((course) => (
+                  <SelectItem
+                    key={course.id}
+                    value={course.id}
+                    disabled={!isItemSelectable(course, workplaceId)}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span>{course.title}</span>
+                      {getAssignmentBadge(course, workplaceId)}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSelectCourse(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleLinkCourse} 
+              disabled={!selectedCourseId || linkingCourse}
+            >
+              {linkingCourse ? 'Linking...' : 'Link Course'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Select Event Dialog */}
+      <Dialog open={showSelectEvent} onOpenChange={setShowSelectEvent}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Event</DialogTitle>
+            <DialogDescription>
+              Choose an event from your created events to assign to this workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose an event..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableEvents.map((event) => (
+                  <SelectItem
+                    key={event.id}
+                    value={event.id}
+                    disabled={!isItemSelectable(event, workplaceId)}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div>
+                        <div>{event.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(event.start_time).toLocaleDateString()}
+                        </div>
+                      </div>
+                      {getAssignmentBadge(event, workplaceId)}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSelectEvent(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleLinkEvent} 
+              disabled={!selectedEventId || linkingEvent}
+            >
+              {linkingEvent ? 'Linking...' : 'Link Event'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
