@@ -58,7 +58,8 @@ const handler = async (req: Request): Promise<Response> => {
           start_time,
           end_time,
           location,
-          creator_id
+          creator_id,
+          workplace_id
         ),
         check_ins (
           check_in_time,
@@ -124,25 +125,51 @@ const handler = async (req: Request): Promise<Response> => {
 
     const ticket = tickets[0];
 
-    // Check if the verifier is authorized (creator of the event)
-    if (verifierUserId && ticket.event?.creator_id !== verifierUserId) {
-      console.log('Unauthorized verification attempt:', {
-        verifierUserId,
-        eventCreatorId: ticket.event?.creator_id,
-        eventId: ticket.event?.id
-      });
+    // Check if the verifier is authorized (event creator or workplace owner/editor)
+    if (verifierUserId) {
+      let isAuthorized = false;
       
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'unauthorized',
-          message: 'You are not authorized to verify tickets for this event' 
-        }),
-        { 
-          status: 403, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      // Check if verifier is the event creator
+      if (ticket.event?.creator_id === verifierUserId) {
+        isAuthorized = true;
+      }
+      
+      // Check if verifier is a workplace owner or editor (if event has workplace_id)
+      if (!isAuthorized && ticket.event?.workplace_id) {
+        const { data: membership, error: membershipError } = await supabase
+          .from('creator_workplace_members')
+          .select('role')
+          .eq('user_id', verifierUserId)
+          .eq('workplace_id', ticket.event.workplace_id)
+          .eq('status', 'active')
+          .in('role', ['owner', 'editor'])
+          .single();
+
+        if (!membershipError && membership) {
+          isAuthorized = true;
         }
-      );
+      }
+      
+      if (!isAuthorized) {
+        console.log('Unauthorized verification attempt:', {
+          verifierUserId,
+          eventCreatorId: ticket.event?.creator_id,
+          eventId: ticket.event?.id,
+          workplaceId: ticket.event?.workplace_id
+        });
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'unauthorized',
+            message: 'You are not authorized to verify tickets for this event' 
+          }),
+          { 
+            status: 403, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
     }
 
     // Additional verification by ticket holder name if provided
@@ -203,7 +230,8 @@ const handler = async (req: Request): Promise<Response> => {
           start_time: ticket.event?.start_time || '',
           end_time: ticket.event?.end_time || '',
           location: ticket.event?.location || 'Unknown Location',
-          creator_id: ticket.event?.creator_id
+          creator_id: ticket.event?.creator_id,
+          workplace_id: ticket.event?.workplace_id
         },
         ticket_type: ticketType,
         user: {

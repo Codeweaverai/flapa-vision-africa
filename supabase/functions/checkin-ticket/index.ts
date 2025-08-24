@@ -17,14 +17,24 @@ serve(async (req) => {
   try {
     const { ticketId, bookingId, eventId, checkedInBy } = await req.json();
 
-    if (!ticketId || !bookingId || !eventId) {
-      throw new Error("Missing required fields: ticketId, bookingId, eventId");
+    if (!ticketId || !checkedInBy) {
+      throw new Error("Missing required fields: ticketId, checkedInBy");
     }
 
-    // First verify the ticket exists and is not already checked in
+    // First verify the ticket exists and get event and booking details
     const { data: ticketData, error: ticketError } = await supabaseClient
       .from('generated_tickets')
-      .select('*')
+      .select(`
+        *,
+        event:events!generated_tickets_event_id_fkey (
+          id,
+          creator_id,
+          workplace_id
+        ),
+        booking:event_bookings!generated_tickets_booking_id_fkey (
+          id
+        )
+      `)
       .eq('id', ticketId)
       .single();
 
@@ -42,6 +52,45 @@ serve(async (req) => {
         status: 400
       });
     }
+
+    // Check authorization - event creator or workplace owner/editor
+    let isAuthorized = false;
+    
+    // Check if user is the event creator
+    if (ticketData.event?.creator_id === checkedInBy) {
+      isAuthorized = true;
+    }
+    
+    // Check if user is a workplace owner or editor (if event has workplace_id)
+    if (!isAuthorized && ticketData.event?.workplace_id) {
+      const { data: membership, error: membershipError } = await supabaseClient
+        .from('creator_workplace_members')
+        .select('role')
+        .eq('user_id', checkedInBy)
+        .eq('workplace_id', ticketData.event.workplace_id)
+        .eq('status', 'active')
+        .in('role', ['owner', 'editor'])
+        .single();
+
+      if (!membershipError && membership) {
+        isAuthorized = true;
+      }
+    }
+    
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'You are not authorized to check in tickets for this event'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403
+      });
+    }
+
+    // Use the actual data from ticket lookup
+    const actualBookingId = ticketData.booking?.id || bookingId;
+    const actualEventId = ticketData.event?.id || eventId;
 
     // Check if there's already a check-in record for this ticket
     const { data: existingCheckin } = await supabaseClient
@@ -79,8 +128,8 @@ serve(async (req) => {
       .from('check_ins')
       .insert({
         ticket_id: ticketId,
-        booking_id: bookingId,
-        event_id: eventId,
+        booking_id: actualBookingId,
+        event_id: actualEventId,
         checked_in_by: checkedInBy,
         check_in_time: new Date().toISOString()
       })
