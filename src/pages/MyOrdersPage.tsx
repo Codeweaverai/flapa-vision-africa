@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode } from 'lucide-react';
+import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -14,11 +14,27 @@ import TicketDisplay from '@/components/tickets/TicketDisplay';
 import { QRCodeSVG } from 'qrcode.react';
 import html2pdf from 'html2pdf.js';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
 
 declare global {
   interface Window {
     QRCode?: any;
   }
+}
+
+// Local interfaces and helpers
+interface GiftCard {
+  id: string;
+  amount: number;
+  currency: string;
+  gift_card_code: string;
+  status: string;
+  expires_at: string;
+  sender_name: string;
+  sender_email: string;
+  recipient_name: string;
+  recipient_email: string;
+  personal_message: string;
 }
 
 interface Order {
@@ -66,7 +82,16 @@ interface Order {
       creator_id: string;
     };
   }[];
+  gift_cards?: GiftCard[];
   user_name?: string;
+}
+
+interface OrderCard {
+  key: string;
+  type: 'event' | 'course' | 'gift';
+  order: Order;
+  items: any[];
+  subtotal: number;
 }
 
 interface TicketData {
@@ -95,6 +120,80 @@ interface TicketData {
   ticket_status?: string;
 }
 
+// Helper functions
+const safeCurrency = (value: string | null | undefined): CurrencyCode => {
+  if (!value) return 'USD';
+  const normalized = value.toString().toUpperCase();
+  return SUPPORTED_CURRENCIES[normalized as CurrencyCode] ? normalized as CurrencyCode : 'USD';
+};
+
+const obfuscateGiftCode = (code: string): string => {
+  if (!code || code.length < 8) return code;
+  const start = code.slice(0, 4);
+  const end = code.slice(-4);
+  const middle = '*'.repeat(Math.max(0, code.length - 8));
+  return `${start}${middle}${end}`;
+};
+
+const computeTypeSubtotals = (order: Order) => {
+  const subtotals = { event: 0, course: 0, gift: 0 };
+  
+  order.order_items?.forEach(item => {
+    if (item.item_type === 'event') {
+      subtotals.event += item.total_price;
+    } else if (item.item_type === 'course') {
+      subtotals.course += item.total_price;
+    } else if (item.item_type === 'gift_card') {
+      subtotals.gift += item.total_price;
+    }
+  });
+  
+  return subtotals;
+};
+
+const buildCards = (orders: Order[]): OrderCard[] => {
+  const cards: OrderCard[] = [];
+  
+  orders.forEach(order => {
+    const subtotals = computeTypeSubtotals(order);
+    
+    // Event card
+    if ((order.event_bookings && order.event_bookings.length > 0) || subtotals.event > 0) {
+      cards.push({
+        key: `${order.id}-event`,
+        type: 'event',
+        order,
+        items: order.event_bookings || [],
+        subtotal: subtotals.event
+      });
+    }
+    
+    // Course card
+    if ((order.course_enrollments && order.course_enrollments.length > 0) || subtotals.course > 0) {
+      cards.push({
+        key: `${order.id}-course`,
+        type: 'course',
+        order,
+        items: order.course_enrollments || [],
+        subtotal: subtotals.course
+      });
+    }
+    
+    // Gift card
+    if ((order.gift_cards && order.gift_cards.length > 0) || subtotals.gift > 0) {
+      cards.push({
+        key: `${order.id}-gift`,
+        type: 'gift',
+        order,
+        items: order.gift_cards || [],
+        subtotal: subtotals.gift
+      });
+    }
+  });
+  
+  return cards;
+};
+
 const MyOrdersPage = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -103,6 +202,18 @@ const MyOrdersPage = () => {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedType, setSelectedType] = useState<'event' | 'course' | 'gift'>('event');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  
+  // Derived data
+  const cards = buildCards(orders);
+  const totalPages = Math.ceil(cards.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedCards = cards.slice(startIndex, endIndex);
 
   useEffect(() => {
     if (user) {
@@ -165,6 +276,19 @@ const MyOrdersPage = () => {
               thumbnail_url,
               creator_id
             )
+          ),
+          gift_cards (
+            id,
+            amount,
+            currency,
+            gift_card_code,
+            status,
+            expires_at,
+            sender_name,
+            sender_email,
+            recipient_name,
+            recipient_email,
+            personal_message
           )
         `)
         .eq('user_id', user?.id)
@@ -191,7 +315,10 @@ const MyOrdersPage = () => {
       confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmed' },
       pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
       cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' },
-      completed: { color: 'bg-green-100 text-green-800', label: 'Completed' }
+      completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+      active: { color: 'bg-green-100 text-green-800', label: 'Active' },
+      redeemed: { color: 'bg-blue-100 text-blue-800', label: 'Redeemed' },
+      expired: { color: 'bg-red-100 text-red-800', label: 'Expired' }
     };
     
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
@@ -319,8 +446,9 @@ const MyOrdersPage = () => {
     }, 100);
   };
 
-  const handleViewReceipt = (order: Order) => {
+  const handleViewReceipt = (order: Order, type: 'event' | 'course' | 'gift') => {
     setSelectedOrder(order);
+    setSelectedType(type);
     setShowReceiptModal(true);
   };
 
@@ -681,6 +809,23 @@ const MyOrdersPage = () => {
   const handlePrintReceipt = () => {
     if (!selectedOrder) return;
     
+    // Filter items based on selectedType
+    const getFilteredItems = () => {
+      switch (selectedType) {
+        case 'event':
+          return selectedOrder.order_items.filter(item => item.item_type === 'event');
+        case 'course':
+          return selectedOrder.order_items.filter(item => item.item_type === 'course');
+        case 'gift':
+          return selectedOrder.order_items.filter(item => item.item_type === 'gift_card');
+        default:
+          return selectedOrder.order_items;
+      }
+    };
+    
+    const filteredItems = getFilteredItems();
+    const subtotal = filteredItems.reduce((sum, item) => sum + item.total_price, 0);
+    
     const receiptHTML = `
       <!DOCTYPE html>
       <html>
@@ -769,7 +914,7 @@ const MyOrdersPage = () => {
         <div class="receipt-container">
           <div class="receipt-header">
             <div class="receipt-title">RECEIPT</div>
-            <p>Order #${selectedOrder.id.slice(0, 8).toUpperCase()}</p>
+            <p>Order #${selectedOrder.id.slice(0, 8).toUpperCase()} - ${selectedType.toUpperCase()}</p>
           </div>
           
           <div class="order-info">
@@ -805,20 +950,35 @@ const MyOrdersPage = () => {
               </tr>
             </thead>
             <tbody>
-              ${selectedOrder.order_items.map(item => `
+              ${filteredItems.map(item => `
                 <tr>
                   <td>${item.item_name}</td>
                   <td>${item.quantity}</td>
-                  <td><PriceDisplay amount={${item.unit_price}} originalCurrency="${selectedOrder.currency}" /></td>
-                  <td><PriceDisplay amount={${item.total_price}} originalCurrency="${selectedOrder.currency}" /></td>
+                  <td>$${item.unit_price.toFixed(2)}</td>
+                  <td>$${item.total_price.toFixed(2)}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
+          ${selectedType === 'gift' && selectedOrder.gift_cards ? `
+            <div>
+              <h4>Gift Cards:</h4>
+              ${selectedOrder.gift_cards.map(gift => `
+                <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px;">
+                  <p><strong>Code:</strong> ${obfuscateGiftCode(gift.gift_card_code)}</p>
+                  <p><strong>Amount:</strong> $${gift.amount.toFixed(2)}</p>
+                  <p><strong>Recipient:</strong> ${gift.recipient_name} (${gift.recipient_email})</p>
+                  <p><strong>Status:</strong> ${gift.status.toUpperCase()}</p>
+                  <p><strong>Expires:</strong> ${format(new Date(gift.expires_at), 'PPP')}</p>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+
           <div class="total-section">
             <div class="total-amount">
-              Total: <PriceDisplay amount={${selectedOrder.total_amount}} originalCurrency="${selectedOrder.currency}" />
+              Total: $${subtotal.toFixed(2)}
             </div>
           </div>
         </div>
@@ -832,6 +992,11 @@ const MyOrdersPage = () => {
       printWindow.document.close();
       printWindow.print();
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (loading) {
@@ -854,7 +1019,7 @@ const MyOrdersPage = () => {
               <p className="text-gray-600">View and manage all your orders, tickets and course purchases</p>
             </div>
 
-            {orders.length === 0 ? (
+            {cards.length === 0 ? (
               <Card className="text-center py-12">
                 <CardContent>
                   <Ticket className="h-16 w-16 mx-auto mb-4 text-gray-400" />
@@ -877,147 +1042,243 @@ const MyOrdersPage = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
-                {orders.map((order) => (
-                  <Card key={order.id} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                    <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl">Order #{order.id.slice(0, 8)}</CardTitle>
-                          <p className="text-orange-100">
-                            {format(new Date(order.created_at), 'PPP')}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">
-                            <PriceDisplay amount={order.total_amount} originalCurrency={order.currency} />
+              <>
+                <div className="space-y-6">
+                  {paginatedCards.map((card) => (
+                    <Card key={card.key} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                      <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-xl">Order #{card.order.id.slice(0, 8)} - {card.type.toUpperCase()}</CardTitle>
+                            <p className="text-orange-100">
+                              {format(new Date(card.order.created_at), 'PPP')}
+                            </p>
                           </div>
-                          {getStatusBadge(order.payment_status)}
+                          <div className="text-right">
+                            <div className="text-2xl font-bold">
+                              <PriceDisplay 
+                                amount={card.subtotal} 
+                                originalCurrency={safeCurrency(card.order.currency)} 
+                              />
+                            </div>
+                            {getStatusBadge(card.order.payment_status)}
+                          </div>
                         </div>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent className="p-6">
-                      {/* Event Bookings */}
-                      {order.event_bookings?.filter(booking => booking.event && booking.event_ticket).map((booking) => (
-                        <div key={booking.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
-                          <div className="flex flex-col lg:flex-row gap-6">
-                            {booking.event?.image_url && (
-                              <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                                <img
-                                  src={booking.event.image_url}
-                                  alt={booking.event.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            
-                            <div className="flex-1">
-                              <div className="flex justify-between items-start mb-3">
-                                <h3 className="text-xl font-semibold text-gray-900">
-                                  {booking.event?.title || 'Event'}
-                                </h3>
-                                {getStatusBadge(booking.status)}
-                              </div>
+                      </CardHeader>
+                      
+                      <CardContent className="p-6">
+                        {/* Event content */}
+                        {card.type === 'event' && card.items.map((booking: any) => (
+                          <div key={booking.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                              {booking.event?.image_url && (
+                                <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                  <img
+                                    src={booking.event.image_url}
+                                    alt={booking.event.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
                               
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                {booking.event?.start_time && (
-                                  <div className="flex items-center gap-2 text-gray-600">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>{format(new Date(booking.event.start_time), 'PPP p')}</span>
-                                  </div>
-                                )}
-                                {booking.event?.location && (
-                                  <div className="flex items-center gap-2 text-gray-600">
-                                    <MapPin className="h-4 w-4" />
-                                    <span>{booking.event.location}</span>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg mb-4 border border-orange-200">
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <p className="font-medium text-orange-800">{booking.event_ticket?.name || 'Standard Ticket'}</p>
-                                    <p className="text-sm text-orange-600">
-                                      {booking.event_ticket?.ticket_type || 'Regular'} • Quantity: {booking.ticket_quantity}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-mono text-sm text-orange-700 font-medium">
-                                      Code: {booking.booking_code}
-                                    </p>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start mb-3">
+                                  <h3 className="text-xl font-semibold text-gray-900">
+                                    {booking.event?.title || 'Event'}
+                                  </h3>
+                                  {getStatusBadge(booking.status)}
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                  {booking.event?.start_time && (
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                      <Calendar className="h-4 w-4" />
+                                      <span>{format(new Date(booking.event.start_time), 'PPP p')}</span>
+                                    </div>
+                                  )}
+                                  {booking.event?.location && (
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                      <MapPin className="h-4 w-4" />
+                                      <span>{booking.event.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg mb-4 border border-orange-200">
+                                  <div className="flex justify-between items-center">
+                                    <div>
+                                      <p className="font-medium text-orange-800">{booking.event_ticket?.name || 'Standard Ticket'}</p>
+                                      <p className="text-sm text-orange-600">
+                                        {booking.event_ticket?.ticket_type || 'Regular'} • Quantity: {booking.ticket_quantity}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-mono text-sm text-orange-700 font-medium">
+                                        Code: {booking.booking_code}
+                                      </p>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
 
-                      {/* Course Enrollments */}
-                      {order.course_enrollments?.filter(enrollment => enrollment.course).map((enrollment) => (
-                        <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
-                          <div className="flex flex-col lg:flex-row gap-6">
-                            {enrollment.course?.thumbnail_url && (
-                              <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                                <img
-                                  src={enrollment.course.thumbnail_url}
-                                  alt={enrollment.course.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            
-                            <div className="flex-1">
-                              <div className="flex justify-between items-start mb-3">
-                                <h3 className="text-xl font-semibold text-gray-900">
-                                  {enrollment.course?.title || 'Course'}
-                                </h3>
-                                {getStatusBadge('completed')}
-                              </div>
+                        {/* Course content */}
+                        {card.type === 'course' && card.items.map((enrollment: any) => (
+                          <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                              {enrollment.course?.thumbnail_url && (
+                                <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                  <img
+                                    src={enrollment.course.thumbnail_url}
+                                    alt={enrollment.course.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
                               
-                              <p className="text-gray-600 mb-4 line-clamp-2">
-                                {enrollment.course?.description || 'No description available'}
-                              </p>
-                              
-                              <div className="flex gap-3">
-                                <Link to={`/learning/course/${enrollment.course?.id}`}>
-                                  <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
-                                    <BookOpen className="h-4 w-4 mr-2" />
-                                    Start Learning
-                                  </Button>
-                                </Link>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start mb-3">
+                                  <h3 className="text-xl font-semibold text-gray-900">
+                                    {enrollment.course?.title || 'Course'}
+                                  </h3>
+                                  {getStatusBadge('completed')}
+                                </div>
+                                
+                                <p className="text-gray-600 mb-4 line-clamp-2">
+                                  {enrollment.course?.description || 'No description available'}
+                                </p>
+                                
+                                <div className="flex gap-3">
+                                  <Link to={`/learning/course/${enrollment.course?.id}`}>
+                                    <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
+                                      <BookOpen className="h-4 w-4 mr-2" />
+                                      Start Learning
+                                    </Button>
+                                  </Link>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
 
-                      {/* Action Buttons */}
-                      <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
-                        <Button
-                          onClick={() => handleViewReceipt(order)}
-                          className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Receipt
-                        </Button>
-                        
-                        {(order.event_bookings && order.event_bookings.length > 0) && (
-                          <Button 
-                            onClick={() => handleViewTickets(order)}
-                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Tickets
-                          </Button>
+                        {/* Gift card content */}
+                        {card.type === 'gift' && (
+                          <div className="bg-gradient-to-r from-orange-50 via-purple-50 to-pink-50 p-6 rounded-lg border border-orange-200">
+                            <h4 className="text-lg font-semibold text-gray-900 mb-4">Gift Cards</h4>
+                            <div className="space-y-4">
+                              {(card.items as GiftCard[]).map((gift) => (
+                                <div key={gift.id} className="bg-white p-4 rounded-lg shadow-sm">
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                      <div className="text-xl font-semibold text-gray-900 mb-1">
+                                        <PriceDisplay 
+                                          amount={gift.amount} 
+                                          originalCurrency={safeCurrency(gift.currency)} 
+                                        />
+                                      </div>
+                                      <p className="font-mono text-sm text-gray-600">
+                                        Code: {obfuscateGiftCode(gift.gift_card_code)}
+                                      </p>
+                                    </div>
+                                    {getStatusBadge(gift.status)}
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                    <div>
+                                      <p className="text-sm text-gray-600">
+                                        <strong>Recipient:</strong> {gift.recipient_name}
+                                      </p>
+                                      <p className="text-sm text-gray-600">{gift.recipient_email}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-gray-600">
+                                        <strong>Expires:</strong> {format(new Date(gift.expires_at), 'PPP')}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  {gift.personal_message && (
+                                    <div className="bg-gray-50 p-3 rounded-md mt-3">
+                                      <p className="text-sm text-gray-700">
+                                        <strong>Message:</strong> {gift.personal_message}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+                          <Button
+                            onClick={() => handleViewReceipt(card.order, card.type)}
+                            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            View Receipt
+                          </Button>
+                          
+                          {card.type === 'event' && (
+                            <Button 
+                              onClick={() => handleViewTickets(card.order)}
+                              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Tickets
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-8">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, index) => {
+                        const page = index + 1;
+                        return (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(page)}
+                            className="min-w-[40px]"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage >= totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1180,7 +1441,7 @@ const MyOrdersPage = () => {
           {selectedOrder && (
             <div className="space-y-4">
               <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)}</h3>
+                <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
@@ -1188,7 +1449,13 @@ const MyOrdersPage = () => {
                   </div>
                   <div>
                     <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                    <p><strong>Total:</strong> <PriceDisplay amount={selectedOrder.total_amount} originalCurrency={selectedOrder.currency} /></p>
+                    <p>
+                      <strong>Total:</strong> 
+                      <PriceDisplay 
+                        amount={computeTypeSubtotals(selectedOrder)[selectedType]} 
+                        originalCurrency={safeCurrency(selectedOrder.currency)} 
+                      />
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1196,18 +1463,50 @@ const MyOrdersPage = () => {
               <div>
                 <h4 className="font-semibold mb-2">Items:</h4>
                 <div className="space-y-2">
-                  {selectedOrder.order_items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <div>
-                        <p className="font-medium">{item.item_name}</p>
-                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                  {selectedOrder.order_items
+                    .filter(item => {
+                      if (selectedType === 'event') return item.item_type === 'event';
+                      if (selectedType === 'course') return item.item_type === 'course';
+                      if (selectedType === 'gift') return item.item_type === 'gift_card';
+                      return true;
+                    })
+                    .map((item) => (
+                      <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                        <div>
+                          <p className="font-medium">{item.item_name}</p>
+                          <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                        </div>
+                        <p className="font-semibold">
+                          <PriceDisplay 
+                            amount={item.total_price} 
+                            originalCurrency={safeCurrency(selectedOrder.currency)} 
+                          />
+                        </p>
                       </div>
-                      <p className="font-semibold">
-                        <PriceDisplay amount={item.total_price} originalCurrency={selectedOrder.currency} />
-                      </p>
-                    </div>
-                  ))}
+                    ))}
                 </div>
+                
+                {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Gift Card Details:</h5>
+                    <div className="space-y-2">
+                      {selectedOrder.gift_cards.map((gift) => (
+                        <div key={gift.id} className="p-3 bg-gray-50 rounded">
+                          <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
+                          <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
+                          <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
+                          <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
+                          <p className="font-semibold">
+                            Amount: <PriceDisplay 
+                              amount={gift.amount} 
+                              originalCurrency={safeCurrency(gift.currency)} 
+                            />
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
