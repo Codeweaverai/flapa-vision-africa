@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -208,12 +207,18 @@ const CreatorEvents = () => {
                       src={event.thumbnail_url}
                       alt={event.title}
                       className="w-full h-48 object-cover"
+                      onError={(e) => {
+                        // Add fallback if image fails to load
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center">
-                      <Calendar className="h-12 w-12 text-gray-400" />
-                    </div>
-                  )}
+                  ) : null}
+                  
+                  {/* Fallback when no thumbnail or image fails to load */}
+                  <div className={`w-full h-48 bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center ${event.thumbnail_url ? 'hidden' : ''}`}>
+                    <Calendar className="h-12 w-12 text-gray-400" />
+                  </div>
                   
                   <div className="absolute top-3 right-3">
                     <Badge
