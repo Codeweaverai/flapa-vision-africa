@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,7 +64,7 @@ interface VerifiedTicket {
 }
 
 const TicketVerificationPage = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [ticketCode, setTicketCode] = useState('');
   const [bookingCode, setBookingCode] = useState('');
   const [ticketHolderName, setTicketHolderName] = useState('');
@@ -82,6 +83,15 @@ const TicketVerificationPage = () => {
   const successSoundRef = useRef<HTMLAudioElement>(null);
   const errorSoundRef = useRef<HTMLAudioElement>(null);
   const checkinSoundRef = useRef<HTMLAudioElement>(null);
+
+  // Helper function to get authentication headers
+  const getAuthHeaders = () => {
+    const headers: Record<string, string> = {};
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    return headers;
+  };
 
   // Initialize audio on user interaction (to bypass autoplay restrictions)
   useEffect(() => {
@@ -201,13 +211,18 @@ const TicketVerificationPage = () => {
     setErrorMessage('');
 
     try {
+      // Normalize ticket codes
+      const normalizedTicketCode = ticketCode.trim().toUpperCase();
+      const normalizedBookingCode = bookingCode.trim().toUpperCase();
+
       const { data, error } = await supabase.functions.invoke('verify-ticket', {
         body: {
-          ticketCode: ticketCode.trim() || undefined,
-          bookingCode: bookingCode.trim() || undefined,
+          ticketCode: normalizedTicketCode || undefined,
+          bookingCode: normalizedBookingCode || undefined,
           ticketHolderName: ticketHolderName.trim() || undefined,
           verifierUserId: user.id
-        }
+        },
+        headers: getAuthHeaders()
       });
 
       if (error) throw error;
@@ -225,7 +240,7 @@ const TicketVerificationPage = () => {
         setVerificationStatus('error');
         if (data.error === 'unauthorized') {
           setVerificationStatus('unauthorized');
-          setErrorMessage('You are not authorized to verify tickets for this event. You can only verify tickets for events you have created.');
+          setErrorMessage('You are not authorized to verify tickets for this event. You can only verify tickets for events you have created or manage.');
         } else {
           setErrorMessage(data.message || 'Ticket verification failed');
         }
@@ -244,14 +259,17 @@ const TicketVerificationPage = () => {
   };
 
   const handleScanResult = (scannedCode: string) => {
+    // Normalize scanned code
+    const normalizedCode = scannedCode.trim().toUpperCase();
+    
     // Determine if it's a ticket code or booking code based on format
-    if (scannedCode.startsWith('TCK-')) {
-      setTicketCode(scannedCode);
-    } else if (scannedCode.startsWith('EVT-')) {
-      setBookingCode(scannedCode);
+    if (normalizedCode.startsWith('TCK-')) {
+      setTicketCode(normalizedCode);
+    } else if (normalizedCode.startsWith('EVT-')) {
+      setBookingCode(normalizedCode);
     } else {
       // Default to ticket code if format is unclear
-      setTicketCode(scannedCode);
+      setTicketCode(normalizedCode);
     }
     
     setShowScanner(false);
@@ -274,7 +292,8 @@ const TicketVerificationPage = () => {
           bookingId: verifiedTicket.booking_id,
           eventId: verifiedTicket.event_id,
           checkedInBy: user.id
-        }
+        },
+        headers: getAuthHeaders()
       });
 
       if (error) throw error;
@@ -370,7 +389,7 @@ const TicketVerificationPage = () => {
               </p>
               {user && (
                 <p className="text-sm text-gray-500 mt-2">
-                  You can only verify tickets for events you have created
+                  You can verify tickets for events you have created or manage as an editor
                 </p>
               )}
               
@@ -580,7 +599,7 @@ const TicketVerificationPage = () => {
                           {verificationStatus === 'unauthorized' && (
                             <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-red-100 rounded-lg border border-red-200">
                               <p className="text-red-800 text-xs sm:text-sm">
-                                <strong>Access Restricted:</strong> As a creator, you can only verify tickets for events that you have created. 
+                                <strong>Access Restricted:</strong> You can only verify tickets for events that you have created or manage as an editor. 
                                 If you believe this is an error, please contact the event organizer.
                               </p>
                             </div>
