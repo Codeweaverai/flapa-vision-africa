@@ -82,7 +82,7 @@ interface Order {
       creator_id: string;
     };
   }[];
-  gift_cards?: GiftCard[];
+  gift_cards: GiftCard[];
   user_name?: string;
 }
 
@@ -276,19 +276,6 @@ const MyOrdersPage = () => {
               thumbnail_url,
               creator_id
             )
-          ),
-          gift_cards (
-            id,
-            amount,
-            currency,
-            gift_card_code,
-            status,
-            expires_at,
-            sender_name,
-            sender_email,
-            recipient_name,
-            recipient_email,
-            personal_message
           )
         `)
         .eq('user_id', user?.id)
@@ -296,10 +283,29 @@ const MyOrdersPage = () => {
 
       if (error) throw error;
       
-      const transformedOrders = data?.map(order => ({
+      // Fetch gift cards separately
+      const orderIds = data?.map(order => order.id) || [];
+      let giftCardsData: any[] = [];
+      
+      if (orderIds.length > 0) {
+        const { data: giftCards, error: giftCardsError } = await supabase
+          .from('gift_cards')
+          .select('*')
+          .in('order_id', orderIds);
+        
+        if (giftCardsError) {
+          console.warn('Error fetching gift cards:', giftCardsError);
+        } else {
+          giftCardsData = giftCards || [];
+        }
+      }
+      
+      // Transform orders and attach gift cards
+      const transformedOrders: Order[] = (data || []).map(order => ({
         ...order,
-        user_name: user?.email || 'Customer'
-      })) || [];
+        user_name: user?.email || 'Customer',
+        gift_cards: giftCardsData.filter(gc => gc.order_id === order.id)
+      }));
       
       setOrders(transformedOrders);
     } catch (error) {
