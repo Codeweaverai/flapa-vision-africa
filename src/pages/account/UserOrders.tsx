@@ -3,13 +3,16 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, PlayCircle, RefreshCw, MapPin, Clock } from 'lucide-react';
+import { Calendar, Download, Package, Ticket, Eye, Printer, FileText, PlayCircle, RefreshCw, MapPin, Clock, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
+import { SUPPORTED_CURRENCIES, CurrencyCode } from '@/constants/currencies';
+import PriceDisplay from '@/components/currency/PriceDisplay';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface OrderItem {
   id: string;
@@ -40,6 +43,20 @@ interface EventBooking {
   };
 }
 
+interface GiftCard {
+  id: string;
+  amount: number;
+  currency: string;
+  gift_card_code: string;
+  status: string;
+  expires_at: string;
+  sender_name: string;
+  sender_email: string;
+  recipient_name: string;
+  recipient_email: string;
+  personal_message: string;
+}
+
 interface Order {
   id: string;
   total_amount: number;
@@ -54,6 +71,7 @@ interface Order {
   payment_provider_id?: string;
   order_items: OrderItem[];
   event_bookings?: EventBooking[];
+  gift_cards?: GiftCard[];
   course_enrollments?: Array<{
     id: string;
     course: {
@@ -73,6 +91,23 @@ const UserOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const pageSize = 10;
+
+  // Helper function to safely convert currency codes
+  const safeCurrency = (value: string | null | undefined): CurrencyCode => {
+    if (!value) return 'USD';
+    const upperValue = value.toUpperCase();
+    return (SUPPORTED_CURRENCIES as any)[upperValue] ? upperValue as CurrencyCode : 'USD';
+  };
+
+  // Pagination calculations
+  const totalPages = Math.ceil(orders.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedOrders = orders.slice(startIndex, endIndex);
 
   useEffect(() => {
     if (user) {
@@ -120,6 +155,19 @@ const UserOrders = () => {
               thumbnail_url,
               creator_id
             )
+          ),
+          gift_cards (
+            id,
+            amount,
+            currency,
+            gift_card_code,
+            status,
+            expires_at,
+            sender_name,
+            sender_email,
+            recipient_name,
+            recipient_email,
+            personal_message
           )
         `)
         .eq('user_id', user?.id)
@@ -254,6 +302,11 @@ const UserOrders = () => {
     toast.success('Orders refreshed');
   };
 
+  const handleViewReceipt = (order: Order) => {
+    setSelectedOrder(order);
+    setShowReceiptModal(true);
+  };
+
   const handleDownloadReceipt = (receiptUrl: string) => {
     if (receiptUrl) {
       const newWindow = window.open();
@@ -322,12 +375,16 @@ const UserOrders = () => {
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'completed':
+      case 'active':
         return 'bg-green-100 text-green-800 border-green-300';
       case 'pending':
       case 'processing':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'failed':
+      case 'expired':
         return 'bg-red-100 text-red-800 border-red-300';
+      case 'redeemed':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300';
     }
@@ -344,6 +401,18 @@ const UserOrders = () => {
       default:
         return method || 'Unknown';
     }
+  };
+
+  const obfuscateGiftCode = (code: string) => {
+    if (!code || code.length < 8) return code;
+    const start = code.slice(0, 4);
+    const end = code.slice(-4);
+    const middle = '*'.repeat(code.length - 8);
+    return `${start}${middle}${end}`;
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   if (loading) {
@@ -389,9 +458,10 @@ const UserOrders = () => {
               </Card>
             ) : (
               <div className="space-y-6">
-                {orders.map((order) => {
+                {paginatedOrders.map((order) => {
                   const hasEventTickets = order.order_items.some(item => item.item_type === 'event_ticket');
                   const hasCourses = order.order_items.some(item => item.item_type === 'course');
+                  const hasGiftCards = order.gift_cards && order.gift_cards.length > 0;
                   const eventBookings = order.event_bookings || [];
                   
                   return (
@@ -421,7 +491,11 @@ const UserOrders = () => {
                           </div>
                           <div className="text-lg lg:text-right">
                             <div className="font-bold text-orange-600">
-                              {order.total_amount.toFixed(2)} {order.currency}
+                              <PriceDisplay
+                                amount={order.total_amount}
+                                originalCurrency={safeCurrency(order.currency)}
+                                className="text-lg font-bold"
+                              />
                             </div>
                             <div className="text-sm text-gray-600 capitalize">
                               via {getPaymentMethodDisplay(order.payment_method)}
@@ -445,14 +519,20 @@ const UserOrders = () => {
                                 <div>
                                   <div className="font-medium">{item.item_name}</div>
                                   <div className="text-sm text-gray-600">
-                                    {item.item_type === 'event_ticket' ? 'Event Ticket' : 'Course'} • 
+                                    {item.item_type === 'event_ticket' ? 'Event Ticket' : item.item_type === 'course' ? 'Course' : 'Gift Card'} • 
                                     Quantity: {item.quantity} • 
-                                    Unit Price: {item.unit_price?.toFixed(2) || (item.total_price / item.quantity).toFixed(2)} {order.currency}
+                                    Unit Price: <PriceDisplay
+                                      amount={item.unit_price || (item.total_price / item.quantity)}
+                                      originalCurrency={safeCurrency(order.currency)}
+                                    />
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   <div className="font-semibold">
-                                    {item.total_price.toFixed(2)} {order.currency}
+                                    <PriceDisplay
+                                      amount={item.total_price}
+                                      originalCurrency={safeCurrency(order.currency)}
+                                    />
                                   </div>
                                   {/* Start Learning Button for Courses */}
                                   {item.item_type === 'course' && order.payment_status === 'completed' && (
@@ -560,6 +640,71 @@ const UserOrders = () => {
                           </div>
                         )}
 
+                        {/* Gift Cards Section */}
+                        {hasGiftCards && (
+                          <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 via-pink-50 to-orange-50 rounded-lg border border-purple-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <Gift className="h-5 w-5 text-purple-600" />
+                                <h3 className="font-semibold text-purple-800">Gift Cards</h3>
+                                <Badge className="bg-purple-100 text-purple-800">
+                                  {order.gift_cards?.length} card(s)
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              {order.gift_cards?.map((giftCard) => (
+                                <div key={giftCard.id} className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 p-1 rounded-lg">
+                                  <div className="bg-white rounded-lg p-4">
+                                    <div className="flex justify-between items-start mb-3">
+                                      <div>
+                                        <div className="text-2xl font-bold text-transparent bg-gradient-to-r from-purple-500 to-orange-500 bg-clip-text">
+                                          <PriceDisplay
+                                            amount={giftCard.amount}
+                                            originalCurrency={safeCurrency(giftCard.currency)}
+                                          />
+                                        </div>
+                                        <p className="text-sm text-gray-600">Gift Card</p>
+                                      </div>
+                                      <Badge className={getStatusBadgeColor(giftCard.status)}>
+                                        {giftCard.status.charAt(0).toUpperCase() + giftCard.status.slice(1)}
+                                      </Badge>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                      <div>
+                                        <span className="font-medium text-gray-700">Code:</span>
+                                        <p className="font-mono text-purple-600">{obfuscateGiftCode(giftCard.gift_card_code)}</p>
+                                      </div>
+                                      <div>
+                                        <span className="font-medium text-gray-700">Expires:</span>
+                                        <p>{format(new Date(giftCard.expires_at), 'PPP')}</p>
+                                      </div>
+                                      <div>
+                                        <span className="font-medium text-gray-700">Recipient:</span>
+                                        <p>{giftCard.recipient_name}</p>
+                                        <p className="text-gray-500">{giftCard.recipient_email}</p>
+                                      </div>
+                                      <div>
+                                        <span className="font-medium text-gray-700">From:</span>
+                                        <p>{giftCard.sender_name}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    {giftCard.personal_message && (
+                                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                        <span className="font-medium text-gray-700">Message:</span>
+                                        <p className="text-sm italic mt-1">"{giftCard.personal_message}"</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Course Enrollments */}
                         {order.course_enrollments?.map((enrollment) => (
                           <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
@@ -605,9 +750,8 @@ const UserOrders = () => {
                         {/* Action Buttons */}
                         <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-gray-200">
                           <Button
-                            onClick={() => handleDownloadReceipt(order.receipt_url)}
+                            onClick={() => handleViewReceipt(order)}
                             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                            disabled={!order.receipt_url}
                           >
                             <FileText className="h-4 w-4 mr-2" />
                             View Receipt
@@ -627,11 +771,172 @@ const UserOrders = () => {
                     </Card>
                   );
                 })}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-8">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                    
+                    <div className="flex gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(page)}
+                          className={currentPage === page ? "bg-orange-600 hover:bg-orange-700" : ""}
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Receipt Modal */}
+      {selectedOrder && (
+        <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Order Receipt</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Order Header */}
+              <div className="text-center border-b pb-4">
+                <h2 className="text-2xl font-bold">Receipt</h2>
+                <p className="text-gray-600">Order #{selectedOrder.id.slice(-8).toUpperCase()}</p>
+                <p className="text-sm text-gray-500">{format(new Date(selectedOrder.created_at), 'PPP p')}</p>
+              </div>
+
+              {/* Customer Info */}
+              <div>
+                <h3 className="font-semibold mb-2">Customer Information</h3>
+                <p>{selectedOrder.user_name}</p>
+                <p className="text-sm text-gray-600">Payment Method: {getPaymentMethodDisplay(selectedOrder.payment_method)}</p>
+              </div>
+
+              {/* Items */}
+              <div>
+                <h3 className="font-semibold mb-3">Items</h3>
+                <div className="space-y-2">
+                  {selectedOrder.order_items.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                      <div>
+                        <p className="font-medium">{item.item_name}</p>
+                        <p className="text-sm text-gray-600">
+                          {item.item_type === 'event_ticket' ? 'Event Ticket' : item.item_type === 'course' ? 'Course' : 'Gift Card'} × {item.quantity}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">
+                          <PriceDisplay
+                            amount={item.total_price}
+                            originalCurrency={safeCurrency(selectedOrder.currency)}
+                          />
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gift Cards */}
+              {selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-3">Gift Cards</h3>
+                  <div className="space-y-2">
+                    {selectedOrder.gift_cards.map((giftCard) => (
+                      <div key={giftCard.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                        <div>
+                          <p className="font-medium">Gift Card - {obfuscateGiftCode(giftCard.gift_card_code)}</p>
+                          <p className="text-sm text-gray-600">
+                            To: {giftCard.recipient_name} ({giftCard.recipient_email})
+                          </p>
+                          <p className="text-sm text-gray-600">Status: {giftCard.status}</p>
+                          <p className="text-sm text-gray-600">Expires: {format(new Date(giftCard.expires_at), 'PPP')}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">
+                            <PriceDisplay
+                              amount={giftCard.amount}
+                              originalCurrency={safeCurrency(giftCard.currency)}
+                            />
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Total */}
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center text-xl font-bold">
+                  <span>Total</span>
+                  <span>
+                    <PriceDisplay
+                      amount={selectedOrder.total_amount}
+                      originalCurrency={safeCurrency(selectedOrder.currency)}
+                    />
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm text-gray-600 mt-1">
+                  <span>Payment Status</span>
+                  <Badge className={getStatusBadgeColor(selectedOrder.payment_status)}>
+                    {selectedOrder.payment_status.toUpperCase()}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Print/Download Actions */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  onClick={() => window.print()}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Receipt
+                </Button>
+                {selectedOrder.receipt_url && (
+                  <Button
+                    onClick={() => handleDownloadReceipt(selectedOrder.receipt_url)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Layout>
   );
 };
