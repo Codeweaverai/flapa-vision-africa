@@ -31,6 +31,7 @@ interface Event {
   category: string;
   is_free: boolean;
   price: number;
+  image_url?: string;
 }
 
 const CreatorEvents = () => {
@@ -202,9 +203,9 @@ const CreatorEvents = () => {
             {paginatedEvents.map((event) => (
               <Card key={event.id} className="relative overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="relative">
-                  {event.thumbnail_url ? (
+                  {event.image_url ? (
                     <img
-                      src={event.thumbnail_url}
+                      src={event.image_url}
                       alt={event.title}
                       className="w-full h-48 object-cover"
                       onError={(e) => {
@@ -216,7 +217,7 @@ const CreatorEvents = () => {
                   ) : null}
                   
                   {/* Fallback when no thumbnail or image fails to load */}
-                  <div className={`w-full h-48 bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center ${event.thumbnail_url ? 'hidden' : ''}`}>
+                  <div className={`w-full h-48 bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center ${event.image_url ? 'hidden' : ''}`}>
                     <Calendar className="h-12 w-12 text-gray-400" />
                   </div>
                   

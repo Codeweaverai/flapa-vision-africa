@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -15,6 +14,7 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import AttendeeExportButton from '@/components/creator/AttendeeExportButton';
 import BulkAnnouncementModal from '@/components/creator/BulkAnnouncementModal';
 import { getEditableWorkplaceIds } from '@/services/workplaceService';
+import { getMemberWorkplaceIds } from '@/services/workplaceService';
 import {
   Pagination,
   PaginationContent,
@@ -87,15 +87,15 @@ const CreatorAttendeeManagement: React.FC = () => {
 
       if (ownError) throw ownError;
 
-      // Fetch editable workplace IDs
-      const editableWorkplaceIds = await getEditableWorkplaceIds();
+      // Fetch member workplace IDs (includes all roles: owner, editor, viewer)
+      const memberWorkplaceIds = await getMemberWorkplaceIds();
       
       let workplaceEvents: Event[] = [];
-      if (editableWorkplaceIds.length > 0) {
+      if (memberWorkplaceIds.length > 0) {
         const { data: wpEvents, error: wpError } = await supabase
           .from('events')
           .select('id, title, start_time, end_time, location')
-          .in('workplace_id', editableWorkplaceIds)
+          .in('workplace_id', memberWorkplaceIds)
           .order('start_time', { ascending: false });
 
         if (wpError) throw wpError;

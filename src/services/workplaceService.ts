@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 
 export interface UserWorkplace {
@@ -199,6 +198,26 @@ export async function getEditableWorkplaceIds(): Promise<string[]> {
     return (memberships || []).map(m => m.workplace_id);
   } catch (error) {
     console.error('Error fetching editable workplace IDs:', error);
+    return [];
+  }
+}
+
+export async function getMemberWorkplaceIds(): Promise<string[]> {
+  try {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) return [];
+
+    const { data: memberships, error } = await supabase
+      .from('creator_workplace_members')
+      .select('workplace_id')
+      .eq('user_id', user.user.id)
+      .eq('status', 'active');
+
+    if (error) throw error;
+
+    return (memberships || []).map(m => m.workplace_id);
+  } catch (error) {
+    console.error('Error fetching member workplace IDs:', error);
     return [];
   }
 }
