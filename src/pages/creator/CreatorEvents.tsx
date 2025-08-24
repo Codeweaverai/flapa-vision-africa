@@ -326,7 +326,7 @@ const CreatorEvents = () => {
                     variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => navigate(`/creator/attendee-management`)}
+                    onClick={() => navigate(`/creator/attendees`)}
                   >
                     <UserCheck className="h-4 w-4 mr-1" />
                     Attendees
