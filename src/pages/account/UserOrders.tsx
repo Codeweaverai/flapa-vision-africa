@@ -36,10 +36,13 @@ interface EventBooking {
     start_time: string;
     location: string;
     image_url: string;
+    currency?: string;
+    price?: number;
   };
   event_ticket: {
     name: string;
     ticket_type: string;
+    price?: number;
   };
 }
 
@@ -71,7 +74,7 @@ interface Order {
   payment_provider_id?: string;
   order_items: OrderItem[];
   event_bookings?: EventBooking[];
-  gift_cards?: GiftCard[];
+  gift_cards: GiftCard[];
   course_enrollments?: Array<{
     id: string;
     course: {
@@ -80,6 +83,8 @@ interface Order {
       description: string;
       thumbnail_url: string;
       creator_id: string;
+      price?: number;
+      currency?: string;
     };
   }>;
   user_name?: string;
@@ -101,6 +106,16 @@ const UserOrders = () => {
     if (!value) return 'USD';
     const upperValue = value.toUpperCase();
     return (SUPPORTED_CURRENCIES as any)[upperValue] ? upperValue as CurrencyCode : 'USD';
+  };
+
+  // Helper to safely convert to number
+  const safeNumber = (value: any): number => {
+    if (typeof value === 'number' && !isNaN(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
   };
 
   // Pagination calculations
@@ -139,11 +154,14 @@ const UserOrders = () => {
               description,
               start_time,
               location,
-              image_url
+              image_url,
+              currency,
+              price
             ),
             event_ticket:event_tickets (
               name,
-              ticket_type
+              ticket_type,
+              price
             )
           ),
           course_enrollments (
@@ -153,27 +171,33 @@ const UserOrders = () => {
               title,
               description,
               thumbnail_url,
-              creator_id
+              creator_id,
+              price,
+              currency
             )
-          ),
-          gift_cards (
-            id,
-            amount,
-            currency,
-            gift_card_code,
-            status,
-            expires_at,
-            sender_name,
-            sender_email,
-            recipient_name,
-            recipient_email,
-            personal_message
           )
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Fetch gift cards separately to avoid ambiguity
+      const orderIds = ordersData?.map(order => order.id) || [];
+      let giftCardsData: GiftCard[] = [];
+      
+      if (orderIds.length > 0) {
+        const { data: giftCards, error: giftCardsError } = await supabase
+          .from('gift_cards')
+          .select('*')
+          .in('order_id', orderIds);
+        
+        if (giftCardsError) {
+          console.warn('Error fetching gift cards:', giftCardsError);
+        } else {
+          giftCardsData = giftCards || [];
+        }
+      }
 
       // Enhance order items with proper event and course titles
       const enhancedOrders = await Promise.all(
@@ -185,28 +209,32 @@ const UserOrders = () => {
                   // First try to get from event_tickets table
                   const { data: ticket } = await supabase
                     .from('event_tickets')
-                    .select('event_id, name, events!event_tickets_event_id_fkey(title)')
+                    .select('event_id, name, price, events!event_tickets_event_id_fkey(title, currency)')
                     .eq('id', item.item_id)
                     .maybeSingle();
 
                   if (ticket && ticket.events) {
                     return {
                       ...item,
-                      item_name: `${ticket.events.title} - ${ticket.name}`
+                      item_name: `${ticket.events.title} - ${ticket.name}`,
+                      unit_price: safeNumber(ticket.price) || safeNumber(item.unit_price) || (safeNumber(item.total_price) / Math.max(item.quantity, 1)),
+                      total_price: safeNumber(item.total_price) || (safeNumber(ticket.price) * item.quantity)
                     };
                   }
 
                   // Fallback: check if item_id is actually an event_id
                   const { data: event } = await supabase
                     .from('events')
-                    .select('title')
+                    .select('title, price, currency')
                     .eq('id', item.item_id)
                     .maybeSingle();
 
                   if (event) {
                     return {
                       ...item,
-                      item_name: event.title
+                      item_name: event.title,
+                      unit_price: safeNumber(event.price) || safeNumber(item.unit_price) || (safeNumber(item.total_price) / Math.max(item.quantity, 1)),
+                      total_price: safeNumber(item.total_price) || (safeNumber(event.price) * item.quantity)
                     };
                   }
                 } catch (err) {
@@ -216,28 +244,60 @@ const UserOrders = () => {
                 try {
                   const { data: course } = await supabase
                     .from('courses')
-                    .select('title')
+                    .select('title, price, currency')
                     .eq('id', item.item_id)
                     .maybeSingle();
 
                   if (course) {
                     return {
                       ...item,
-                      item_name: course.title
+                      item_name: course.title,
+                      unit_price: safeNumber(course.price) || safeNumber(item.unit_price) || (safeNumber(item.total_price) / Math.max(item.quantity, 1)),
+                      total_price: safeNumber(item.total_price) || (safeNumber(course.price) * item.quantity)
                     };
                   }
                 } catch (err) {
                   console.error('Error fetching course details for item:', item.item_id, err);
                 }
               }
-              return item;
+              
+              // Ensure numeric values are properly converted
+              return {
+                ...item,
+                unit_price: safeNumber(item.unit_price) || (safeNumber(item.total_price) / Math.max(item.quantity, 1)),
+                total_price: safeNumber(item.total_price)
+              };
             })
           );
 
           return {
             ...order,
             order_items: enhancedItems,
-            user_name: user?.email || 'Customer'
+            user_name: user?.email || 'Customer',
+            gift_cards: giftCardsData.filter(gc => gc.order_id === order.id),
+            total_amount: safeNumber(order.total_amount),
+            // Ensure event bookings have proper pricing data
+            event_bookings: (order.event_bookings || []).map((booking: any) => ({
+              ...booking,
+              event: {
+                ...booking.event,
+                price: safeNumber(booking.event?.price),
+                currency: booking.event?.currency || 'USD'
+              },
+              event_ticket: {
+                ...booking.event_ticket,
+                price: safeNumber(booking.event_ticket?.price)
+              }
+            })),
+            // Ensure course enrollments have proper pricing data
+            course_enrollments: (order.course_enrollments || []).map((enrollment: any) => ({
+              ...enrollment,
+              course: {
+                ...enrollment.course,
+                price: safeNumber(enrollment.course?.price),
+                currency: enrollment.course?.currency || 'USD'
+              }
+            }))
           };
         })
       );
@@ -415,6 +475,25 @@ const UserOrders = () => {
     setCurrentPage(page);
   };
 
+  // Calculate order total with fallbacks
+  const calculateOrderTotal = (order: Order): number => {
+    if (order.total_amount && order.total_amount > 0) {
+      return safeNumber(order.total_amount);
+    }
+
+    // Fallback: calculate from order items
+    const itemsTotal = order.order_items.reduce((sum, item) => {
+      return sum + safeNumber(item.total_price);
+    }, 0);
+
+    // Add gift card amounts
+    const giftCardsTotal = order.gift_cards.reduce((sum, gc) => {
+      return sum + safeNumber(gc.amount);
+    }, 0);
+
+    return itemsTotal + giftCardsTotal;
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -463,6 +542,7 @@ const UserOrders = () => {
                   const hasCourses = order.order_items.some(item => item.item_type === 'course');
                   const hasGiftCards = order.gift_cards && order.gift_cards.length > 0;
                   const eventBookings = order.event_bookings || [];
+                  const orderTotal = calculateOrderTotal(order);
                   
                   return (
                     <Card key={order.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm overflow-hidden">
@@ -492,9 +572,10 @@ const UserOrders = () => {
                           <div className="text-lg lg:text-right">
                             <div className="font-bold text-orange-600">
                               <PriceDisplay
-                                amount={order.total_amount}
-                                originalCurrency={safeCurrency(order.currency)}
+                                amount={orderTotal}
+                                originalCurrency="USD"
                                 className="text-lg font-bold"
+                                showOriginal={true}
                               />
                             </div>
                             <div className="text-sm text-gray-600 capitalize">
@@ -522,16 +603,18 @@ const UserOrders = () => {
                                     {item.item_type === 'event_ticket' ? 'Event Ticket' : item.item_type === 'course' ? 'Course' : 'Gift Card'} • 
                                     Quantity: {item.quantity} • 
                                     Unit Price: <PriceDisplay
-                                      amount={item.unit_price || (item.total_price / item.quantity)}
-                                      originalCurrency={safeCurrency(order.currency)}
+                                      amount={safeNumber(item.unit_price)}
+                                      originalCurrency="USD"
+                                      showOriginal={true}
                                     />
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   <div className="font-semibold">
                                     <PriceDisplay
-                                      amount={item.total_price}
-                                      originalCurrency={safeCurrency(order.currency)}
+                                      amount={safeNumber(item.total_price)}
+                                      originalCurrency="USD"
+                                      showOriginal={true}
                                     />
                                   </div>
                                   {/* Start Learning Button for Courses */}
@@ -661,8 +744,9 @@ const UserOrders = () => {
                                       <div>
                                         <div className="text-2xl font-bold text-transparent bg-gradient-to-r from-purple-500 to-orange-500 bg-clip-text">
                                           <PriceDisplay
-                                            amount={giftCard.amount}
-                                            originalCurrency={safeCurrency(giftCard.currency)}
+                                            amount={safeNumber(giftCard.amount)}
+                                            originalCurrency="USD"
+                                            showOriginal={true}
                                           />
                                         </div>
                                         <p className="text-sm text-gray-600">Gift Card</p>
@@ -854,8 +938,9 @@ const UserOrders = () => {
                       <div className="text-right">
                         <p className="font-medium">
                           <PriceDisplay
-                            amount={item.total_price}
-                            originalCurrency={safeCurrency(selectedOrder.currency)}
+                            amount={safeNumber(item.total_price)}
+                            originalCurrency="USD"
+                            showOriginal={true}
                           />
                         </p>
                       </div>
@@ -882,8 +967,9 @@ const UserOrders = () => {
                         <div className="text-right">
                           <p className="font-medium">
                             <PriceDisplay
-                              amount={giftCard.amount}
-                              originalCurrency={safeCurrency(giftCard.currency)}
+                              amount={safeNumber(giftCard.amount)}
+                              originalCurrency="USD"
+                              showOriginal={true}
                             />
                           </p>
                         </div>
@@ -899,8 +985,9 @@ const UserOrders = () => {
                   <span>Total</span>
                   <span>
                     <PriceDisplay
-                      amount={selectedOrder.total_amount}
-                      originalCurrency={safeCurrency(selectedOrder.currency)}
+                      amount={calculateOrderTotal(selectedOrder)}
+                      originalCurrency="USD"
+                      showOriginal={true}
                     />
                   </span>
                 </div>
