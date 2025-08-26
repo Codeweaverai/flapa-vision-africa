@@ -802,21 +802,16 @@ const MyOrdersPage = () => {
         </div>
 
         <div style="padding: 40px;">
-          <!-- Event Image and Title -->
-          <div style="display: flex; gap: 20px; margin-bottom: 30px; align-items: center;">
-            ${ticket.event?.image_url ? `
-              <div style="width: 120px; height: 120px; border-radius: 15px; overflow: hidden; flex-shrink: 0; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
-                <img src="${ticket.event.image_url}" alt="${ticket.event?.title || 'Event'}" style="width: 100%; height: 100%; object-fit: cover;" />
-              </div>
-            ` : ''}
-            <div style="flex: 1;">
-              <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #1f2937; font-weight: bold;">${ticket.event?.title || 'Event Title'}</h2>
-              <div style="background: linear-gradient(135deg, #fef7ed, #faf5ff); padding: 12px 16px; border-radius: 10px; border-left: 4px solid #f97316;">
-                <div style="font-weight: 600; color: #ea580c; margin-bottom: 5px;">${ticket.event_ticket?.name || 'Standard Ticket'}</div>
-                <div style="font-size: 14px; color: #7c2d12;">${ticket.event_ticket?.ticket_type || 'Regular'}</div>
-              </div>
-            </div>
-          </div>
+  <!-- Event Title -->
+  <div style="margin-bottom: 30px;">
+    <div style="flex: 1;">
+      <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #1f2937; font-weight: bold;">${ticket.event?.title || 'Event Title'}</h2>
+      <div style="background: linear-gradient(135deg, #fef7ed, #faf5ff); padding: 12px 16px; border-radius: 10px; border-left: 4px solid #f97316;">
+        <div style="font-weight: 600; color: #ea580c; margin-bottom: 5px;">${ticket.event_ticket?.name || 'Standard Ticket'}</div>
+        <div style="font-size: 14px; color: #7c2d12;">${ticket.event_ticket?.ticket_type || 'Regular'}</div>
+      </div>
+    </div>
+        </div>
 
           <!-- Event Details Grid -->
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
