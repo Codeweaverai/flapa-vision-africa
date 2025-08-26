@@ -66,10 +66,12 @@ interface Order {
       location: string;
       image_url: string;
       description: string;
+      currency?: string;
     };
     event_ticket: {
       name: string;
       ticket_type: string;
+      price?: number;
     };
   }[];
   course_enrollments: {
@@ -80,6 +82,7 @@ interface Order {
       description: string;
       thumbnail_url: string;
       creator_id: string;
+      price?: number;
     };
   }[];
   gift_cards: GiftCard[];
@@ -127,6 +130,15 @@ const safeCurrency = (value: string | null | undefined): CurrencyCode => {
   return SUPPORTED_CURRENCIES[normalized as CurrencyCode] ? normalized as CurrencyCode : 'USD';
 };
 
+const safeNumber = (value: any): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
+
 const obfuscateGiftCode = (code: string): string => {
   if (!code || code.length < 8) return code;
   const start = code.slice(0, 4);
@@ -135,18 +147,61 @@ const obfuscateGiftCode = (code: string): string => {
   return `${start}${middle}${end}`;
 };
 
-const computeTypeSubtotals = (order: Order) => {
+const computeTypeSubtotalsFull = (order: Order) => {
   const subtotals = { event: 0, course: 0, gift: 0 };
   
+  // Calculate from order_items first (most reliable)
   order.order_items?.forEach(item => {
-    if (item.item_type === 'event') {
-      subtotals.event += item.total_price;
+    const price = safeNumber(item.total_price);
+    if (item.item_type === 'event' || item.item_type === 'event_ticket') {
+      subtotals.event += price;
     } else if (item.item_type === 'course') {
-      subtotals.course += item.total_price;
+      subtotals.course += price;
     } else if (item.item_type === 'gift_card') {
-      subtotals.gift += item.total_price;
+      subtotals.gift += price;
     }
   });
+
+  // Fallback calculations if order_items are missing or zero
+  if (subtotals.event === 0 && order.event_bookings?.length > 0) {
+    order.event_bookings.forEach(booking => {
+      const ticketPrice = safeNumber(booking.event_ticket?.price) || 0;
+      const quantity = safeNumber(booking.ticket_quantity) || 1;
+      subtotals.event += ticketPrice * quantity;
+    });
+  }
+
+  if (subtotals.course === 0 && order.course_enrollments?.length > 0) {
+    order.course_enrollments.forEach(enrollment => {
+      const coursePrice = safeNumber(enrollment.course?.price) || 0;
+      subtotals.course += coursePrice;
+    });
+  }
+
+  if (subtotals.gift === 0 && order.gift_cards?.length > 0) {
+    order.gift_cards.forEach(gift => {
+      subtotals.gift += safeNumber(gift.amount);
+    });
+  }
+
+  // Final fallback to total_amount if all subtotals are still zero
+  const totalCalculated = subtotals.event + subtotals.course + subtotals.gift;
+  if (totalCalculated === 0 && safeNumber(order.total_amount) > 0) {
+    // Distribute total amount based on what exists
+    const hasEvents = order.event_bookings?.length > 0;
+    const hasCourses = order.course_enrollments?.length > 0;
+    const hasGifts = order.gift_cards?.length > 0;
+    
+    const totalAmount = safeNumber(order.total_amount);
+    
+    if (hasEvents && !hasCourses && !hasGifts) {
+      subtotals.event = totalAmount;
+    } else if (!hasEvents && hasCourses && !hasGifts) {
+      subtotals.course = totalAmount;
+    } else if (!hasEvents && !hasCourses && hasGifts) {
+      subtotals.gift = totalAmount;
+    }
+  }
   
   return subtotals;
 };
@@ -155,7 +210,7 @@ const buildCards = (orders: Order[]): OrderCard[] => {
   const cards: OrderCard[] = [];
   
   orders.forEach(order => {
-    const subtotals = computeTypeSubtotals(order);
+    const subtotals = computeTypeSubtotalsFull(order);
     
     // Event card
     if ((order.event_bookings && order.event_bookings.length > 0) || subtotals.event > 0) {
@@ -260,11 +315,13 @@ const MyOrdersPage = () => {
               end_time,
               location,
               image_url,
-              description
+              description,
+              currency
             ),
             event_ticket:event_tickets!event_bookings_event_ticket_id_fkey (
               name,
-              ticket_type
+              ticket_type,
+              price
             )
           ),
           course_enrollments (
@@ -274,7 +331,8 @@ const MyOrdersPage = () => {
               title,
               description,
               thumbnail_url,
-              creator_id
+              creator_id,
+              price
             )
           )
         `)
@@ -300,13 +358,39 @@ const MyOrdersPage = () => {
         }
       }
       
-      // Transform orders and attach gift cards
+      // Transform orders and attach gift cards with proper number coercion
       const transformedOrders: Order[] = (data || []).map(order => ({
         ...order,
+        total_amount: safeNumber(order.total_amount),
         user_name: user?.email || 'Customer',
-        gift_cards: giftCardsData.filter(gc => gc.order_id === order.id)
+        gift_cards: giftCardsData.filter(gc => gc.order_id === order.id).map(gc => ({
+          ...gc,
+          amount: safeNumber(gc.amount)
+        })),
+        order_items: (order.order_items || []).map(item => ({
+          ...item,
+          unit_price: safeNumber(item.unit_price),
+          total_price: safeNumber(item.total_price),
+          quantity: safeNumber(item.quantity) || 1
+        })),
+        event_bookings: (order.event_bookings || []).map(booking => ({
+          ...booking,
+          ticket_quantity: safeNumber(booking.ticket_quantity) || 1,
+          event_ticket: booking.event_ticket ? {
+            ...booking.event_ticket,
+            price: safeNumber(booking.event_ticket.price)
+          } : booking.event_ticket
+        })),
+        course_enrollments: (order.course_enrollments || []).map(enrollment => ({
+          ...enrollment,
+          course: enrollment.course ? {
+            ...enrollment.course,
+            price: safeNumber(enrollment.course.price)
+          } : enrollment.course
+        }))
       }));
       
+      console.log('Transformed orders:', transformedOrders);
       setOrders(transformedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -819,7 +903,7 @@ const MyOrdersPage = () => {
     const getFilteredItems = () => {
       switch (selectedType) {
         case 'event':
-          return selectedOrder.order_items.filter(item => item.item_type === 'event');
+          return selectedOrder.order_items.filter(item => item.item_type === 'event' || item.item_type === 'event_ticket');
         case 'course':
           return selectedOrder.order_items.filter(item => item.item_type === 'course');
         case 'gift':
@@ -830,7 +914,7 @@ const MyOrdersPage = () => {
     };
     
     const filteredItems = getFilteredItems();
-    const subtotal = filteredItems.reduce((sum, item) => sum + item.total_price, 0);
+    const subtotal = filteredItems.reduce((sum, item) => sum + safeNumber(item.total_price), 0);
     
     const receiptHTML = `
       <!DOCTYPE html>
@@ -960,8 +1044,8 @@ const MyOrdersPage = () => {
                 <tr>
                   <td>${item.item_name}</td>
                   <td>${item.quantity}</td>
-                  <td>$${item.unit_price.toFixed(2)}</td>
-                  <td>$${item.total_price.toFixed(2)}</td>
+                  <td>$${safeNumber(item.unit_price).toFixed(2)}</td>
+                  <td>$${safeNumber(item.total_price).toFixed(2)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -973,7 +1057,7 @@ const MyOrdersPage = () => {
               ${selectedOrder.gift_cards.map(gift => `
                 <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px;">
                   <p><strong>Code:</strong> ${obfuscateGiftCode(gift.gift_card_code)}</p>
-                  <p><strong>Amount:</strong> $${gift.amount.toFixed(2)}</p>
+                  <p><strong>Amount:</strong> $${safeNumber(gift.amount).toFixed(2)}</p>
                   <p><strong>Recipient:</strong> ${gift.recipient_name} (${gift.recipient_email})</p>
                   <p><strong>Status:</strong> ${gift.status.toUpperCase()}</p>
                   <p><strong>Expires:</strong> ${format(new Date(gift.expires_at), 'PPP')}</p>
@@ -1064,7 +1148,8 @@ const MyOrdersPage = () => {
                             <div className="text-2xl font-bold">
                               <PriceDisplay 
                                 amount={card.subtotal} 
-                                originalCurrency={safeCurrency(card.order.currency)} 
+                                originalCurrency="USD"
+                                showOriginal={true}
                               />
                             </div>
                             {getStatusBadge(card.order.payment_status)}
@@ -1117,6 +1202,15 @@ const MyOrdersPage = () => {
                                       <p className="text-sm text-orange-600">
                                         {booking.event_ticket?.ticket_type || 'Regular'} • Quantity: {booking.ticket_quantity}
                                       </p>
+                                      {booking.event_ticket?.price && (
+                                        <p className="text-sm text-orange-700 font-semibold">
+                                          Price: <PriceDisplay 
+                                            amount={safeNumber(booking.event_ticket.price)} 
+                                            originalCurrency={safeCurrency(booking.event?.currency) || "USD"}
+                                            showOriginal={true}
+                                          />
+                                        </p>
+                                      )}
                                     </div>
                                     <div className="text-right">
                                       <p className="font-mono text-sm text-orange-700 font-medium">
@@ -1155,6 +1249,16 @@ const MyOrdersPage = () => {
                                 <p className="text-gray-600 mb-4 line-clamp-2">
                                   {enrollment.course?.description || 'No description available'}
                                 </p>
+
+                                {enrollment.course?.price && (
+                                  <p className="text-sm text-purple-700 font-semibold mb-4">
+                                    Price: <PriceDisplay 
+                                      amount={safeNumber(enrollment.course.price)} 
+                                      originalCurrency="USD"
+                                      showOriginal={true}
+                                    />
+                                  </p>
+                                )}
                                 
                                 <div className="flex gap-3">
                                   <Link to={`/learning/course/${enrollment.course?.id}`}>
@@ -1180,8 +1284,9 @@ const MyOrdersPage = () => {
                                     <div>
                                       <div className="text-xl font-semibold text-gray-900 mb-1">
                                         <PriceDisplay 
-                                          amount={gift.amount} 
+                                          amount={safeNumber(gift.amount)} 
                                           originalCurrency={safeCurrency(gift.currency)} 
+                                          showOriginal={true}
                                         />
                                       </div>
                                       <p className="font-mono text-sm text-gray-600">
@@ -1458,8 +1563,9 @@ const MyOrdersPage = () => {
                     <p>
                       <strong>Total:</strong> 
                       <PriceDisplay 
-                        amount={computeTypeSubtotals(selectedOrder)[selectedType]} 
-                        originalCurrency={safeCurrency(selectedOrder.currency)} 
+                        amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
+                        originalCurrency="USD"
+                        showOriginal={true}
                       />
                     </p>
                   </div>
@@ -1471,7 +1577,7 @@ const MyOrdersPage = () => {
                 <div className="space-y-2">
                   {selectedOrder.order_items
                     .filter(item => {
-                      if (selectedType === 'event') return item.item_type === 'event';
+                      if (selectedType === 'event') return item.item_type === 'event' || item.item_type === 'event_ticket';
                       if (selectedType === 'course') return item.item_type === 'course';
                       if (selectedType === 'gift') return item.item_type === 'gift_card';
                       return true;
@@ -1484,8 +1590,9 @@ const MyOrdersPage = () => {
                         </div>
                         <p className="font-semibold">
                           <PriceDisplay 
-                            amount={item.total_price} 
-                            originalCurrency={safeCurrency(selectedOrder.currency)} 
+                            amount={safeNumber(item.total_price)} 
+                            originalCurrency="USD"
+                            showOriginal={true}
                           />
                         </p>
                       </div>
@@ -1504,8 +1611,9 @@ const MyOrdersPage = () => {
                           <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
                           <p className="font-semibold">
                             Amount: <PriceDisplay 
-                              amount={gift.amount} 
+                              amount={safeNumber(gift.amount)} 
                               originalCurrency={safeCurrency(gift.currency)} 
+                              showOriginal={true}
                             />
                           </p>
                         </div>
