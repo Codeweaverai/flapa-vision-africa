@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -36,6 +35,58 @@ interface ProfileData {
   mobile_money_number?: string;
   default_payout_method?: string;
 }
+
+// Phone number normalization function
+const normalizePhoneNumber = (phoneNumber: string, countryCode: string): string => {
+  if (!phoneNumber) return phoneNumber;
+  
+  let normalized = phoneNumber.trim();
+  
+  // Remove any non-digit characters except leading +
+  normalized = normalized.replace(/[^\d+]/g, '');
+  
+  // Remove any existing + or 00 prefix
+  normalized = normalized.replace(/^(\+|00)/, '');
+  
+  // Map country codes to phone prefixes
+  const countryPrefixes: Record<string, string> = {
+    'ZMB': '260', // Zambia
+    'KEN': '254', // Kenya
+    'UGA': '256', // Uganda
+    'TZA': '255', // Tanzania
+    'RWA': '250', // Rwanda
+    'GHA': '233', // Ghana
+  };
+  
+  const prefix = countryPrefixes[countryCode];
+  
+  if (prefix) {
+    // Check if number already has the correct prefix
+    if (normalized.startsWith(prefix)) {
+      return '+' + normalized;
+    }
+    
+    // Check if number has a different country code that needs to be replaced
+    const hasOtherCountryCode = Object.values(countryPrefixes).some(otherPrefix => 
+      normalized.startsWith(otherPrefix) && otherPrefix !== prefix
+    );
+    
+    if (hasOtherCountryCode) {
+      // Remove any existing country code
+      for (const otherPrefix of Object.values(countryPrefixes)) {
+        if (normalized.startsWith(otherPrefix)) {
+          normalized = normalized.substring(otherPrefix.length);
+          break;
+        }
+      }
+    }
+    
+    // Add the correct country prefix
+    normalized = prefix + normalized;
+  }
+  
+  return '+' + normalized;
+};
 
 const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   open,
@@ -238,10 +289,16 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
+        // Normalize the phone number with proper country code
+        const normalizedPhoneNumber = normalizePhoneNumber(profileData.mobile_money_number, countryCode);
+
         // Calculate the USD equivalent to deduct from balance
         const usdAmountToDeduct = withdrawAmount / exchangeRate;
 
         console.log('Mobile Money Withdrawal:', {
+          originalNumber: profileData.mobile_money_number,
+          normalizedNumber: normalizedPhoneNumber,
+          countryCode,
           withdrawAmount: withdrawAmount, // Local currency amount
           localCurrency,
           exchangeRate,
@@ -254,7 +311,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             amount: usdAmountToDeduct,          // USD amount to deduct from creator balance
             targetAmount: withdrawAmount,       // Local currency amount to send to user
             targetCurrency: localCurrency,      // Local currency code (e.g., ZMW, KES)
-            phone_number: profileData.mobile_money_number,
+            phone_number: normalizedPhoneNumber, // Use normalized number with country code
             operator: profileData.mobile_money_operator,
             country: countryCode,
             creator_id: user.id
