@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -36,65 +37,6 @@ interface ProfileData {
   default_payout_method?: string;
 }
 
-interface ExchangeRateData {
-  rate: number;
-  targetCurrency: CurrencyCode;
-}
-
-// Updated phone number normalization function - digits only, no prefixes
-const normalizePhoneNumber = (phoneNumber: string, countryCode: string): string => {
-  if (!phoneNumber) return phoneNumber;
-  
-  let normalized = phoneNumber.trim();
-  
-  // Remove ALL non-digit characters (including +, spaces, hyphens, etc.)
-  normalized = normalized.replace(/\D/g, '');
-  
-  // Map country codes to phone prefixes
-  const countryPrefixes: Record<string, string> = {
-    'ZMB': '260', // Zambia
-    'KEN': '254', // Kenya
-    'UGA': '256', // Uganda
-    'TZA': '255', // Tanzania
-    'RWA': '250', // Rwanda
-    'GHA': '233', // Ghana
-  };
-  
-  const prefix = countryPrefixes[countryCode];
-  
-  if (prefix) {
-    // Remove leading zero if present (common in local format numbers)
-    if (normalized.startsWith('0')) {
-      normalized = normalized.substring(1);
-    }
-    
-    // Check if number already has the correct prefix
-    if (normalized.startsWith(prefix)) {
-      return normalized; // Return digits only, no +
-    }
-    
-    // Check if number has a different country code that needs to be replaced
-    const hasOtherCountryCode = Object.values(countryPrefixes).some(otherPrefix => 
-      normalized.startsWith(otherPrefix) && otherPrefix !== prefix
-    );
-    
-    if (hasOtherCountryCode) {
-      // Remove any existing country code
-      for (const otherPrefix of Object.values(countryPrefixes)) {
-        if (normalized.startsWith(otherPrefix)) {
-          normalized = normalized.substring(otherPrefix.length);
-          break;
-        }
-      }
-    }
-    
-    // Add the correct country prefix (no +)
-    normalized = prefix + normalized;
-  }
-  
-  return normalized; // Return digits only, no +
-};
-
 const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   open,
   onOpenChange,
@@ -110,39 +52,14 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [convertedBalance, setConvertedBalance] = useState(0);
   const [localCurrency, setLocalCurrency] = useState<CurrencyCode>('USD');
   const [exchangeRate, setExchangeRate] = useState(1);
-  const [exchangeRateLoading, setExchangeRateLoading] = useState(false);
   const { user } = useAuth();
-  const { convertPrice, currentCurrency, formatPrice, getExchangeRate } = useCurrency();
+  const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
   useEffect(() => {
     if (open && user) {
       loadProfileData();
     }
   }, [open, user]);
-
-  // Fetch real exchange rates from API
-  const fetchExchangeRate = async (targetCurrency: CurrencyCode): Promise<ExchangeRateData> => {
-    try {
-      setExchangeRateLoading(true);
-      const rate = await getExchangeRate('USD', targetCurrency);
-      return { rate, targetCurrency };
-    } catch (error) {
-      console.error('Error fetching exchange rate:', error);
-      // Fallback to reasonable exchange rates if API fails
-      const fallbackRates: Record<string, number> = {
-        'ZMW': 23.4,
-        'KES': 150.0,
-        'UGX': 3700.0,
-        'TZS': 2300.0,
-        'RWF': 1100.0,
-        'GHS': 12.0,
-        'USD': 1
-      };
-      return { rate: fallbackRates[targetCurrency] || 1, targetCurrency };
-    } finally {
-      setExchangeRateLoading(false);
-    }
-  };
 
   // Convert balance and determine local currency based on selected payout method
   useEffect(() => {
@@ -167,14 +84,29 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             'TZA': 'TZS', // Tanzania
             'RWA': 'RWF', // Rwanda
             'GHA': 'GHS', // Ghana
+            // Add more as needed
           };
           
           const targetCurrency = currencyMap[countryCode] || 'USD';
           
-          // Get real exchange rate from API
-          const exchangeData = await fetchExchangeRate(targetCurrency);
-          const rate = exchangeData.rate;
-          const localAmount = availableBalance * rate;
+          // Get exchange rate for mobile money
+          let localAmount = availableBalance;
+          let rate = 1;
+          
+          if (targetCurrency !== 'USD') {
+            // Simulate exchange rates (in a real app, you'd fetch from an API)
+            const exchangeRates: Record<string, number> = {
+              'ZMW': 23.4, // 1 USD = 23.4 ZMW
+              'KES': 150.0, // 1 USD = 150 KES
+              'UGX': 3700.0, // 1 USD = 3700 UGX
+              'TZS': 2300.0, // 1 USD = 2300 TZS
+              'RWF': 1100.0, // 1 USD = 1100 RWF
+              'GHS': 12.0, // 1 USD = 12 GHS
+            };
+            
+            rate = exchangeRates[targetCurrency] || 1;
+            localAmount = availableBalance * rate;
+          }
           
           setConvertedBalance(localAmount);
           setLocalCurrency(targetCurrency);
@@ -306,16 +238,10 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         const operatorParts = profileData.mobile_money_operator.split('_');
         const countryCode = operatorParts[operatorParts.length - 1].toUpperCase();
 
-        // Normalize the phone number with proper country code (digits only)
-        const normalizedPhoneNumber = normalizePhoneNumber(profileData.mobile_money_number, countryCode);
-
         // Calculate the USD equivalent to deduct from balance
         const usdAmountToDeduct = withdrawAmount / exchangeRate;
 
         console.log('Mobile Money Withdrawal:', {
-          originalNumber: profileData.mobile_money_number,
-          normalizedNumber: normalizedPhoneNumber,
-          countryCode,
           withdrawAmount: withdrawAmount, // Local currency amount
           localCurrency,
           exchangeRate,
@@ -328,7 +254,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             amount: usdAmountToDeduct,          // USD amount to deduct from creator balance
             targetAmount: withdrawAmount,       // Local currency amount to send to user
             targetCurrency: localCurrency,      // Local currency code (e.g., ZMW, KES)
-            phone_number: normalizedPhoneNumber, // Use normalized number (digits only)
+            phone_number: profileData.mobile_money_number,
             operator: profileData.mobile_money_operator,
             country: countryCode,
             creator_id: user.id
@@ -408,8 +334,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
               Funds available for withdrawal (after 7-day hold period)
               {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
                 <div className="mt-1 text-xs text-blue-600">
-                  USD equivalent: {formatPrice(availableBalance, 'USD')} • 
-                  {exchangeRateLoading ? ' Loading exchange rate...' : ` Rate: 1 USD = ${exchangeRate.toFixed(2)} ${localCurrency}`}
+                  USD equivalent: {formatPrice(availableBalance, 'USD')} • Rate: 1 USD = {exchangeRate} {localCurrency}
                 </div>
               )}
             </div>
@@ -534,7 +459,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                   <div>• Platform fee: 8% (already deducted)</div>
                   <div>• You'll receive an email confirmation</div>
                   {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
-                    <div>• Exchange rate: 1 USD = {exchangeRate.toFixed(2)} {localCurrency}</div>
+                    <div>• Exchange rate: 1 USD = {exchangeRate} {localCurrency}</div>
                   )}
                 </div>
               </div>
@@ -549,7 +474,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           {hasAnyPayoutMethod && (
             <Button 
               onClick={handleWithdraw} 
-              disabled={!isValidAmount || loading || exchangeRateLoading}
+              disabled={!isValidAmount || loading}
               className="min-w-[100px]"
             >
               {loading ? "Processing..." : selectedPayoutMethod === 'stripe' ? "Transfer" : "Withdraw"}
