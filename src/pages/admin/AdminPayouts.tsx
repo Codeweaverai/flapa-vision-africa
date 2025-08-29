@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import AdminLayout from '@/components/layout/AdminLayout';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { calculateCreatorEarningsFromOrders } from '@/services/creatorEarningsService';
 
 interface CreatorPayout {
   id: string;
@@ -120,7 +122,7 @@ const AdminPayouts = () => {
 
   const loadCreatorBalances = async () => {
     try {
-      // Get all creators (those who have created courses or events)
+      // Get all creators from various sources
       const { data: courseCreators } = await supabase
         .from('courses')
         .select('creator_id')
@@ -131,10 +133,16 @@ const AdminPayouts = () => {
         .select('creator_id')
         .not('creator_id', 'is', null);
 
+      const { data: payoutCreators } = await supabase
+        .from('creator_payouts')
+        .select('creator_id')
+        .not('creator_id', 'is', null);
+
       // Combine and deduplicate creator IDs
       const allCreatorIds = [
         ...(courseCreators?.map(c => c.creator_id) || []),
-        ...(eventCreators?.map(e => e.creator_id) || [])
+        ...(eventCreators?.map(e => e.creator_id) || []),
+        ...(payoutCreators?.map(p => p.creator_id) || [])
       ];
       const uniqueCreatorIds = [...new Set(allCreatorIds)];
 
@@ -148,38 +156,45 @@ const AdminPayouts = () => {
 
       const balances: CreatorBalance[] = [];
 
-      // Calculate balances for each creator using the RPC function
+      // Calculate balances for each creator using the same logic as creator services
       for (const creatorId of uniqueCreatorIds) {
         try {
-          const { data: earningsData, error: earningsError } = await supabase
-            .rpc('calculate_creator_earnings', { creator_user_id: creatorId });
+          // Use the same calculation logic as creator services
+          const earningsData = await calculateCreatorEarningsFromOrders(creatorId);
 
-          if (earningsError) {
-            console.error(`Error calculating earnings for creator ${creatorId}:`, earningsError);
-            continue;
-          }
-
-          const earnings = earningsData?.[0];
-          if (!earnings) continue;
-
-          // Get total completed payouts for this creator
-          const { data: completedPayouts } = await supabase
+          // Get total payouts for this creator (completed and processing)
+          const { data: payoutsData } = await supabase
             .from('creator_payouts')
-            .select('amount')
+            .select('amount, method, mobile_money_details, currency')
             .eq('creator_id', creatorId)
-            .eq('status', 'completed');
+            .in('status', ['completed', 'processing']);
 
-          const totalPayouts = completedPayouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+          let totalPayouts = 0;
+          
+          if (payoutsData) {
+            payoutsData.forEach(payout => {
+              if (payout.method === 'mobile_money' && payout.mobile_money_details) {
+                const mobileMoneyDetails = payout.mobile_money_details as any;
+                if (mobileMoneyDetails && typeof mobileMoneyDetails === 'object' && mobileMoneyDetails.original_usd_amount) {
+                  totalPayouts += Number(mobileMoneyDetails.original_usd_amount);
+                } else {
+                  totalPayouts += Number(payout.amount);
+                }
+              } else {
+                totalPayouts += Number(payout.amount);
+              }
+            });
+          }
 
           const creatorProfile = profilesData?.find(p => p.id === creatorId);
 
           balances.push({
             creator_id: creatorId,
-            available_balance: Number(earnings.available_balance) || 0,
-            pending_balance: Number(earnings.pending_balance) || 0,
-            total_earnings: Number(earnings.total_earnings) || 0,
-            course_revenue: Number(earnings.course_revenue) || 0,
-            event_revenue: Number(earnings.event_revenue) || 0,
+            available_balance: earningsData.available_balance,
+            pending_balance: earningsData.pending_balance,
+            total_earnings: earningsData.total_earnings,
+            course_revenue: earningsData.course_revenue,
+            event_revenue: earningsData.event_revenue,
             total_payouts: totalPayouts,
             creator_profile: {
               full_name: creatorProfile?.full_name || 'N/A',
@@ -188,6 +203,21 @@ const AdminPayouts = () => {
           });
         } catch (error) {
           console.error(`Error processing creator ${creatorId}:`, error);
+          // Include creator with zero balances if calculation fails
+          const creatorProfile = profilesData?.find(p => p.id === creatorId);
+          balances.push({
+            creator_id: creatorId,
+            available_balance: 0,
+            pending_balance: 0,
+            total_earnings: 0,
+            course_revenue: 0,
+            event_revenue: 0,
+            total_payouts: 0,
+            creator_profile: {
+              full_name: creatorProfile?.full_name || 'N/A',
+              username: creatorProfile?.username || 'N/A'
+            }
+          });
         }
       }
 
@@ -604,7 +634,7 @@ const AdminPayouts = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => loadMorePayouts(currentPage - 1)}
+                        onClick={() => setCurrentPage(currentPage - 1)}
                         disabled={currentPage === 1}
                       >
                         <ChevronLeft className="h-4 w-4" />
@@ -613,7 +643,7 @@ const AdminPayouts = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => loadMorePayouts(currentPage + 1)}
+                        onClick={() => setCurrentPage(currentPage + 1)}
                         disabled={currentPage >= totalPages}
                       >
                         Next
