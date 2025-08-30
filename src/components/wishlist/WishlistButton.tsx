@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
@@ -7,55 +8,46 @@ import { cn } from '@/lib/utils';
 interface WishlistButtonProps {
   itemId: string;
   itemType: 'course' | 'event';
-  variant?: 'default' | 'ghost' | 'outline';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
 }
 
 const WishlistButton: React.FC<WishlistButtonProps> = ({
   itemId,
   itemType,
-  variant = 'ghost',
-  size = 'icon',
   className
 }) => {
-  const { addToWishlist, removeFromWishlist, isInWishlist, loading } = useWishlist();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
+  
   const inWishlist = isInWishlist(itemId, itemType);
 
-  const handleClick = async (e: React.MouseEvent) => {
+  const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
     if (inWishlist) {
-      await removeFromWishlist(itemId, itemType);
+      removeFromWishlist(itemId, itemType);
     } else {
-      await addToWishlist(itemId, itemType);
+      addToWishlist(itemId, itemType);
     }
   };
 
   return (
     <Button
-      variant={variant}
-      size={size}
-      onClick={handleClick}
-      disabled={loading}
+      variant="ghost"
+      size="sm"
+      onClick={handleToggle}
       className={cn(
-        'transition-colors',
-        inWishlist && 'text-red-500 hover:text-red-600',
+        "p-2 hover:bg-gray-100 transition-colors",
+        inWishlist && "text-red-500 hover:text-red-600",
         className
       )}
     >
       <Heart 
         className={cn(
-          'h-4 w-4',
-          inWishlist && 'fill-current'
+          "h-4 w-4",
+          inWishlist && "fill-current"
         )} 
       />
-      {size !== 'icon' && (
-        <span className="ml-2">
-          {inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
-        </span>
-      )}
     </Button>
   );
 };

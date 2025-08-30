@@ -1,66 +1,73 @@
 
 import React, { useState, useEffect } from 'react';
+import { currencyService } from '@/services/currencyService';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { CurrencyCode } from '@/constants/currencies';
+import { cn } from '@/lib/utils';
 
-interface PriceDisplayProps {
+export interface PriceDisplayProps {
   amount: number;
-  originalCurrency?: CurrencyCode;
+  originalCurrency: CurrencyCode;
   className?: string;
   showOriginal?: boolean;
+  showAmount?: boolean;
+  children?: React.ReactNode;
 }
 
 const PriceDisplay: React.FC<PriceDisplayProps> = ({
   amount,
-  originalCurrency = 'USD',
-  className = '',
-  showOriginal = false
+  originalCurrency,
+  className,
+  showOriginal = true,
+  showAmount = true,
+  children
 }) => {
-  const { currentCurrency, convertPrice, formatPrice, isLoading } = useCurrency();
   const [convertedAmount, setConvertedAmount] = useState<number>(amount);
-  const [converting, setConverting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { currency: targetCurrency } = useCurrency();
 
   useEffect(() => {
-    const performConversion = async () => {
-      if (isLoading || originalCurrency === currentCurrency) {
+    const convertPrice = async () => {
+      if (originalCurrency === targetCurrency || !amount || amount <= 0) {
         setConvertedAmount(amount);
         return;
       }
 
-      setConverting(true);
+      setIsLoading(true);
       try {
-        const converted = await convertPrice(amount, originalCurrency);
+        const converted = await currencyService.convertPrice(amount, originalCurrency, targetCurrency);
         setConvertedAmount(converted);
       } catch (error) {
         console.error('Error converting price:', error);
         setConvertedAmount(amount);
       } finally {
-        setConverting(false);
+        setIsLoading(false);
       }
     };
 
-    performConversion();
-  }, [amount, originalCurrency, currentCurrency, convertPrice, isLoading]);
+    convertPrice();
+  }, [amount, originalCurrency, targetCurrency]);
 
-  if (isLoading || converting) {
-    return (
-      <span className={className}>
-        {formatPrice(amount, originalCurrency)}
-      </span>
-    );
+  if (isLoading) {
+    return <span className={cn("animate-pulse", className)}>Converting...</span>;
   }
 
-  const displayPrice = formatPrice(convertedAmount, currentCurrency);
-  const originalPrice = formatPrice(amount, originalCurrency);
+  const formatPrice = (price: number, currency: CurrencyCode) => {
+    if (!showAmount) {
+      return currencyService.formatCurrency(0, currency).replace(/[\d.,]/g, '').trim();
+    }
+    return currencyService.formatCurrency(price, currency);
+  };
 
   return (
     <span className={className}>
-      {displayPrice}
-      {showOriginal && originalCurrency !== currentCurrency && (
-        <span className="text-sm text-muted-foreground ml-1">
-          (~{originalPrice})
+      {formatPrice(convertedAmount, targetCurrency)}
+      {showOriginal && originalCurrency !== targetCurrency && (
+        <span className="text-xs text-muted-foreground ml-1">
+          ({formatPrice(amount, originalCurrency)})
         </span>
       )}
+      {children}
     </span>
   );
 };
