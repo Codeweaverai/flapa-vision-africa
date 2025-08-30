@@ -9,12 +9,18 @@ interface WishlistButtonProps {
   itemId: string;
   itemType: 'course' | 'event';
   className?: string;
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+  children?: React.ReactNode;
 }
 
 const WishlistButton: React.FC<WishlistButtonProps> = ({
   itemId,
   itemType,
-  className
+  className,
+  variant = 'ghost',
+  size = 'sm',
+  children
 }) => {
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   
@@ -33,8 +39,8 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
 
   return (
     <Button
-      variant="ghost"
-      size="sm"
+      variant={variant}
+      size={size}
       onClick={handleToggle}
       className={cn(
         "p-2 hover:bg-gray-100 transition-colors",
@@ -48,6 +54,7 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
           inWishlist && "fill-current"
         )} 
       />
+      {children}
     </Button>
   );
 };

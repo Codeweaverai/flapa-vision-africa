@@ -11,6 +11,8 @@ export interface PriceDisplayProps {
   className?: string;
   showOriginal?: boolean;
   showAmount?: boolean;
+  showCurrencySymbol?: boolean;
+  targetCurrency?: CurrencyCode;
   children?: React.ReactNode;
 }
 
@@ -20,22 +22,27 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   className,
   showOriginal = true,
   showAmount = true,
+  showCurrencySymbol = true,
+  targetCurrency,
   children
 }) => {
   const [convertedAmount, setConvertedAmount] = useState<number>(amount);
   const [isLoading, setIsLoading] = useState(false);
-  const { currency: targetCurrency } = useCurrency();
+  const { currentCurrency } = useCurrency();
+  
+  // Use targetCurrency if provided, otherwise use currentCurrency from context
+  const displayCurrency = targetCurrency || currentCurrency;
 
   useEffect(() => {
     const convertPrice = async () => {
-      if (originalCurrency === targetCurrency || !amount || amount <= 0) {
+      if (originalCurrency === displayCurrency || !amount || amount <= 0) {
         setConvertedAmount(amount);
         return;
       }
 
       setIsLoading(true);
       try {
-        const converted = await currencyService.convertPrice(amount, originalCurrency, targetCurrency);
+        const converted = await currencyService.convertPrice(amount, originalCurrency, displayCurrency);
         setConvertedAmount(converted);
       } catch (error) {
         console.error('Error converting price:', error);
@@ -46,7 +53,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
     };
 
     convertPrice();
-  }, [amount, originalCurrency, targetCurrency]);
+  }, [amount, originalCurrency, displayCurrency]);
 
   if (isLoading) {
     return <span className={cn("animate-pulse", className)}>Converting...</span>;
@@ -54,15 +61,16 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
 
   const formatPrice = (price: number, currency: CurrencyCode) => {
     if (!showAmount) {
-      return currencyService.formatCurrency(0, currency).replace(/[\d.,]/g, '').trim();
+      const formatted = currencyService.formatCurrency(0, currency);
+      return showCurrencySymbol ? formatted.replace(/[\d.,]/g, '').trim() : '';
     }
-    return currencyService.formatCurrency(price, currency);
+    return showCurrencySymbol ? currencyService.formatCurrency(price, currency) : price.toString();
   };
 
   return (
     <span className={className}>
-      {formatPrice(convertedAmount, targetCurrency)}
-      {showOriginal && originalCurrency !== targetCurrency && (
+      {formatPrice(convertedAmount, displayCurrency)}
+      {showOriginal && originalCurrency !== displayCurrency && (
         <span className="text-xs text-muted-foreground ml-1">
           ({formatPrice(amount, originalCurrency)})
         </span>
