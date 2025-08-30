@@ -1,122 +1,115 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const supabaseClient = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  { auth: { persistSession: false } }
+);
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const handler = async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const payload = await req.json();
+    console.log("Received PawaPay webhook:", payload);
 
-    const webhook = await req.json();
-    console.log('PawaPay webhook received:', webhook);
+    const { 
+      depositId, 
+      status, 
+      amount, 
+      currency,
+      referenceId,
+      payer,
+      timestamp 
+    } = payload;
 
-    const { depositId, status } = webhook;
+    if (status === "COMPLETED" || status === "ACCEPTED") {
+      console.log("Processing successful PawaPay payment:", depositId);
 
-    if (status === 'COMPLETED') {
-      // Find the order by PawaPay deposit ID
-      const { data: order } = await supabase
+      // Find order by payment_provider_id (depositId)
+      const { data: order, error: orderError } = await supabaseClient
         .from('orders')
         .select('*')
-        .eq('pawapay_deposit_id', depositId)
+        .eq('payment_provider_id', depositId)
         .single();
 
-      if (order) {
-        // Update order status
-        await supabase
-          .from('orders')
-          .update({ payment_status: 'completed' })
-          .eq('id', order.id);
-
-        // Process gifts
-        try {
-          await supabase.functions.invoke('process-gifts', {
-            body: { orderId: order.id }
-          });
-        } catch (error) {
-          console.error('Error processing gifts:', error);
-        }
-
-        // Process regular enrollments/bookings
-        const { data: orderItems } = await supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', order.id);
-
-        if (orderItems) {
-          for (const item of orderItems) {
-            if (item.item_type === 'course') {
-              await supabase
-                .from('course_enrollments')
-                .insert({
-                  user_id: order.user_id,
-                  course_id: item.item_id,
-                  payment_status: 'completed',
-                  order_id: order.id
-                });
-            } else if (item.item_type === 'event_ticket') {
-              const { data: ticket } = await supabase
-                .from('event_tickets')
-                .select('event_id')
-                .eq('id', item.item_id)
-                .single();
-
-              if (ticket) {
-                await supabase
-                  .from('event_bookings')
-                  .insert({
-                    user_id: order.user_id,
-                    event_id: ticket.event_id,
-                    event_ticket_id: item.item_id,
-                    status: 'confirmed',
-                    payment_status: 'completed',
-                    ticket_quantity: item.quantity,
-                    order_id: order.id,
-                    booking_code: `BK-${Date.now().toString(36).toUpperCase()}`
-                  });
-              }
-            }
-          }
-        }
+      if (orderError || !order) {
+        console.error("Order not found for depositId:", depositId, orderError);
+        return new Response("Order not found", { status: 404 });
       }
-    } else if (status === 'FAILED') {
-      // Update order to failed status
-      const { data: order } = await supabase
+
+      console.log("Found order:", order.id);
+
+      // Update order status to completed
+      const { error: updateError } = await supabaseClient
         .from('orders')
-        .select('id')
-        .eq('pawapay_deposit_id', depositId)
-        .single();
+        .update({
+          payment_status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
 
-      if (order) {
-        await supabase
-          .from('orders')
-          .update({ payment_status: 'failed' })
-          .eq('id', order.id);
+      if (updateError) {
+        console.error("Error updating order:", updateError);
+        throw updateError;
       }
+
+      console.log("Order status updated successfully:", order.id);
+
+      // Call verify-payment function for fulfillment
+      console.log("Calling verify-payment function for order:", order.id);
+      const { data: verifyData, error: verifyError } = await supabaseClient.functions.invoke('verify-payment', {
+        body: { orderId: order.id }
+      });
+
+      if (verifyError) {
+        console.error("Error calling verify-payment:", verifyError);
+        // Don't throw here - payment is already processed, but log the issue
+        console.error("Verify-payment failed for order:", order.id, "Error:", verifyError);
+      } else {
+        console.log("Verify-payment completed successfully for order:", order.id);
+        console.log("Verify-payment response:", verifyData);
+      }
+
+      // Create payment transaction record
+      await supabaseClient
+        .from('payment_transactions')
+        .insert({
+          user_id: order.user_id,
+          reference_type: 'order',
+          reference_id: order.id,
+          amount: parseFloat(amount),
+          currency: currency,
+          status: 'completed',
+          provider: 'pawapay',
+          provider_transaction_id: depositId,
+          phone_number: payer?.msisdn,
+          correspondent: payer?.correspondent,
+          metadata: payload
+        });
+
+      console.log("Payment transaction recorded");
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify({ status: "received" }), {
       status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
-  } catch (error: any) {
-    console.error('PawaPay webhook error:', error);
+  } catch (error) {
+    console.error("PawaPay webhook error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
-};
-
-serve(handler);
+});
