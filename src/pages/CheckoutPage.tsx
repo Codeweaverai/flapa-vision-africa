@@ -460,7 +460,7 @@ const CheckoutPage = () => {
                     )}
                     
                     <div className="flex justify-between">
-                      <span>Tax (4%)</span>
+                      <span>Tax</span>
                       <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
                     </div>
                     
