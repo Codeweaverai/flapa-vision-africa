@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { CreditCard, Smartphone, Plus, Minus, Trash2, Gift } from 'lucide-react';
+import { CreditCard, Smartphone, Plus, Minus, Trash2, Gift, CheckCircle, User, Mail, MessageSquare } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
 
@@ -41,7 +41,7 @@ const CheckoutPage = () => {
   const { currentCurrency, convertPrice } = useCurrency();
   const navigate = useNavigate();
   
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay'>('stripe');
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay' | 'free'>('stripe');
   const [promoCode, setPromoCode] = useState('');
   const [giftCardCode, setGiftCardCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -69,6 +69,15 @@ const CheckoutPage = () => {
   const taxAmountUSD = totalAmountUSD * TAX_RATE;
   const finalAmountBeforeDiscountsUSD = totalAmountUSD + taxAmountUSD;
   const finalAmountUSD = finalAmountBeforeDiscountsUSD - discount - giftCardDiscount;
+
+  // Automatically set payment method to 'free' when amount is 0
+  useEffect(() => {
+    if (finalAmountUSD <= 0) {
+      setPaymentMethod('free');
+    } else if (paymentMethod === 'free') {
+      setPaymentMethod('stripe');
+    }
+  }, [finalAmountUSD, paymentMethod]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -201,45 +210,89 @@ const CheckoutPage = () => {
 
     setLoading(true);
     try {
-      if (paymentMethod === 'stripe') {
-        const checkoutData: any = {
-          payment_method: 'stripe',
-          success_url: `${window.location.origin}/checkout/success`,
-          cancel_url: `${window.location.origin}/checkout`,
-          items: items.map(item => ({
-            item_id: item.itemId,
-            item_type: item.itemType,
-            item_name: item.itemName,
-            quantity: item.quantity,
-            price: item.price
-          }))
-        };
+      // Prepare common checkout data with metadata
+      const checkoutData: any = {
+        items: items.map(item => ({
+          item_id: item.itemId,
+          item_type: item.itemType,
+          item_name: item.itemName,
+          quantity: item.quantity,
+          price: item.price,
+          // Add metadata for gift items
+          metadata: item.giftMetadata ? {
+            sender_name: item.giftMetadata.senderName,
+            recipient_name: item.giftMetadata.recipientName,
+            recipient_email: item.giftMetadata.recipientEmail,
+            personal_message: item.giftMetadata.personalMessage,
+            amount: item.giftMetadata.amount,
+            // For gift events/courses, include the original item details
+            ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
+              original_item_id: item.itemId,
+              original_item_name: item.itemName
+            },
+            // For event tickets, include ticket holder info
+            ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
+              ticket_holder_names: item.ticketHolderNames || [],
+              ticket_holder_emails: item.ticketHolderEmails || []
+            }
+          } : {}
+        }))
+      };
 
-        // Add gift card info if applied
-        if (appliedGiftCard) {
-          checkoutData.gift_card_id = appliedGiftCard.id;
-          checkoutData.gift_card_code = appliedGiftCard.code;
-          checkoutData.gift_card_discount = giftCardDiscount;
-        }
+      // Add gift card info if applied
+      if (appliedGiftCard) {
+        checkoutData.gift_card_id = appliedGiftCard.id;
+        checkoutData.gift_card_code = appliedGiftCard.code;
+        checkoutData.gift_card_discount = giftCardDiscount;
+      }
 
-        // Add promo code if applied
-        if (promoCode && discount > 0) {
-          checkoutData.promo_code = promoCode;
-          checkoutData.promo_discount = discount;
-        }
+      // Add promo code if applied
+      if (promoCode && discount > 0) {
+        checkoutData.promo_code = promoCode;
+        checkoutData.promo_discount = discount;
+      }
 
-        const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      if (paymentMethod === 'free') {
+        // Handle free purchase (gift card covers full amount)
+        checkoutData.payment_method = 'free';
+        checkoutData.success_url = `${window.location.origin}/checkout/success`;
+
+        const { data, error } = await supabase.functions.invoke('create-free-order', {
           body: checkoutData
         });
 
         if (error) throw error;
 
-        if (data?.url) {
-          window.location.href = data.url;
+        if (data?.success) {
+          clearCart();
+          navigate('/checkout/success', { 
+            state: { 
+              orderId: data.orderId,
+              message: 'Your purchase was completed successfully using your gift card balance!'
+            }
+          });
+        } else {
+          throw new Error('Failed to create free order');
+        }
+      } else if (paymentMethod === 'stripe') {
+        // Stripe payment
+        checkoutData.payment_method = 'stripe';
+        checkoutData.success_url = `${window.location.origin}/checkout/success`;
+        checkoutData.cancel_url = `${window.location.origin}/checkout`;
+
+        const { data: stripeData, error } = await supabase.functions.invoke('create-checkout-session', {
+          body: checkoutData
+        });
+
+        if (error) throw error;
+
+        if (stripeData?.url) {
+          window.location.href = stripeData.url;
         } else {
           throw new Error('No checkout URL returned');
         }
       } else {
+        // Mobile Money payment
         setShowMobileMoneyDialog(true);
       }
     } catch (error) {
@@ -248,6 +301,13 @@ const CheckoutPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to truncate text for display
+  const truncateText = (text: string, maxLength: number = 25) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   };
 
   if (items.length === 0) {
@@ -281,6 +341,12 @@ const CheckoutPage = () => {
                                  item.itemType === 'gift_card' ? 'Gift Card' : 
                                  item.itemType}
                               </Badge>
+                              {item.itemType.startsWith('gift_') && (
+                                <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                                  <Gift className="h-3 w-3 mr-1" />
+                                  Gift
+                                </Badge>
+                              )}
                             </div>
                             <div className="mt-2 space-y-1">
                               <div className="text-lg font-semibold">
@@ -295,6 +361,33 @@ const CheckoutPage = () => {
                                 </div>
                               )}
                             </div>
+
+                            {/* Display gift metadata if available */}
+                            {item.giftMetadata && (
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <User className="h-4 w-4" />
+                                  <span>To: {truncateText(item.giftMetadata.recipientName)}</span>
+                                </div>
+                                {item.giftMetadata.recipientEmail && (
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Mail className="h-4 w-4" />
+                                    <span>Email: {truncateText(item.giftMetadata.recipientEmail)}</span>
+                                  </div>
+                                )}
+                                {item.giftMetadata.personalMessage && (
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <MessageSquare className="h-4 w-4" />
+                                    <span>Message: {truncateText(item.giftMetadata.personalMessage)}</span>
+                                  </div>
+                                )}
+                                {item.giftMetadata.amount && (
+                                  <div className="text-sm text-gray-600">
+                                    Amount: ${item.giftMetadata.amount}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           
                           <div className="flex items-center gap-4">
@@ -406,33 +499,50 @@ const CheckoutPage = () => {
                   </CardContent>
                 </Card>
 
-                {/* Payment Method */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Payment Method</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <RadioGroup 
-                      value={paymentMethod} 
-                      onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay')}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="stripe" id="stripe" />
-                        <Label htmlFor="stripe" className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" />
-                          Credit/Debit Card
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="pawapay" id="pawapay" />
-                        <Label htmlFor="pawapay" className="flex items-center gap-2">
-                          <Smartphone className="h-4 w-4" />
-                          Mobile Money
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </CardContent>
-                </Card>
+                {/* Payment Method - Updated for Free purchases */}
+                {finalAmountUSD > 0 ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Payment Method</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <RadioGroup 
+                        value={paymentMethod} 
+                        onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay')}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="stripe" id="stripe" />
+                          <Label htmlFor="stripe" className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            Credit/Debit Card
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="pawapay" id="pawapay" />
+                          <Label htmlFor="pawapay" className="flex items-center gap-2">
+                            <Smartphone className="h-4 w-4" />
+                            Mobile Money
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="bg-green-50 border-green-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-green-800">
+                        <CheckCircle className="h-5 w-5" />
+                        Gift Card Payment
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-green-700 text-sm">
+                        Your gift card balance covers the entire purchase amount. 
+                        No additional payment is required.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Order Total */}
                 <Card>
@@ -468,7 +578,11 @@ const CheckoutPage = () => {
                     
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
-                      <PriceDisplay amount={convertedAmounts.final} originalCurrency={currentCurrency as any} />
+                      <PriceDisplay 
+                        amount={convertedAmounts.final} 
+                        originalCurrency={currentCurrency as any} 
+                        className={finalAmountUSD <= 0 ? "text-green-600" : ""}
+                      />
                     </div>
                     
                     {currentCurrency !== 'USD' && (
@@ -476,16 +590,24 @@ const CheckoutPage = () => {
                         Original: ${finalAmountUSD.toFixed(2)} USD
                       </div>
                     )}
+
+                    {finalAmountUSD <= 0 && (
+                      <div className="text-sm text-green-600 text-right mt-2">
+                        ✓ Fully covered by gift card balance
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
                 <Button
                   onClick={handleCheckout}
-                  disabled={loading || finalAmountUSD <= 0}
+                  disabled={loading}
                   className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white py-3"
                   size="lg"
                 >
-                  {loading ? "Processing..." : paymentMethod === 'stripe' ? "Pay with Card" : "Pay with Mobile Money"}
+                  {loading ? "Processing..." : 
+                   finalAmountUSD <= 0 ? "Complete Purchase with Gift Card" :
+                   paymentMethod === 'stripe' ? "Pay with Card" : "Pay with Mobile Money"}
                 </Button>
               </div>
             </div>
@@ -493,24 +615,41 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      <MobileMoneyPaymentDialog
-        isOpen={showMobileMoneyDialog}
-        onClose={() => setShowMobileMoneyDialog(false)}
-        amount={convertedAmounts.final}
-        currency={currentCurrency}
-        items={items.map(item => ({
-          item_id: item.itemId,
-          item_type: item.itemType,
-          item_name: item.itemName,
-          quantity: item.quantity,
-          price: item.price,
-          ticket_holder_names: []
-        }))}
-        discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
-        taxAmount={convertedAmounts.tax}
-        promoCode={promoCode}
-        giftCardCode={appliedGiftCard?.code}
-      />
+      {finalAmountUSD > 0 && (
+        <MobileMoneyPaymentDialog
+          isOpen={showMobileMoneyDialog}
+          onClose={() => setShowMobileMoneyDialog(false)}
+          amount={convertedAmounts.final}
+          currency={currentCurrency}
+          items={items.map(item => ({
+            item_id: item.itemId,
+            item_type: item.itemType,
+            item_name: item.itemName,
+            quantity: item.quantity,
+            price: item.price,
+            // Pass metadata to mobile money dialog as well
+            metadata: item.giftMetadata ? {
+              sender_name: item.giftMetadata.senderName,
+              recipient_name: item.giftMetadata.recipientName,
+              recipient_email: item.giftMetadata.recipientEmail,
+              personal_message: item.giftMetadata.personalMessage,
+              amount: item.giftMetadata.amount,
+              ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
+                original_item_id: item.itemId,
+                original_item_name: item.itemName
+              },
+              ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
+                ticket_holder_names: item.ticketHolderNames || [],
+                ticket_holder_emails: item.ticketHolderEmails || []
+              }
+            } : {}
+          }))}
+          discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
+          taxAmount={convertedAmounts.tax}
+          promoCode={promoCode}
+          giftCardCode={appliedGiftCard?.code}
+        />
+      )}
     </Layout>
   );
 };
