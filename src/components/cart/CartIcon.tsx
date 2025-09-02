@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, X, Plus, Minus, User, Gift } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, User, Gift, Mail, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
@@ -15,12 +15,14 @@ import {
 } from '@/components/ui/sheet';
 import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const CartIcon = () => {
   const { items, getItemCount, updateQuantity, removeFromCart } = useCart();
   const { convertPrice, formatPrice, currentCurrency } = useCurrency();
   const [isOpen, setIsOpen] = useState(false);
   const [convertedTotal, setConvertedTotal] = useState(0);
+  const [isConverting, setIsConverting] = useState(false);
   const navigate = useNavigate();
 
   const totalItems = getItemCount();
@@ -28,21 +30,26 @@ const CartIcon = () => {
   // Calculate converted total
   useEffect(() => {
     const calculateConvertedTotal = async () => {
+      if (items.length === 0) {
+        setConvertedTotal(0);
+        return;
+      }
+
+      setIsConverting(true);
       const totalUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      
       try {
         const converted = await convertPrice(totalUSD, 'USD');
         setConvertedTotal(converted);
       } catch (error) {
         console.error('Error converting total price:', error);
         setConvertedTotal(totalUSD);
+      } finally {
+        setIsConverting(false);
       }
     };
 
-    if (items.length > 0) {
-      calculateConvertedTotal();
-    } else {
-      setConvertedTotal(0);
-    }
+    calculateConvertedTotal();
   }, [items, convertPrice, currentCurrency]);
 
   const handleCheckout = () => {
@@ -66,6 +73,12 @@ const CartIcon = () => {
       default:
         return itemType;
     }
+  };
+
+  // Function to truncate text for display
+  const truncateText = (text: string, maxLength: number = 30) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   };
 
   return (
@@ -101,7 +114,7 @@ const CartIcon = () => {
             <>
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {items.map((item) => (
-                  <Card key={item.itemId}>
+                  <Card key={`${item.itemId}-${item.itemType}`} className="relative">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -129,6 +142,33 @@ const CartIcon = () => {
                               </p>
                             )}
                           </div>
+
+                          {/* Gift Metadata Preview */}
+                          {item.giftMetadata && (
+                            <div className="mt-2 space-y-1 text-xs text-gray-500">
+                              <div className="flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                <span>To: {truncateText(item.giftMetadata.recipientName)}</span>
+                              </div>
+                              {item.giftMetadata.recipientEmail && (
+                                <div className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  <span>Email: {truncateText(item.giftMetadata.recipientEmail, 25)}</span>
+                                </div>
+                              )}
+                              {item.giftMetadata.personalMessage && (
+                                <div className="flex items-center gap-1">
+                                  <MessageSquare className="h-3 w-3" />
+                                  <span>Message: {truncateText(item.giftMetadata.personalMessage, 25)}</span>
+                                </div>
+                              )}
+                              {item.giftMetadata.amount && (
+                                <div className="flex items-center gap-1">
+                                  <span>Amount: ${item.giftMetadata.amount}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
@@ -140,7 +180,7 @@ const CartIcon = () => {
                         </Button>
                       </div>
                       
-                      {/* Only show quantity controls for event tickets (not gift items) */}
+                      {/* Quantity controls for event tickets only (not gift items) */}
                       {(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && (
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center justify-between">
@@ -151,10 +191,13 @@ const CartIcon = () => {
                                 size="sm"
                                 onClick={() => updateQuantity(item.itemId, item.quantity - 1)}
                                 className="h-6 w-6 p-0"
+                                disabled={item.quantity <= 1}
                               >
                                 <Minus className="h-3 w-3" />
                               </Button>
-                              <span className="text-sm font-medium">{item.quantity}</span>
+                              <span className="text-sm font-medium min-w-[20px] text-center">
+                                {item.quantity}
+                              </span>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -176,13 +219,19 @@ const CartIcon = () => {
                 <div className="flex justify-between items-center mb-4">
                   <span className="font-semibold">Total:</span>
                   <div className="text-right">
-                    <div className="text-xl font-bold">
-                      {formatPrice(convertedTotal, currentCurrency)}
-                    </div>
-                    {currentCurrency !== 'USD' && (
-                      <div className="text-sm text-gray-500">
-                        ${items.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)} USD
-                      </div>
+                    {isConverting ? (
+                      <Skeleton className="h-6 w-20" />
+                    ) : (
+                      <>
+                        <div className="text-xl font-bold">
+                          {formatPrice(convertedTotal, currentCurrency)}
+                        </div>
+                        {currentCurrency !== 'USD' && (
+                          <div className="text-sm text-gray-500">
+                            ${items.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)} USD
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -190,8 +239,9 @@ const CartIcon = () => {
                 <Button 
                   onClick={handleCheckout}
                   className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                  disabled={isConverting}
                 >
-                  Proceed to Checkout
+                  {isConverting ? 'Calculating...' : 'Proceed to Checkout'}
                 </Button>
               </div>
             </>
