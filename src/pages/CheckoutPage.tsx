@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,62 +14,37 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { CreditCard, Smartphone, Plus, Minus, Trash2, Gift } from 'lucide-react';
+import { CreditCard, Smartphone, Plus, Minus, Trash2, Users } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
-
-// Gift card validation function
-const validateGiftCard = async (giftCardCode: string, orderAmount: number) => {
-  try {
-    const { data, error } = await supabase.functions.invoke('validate-gift-card', {
-      body: {
-        giftCardCode,
-        orderAmount
-      }
-    });
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Gift card validation error:', error);
-    throw error;
-  }
-};
 
 const CheckoutPage = () => {
   const { items, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
-  const { currentCurrency, convertPrice } = useCurrency();
+  const { currentCurrency, convertPrice, formatPrice } = useCurrency();
   const navigate = useNavigate();
   
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay'>('stripe');
   const [promoCode, setPromoCode] = useState('');
-  const [giftCardCode, setGiftCardCode] = useState('');
   const [discount, setDiscount] = useState(0);
-  const [giftCardDiscount, setGiftCardDiscount] = useState(0);
-  const [appliedGiftCard, setAppliedGiftCard] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [giftCardLoading, setGiftCardLoading] = useState(false);
   const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
   const [convertedAmounts, setConvertedAmounts] = useState<{
     total: number;
     tax: number;
     final: number;
     discount: number;
-    giftCardDiscount: number;
   }>({
     total: 0,
     tax: 0,
     final: 0,
-    discount: 0,
-    giftCardDiscount: 0
+    discount: 0
   });
   
   const totalAmountUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const TAX_RATE = 0.04;
+  const TAX_RATE = 0.04; // Changed to 4% tax
   const taxAmountUSD = totalAmountUSD * TAX_RATE;
-  const finalAmountBeforeDiscountsUSD = totalAmountUSD + taxAmountUSD;
-  const finalAmountUSD = finalAmountBeforeDiscountsUSD - discount - giftCardDiscount;
+  const finalAmountUSD = totalAmountUSD + taxAmountUSD - discount;
 
   useEffect(() => {
     if (items.length === 0) {
@@ -80,21 +56,19 @@ const CheckoutPage = () => {
   useEffect(() => {
     const convertAmounts = async () => {
       try {
-        const [convertedTotal, convertedTax, convertedDiscount, convertedGiftCardDiscount] = await Promise.all([
+        const [convertedTotal, convertedTax, convertedDiscount] = await Promise.all([
           convertPrice(totalAmountUSD, 'USD'),
           convertPrice(taxAmountUSD, 'USD'),
-          convertPrice(discount, 'USD'),
-          convertPrice(giftCardDiscount, 'USD')
+          convertPrice(discount, 'USD')
         ]);
         
-        const convertedFinal = convertedTotal + convertedTax - convertedDiscount - convertedGiftCardDiscount;
+        const convertedFinal = convertedTotal + convertedTax - convertedDiscount;
         
         setConvertedAmounts({
           total: convertedTotal,
           tax: convertedTax,
           final: convertedFinal,
-          discount: convertedDiscount,
-          giftCardDiscount: convertedGiftCardDiscount
+          discount: convertedDiscount
         });
       } catch (error) {
         console.error('Error converting amounts:', error);
@@ -102,14 +76,13 @@ const CheckoutPage = () => {
           total: totalAmountUSD,
           tax: taxAmountUSD,
           final: finalAmountUSD,
-          discount: discount,
-          giftCardDiscount: giftCardDiscount
+          discount: discount
         });
       }
     };
 
     convertAmounts();
-  }, [totalAmountUSD, taxAmountUSD, finalAmountUSD, discount, giftCardDiscount, convertPrice, currentCurrency]);
+  }, [totalAmountUSD, taxAmountUSD, finalAmountUSD, discount, convertPrice, currentCurrency]);
 
   const applyPromoCode = async () => {
     if (!promoCode.trim()) return;
@@ -163,36 +136,6 @@ const CheckoutPage = () => {
     }
   };
 
-  // Gift card validation function
-  const applyGiftCard = async () => {
-    if (!giftCardCode.trim()) return;
-
-    try {
-      setGiftCardLoading(true);
-      const result = await validateGiftCard(giftCardCode, finalAmountBeforeDiscountsUSD);
-
-      if (result.success) {
-        setGiftCardDiscount(result.discount_amount);
-        setAppliedGiftCard(result.giftCard);
-        toast.success(`Gift card applied! Discount: $${result.discount_amount.toFixed(2)}`);
-      } else {
-        toast.error(result.message || 'Invalid gift card');
-      }
-    } catch (error) {
-      console.error('Error applying gift card:', error);
-      toast.error('Failed to apply gift card');
-    } finally {
-      setGiftCardLoading(false);
-    }
-  };
-
-  const removeGiftCard = () => {
-    setGiftCardDiscount(0);
-    setAppliedGiftCard(null);
-    setGiftCardCode('');
-    toast.info('Gift card removed');
-  };
-
   const handleCheckout = async () => {
     if (!user) {
       navigate('/auth', { state: { redirectTo: '/checkout' } });
@@ -202,34 +145,21 @@ const CheckoutPage = () => {
     setLoading(true);
     try {
       if (paymentMethod === 'stripe') {
-        const checkoutData: any = {
-          payment_method: 'stripe',
-          success_url: `${window.location.origin}/checkout/success`,
-          cancel_url: `${window.location.origin}/checkout`,
-          items: items.map(item => ({
-            item_id: item.itemId,
-            item_type: item.itemType,
-            item_name: item.itemName,
-            quantity: item.quantity,
-            price: item.price
-          }))
-        };
-
-        // Add gift card info if applied
-        if (appliedGiftCard) {
-          checkoutData.gift_card_id = appliedGiftCard.id;
-          checkoutData.gift_card_code = appliedGiftCard.code;
-          checkoutData.gift_card_discount = giftCardDiscount;
-        }
-
-        // Add promo code if applied
-        if (promoCode && discount > 0) {
-          checkoutData.promo_code = promoCode;
-          checkoutData.promo_discount = discount;
-        }
-
+        // For cart-based checkout, pass the items from cart
         const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-          body: checkoutData
+          body: {
+            payment_method: 'stripe',
+            success_url: `${window.location.origin}/checkout/success`,
+            cancel_url: `${window.location.origin}/checkout`,
+            // Pass cart items for processing
+            items: items.map(item => ({
+              item_id: item.itemId,
+              item_type: item.itemType,
+              item_name: item.itemName,
+              quantity: item.quantity,
+              price: item.price
+            }))
+          }
         });
 
         if (error) throw error;
@@ -276,11 +206,11 @@ const CheckoutPage = () => {
                             <h4 className="font-medium">{item.itemName}</h4>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge variant="secondary">
-                                {item.itemType === 'course' || item.itemType === 'gift_course' ? 'Course' : 
-                                 item.itemType === 'event_ticket' || item.itemType === 'gift_event' ? 'Event Ticket' :
-                                 item.itemType === 'gift_card' ? 'Gift Card' : 
-                                 item.itemType}
-                              </Badge>
+                               {item.itemType === 'course' || item.itemType === 'gift_course' ? 'Course' : 
+                           item.itemType === 'event_ticket' || item.itemType === 'gift_event' ? 'Event Ticket' :
+                           item.itemType === 'gift_card' ? 'Gift Card' : 
+                           item.itemType}
+                           </Badge>
                             </div>
                             <div className="mt-2 space-y-1">
                               <div className="text-lg font-semibold">
@@ -357,55 +287,6 @@ const CheckoutPage = () => {
                   </CardContent>
                 </Card>
 
-                {/* Gift Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Gift className="h-5 w-5" />
-                      Gift Card
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {appliedGiftCard ? (
-                      <div className="space-y-2 p-3 bg-green-50 rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">Gift Card Applied:</span>
-                          <Badge variant="outline" className="bg-green-100">
-                            {appliedGiftCard.code}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-green-600">
-                          Remaining Balance: ${appliedGiftCard.remaining_balance.toFixed(2)}
-                        </div>
-                        <Button
-                          onClick={removeGiftCard}
-                          variant="outline"
-                          size="sm"
-                          className="mt-2"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Enter gift card code"
-                          value={giftCardCode}
-                          onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
-                          disabled={giftCardLoading}
-                        />
-                        <Button 
-                          onClick={applyGiftCard} 
-                          variant="outline"
-                          disabled={giftCardLoading || !giftCardCode.trim()}
-                        >
-                          {giftCardLoading ? "..." : "Apply"}
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
                 {/* Payment Method */}
                 <Card>
                   <CardHeader>
@@ -444,33 +325,21 @@ const CheckoutPage = () => {
                       <span>Subtotal</span>
                       <PriceDisplay amount={convertedAmounts.total} originalCurrency={currentCurrency as any} />
                     </div>
-                    
                     {discount > 0 && (
                       <div className="flex justify-between text-green-600">
-                        <span>Promo Discount</span>
+                        <span>Discount</span>
                         <span>-<PriceDisplay amount={convertedAmounts.discount} originalCurrency={currentCurrency as any} /></span>
                       </div>
                     )}
-                    
-                    {giftCardDiscount > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Gift Card</span>
-                        <span>-<PriceDisplay amount={convertedAmounts.giftCardDiscount} originalCurrency={currentCurrency as any} /></span>
-                      </div>
-                    )}
-                    
                     <div className="flex justify-between">
-                      <span>Tax</span>
+                      <span>Tax (4%)</span>
                       <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
                     </div>
-                    
                     <Separator />
-                    
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
                       <PriceDisplay amount={convertedAmounts.final} originalCurrency={currentCurrency as any} />
                     </div>
-                    
                     {currentCurrency !== 'USD' && (
                       <div className="text-sm text-gray-500 text-right">
                         Original: ${finalAmountUSD.toFixed(2)} USD
@@ -506,10 +375,9 @@ const CheckoutPage = () => {
           price: item.price,
           ticket_holder_names: []
         }))}
-        discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
+        discount={convertedAmounts.discount}
         taxAmount={convertedAmounts.tax}
         promoCode={promoCode}
-        giftCardCode={appliedGiftCard?.code}
       />
     </Layout>
   );

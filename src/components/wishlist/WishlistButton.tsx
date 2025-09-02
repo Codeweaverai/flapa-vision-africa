@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
@@ -8,32 +7,29 @@ import { cn } from '@/lib/utils';
 interface WishlistButtonProps {
   itemId: string;
   itemType: 'course' | 'event';
-  className?: string;
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  variant?: 'default' | 'ghost' | 'outline';
   size?: 'default' | 'sm' | 'lg' | 'icon';
-  children?: React.ReactNode;
+  className?: string;
 }
 
 const WishlistButton: React.FC<WishlistButtonProps> = ({
   itemId,
   itemType,
-  className,
   variant = 'ghost',
-  size = 'sm',
-  children
+  size = 'icon',
+  className
 }) => {
-  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
-  
+  const { addToWishlist, removeFromWishlist, isInWishlist, loading } = useWishlist();
   const inWishlist = isInWishlist(itemId, itemType);
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
     if (inWishlist) {
-      removeFromWishlist(itemId, itemType);
+      await removeFromWishlist(itemId, itemType);
     } else {
-      addToWishlist(itemId, itemType);
+      await addToWishlist(itemId, itemType);
     }
   };
 
@@ -41,20 +37,25 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
     <Button
       variant={variant}
       size={size}
-      onClick={handleToggle}
+      onClick={handleClick}
+      disabled={loading}
       className={cn(
-        "p-2 hover:bg-gray-100 transition-colors",
-        inWishlist && "text-red-500 hover:text-red-600",
+        'transition-colors',
+        inWishlist && 'text-red-500 hover:text-red-600',
         className
       )}
     >
       <Heart 
         className={cn(
-          "h-4 w-4",
-          inWishlist && "fill-current"
+          'h-4 w-4',
+          inWishlist && 'fill-current'
         )} 
       />
-      {children}
+      {size !== 'icon' && (
+        <span className="ml-2">
+          {inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+        </span>
+      )}
     </Button>
   );
 };
