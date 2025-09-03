@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { currencyService } from '@/services/currencyService';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -20,7 +19,6 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   amount,
   originalCurrency,
   className,
-  showOriginal = true,
   showAmount = true,
   showCurrencySymbol = true,
   targetCurrency,
@@ -70,11 +68,6 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   return (
     <span className={className}>
       {formatPrice(convertedAmount, displayCurrency)}
-      {showOriginal && originalCurrency !== displayCurrency && (
-        <span className="text-xs text-muted-foreground ml-1">
-          ({formatPrice(amount, originalCurrency)})
-        </span>
-      )}
       {children}
     </span>
   );
