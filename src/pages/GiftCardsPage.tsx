@@ -177,13 +177,13 @@ const GiftCardsPage = () => {
                   {/* Amount Selection */}
                   <div>
                     <Label className="text-base font-medium">Select Amount</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {predefinedAmounts.map((preAmount) => (
                         <Button
                           key={preAmount}
                           variant={amount === preAmount && !customAmount ? "default" : "outline"}
                           onClick={() => handleAmountSelect(preAmount)}
-                          className="h-12"
+                          className="h-12 flex-1 min-w-[80px]"
                         >
                           <PriceDisplay 
                             amount={preAmount} 
@@ -198,12 +198,7 @@ const GiftCardsPage = () => {
                       <Label htmlFor="customAmount" className="text-sm">Or enter custom amount</Label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                          <PriceDisplay 
-                            amount={0} 
-                            originalCurrency="USD" 
-                            showCurrencySymbol={true}
-                            showAmount={false}
-                          />
+                          $
                         </span>
                         <Input
                           id="customAmount"
@@ -213,7 +208,7 @@ const GiftCardsPage = () => {
                           placeholder="Enter amount"
                           min="1"
                           step="0.01"
-                          className="pl-10"
+                          className="pl-8"
                         />
                       </div>
                     </div>
