@@ -327,14 +327,8 @@ const CreatorPublicProfile: React.FC = () => {
                           {course.title}
                         </h3>
                         <Badge variant={course.is_free ? "secondary" : "default"} className="ml-2">
-                          {course.is_free ? 'Free' : (
-                            <PriceDisplay 
-                              amount={course.price} 
-                              originalCurrency="USD"
-                              targetCurrency={userCurrency}
-                              showOriginal={false}
-                              className="text-inherit"
-                            />
+                          {course.is_free ? 'Free' : (                           
+                          <PriceDisplay amount={course.price} originalCurrency="USD" />
                           )}
                         </Badge>
                       </div>
@@ -403,13 +397,8 @@ const CreatorPublicProfile: React.FC = () => {
                         </h3>
                         <Badge variant={event.is_free ? "secondary" : "default"} className="ml-2">
                           {event.is_free ? 'Free' : (
-                            <PriceDisplay 
-                              amount={event.price}
-                              originalCurrency="USD"
-                              targetCurrency={userCurrency}
-                              showOriginal={false}
-                              className="text-inherit"
-                            />
+                            <PriceDisplay amount={event.price} 
+                              originalCurrency="USD" />
                           )}
                         </Badge>
                       </div>
