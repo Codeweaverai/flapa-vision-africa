@@ -161,7 +161,7 @@ const HelpCenterPage = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-500 to-purple-600">
+          <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
           <div className="section-container">
             <div className="text-center">
               <div className="animate-pulse space-y-6">
