@@ -335,7 +335,7 @@ const MyCoursesPage = () => {
                   Start your learning journey by enrolling in some courses.
                 </p>
                 <Button asChild size="lg" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0">
-                  <Link to="/explore/courses">Browse Courses</Link>
+                  <Link to="/explore-courses">Browse Courses</Link>
                 </Button>
               </div>
             </div>
