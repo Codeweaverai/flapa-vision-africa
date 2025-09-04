@@ -22,7 +22,7 @@ const GiftCardsPage = () => {
   const [personalMessage, setPersonalMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const predefinedAmounts = [25, 50, 100, 200, 500];
+  const predefinedAmounts = [10, 25, 50, 100, 200, 500];
 
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount);
