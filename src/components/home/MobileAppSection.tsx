@@ -5,11 +5,9 @@ import { Smartphone, Download, Star, Users } from 'lucide-react';
 
 const MobileAppSection = () => {
   return (
-    <section className="section-container relative overflow-hidden">
-      {/* Background gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-400/5 to-purple-500/5 pointer-events-none" />
-      
-      <div className="relative z-10">
+    <section className="section-container relative overflow-hidden bg-gradient-to-br from-orange-400/5 to-purple-500/5">
+      {/* Content container with relative positioning */}
+      <div className="relative z-10 py-16">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 mb-4">
             <Smartphone className="h-8 w-8 text-orange-500" />
