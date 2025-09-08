@@ -12,6 +12,7 @@ import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
 import CreatorsSection from '@/components/home/CreatorsSection';
 import TrendingNowSection from '@/components/home/TrendingNowSection';
 import LocalContentSection from '@/components/home/LocalContentSection';
+import MobileAppSection from '@/components/home/MobileAppSection';
 
 const Index = () => {
   return (
@@ -25,8 +26,9 @@ const Index = () => {
       <LearningSection />
       <TrendingNowSection />
       <EventsSection />
-       <AboutSection />
+      <AboutSection />
       <CreatorsSection />
+      <MobileAppSection />
       <CallToAction />
     </Layout>
   );
