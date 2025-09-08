@@ -7,7 +7,7 @@ const MobileAppSection = () => {
   return (
     <section className="section-container relative overflow-hidden">
       {/* Background gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-purple-600/10 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-400/5 to-purple-500/5 pointer-events-none" />
       
       <div className="relative z-10">
         <div className="text-center mb-12">
