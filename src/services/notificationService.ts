@@ -53,6 +53,69 @@ export const setupNotificationListener = (userId: string, onNotification: (notif
   };
 };
 
+// Notification preferences management
+export const getUserNotificationPreferences = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code === 'PGRST116') {
+    // No preferences exist, create default ones
+    const { data: newPrefs, error: createError } = await supabase
+      .from('notification_preferences')
+      .insert({
+        user_id: userId,
+        event_reminders_enabled: true,
+        course_recommendations_enabled: true,
+        reminder_timing_hours: 24,
+        push_notifications_enabled: false,
+        email_notifications_enabled: true
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Failed to create notification preferences:', createError);
+      return null;
+    }
+    return newPrefs;
+  }
+
+  if (error) {
+    console.error('Failed to fetch notification preferences:', error);
+    return null;
+  }
+
+  return data;
+};
+
+export const updateNotificationPreferences = async (userId: string, preferences: Partial<{
+  event_reminders_enabled: boolean;
+  course_recommendations_enabled: boolean;
+  reminder_timing_hours: number;
+  push_notifications_enabled: boolean;
+  email_notifications_enabled: boolean;
+}>) => {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .upsert({
+      user_id: userId,
+      ...preferences,
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Failed to update notification preferences:', error);
+    throw error;
+  }
+
+  return data;
+};
+
 // Setup inbox message listener
 export const setupInboxMessageListener = (userId: string, onMessage: (message: any) => void) => {
   const channel = supabase

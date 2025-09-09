@@ -1152,6 +1152,39 @@ export type Database = {
           },
         ]
       }
+      event_reminder_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_id: string
+          id: string
+          reminder_type: string
+          sent_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_id: string
+          id?: string
+          reminder_type: string
+          sent_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_id?: string
+          id?: string
+          reminder_type?: string
+          sent_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       event_reviews: {
         Row: {
           created_at: string
@@ -2742,6 +2775,42 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          course_recommendations_enabled: boolean
+          created_at: string
+          email_notifications_enabled: boolean
+          event_reminders_enabled: boolean
+          id: string
+          push_notifications_enabled: boolean
+          reminder_timing_hours: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          course_recommendations_enabled?: boolean
+          created_at?: string
+          email_notifications_enabled?: boolean
+          event_reminders_enabled?: boolean
+          id?: string
+          push_notifications_enabled?: boolean
+          reminder_timing_hours?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          course_recommendations_enabled?: boolean
+          created_at?: string
+          email_notifications_enabled?: boolean
+          event_reminders_enabled?: boolean
+          id?: string
+          push_notifications_enabled?: boolean
+          reminder_timing_hours?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           content: string
@@ -3189,6 +3258,42 @@ export type Database = {
           updated_at?: string | null
           valid_from?: string | null
           valid_until?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth_key: string
+          created_at: string
+          endpoint: string
+          id: string
+          is_active: boolean
+          p256dh_key: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth_key: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          is_active?: boolean
+          p256dh_key: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth_key?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          is_active?: boolean
+          p256dh_key?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }

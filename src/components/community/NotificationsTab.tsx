@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Bell, MessageCircle, Heart, Share2, CheckCheck, Trash2 } from 'lucide-react';
+import { Bell, MessageCircle, Heart, Share2, CheckCheck, Trash2, Clock, BookOpen, Info } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -123,6 +123,12 @@ const NotificationsTab: React.FC = () => {
         return <Heart className="h-4 w-4 text-red-500" />;
       case 'message':
         return <MessageCircle className="h-4 w-4 text-purple-500" />;
+      case 'event_reminder':
+        return <Clock className="h-4 w-4 text-orange-500" />;
+      case 'course_recommendation':
+        return <BookOpen className="h-4 w-4 text-purple-500" />;
+      case 'system':
+        return <Info className="h-4 w-4 text-blue-500" />;
       default:
         return <Bell className="h-4 w-4 text-gray-500" />;
     }
