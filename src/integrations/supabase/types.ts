@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          category: string
+          created_at: string | null
+          criteria_type: string
+          criteria_value: number
+          description: string
+          icon_name: string
+          id: string
+          is_active: boolean
+          points: number
+          rarity: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          criteria_type: string
+          criteria_value?: number
+          description: string
+          icon_name: string
+          id?: string
+          is_active?: boolean
+          points?: number
+          rarity: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          criteria_type?: string
+          criteria_value?: number
+          description?: string
+          icon_name?: string
+          id?: string
+          is_active?: boolean
+          points?: number
+          rarity?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      activities: {
+        Row: {
+          activity_type: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          message: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_chat_history: {
         Row: {
           action_ids: Json | null
@@ -3668,6 +3746,47 @@ export type Database = {
           stripe_event_id?: string
         }
         Relationships: []
+      }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          created_at: string | null
+          id: string
+          max_progress: number
+          progress: number
+          unlocked_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          created_at?: string | null
+          id?: string
+          max_progress?: number
+          progress?: number
+          unlocked_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          created_at?: string | null
+          id?: string
+          max_progress?: number
+          progress?: number
+          unlocked_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_otp_verifications: {
         Row: {

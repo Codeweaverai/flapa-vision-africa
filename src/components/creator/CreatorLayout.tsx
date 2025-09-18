@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign, Building2 } from 'lucide-react';
+import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign, Building2, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -61,6 +61,11 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
       label: 'Workplaces',
       href: '/creator/workplaces',
       icon: <Building2 className="h-5 w-5 mr-2" />
+    },
+    {
+      label: 'Recent Activities',
+      href: '/creator/activities',
+      icon: <Activity className="h-5 w-5 mr-2" />
     },
     {
       label: 'inbox',

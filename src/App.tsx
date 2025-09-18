@@ -73,6 +73,7 @@ import CreatorPromoCodes from '@/pages/creator/CreatorPromoCodes';
 import CreatorSettings from '@/pages/creator/CreatorSettings';
 import CreatorAttendeeManagement from '@/pages/creator/CreatorAttendeeManagement';
 import CreatorWorkplaces from '@/pages/creator/CreatorWorkplaces';
+import CreatorRecentActivities from '@/pages/creator/CreatorRecentActivities';
 
 // Import workplace pages
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
@@ -255,9 +256,10 @@ function App() {
                   <Route path="/creator/workplaces" element={<ProtectedRoute><CreatorWorkplaces /></ProtectedRoute>} />
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
-                  <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
-                  <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
-                  <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
+    <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
+    <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
+    <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
+    <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
 
                   {/* Community Routes */}
                   <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
