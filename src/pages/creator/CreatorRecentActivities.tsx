@@ -136,12 +136,14 @@ const CreatorRecentActivities: React.FC = () => {
 
   return (
     <CreatorLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 bg-white p-6 rounded-lg">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Recent Activities</h1>
-            <p className="text-muted-foreground mt-2">
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+              Recent Activities
+            </h1>
+            <p className="text-gray-600 mt-2">
               Track your recent course enrollments, event bookings, payments, and more
             </p>
           </div>
@@ -149,7 +151,7 @@ const CreatorRecentActivities: React.FC = () => {
             onClick={handleRefresh}
             disabled={refreshing}
             size="sm"
-            variant="outline"
+            className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 shadow-md hover:shadow-lg transition-all duration-200"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -158,9 +160,9 @@ const CreatorRecentActivities: React.FC = () => {
 
         {/* Error Alert */}
         {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" className="bg-red-50 border-red-200 shadow-sm">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-600">{error}</AlertDescription>
           </Alert>
         )}
 
@@ -177,16 +179,16 @@ const CreatorRecentActivities: React.FC = () => {
             // Loading skeletons
             <>
               {[...Array(6)].map((_, i) => (
-                <Card key={i} className="p-4">
+                <Card key={i} className="p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                   <div className="flex items-start gap-4">
-                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <Skeleton className="h-10 w-10 rounded-lg bg-gradient-to-r from-orange-100 to-purple-100" />
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center justify-between">
-                        <Skeleton className="h-5 w-24" />
-                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-5 w-24 bg-gradient-to-r from-orange-100 to-purple-100" />
+                        <Skeleton className="h-4 w-20 bg-gradient-to-r from-orange-100 to-purple-100" />
                       </div>
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-4 w-full bg-gradient-to-r from-orange-100 to-purple-100" />
+                      <Skeleton className="h-3 w-32 bg-gradient-to-r from-orange-100 to-purple-100" />
                     </div>
                   </div>
                 </Card>
@@ -195,18 +197,22 @@ const CreatorRecentActivities: React.FC = () => {
           ) : activities.length > 0 ? (
             // Activities
             activities.map((activity) => (
-              <ActivityItem key={activity.id} activity={activity} />
+              <ActivityItem 
+                key={activity.id} 
+                activity={activity} 
+                className="shadow-sm hover:shadow-md transition-shadow duration-200 border-gray-100"
+              />
             ))
           ) : (
             // Empty state
-            <Card className="p-12 text-center">
+            <Card className="p-12 text-center shadow-md border-gray-100">
               <div className="flex flex-col items-center gap-4">
-                <div className="p-4 rounded-full bg-muted">
-                  <ActivityIcon className="h-8 w-8 text-muted-foreground" />
+                <div className="p-4 rounded-full bg-gradient-to-r from-orange-50 to-purple-50 shadow-inner">
+                  <ActivityIcon className="h-8 w-8 text-gray-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold mb-2">No Activities Yet</h3>
-                  <p className="text-muted-foreground mb-4">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-700">No Activities Yet</h3>
+                  <p className="text-gray-500 mb-4">
                     {selectedType === 'all' 
                       ? "Start creating courses, events, or engaging with students to see activities here."
                       : `No ${selectedType} activities found. Try selecting a different filter.`
@@ -216,6 +222,7 @@ const CreatorRecentActivities: React.FC = () => {
                     <Button 
                       variant="outline" 
                       onClick={() => handleTypeChange('all')}
+                      className="border-orange-200 text-orange-600 hover:bg-orange-50 shadow-sm"
                     >
                       View All Activities
                     </Button>
@@ -229,9 +236,13 @@ const CreatorRecentActivities: React.FC = () => {
         {/* Load More (Future Enhancement) */}
         {activities.length >= 50 && (
           <div className="text-center pt-6">
-            <Button variant="outline" disabled>
+            <Button 
+              variant="outline" 
+              disabled
+              className="border-gray-200 text-gray-500 shadow-sm"
+            >
               Load More Activities
-              <span className="ml-2 text-xs text-muted-foreground">(Coming Soon)</span>
+              <span className="ml-2 text-xs text-gray-400">(Coming Soon)</span>
             </Button>
           </div>
         )}
