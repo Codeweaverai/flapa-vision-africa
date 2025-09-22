@@ -342,6 +342,30 @@ export type Database = {
           },
         ]
       }
+      community_followers: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       community_messages: {
         Row: {
           channel: string
@@ -365,6 +389,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      community_post_images: {
+        Row: {
+          alt_text: string | null
+          created_at: string
+          file_size: number
+          file_type: string
+          id: string
+          image_path: string
+          image_url: string
+          post_id: string
+          updated_at: string
+          upload_order: number
+        }
+        Insert: {
+          alt_text?: string | null
+          created_at?: string
+          file_size: number
+          file_type: string
+          id?: string
+          image_path: string
+          image_url: string
+          post_id: string
+          updated_at?: string
+          upload_order?: number
+        }
+        Update: {
+          alt_text?: string | null
+          created_at?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          image_path?: string
+          image_url?: string
+          post_id?: string
+          updated_at?: string
+          upload_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_images_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       community_posts: {
         Row: {

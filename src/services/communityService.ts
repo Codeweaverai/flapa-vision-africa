@@ -1,6 +1,8 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { getImagesForPosts, type CommunityPostImage } from './communityImageService';
+import { getFollowStatusForUsers } from './communityFollowerService';
 
 export interface CommentProfile {
   id: string;
@@ -23,6 +25,9 @@ export interface Profile {
   username?: string;
   full_name?: string;
   avatar_url?: string;
+  followers_count?: number;
+  following_count?: number;
+  is_following?: boolean;
 }
 
 export interface CommunityPost {
@@ -32,8 +37,12 @@ export interface CommunityPost {
   content: string;
   created_at: string;
   updated_at: string;
+  like_count: number;
+  comment_count: number;
+  user_has_liked: boolean;
   profiles?: Profile;
   comments?: Comment[];
+  images?: CommunityPostImage[];
 }
 
 export interface CommunityMessage {
@@ -61,18 +70,18 @@ export interface Notification {
 
 export const fetchCommunityPosts = async (): Promise<CommunityPost[]> => {
   try {
-    const { data: posts, error } = await supabase
+    const { data: user } = await supabase.auth.getUser();
+    const userId = user.user?.id;
+
+    const { data, error } = await supabase
       .from('community_posts')
       .select(`
         *,
-        profiles: user_id (id, username, full_name, avatar_url),
-        comments: post_comments (
+        profiles (
           id,
-          post_id,
-          user_id,
-          content,
-          created_at,
-          profiles: user_id (id, username, full_name, avatar_url)
+          username,
+          full_name,
+          avatar_url
         )
       `)
       .order('created_at', { ascending: false });
@@ -83,7 +92,67 @@ export const fetchCommunityPosts = async (): Promise<CommunityPost[]> => {
       return [];
     }
 
-    return posts as unknown as CommunityPost[];
+    if (!data) return [];
+
+    // Get like counts and user's like status for all posts
+    const postIds = data.map(post => post.id);
+    
+    // Fetch like counts
+    const { data: likeCounts } = await supabase
+      .from('post_likes')
+      .select('post_id')
+      .in('post_id', postIds);
+
+    // Count likes per post
+    const likeCountMap = new Map();
+    likeCounts?.forEach(like => {
+      likeCountMap.set(like.post_id, (likeCountMap.get(like.post_id) || 0) + 1);
+    });
+
+    // Fetch user's likes if authenticated
+    let userLikes = new Set();
+    if (userId) {
+      const { data: userLikeData } = await supabase
+        .from('post_likes')
+        .select('post_id')
+        .eq('user_id', userId)
+        .in('post_id', postIds);
+      
+      userLikes = new Set(userLikeData?.map(like => like.post_id) || []);
+    }
+
+    // Fetch comment counts
+    const { data: commentCounts } = await supabase
+      .from('post_comments')
+      .select('post_id')
+      .in('post_id', postIds);
+
+    const commentCountMap = new Map();
+    commentCounts?.forEach(comment => {
+      commentCountMap.set(comment.post_id, (commentCountMap.get(comment.post_id) || 0) + 1);
+    });
+
+    // Fetch images for all posts
+    const imagesMap = await getImagesForPosts(postIds);
+
+    // Get follow status for post authors if user is authenticated
+    let followStatusMap = new Map();
+    if (userId) {
+      const authorIds = data.map(post => post.user_id).filter(id => id !== userId);
+      followStatusMap = await getFollowStatusForUsers(authorIds);
+    }
+
+    return data.map(post => ({
+      ...post,
+      like_count: likeCountMap.get(post.id) || 0,
+      comment_count: commentCountMap.get(post.id) || 0,
+      user_has_liked: userLikes.has(post.id),
+      images: imagesMap.get(post.id) || [],
+      profiles: post.profiles ? {
+        ...post.profiles,
+        is_following: followStatusMap.get(post.user_id) || false
+      } : undefined
+    }));
   } catch (error) {
     console.error('Error in fetchCommunityPosts:', error);
     toast.error('Failed to load community posts');
